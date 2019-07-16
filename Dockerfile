@@ -68,16 +68,6 @@ ENV OPENSSL_DIR=/usr/local/musl/ \
     LIBZ_SYS_STATIC=1 \
     TARGET=musl
 
-## fake build to cache dependencies
-##WORKDIR /tmp
-##RUN USER=root cargo new --bin ballista
-##WORKDIR /tmp/ballista
-##COPY Cargo.fake ./
-##COPY Cargo.lock ./
-##RUN cp Cargo.fake Cargo.toml
-##RUN cargo build --release --target x86_64-unknown-linux-musl
-##RUN rm -rf src
-
 # Copy Ballista sources
 RUN mkdir -p /tmp/ballista/src
 RUN mkdir -p /tmp/ballista/proto

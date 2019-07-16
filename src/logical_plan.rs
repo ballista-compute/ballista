@@ -38,7 +38,9 @@ impl LogicalPlan {
     }
 
     pub fn selection(&self, _expr: &proto::ExprNode) -> Result<LogicalPlan> {
-        Err(BallistaError::NotImplemented("selection with expr".to_string()))
+        Err(BallistaError::NotImplemented(
+            "selection with expr".to_string(),
+        ))
     }
 
     pub fn aggregate(
@@ -120,7 +122,7 @@ pub fn read_file(filename: &str, schema: &Schema, projection: Vec<usize>) -> Log
     plan.file = Some(proto::File {
         filename: filename.to_string(),
         schema: Some(schema_proto),
-        projection: projection.iter().map(|i| *i as u32).collect()
+        projection: projection.iter().map(|i| *i as u32).collect(),
     });
     LogicalPlan { plan }
 }
@@ -162,16 +164,17 @@ fn from_arrow_type(arrow_type: &DataType) -> Result<i32> {
     }
 }
 
-
 pub fn create_ballista_schema(schema: &Schema) -> Result<proto::Schema> {
-    let fields = schema.fields().iter().map(|field| {
-        proto::Field {
+    let fields = schema
+        .fields()
+        .iter()
+        .map(|field| proto::Field {
             name: field.name().clone(),
             arrow_type: from_arrow_type(field.data_type()).unwrap(),
             nullable: true,
-            children: vec![]
-        }
-    }).collect();
+            children: vec![],
+        })
+        .collect();
     Ok(proto::Schema { columns: fields })
 }
 
@@ -185,10 +188,17 @@ pub fn convert_to_ballista_plan(plan: &DFPlan) -> Result<LogicalPlan> {
             projection,
             ..
         } => {
+            println!(
+                "table schema has {} columns and projection is {:?}",
+                table_schema.fields().len(),
+                projection
+            );
 
-            println!("table schema has {} columns and projection is {:?}", table_schema.fields().len(), projection);
-
-            Ok(read_file(table_name, table_schema.as_ref(), projection.as_ref().unwrap().to_vec()))
+            Ok(read_file(
+                table_name,
+                table_schema.as_ref(),
+                projection.as_ref().unwrap().to_vec(),
+            ))
         }
         DFPlan::Aggregate {
             input,
@@ -207,7 +217,9 @@ pub fn convert_to_ballista_plan(plan: &DFPlan) -> Result<LogicalPlan> {
                 .collect::<Result<Vec<proto::ExprNode>>>()?;
             input.aggregate(group_expr, aggr_expr)
         }
-        _ => Err(BallistaError::NotImplemented("convert_to_ballista_plan".to_string())),
+        _ => Err(BallistaError::NotImplemented(
+            "convert_to_ballista_plan".to_string(),
+        )),
     }
 }
 
@@ -225,12 +237,11 @@ fn map_expr(expr: &DFExpr) -> Result<proto::ExprNode> {
                     "SUM" => 2,
                     "AVG" => 3,
                     "COUNT" => 4,
-                    _ => return Err(BallistaError::NotImplemented("map_expr aggr".to_string()))
+                    _ => return Err(BallistaError::NotImplemented("map_expr aggr".to_string())),
                 },
             }));
             Ok(node)
-        },
+        }
         _ => Err(BallistaError::NotImplemented("map_expr".to_string())),
     }
 }
-

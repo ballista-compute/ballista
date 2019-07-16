@@ -4,17 +4,16 @@ extern crate ballista;
 extern crate log;
 
 use arrow::datatypes::{DataType, Field, Schema};
+use ballista::error::Result;
+use ballista::execution;
+use ballista::logical_plan;
 use datafusion::execution::context::ExecutionContext;
 use datafusion::logicalplan::LogicalPlan;
-use ballista::logical_plan;
-use ballista::execution;
-use ballista::error::Result;
 
 use std::sync::Arc;
 
 #[test]
 fn test_aggregate_roundtrip() -> Result<()> {
-
     let _ = ::env_logger::init();
 
     // schema for nyxtaxi csv files
@@ -48,9 +47,12 @@ fn test_aggregate_roundtrip() -> Result<()> {
     // create DataFusion query plan to execute on each partition
     let mut ctx = ExecutionContext::new();
     ctx.register_csv("tripdata", &filename, &schema, true);
-    let logical_plan = ctx.create_logical_plan(
-        "SELECT passenger_count, MIN(fare_amount), MAX(fare_amount) \
-            FROM tripdata GROUP BY passenger_count").unwrap();
+    let logical_plan = ctx
+        .create_logical_plan(
+            "SELECT passenger_count, MIN(fare_amount), MAX(fare_amount) \
+             FROM tripdata GROUP BY passenger_count",
+        )
+        .unwrap();
 
     println!("Logical plan: {:?}", logical_plan);
 
@@ -63,7 +65,6 @@ fn test_aggregate_roundtrip() -> Result<()> {
 
     let original_plan_str = format!("{:?}", logical_plan);
     let new_plan_str = format!("{:?}", plan);
-
 
     assert_eq!(original_plan_str, new_plan_str);
 
@@ -88,8 +89,12 @@ fn execute(ctx: &mut ExecutionContext, logical_plan: &LogicalPlan) -> Result<()>
     println!("Executing query: {:?}", logical_plan);
     let result = ctx.execute(logical_plan, 1024)?;
     let mut result = result.borrow_mut();
-    while let Some(batch)= result.next()? {
-        println!("Fetched {} rows x {} columns", batch.num_rows(), batch.num_columns());
+    while let Some(batch) = result.next()? {
+        println!(
+            "Fetched {} rows x {} columns",
+            batch.num_rows(),
+            batch.num_columns()
+        );
     }
     println!("End of results");
     Ok(())

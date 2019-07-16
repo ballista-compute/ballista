@@ -9,8 +9,8 @@ use tokio::net::TcpListener;
 use tower_grpc::{Request, Response};
 use tower_hyper::server::{Http, Server};
 
-use arrow::datatypes::DataType;
 use arrow::array;
+use arrow::datatypes::DataType;
 use arrow::record_batch::RecordBatch;
 use ballista::error::{BallistaError, Result};
 use ballista::execution;
@@ -30,24 +30,27 @@ impl server::Executor for BallistaService {
 
         let response = match &request.plan {
             Some(plan) => match execution::create_datafusion_plan(plan) {
-                Ok(df_plan) => match execute_query(&request.table_meta, df_plan.as_ref().to_logical_plan().as_ref()) {
+                Ok(df_plan) => match execute_query(
+                    &request.table_meta,
+                    df_plan.as_ref().to_logical_plan().as_ref(),
+                ) {
                     Ok(batches) => Response::new(ExecuteResponse {
                         message: "SUCCESS".to_string(),
-                        batch: batches
+                        batch: batches,
                     }),
                     Err(e) => Response::new(ExecuteResponse {
                         message: format!("Error executing plan: {:?}", e),
-                        batch: vec![]
+                        batch: vec![],
                     }),
                 },
                 Err(e) => Response::new(ExecuteResponse {
                     message: format!("Error converting plan: {:?}", e),
-                    batch: vec![]
+                    batch: vec![],
                 }),
             },
             _ => Response::new(ExecuteResponse {
                 message: "empty request".to_string(),
-                batch: vec![]
+                batch: vec![],
             }),
         };
 
@@ -55,19 +58,24 @@ impl server::Executor for BallistaService {
     }
 }
 
-fn execute_query(table_meta: &Vec<TableMeta>, df_plan: &LogicalPlan) -> Result<Vec<proto::RecordBatch>> {
+fn execute_query(
+    table_meta: &Vec<TableMeta>,
+    df_plan: &LogicalPlan,
+) -> Result<Vec<proto::RecordBatch>> {
     let mut context = ExecutionContext::new();
     table_meta.iter().for_each(|table| {
         let schema = execution::create_arrow_schema(table.schema.as_ref().unwrap()).unwrap();
-        info!("Registering table {} as filename {}", table.table_name, table.filename);
+        info!(
+            "Registering table {} as filename {}",
+            table.table_name, table.filename
+        );
         context.register_csv(&table.table_name, &table.filename, &schema, true); //TODO has_header should not be hard-coded
-
     });
 
     // the plan is already optimized by the client!
 
-//    let optimized_plan = context.optimize(&df_plan)?;
-//    info!("Optimized plan: {:?}", optimized_plan);
+    //    let optimized_plan = context.optimize(&df_plan)?;
+    //    info!("Optimized plan: {:?}", optimized_plan);
 
     println!("Executing: {:?}", df_plan);
 
@@ -77,7 +85,11 @@ fn execute_query(table_meta: &Vec<TableMeta>, df_plan: &LogicalPlan) -> Result<V
 
     let mut batches = vec![];
     while let Some(batch) = x.next()? {
-        println!("Reading batch with {} rows x {} columns", batch.num_rows(), batch.num_columns());
+        println!(
+            "Reading batch with {} rows x {} columns",
+            batch.num_rows(),
+            batch.num_columns()
+        );
         batches.push(serialize_batch(&batch)?);
     }
 
@@ -88,16 +100,12 @@ fn serialize_batch(batch: &RecordBatch) -> Result<proto::RecordBatch> {
     // this just serializes to CSV for now but needs to use IPC encoding instead
     let mut data = String::new();
     for i in 0..batch.num_rows() {
-
         for j in 0..batch.num_columns() {
-
-            if j>0 {
+            if j > 0 {
                 data.push_str(",");
             }
 
-            let col = batch
-                .column(j)
-                .as_any();
+            let col = batch.column(j).as_any();
 
             match batch.schema().field(j).data_type() {
                 DataType::Utf8 => {
@@ -144,16 +152,18 @@ fn serialize_batch(batch: &RecordBatch) -> Result<proto::RecordBatch> {
                     let col = col.downcast_ref::<array::Float64Array>().unwrap();
                     data.push_str(&format!("{}", col.value(i)));
                 }
-                other => return Err(BallistaError::NotImplemented(format!("Unsupported result data type: {:?}", other)))
+                other => {
+                    return Err(BallistaError::NotImplemented(format!(
+                        "Unsupported result data type: {:?}",
+                        other
+                    )))
+                }
             }
         }
         data.push_str("\n");
     }
-    Ok(proto::RecordBatch {
-        data
-    })
+    Ok(proto::RecordBatch { data })
 }
-
 
 pub fn main() {
     let _ = ::env_logger::init();

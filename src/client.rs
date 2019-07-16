@@ -1,9 +1,9 @@
 #![deny(warnings, rust_2018_idioms)]
 
-use std::sync::{Arc,Mutex};
-use std::borrow::BorrowMut;
 use futures::Future;
 use hyper::client::connect::{Destination, HttpConnector};
+use std::borrow::BorrowMut;
+use std::sync::{Arc, Mutex};
 use tower_grpc::Request;
 use tower_hyper::{client, util};
 use tower_util::MakeService;
@@ -26,7 +26,11 @@ impl Client {
         }
     }
 
-    pub fn send(&self, plan: LogicalPlan, table_meta: Vec<proto::TableMeta>) -> Result<proto::ExecuteResponse> {
+    pub fn send(
+        &self,
+        plan: LogicalPlan,
+        table_meta: Vec<proto::TableMeta>,
+    ) -> Result<proto::ExecuteResponse> {
         // send the query to the server
         let uri: http::Uri = format!("http://{}:{}", self.host, self.port)
             .parse()
@@ -56,7 +60,7 @@ impl Client {
             .and_then(move |mut client| {
                 client.execute(Request::new(proto::ExecuteRequest {
                     plan: Some(plan.to_proto()),
-                    table_meta
+                    table_meta,
                 }))
             })
             .and_then(move |response| {

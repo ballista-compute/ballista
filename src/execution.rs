@@ -48,33 +48,40 @@ fn to_arrow_type(proto_type: i32) -> Result<DataType> {
 
 /// Convert Ballista schema to Arrow Schema
 pub fn create_arrow_schema(schema: &proto::Schema) -> Result<Schema> {
-    Ok(Schema::new(schema
-        .columns
-        .iter()
-        .map(|column| {
-            Field::new(
-                &column.name.to_string(),
-                to_arrow_type(column.arrow_type).unwrap(),
-                true,
-            )
-        })
-        .collect()))
+    Ok(Schema::new(
+        schema
+            .columns
+            .iter()
+            .map(|column| {
+                Field::new(
+                    &column.name.to_string(),
+                    to_arrow_type(column.arrow_type).unwrap(),
+                    true,
+                )
+            })
+            .collect(),
+    ))
 }
 
 pub fn create_datafusion_plan(plan: &proto::LogicalPlanNode) -> Result<Arc<dyn Table>> {
     if plan.file.is_some() {
         let file = plan.file.as_ref().unwrap();
 
-        let schema = create_arrow_schema(file
-            .schema
-            .as_ref()
-            .unwrap())?;
+        let schema = create_arrow_schema(file.schema.as_ref().unwrap())?;
 
         let projection: Vec<usize> = file.projection.iter().map(|i| *i as usize).collect();
 
-        let projected_schema = Schema::new(projection.iter().map(|i| schema.field(*i).clone()).collect());
+        let projected_schema = Schema::new(
+            projection
+                .iter()
+                .map(|i| schema.field(*i).clone())
+                .collect(),
+        );
 
-        println!("created table scan with schema {:?} and projection {:?}", schema, projection);
+        println!(
+            "created table scan with schema {:?} and projection {:?}",
+            schema, projection
+        );
 
         Ok(Arc::new(TableImpl::new(Arc::new(DFPlan::TableScan {
             schema_name: "default".to_string(),

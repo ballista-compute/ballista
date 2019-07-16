@@ -1,11 +1,14 @@
 #![deny(warnings, rust_2018_idioms)]
 
+use std::sync::{Arc,Mutex};
+use std::borrow::BorrowMut;
 use futures::Future;
 use hyper::client::connect::{Destination, HttpConnector};
 use tower_grpc::Request;
 use tower_hyper::{client, util};
 use tower_util::MakeService;
 
+use crate::error::Result;
 use crate::logical_plan::LogicalPlan;
 use crate::proto;
 use crate::proto::client::Executor;
@@ -23,7 +26,7 @@ impl Client {
         }
     }
 
-    pub fn send(&self, plan: LogicalPlan, table_meta: Vec<proto::TableMeta>) {
+    pub fn send(&self, plan: LogicalPlan, table_meta: Vec<proto::TableMeta>) -> Result<proto::ExecuteResponse> {
         // send the query to the server
         let uri: http::Uri = format!("http://{}:{}", self.host, self.port)
             .parse()
@@ -32,6 +35,11 @@ impl Client {
         let connector = util::Connector::new(HttpConnector::new(4));
         let settings = client::Builder::new().http2_only(true).clone();
         let mut make_client = client::Connect::with_builder(connector, settings);
+
+        // TODO use channels
+        let mut results: Arc<Mutex<Vec<proto::ExecuteResponse>>> = Arc::new(Mutex::new(vec![]));
+
+        let mut final_result = results.clone();
 
         let execute = make_client
             .make_service(dst)
@@ -51,8 +59,9 @@ impl Client {
                     table_meta
                 }))
             })
-            .and_then(|response| {
-                println!("RESPONSE = {:?}", response);
+            .and_then(move |response| {
+                let mut lock = results.borrow_mut().lock().unwrap();
+                lock.push(response.get_ref().clone());
                 Ok(())
             })
             .map_err(|e| {
@@ -60,5 +69,8 @@ impl Client {
             });
 
         tokio::run(execute);
+
+        let lock = final_result.borrow_mut().lock().unwrap();
+        Ok(lock[0].clone())
     }
 }

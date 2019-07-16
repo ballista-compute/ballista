@@ -1,17 +1,19 @@
+use std::fs::File;
+use std::io::prelude::*;
 use std::thread;
 
+use arrow::array;
 use arrow::datatypes::{DataType, Field, Schema};
-use datafusion::execution::context::ExecutionContext;
 use ballista::client::Client;
 use ballista::cluster;
-use ballista::proto;
+use ballista::error::Result;
 use ballista::logical_plan;
+use ballista::proto;
+use datafusion::execution::context::ExecutionContext;
 
-#[macro_use]
 extern crate log;
 
-pub fn main() {
-
+pub fn main() -> Result<()> {
     let _ = ::env_logger::init();
 
     // discover available executors
@@ -52,18 +54,19 @@ pub fn main() {
         // create DataFusion query plan to execute on each partition
         let mut ctx = ExecutionContext::new();
         ctx.register_csv("tripdata", &filename, &schema, true);
-        let logical_plan = ctx.create_logical_plan(
-            "SELECT passenger_count, MIN(fare_amount), MAX(fare_amount) \
-            FROM tripdata GROUP BY passenger_count").unwrap();
-
-        info!("Logical plan: {:?}", logical_plan);
+        let logical_plan = ctx
+            .create_logical_plan(
+                "SELECT passenger_count, MIN(fare_amount), MAX(fare_amount) \
+                 FROM tripdata GROUP BY passenger_count",
+            )
+            .unwrap();
 
         // convert DataFusion plan to Ballista protobuf
         let table_meta = vec![proto::TableMeta {
             table_name: "tripdata".to_string(),
             filename,
             file_type: "csv".to_string(),
-            schema: Some(logical_plan::create_ballista_schema(&schema).unwrap())
+            schema: Some(logical_plan::create_ballista_schema(&schema).unwrap()),
         }];
         let plan = logical_plan::convert_to_ballista_plan(&logical_plan).unwrap();
 
@@ -76,7 +79,7 @@ pub fn main() {
         threads.push(thread::spawn(move || {
             println!("Executing query against executor at {}:{}", host, port);
             let client = Client::new(&host, port);
-            client.send(plan, table_meta);
+            client.send(plan, table_meta)
         }));
 
         executor_index += 1;
@@ -85,10 +88,64 @@ pub fn main() {
         }
     }
 
-    // wait for threads to complete
+    // collect results and combine into csv file
+    let mut csv = String::new();
     for handle in threads {
-        handle.join().expect("thread panicked");
+        let response: proto::ExecuteResponse = handle.join().expect("thread panicked").unwrap();
+        for batch in response.batch {
+            csv.push_str(&batch.data);
+        }
+    }
+    println!("{}", csv);
+
+    let results_file = "results.csv";
+    let mut file = File::create(results_file)?;
+    file.write_all(csv.as_bytes())?;
+
+    // now perform a final aggregate of the aggregates from each partition
+    let mut ctx = ExecutionContext::new();
+    let results_schema = Schema::new(vec![
+        Field::new("passenger_count", DataType::UInt32, true),
+        Field::new("fare_amount", DataType::Float64, true),
+    ]);
+    ctx.register_csv("tripdata", results_file, &results_schema, true);
+
+    let relation = ctx
+        .sql(
+            "SELECT passenger_count, MIN(fare_amount), MAX(fare_amount) \
+             FROM tripdata GROUP BY passenger_count",
+            1024,
+        )
+        .unwrap();
+
+    let mut relation = relation.borrow_mut();
+
+    while let Some(batch) = relation.next()? {
+        let passenger_count = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<array::UInt32Array>()
+            .unwrap();
+        let min_fare_amount = batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<array::Float64Array>()
+            .unwrap();
+        let max_fare_amount = batch
+            .column(2)
+            .as_any()
+            .downcast_ref::<array::Float64Array>()
+            .unwrap();
+
+        for row in 0..batch.num_rows() {
+            println!(
+                "{}\t{}\t{}",
+                passenger_count.value(row),
+                min_fare_amount.value(row),
+                max_fare_amount.value(row)
+            );
+        }
     }
 
-    println!("Finished");
+    Ok(())
 }

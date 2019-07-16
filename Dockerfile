@@ -85,7 +85,11 @@ RUN cargo build --release --target x86_64-unknown-linux-musl
 # Copy the statically-linked binary into a scratch container.
 FROM scratch
 COPY --from=build /tmp/ballista/target/x86_64-unknown-linux-musl/release/ballista-server /
-USER 1000
+#USER 1000
+
+RUN apk update && \
+    apk upgrade && \
+    apk add bash
 
 EXPOSE 9090
 

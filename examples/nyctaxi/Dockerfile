@@ -85,11 +85,16 @@ WORKDIR /tmp/ballista/examples/nyctaxi
 RUN cargo build --release --target x86_64-unknown-linux-musl
 
 # Copy the statically-linked binary into a scratch container.
-FROM scratch
+FROM alpine
 COPY --from=build /tmp/ballista/examples/nyctaxi/target/x86_64-unknown-linux-musl/release/ballista-nyctaxi /
-USER 1000
 
 ENV RUST_LOG=info
 ENV RUST_BACKTRACE=1
+
+WORKDIR /tmp
+
+RUN apk update && \
+    apk upgrade && \
+    apk add bash
 
 CMD ["/ballista-nyctaxi"]

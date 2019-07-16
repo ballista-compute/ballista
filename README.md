@@ -49,7 +49,7 @@ kubectl logs -f ballista-nyctaxi-app-n5kxl
 - [X] Simple example application works end to end
 - [X] Add support for aggregate queries 
 - [X] Server can return Arrow data back to the application (in CSV format for now)
-- [ ] Example application can aggregate the aggregate results from each partition/node
+- [X] Example application can aggregate the aggregate results from each partition/node
 - [ ] Write blog post and announce Ballista
 
 # v1.0.0 Plan 

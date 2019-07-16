@@ -1,3 +1,4 @@
+use std::env;
 use std::fs::File;
 use std::io::prelude::*;
 use std::thread;
@@ -97,9 +98,16 @@ pub fn main() -> Result<()> {
         }
     }
 
+    let path = env::current_dir()?;
+    println!("The current directory is {}", path.display());
+
     let results_file = "results.csv";
+
+    println!("Writing intermediate csv results to {}", results_file);
     let mut file = File::create(results_file)?;
     file.write_all(csv.as_bytes())?;
+
+    println!("Running final aggregate query");
 
     // now perform a final aggregate of the aggregates from each partition
     let mut ctx = ExecutionContext::new();

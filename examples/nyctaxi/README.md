@@ -5,7 +5,6 @@ This tutorial walks through running the included nyc taxi example.
 # Set up environment
 
 - Create a minikube cluster
-- Pull ballista docker images
 
 # Download data
 

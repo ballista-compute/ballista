@@ -97,7 +97,7 @@ pub fn main() -> Result<()> {
         }
     }
 
-    let results_file = "/tmp/results.csv";
+    let results_file = "results.csv";
     let mut file = File::create(results_file)?;
     file.write_all(csv.as_bytes())?;
 

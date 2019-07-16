@@ -96,9 +96,8 @@ pub fn main() -> Result<()> {
             csv.push_str(&batch.data);
         }
     }
-    println!("{}", csv);
 
-    let results_file = "results.csv";
+    let results_file = "/tmp/results.csv";
     let mut file = File::create(results_file)?;
     file.write_all(csv.as_bytes())?;
 
@@ -106,17 +105,17 @@ pub fn main() -> Result<()> {
     let mut ctx = ExecutionContext::new();
     let results_schema = Schema::new(vec![
         Field::new("passenger_count", DataType::UInt32, true),
-        Field::new("fare_amount", DataType::Float64, true),
+        Field::new("min_fare_amount", DataType::Float64, true),
+        Field::new("max_fare_amount", DataType::Float64, true),
     ]);
     ctx.register_csv("tripdata", results_file, &results_schema, true);
 
     let relation = ctx
         .sql(
-            "SELECT passenger_count, MIN(fare_amount), MAX(fare_amount) \
+            "SELECT passenger_count, MIN(min_fare_amount), MAX(max_fare_amount) \
              FROM tripdata GROUP BY passenger_count",
             1024,
-        )
-        .unwrap();
+        )?;
 
     let mut relation = relation.borrow_mut();
 

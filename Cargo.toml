@@ -34,8 +34,8 @@ tower-util = "0.1"
 k8s-openapi = { version = "0.4.0", features = ["v1_13"] }
 reqwest = "0.9.18"
 clap = "2.33.0"
-arrow = { git = "https://github.com/andygrove/arrow", branch="ballista" }
-datafusion = { git = "https://github.com/andygrove/arrow", branch="ballista" }
+arrow = { git = "https://github.com/apache/arrow" }
+datafusion = { git = "https://github.com/apache/arrow" }
 gtmpl = "0.5.6"
 gtmpl_derive = "0.3.3"
 gtmpl_value = "0.3.3"

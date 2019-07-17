@@ -85,6 +85,7 @@ pub fn max(expr: &proto::ExprNode) -> proto::ExprNode {
     }));
     zexpr
 }
+
 fn empty_expr_node() -> proto::ExprNode {
     proto::ExprNode {
         column_index: None,
@@ -92,6 +93,7 @@ fn empty_expr_node() -> proto::ExprNode {
         aggregate_expr: None,
     }
 }
+
 fn empty_plan_node() -> Box<proto::LogicalPlanNode> {
     Box::new(proto::LogicalPlanNode {
         file: None,

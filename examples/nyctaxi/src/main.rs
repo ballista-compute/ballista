@@ -2,6 +2,7 @@ use std::env;
 use std::fs::File;
 use std::io::prelude::*;
 use std::thread;
+use std::time::Instant;
 
 use arrow::array;
 use arrow::datatypes::{DataType, Field, Schema};
@@ -19,6 +20,8 @@ pub fn main() -> Result<()> {
 
     // discover available executors
     let executors = cluster::get_executors("NYCTAXI").unwrap();
+
+    let now = Instant::now();
 
     // schema for nyxtaxi csv files
     let schema = Schema::new(vec![
@@ -59,8 +62,9 @@ pub fn main() -> Result<()> {
             .create_logical_plan(
                 "SELECT passenger_count, MIN(fare_amount), MAX(fare_amount) \
                  FROM tripdata GROUP BY passenger_count",
-            )
-            .unwrap();
+            )?;
+
+        let logical_plan = ctx.optimize(&logical_plan)?;
 
         // convert DataFusion plan to Ballista protobuf
         let table_meta = vec![proto::TableMeta {
@@ -153,6 +157,8 @@ pub fn main() -> Result<()> {
             );
         }
     }
+
+    println!("Executed query in {} ms", now.elapsed().as_millis());
 
     Ok(())
 }

@@ -9,6 +9,7 @@ edition = "2018"
 log = "0.4"
 env_logger = { version = "0.6", default-features = false }
 
-arrow = { git = "https://github.com/andygrove/arrow", branch="ballista" }
-datafusion = { git = "https://github.com/andygrove/arrow", branch="ballista" }
+arrow = { git = "https://github.com/apache/arrow" }
+datafusion = { git = "https://github.com/apache/arrow" }
+
 ballista = { path = "../../" }

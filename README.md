@@ -10,7 +10,7 @@ My goal is to use this repo to move fast and try out ideas that eventually can b
 
 This demo shows a Ballista cluster being created in Minikube and then shows the [nyctaxi example](examples/nyctaxi) being executed, causing a distributed query to run in the cluster, with each executor pod performing a projection on one partition of the data.
 
-[![asciicast](https://asciinema.org/a/SArI3f8PVFjgc45wHubEQQnca.svg)](https://asciinema.org/a/SArI3f8PVFjgc45wHubEQQnca)
+[![asciicast](https://asciinema.org/a/SArI3f8PVFjgc45wHubEQQnca.svg)](https://asciinema.org/a/UCdmelZpxeACYVSeAlGHSWBRr)
 
 Here are the commands being run, with some explanation:
 
@@ -50,19 +50,17 @@ kubectl logs -f ballista-nyctaxi-app-n5kxl
 - [X] Add support for aggregate queries 
 - [X] Server can return Arrow data back to the application (in CSV format for now)
 - [X] Example application can aggregate the aggregate results from each partition/node
-- [ ] Write blog post and announce Ballista
+- [X] Write blog post and announce Ballista
 
 # v1.0.0 Plan 
 
+- [ ] Distributed query planner
+- [ ] Implement support for all DataFusion logical plan and expressions
 - [ ] Server can write results to CSV files
 - [ ] Server can write results to Parquet files
-- [ ] Benchmarks
 - [ ] Implement Flight protocol
-- [ ] Implement support for all DataFusion logical plan and expressions
-- [ ] Distributed query planner
 - [ ] Support user code as part of distributed query execution
-- [ ] SQL support
-- [ ] REPL
+- [ ] Interactive SQL support
 - [ ] Java bindings (supporting Java, Kotlin, Scala)
 
 

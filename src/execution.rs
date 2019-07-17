@@ -78,6 +78,7 @@ pub fn create_datafusion_plan(plan: &proto::LogicalPlanNode) -> Result<Arc<dyn T
                 .collect(),
         );
 
+        
         println!(
             "created table scan with schema {:?} and projection {:?}",
             schema, projection

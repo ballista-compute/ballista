@@ -1,0 +1,15 @@
+ARG REPO=andygrove
+
+FROM $REPO/ballista-platform as build
+
+# Copy the statically-linked binary into a scratch container.
+FROM scratch
+COPY --from=build /tmp/ballista/target/x86_64-unknown-linux-musl/release/ballista-server /
+USER 1000
+
+EXPOSE 9090
+
+ENV RUST_LOG=info
+ENV RUST_BACKTRACE=1
+
+CMD ["/ballista-server"]

@@ -6,7 +6,7 @@ RUN apt update && apt -y install musl musl-dev musl-tools libssl-dev openssl
 
 ## Download the target for static linking.
 RUN rustup target add x86_64-unknown-linux-musl
-
+RUN cargo install cargo-build-deps
 #NOTE: the following was copied from https://github.com/emk/rust-musl-builder/blob/master/Dockerfile under Apache 2.0 license
 
 # The OpenSSL version to use. We parameterize this because many Rust
@@ -56,6 +56,7 @@ RUN echo "Building libpq" && \
     cd ../../bin/pg_config && make && make install && \
     rm -r /tmp/*
 
+
 ENV OPENSSL_DIR=/usr/local/musl/ \
     OPENSSL_INCLUDE_DIR=/usr/local/musl/include/ \
     DEP_OPENSSL_INCLUDE=/usr/local/musl/include/ \
@@ -68,28 +69,18 @@ ENV OPENSSL_DIR=/usr/local/musl/ \
     LIBZ_SYS_STATIC=1 \
     TARGET=musl
 
-# Copy Ballista sources
-RUN mkdir -p /tmp/ballista/src
-RUN mkdir -p /tmp/ballista/proto
-WORKDIR /tmp/ballista
-COPY Cargo.toml ./
-COPY Cargo.lock ./
-COPY build.rs ./
-COPY src ./src
-COPY proto ./proto
 
-# compile
+# Copy Ballista sources
+WORKDIR /tmp
+RUN USER=root cargo new ballista --lib
 WORKDIR /tmp/ballista
+COPY Cargo.toml Cargo.lock /tmp/ballista/
+RUN cargo fetch
+RUN mkdir -p /tmp/ballista/src/bin/ && echo 'fn main() {}' >> /tmp/ballista/src/bin/server.rs && echo 'fn main() {}' >> /tmp/ballista/src/bin/cli.rs
+COPY proto /tmp/ballista/proto/
+COPY build.rs /tmp/ballista/
+RUN cargo build --release  --target x86_64-unknown-linux-musl
+
+COPY src/ /tmp/ballista/src/
 RUN cargo build --release --target x86_64-unknown-linux-musl
 
-# Copy the statically-linked binary into a scratch container.
-FROM scratch
-COPY --from=build /tmp/ballista/target/x86_64-unknown-linux-musl/release/ballista-server /
-USER 1000
-
-EXPOSE 9090
-
-ENV RUST_LOG=info
-ENV RUST_BACKTRACE=1
-
-CMD ["/ballista-server"]

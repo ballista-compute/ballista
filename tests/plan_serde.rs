@@ -51,8 +51,8 @@ fn test_aggregate_roundtrip() -> Result<()> {
         .create_logical_plan(
             "SELECT passenger_count, MIN(fare_amount), MAX(fare_amount) \
              FROM tripdata GROUP BY passenger_count",
-        )
-        .unwrap();
+        )?;
+    let logical_plan = ctx.optimize(&logical_plan)?;
 
     println!("Logical plan: {:?}", logical_plan);
 

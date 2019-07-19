@@ -59,7 +59,7 @@ impl server::Executor for BallistaService {
 }
 
 fn execute_query(
-    table_meta: &Vec<TableMeta>,
+    table_meta: &[TableMeta],
     df_plan: &LogicalPlan,
 ) -> Result<Vec<proto::RecordBatch>> {
     let mut context = ExecutionContext::new();
@@ -166,7 +166,7 @@ fn serialize_batch(batch: &RecordBatch) -> Result<proto::RecordBatch> {
 }
 
 pub fn main() {
-    let _ = ::env_logger::init();
+    ::env_logger::init();
 
     let new_service = server::ExecutorServer::new(BallistaService);
 

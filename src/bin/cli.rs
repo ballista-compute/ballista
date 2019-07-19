@@ -5,7 +5,7 @@ use std::time::Instant;
 use ballista::cluster;
 
 pub fn main() {
-    let _ = ::env_logger::init();
+    ::env_logger::init();
 
     let now = Instant::now();
 

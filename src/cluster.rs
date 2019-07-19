@@ -182,7 +182,7 @@ pub fn delete_pod(namespace: &str, pod_name: &str) -> Result<(), BallistaError> 
 
         // Some unexpected response
         // (not HTTP 200, but still parsed successfully)
-        Ok(other) => return Err(format!("expected Ok but got {} {:?}", status_code, other).into()),
+        Ok(other) => Err(format!("expected Ok but got {} {:?}", status_code, other).into()),
 
         // Need more response data.
         // Read more bytes from the response into the `ResponseBody`
@@ -192,7 +192,7 @@ pub fn delete_pod(namespace: &str, pod_name: &str) -> Result<(), BallistaError> 
 
         // Some other error, like the response body being
         // malformed JSON or invalid UTF-8.
-        Err(err) => return Err(format!("error: {} {:?}", status_code, err).into()),
+        Err(err) => Err(format!("error: {} {:?}", status_code, err).into()),
     }
 }
 
@@ -228,7 +228,7 @@ pub fn delete_service(namespace: &str, service_name: &str) -> Result<(), Ballist
 
         // Some unexpected response
         // (not HTTP 200, but still parsed successfully)
-        Ok(other) => return Err(format!("expected Ok but got {} {:?}", status_code, other).into()),
+        Ok(other) => Err(format!("expected Ok but got {} {:?}", status_code, other).into()),
 
         // Need more response data.
         // Read more bytes from the response into the `ResponseBody`
@@ -238,7 +238,7 @@ pub fn delete_service(namespace: &str, service_name: &str) -> Result<(), Ballist
 
         // Some other error, like the response body being
         // malformed JSON or invalid UTF-8.
-        Err(err) => return Err(format!("error: {} {:?}", status_code, err).into()),
+        Err(err) => Err(format!("error: {} {:?}", status_code, err).into()),
     }
 }
 
@@ -269,7 +269,7 @@ pub fn list_pods(namespace: &str) -> Result<Vec<String>, BallistaError> {
 
         // Some unexpected response
         // (not HTTP 200, but still parsed successfully)
-        Ok(other) => return Err(format!("expected Ok but got {} {:?}", status_code, other).into()),
+        Ok(other) => Err(format!("expected Ok but got {} {:?}", status_code, other).into()),
 
         // Need more response data.
         // Read more bytes from the response into the `ResponseBody`
@@ -279,6 +279,6 @@ pub fn list_pods(namespace: &str) -> Result<Vec<String>, BallistaError> {
 
         // Some other error, like the response body being
         // malformed JSON or invalid UTF-8.
-        Err(err) => return Err(format!("error: {} {:?}", status_code, err).into()),
+        Err(err) => Err(format!("error: {} {:?}", status_code, err).into()),
     }
 }

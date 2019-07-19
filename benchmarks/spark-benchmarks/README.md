@@ -25,6 +25,8 @@ To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
 
 Run `spark-submit` to deploy in cluster mode. See https://spark.apache.org/docs/latest/running-on-kubernetes.html for more info.
 
+NOTE: this isn't quite working ... but should be close ... need to figure out how to provide jar location, probably with volume mount to hostPath 
+
 ```bash
 $SPARK_HOME/bin/spark-submit \
   --class io.andygrove.ballista.spark.Main \
@@ -33,5 +35,5 @@ $SPARK_HOME/bin/spark-submit \
   --executor-memory 1G \
   --conf spark.executor.instances=2 \
   --conf spark.kubernetes.container.image=andygrove/spark:2.4.3 \
-  target/spark-benchmarks-1.0-SNAPSHOT.jar
+  local://`pwd`/target/spark-benchmarks-1.0-SNAPSHOT.jar
 ```

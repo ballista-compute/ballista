@@ -47,11 +47,10 @@ fn test_aggregate_roundtrip() -> Result<()> {
     // create DataFusion query plan to execute on each partition
     let mut ctx = ExecutionContext::new();
     ctx.register_csv("tripdata", &filename, &schema, true);
-    let logical_plan = ctx
-        .create_logical_plan(
-            "SELECT passenger_count, MIN(fare_amount), MAX(fare_amount) \
-             FROM tripdata GROUP BY passenger_count",
-        )?;
+    let logical_plan = ctx.create_logical_plan(
+        "SELECT passenger_count, MIN(fare_amount), MAX(fare_amount) \
+         FROM tripdata GROUP BY passenger_count",
+    )?;
     let logical_plan = ctx.optimize(&logical_plan)?;
 
     println!("Logical plan: {:?}", logical_plan);

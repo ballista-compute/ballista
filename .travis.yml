@@ -4,7 +4,8 @@ rust:
 cache: cargo
 before_script:
   # - rustup toolchain install nightly
-  - rustup component add --toolchain nightly rustfmt
+  # - rustup component add --toolchain nightly rustfmt
+  - rustup component add rustfmt
   - which rustfmt || cargo install --force rustfmt-nightly
 script:
   - cargo fmt --all -- --write-mode=diff

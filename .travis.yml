@@ -8,6 +8,6 @@ before_script:
   - rustup component add rustfmt
   - which rustfmt || cargo install --force rustfmt-nightly
 script:
-  - cargo fmt --all -- --write-mode=diff
+  - cargo fmt --all -- --check
   - cargo build
   - cargo test

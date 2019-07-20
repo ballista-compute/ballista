@@ -69,7 +69,9 @@ kubectl logs -f ballista-nyctaxi-app-n5kxl
 - [ ] Interactive SQL support
 - [ ] Java bindings (supporting Java, Kotlin, Scala)
 
+# Contributing
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for information on contributing to this project.
 
 
 

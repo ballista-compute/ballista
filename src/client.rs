@@ -21,7 +21,6 @@ pub struct Client {
 }
 
 impl Client {
-
     /// Create a new client to send queries to the specified host/port.
     pub fn new(host: &str, port: usize) -> Self {
         Self {

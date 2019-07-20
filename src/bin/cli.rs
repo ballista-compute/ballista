@@ -1,3 +1,5 @@
+//! Ballista CLI
+
 extern crate clap;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use std::time::Instant;

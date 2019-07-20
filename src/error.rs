@@ -1,3 +1,5 @@
+//! Ballista error types
+
 use std::io;
 use std::result;
 

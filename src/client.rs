@@ -1,3 +1,5 @@
+//! Ballista client for sending a query plan to a Ballista executor for execution
+
 #![deny(warnings, rust_2018_idioms)]
 
 use futures::Future;
@@ -19,6 +21,8 @@ pub struct Client {
 }
 
 impl Client {
+
+    /// Create a new client to send queries to the specified host/port.
     pub fn new(host: &str, port: usize) -> Self {
         Self {
             host: host.to_string(),
@@ -26,6 +30,7 @@ impl Client {
         }
     }
 
+    /// Blocking call to send a query and wait for the result set
     pub fn send(
         &self,
         plan: LogicalPlan,

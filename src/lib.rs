@@ -1,4 +1,6 @@
-/// include the generated protobuf source as a submodule
+//! Ballista is a proof-of-concept distributed compute platform based on Kubernetes and the Rust implementation of Apache Arrow.
+
+// include the generated protobuf source as a submodule
 // https://github.com/tower-rs/tower-grpc/issues/194
 #[allow(clippy::all)]
 pub mod proto {

@@ -1,3 +1,5 @@
+//! Ballista executor process
+
 #[macro_use]
 extern crate log;
 

@@ -1,3 +1,5 @@
+//! Ballista query execution
+
 use std::sync::Arc;
 
 use crate::error::{BallistaError, Result};
@@ -8,6 +10,7 @@ use datafusion::execution::table_impl::TableImpl;
 use datafusion::logicalplan::{Expr, LogicalPlan as DFPlan};
 use datafusion::table::Table;
 
+/// Convert a Ballista protobuf data type to an Arrow DataType
 fn to_arrow_type(proto_type: i32) -> Result<DataType> {
     match proto_type {
         1 => Ok(DataType::Boolean),
@@ -63,6 +66,7 @@ pub fn create_arrow_schema(schema: &proto::Schema) -> Result<Schema> {
     ))
 }
 
+/// Convert Ballista logical plan to DataFusion logical plan
 pub fn create_datafusion_plan(plan: &proto::LogicalPlanNode) -> Result<Arc<dyn Table>> {
     if plan.file.is_some() {
         let file = plan.file.as_ref().unwrap();

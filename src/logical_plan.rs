@@ -1,3 +1,5 @@
+//! Ballista logical query plan
+
 use crate::error::{BallistaError, Result};
 use crate::proto;
 
@@ -6,6 +8,9 @@ use datafusion::logicalplan::{Expr as DFExpr, LogicalPlan as DFPlan};
 
 pub struct Expr {}
 
+/// Ballista logical query plan struct. This is a wrapper around the LogicalPlanNode that is
+/// generated from the .proto definition. The implementation of this struct provides methods
+/// for applying transformations to create new logical plans.
 #[derive(Debug)]
 pub struct LogicalPlan {
     plan: Box<proto::LogicalPlanNode>,
@@ -37,12 +42,14 @@ impl LogicalPlan {
         Ok(LogicalPlan { plan })
     }
 
+    /// Create a selection on this relation to filter by the given expression
     pub fn selection(&self, _expr: &proto::ExprNode) -> Result<LogicalPlan> {
         Err(BallistaError::NotImplemented(
             "selection with expr".to_string(),
         ))
     }
 
+    /// Create an aggregate of the relation
     pub fn aggregate(
         &self,
         group_expr: Vec<proto::ExprNode>,
@@ -57,6 +64,7 @@ impl LogicalPlan {
         Ok(LogicalPlan { plan })
     }
 
+    /// Apply a limit to restrict the number of rows returned
     pub fn limit(&self, _limit: usize) -> Result<LogicalPlan> {
         Err(BallistaError::NotImplemented("limit".to_string()))
     }
@@ -86,6 +94,7 @@ pub fn max(expr: &proto::ExprNode) -> proto::ExprNode {
     zexpr
 }
 
+/// Create an empty ExprNode
 fn empty_expr_node() -> proto::ExprNode {
     proto::ExprNode {
         column_index: None,
@@ -94,6 +103,7 @@ fn empty_expr_node() -> proto::ExprNode {
     }
 }
 
+/// Create an empty LogicalPlanNode
 fn empty_plan_node() -> Box<proto::LogicalPlanNode> {
     Box::new(proto::LogicalPlanNode {
         file: None,
@@ -128,6 +138,8 @@ pub fn read_file(filename: &str, schema: &Schema, projection: Vec<usize>) -> Log
     });
     LogicalPlan { plan }
 }
+
+/// Convert from an Arrow DataType to a value suitable for use in a Ballista protobuf plan
 fn from_arrow_type(arrow_type: &DataType) -> Result<i32> {
     match arrow_type {
         DataType::Boolean => Ok(1),
@@ -166,6 +178,7 @@ fn from_arrow_type(arrow_type: &DataType) -> Result<i32> {
     }
 }
 
+/// Convert an Arrow schema into a Ballista protobuf schema
 pub fn create_ballista_schema(schema: &Schema) -> Result<proto::Schema> {
     let fields = schema
         .fields()

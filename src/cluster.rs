@@ -1,3 +1,5 @@
+//! Ballista cluster management utilities
+
 use std::env;
 use std::fs;
 use std::fs::File;
@@ -67,11 +69,13 @@ fn execute(request: http::Request<Vec<u8>>) -> Result<http::Response<Vec<u8>>, B
     }
 }
 
+/// Ballista executor
 pub struct Executor {
     pub host: String,
     pub port: usize,
 }
 
+/// Get a list of executor nodes in a cluster using Kubernetes service discovery
 pub fn get_executors(cluster_name: &str) -> Result<Vec<Executor>, BallistaError> {
     let mut executors: Vec<Executor> = vec![];
     let mut instance = 1;
@@ -90,6 +94,7 @@ pub fn get_executors(cluster_name: &str) -> Result<Vec<Executor>, BallistaError>
     Ok(executors)
 }
 
+/// Create a Ballista executor pod and service in Kubernetes
 pub fn create_ballista_executor(
     _namespace: &str,
     name: &str,
@@ -120,6 +125,7 @@ pub fn create_ballista_executor(
     Ok(())
 }
 
+/// Create a Ballista application pod in Kubernetes
 pub fn create_ballista_application(
     _namespace: &str,
     name: &str,
@@ -150,6 +156,7 @@ pub fn create_ballista_application(
     Ok(())
 }
 
+/// Delete a Kubernetes pod
 pub fn delete_pod(namespace: &str, pod_name: &str) -> Result<(), BallistaError> {
     let (request, response_body) =
         api::Pod::delete_namespaced_pod(pod_name, namespace, Default::default())
@@ -196,6 +203,7 @@ pub fn delete_pod(namespace: &str, pod_name: &str) -> Result<(), BallistaError> 
     }
 }
 
+/// Delete a Kubernetes service
 pub fn delete_service(namespace: &str, service_name: &str) -> Result<(), BallistaError> {
     let (request, response_body) =
         api::Service::delete_namespaced_service(service_name, namespace, Default::default())
@@ -242,6 +250,7 @@ pub fn delete_service(namespace: &str, service_name: &str) -> Result<(), Ballist
     }
 }
 
+/// Get a list of Kubernetes pods
 pub fn list_pods(namespace: &str) -> Result<Vec<String>, BallistaError> {
     let (request, response_body) =
         api::Pod::list_namespaced_pod(namespace, Default::default()).expect("couldn't list pods");

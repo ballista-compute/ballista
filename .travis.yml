@@ -3,7 +3,7 @@ rust:
   - nightly
 cache: cargo
 before_script:
-  - rustup toolchain install nightly
+  # - rustup toolchain install nightly
   - rustup component add --toolchain nightly rustfmt
   - which rustfmt || cargo install --force rustfmt-nightly
 script:

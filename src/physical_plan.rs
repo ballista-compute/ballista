@@ -7,31 +7,43 @@ use datafusion::logicalplan::Expr;
 use std::sync::Arc;
 
 /// Ballista physical query plan. Note that most of the variants here are just placeholders
-/// currently.
+/// currently. Also note that this plan references Expr from the DataFusion logical plan
+/// and this may change in the future.
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 enum PhysicalPlan {
+    /// Projection filters the input by column
     Projection {
         columns: Vec<usize>,
         input: Box<PhysicalPlan>,
     },
+    /// Selection filters the input by row
     Selection {
         filter: Expr,
         input: Box<PhysicalPlan>,
     },
+    /// GroupAggregate assumes inputs are ordered by the grouping expression and merges the
+    /// results without having to maintain a hash map
     GroupAggregate {
         group_expr: Vec<Expr>,
         aggr_expr: Vec<Expr>,
         input: Box<PhysicalPlan>,
     },
+    /// HashAggregate assumes that the input is unordered and uses a hash map to maintain
+    /// accumulators per grouping hash
     HashAggregate {
         group_expr: Vec<Expr>,
         aggr_expr: Vec<Expr>,
         input: Box<PhysicalPlan>,
     },
-    Merge {
+    Sort {
+        sort_expr: Vec<Expr>,
         input: Box<PhysicalPlan>,
     },
+    /// Merge the input for each partition without additional processing and combine into a
+    /// single partition.
+    Merge { input: Box<PhysicalPlan> },
+    /// Represents a file scan
     FileScan {
         path: String,
         projection: Vec<usize>,

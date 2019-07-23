@@ -1,7 +1,3 @@
-extern crate ballista;
-
-extern crate log;
-
 use arrow::datatypes::{DataType, Field, Schema};
 use ballista::error::Result;
 use ballista::execution;

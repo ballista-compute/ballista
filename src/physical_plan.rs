@@ -1,10 +1,6 @@
 //! Ballista physical query plan
 
-use arrow::datatypes::{DataType, Field, Schema};
-use datafusion::execution::context::ExecutionContext;
-use datafusion::execution::table_impl::TableImpl;
 use datafusion::logicalplan::Expr;
-use std::sync::Arc;
 
 /// Ballista physical query plan. Note that most of the variants here are just placeholders
 /// currently. Also note that this plan references Expr from the DataFusion logical plan
@@ -52,11 +48,15 @@ enum PhysicalPlan {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+
     use crate::error::Result;
     use crate::physical_plan::PhysicalPlan::*;
+    use arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::execution::context::ExecutionContext;
+    use datafusion::execution::table_impl::TableImpl;
     use datafusion::logicalplan::LogicalPlan;
     use datafusion::table::Table;
+    use std::sync::Arc;
 
     #[test]
     fn aggregate() -> Result<()> {

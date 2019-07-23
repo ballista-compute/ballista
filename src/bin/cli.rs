@@ -1,6 +1,5 @@
 //! Ballista CLI
 
-extern crate clap;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use std::time::Instant;
 
@@ -94,7 +93,7 @@ pub fn main() {
     );
 }
 
-fn create_cluster(matches: &ArgMatches) {
+fn create_cluster(matches: &ArgMatches<'_>) {
     let cluster_name = matches.value_of("name").unwrap();
     let template = matches.value_of("template").unwrap();
     let exec_node_count = matches
@@ -111,7 +110,7 @@ fn create_cluster(matches: &ArgMatches) {
     }
 }
 
-fn delete_cluster(matches: &ArgMatches) {
+fn delete_cluster(matches: &ArgMatches<'_>) {
     let cluster_name = matches.value_of("name").unwrap();
     let pod_name_prefix = format!("ballista-{}-", cluster_name);
     let namespace = "default";
@@ -125,7 +124,7 @@ fn delete_cluster(matches: &ArgMatches) {
     }
 }
 
-fn execute(matches: &ArgMatches) {
+fn execute(matches: &ArgMatches<'_>) {
     let cluster_name = matches.value_of("name").unwrap();
     let template = matches.value_of("template").unwrap();
     let namespace = "default";

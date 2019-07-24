@@ -5,8 +5,12 @@ This tutorial walks through running the included nyc taxi example.
 # Set up environment
 
 - Create a minikube cluster
+- Install ingress controller (https://kubernetes.io/docs/tasks/access-application-cluster/ingress-minikube/#enable-the-ingress-controller)
+- Run `kubectl proxy` so that Kubernetes API is accessible on localhost:8001
 
 # Download data
+
+Download the CSV files and store in `/mnt/ssd/nyc_taxis/csv` for now since this is hard-coded in a few places.
 
 ```bash
 ./bin/download-yellow-2018.sh

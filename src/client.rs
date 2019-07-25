@@ -4,8 +4,7 @@
 
 use futures::Future;
 use hyper::client::connect::{Destination, HttpConnector};
-use std::borrow::BorrowMut;
-use std::sync::{Arc, Mutex};
+use std::sync::mpsc;
 use tower_grpc::Request;
 use tower_hyper::{client, util};
 use tower_util::MakeService;
@@ -44,10 +43,8 @@ impl Client {
         let settings = client::Builder::new().http2_only(true).clone();
         let mut make_client = client::Connect::with_builder(connector, settings);
 
-        // TODO use channels
-        let mut results: Arc<Mutex<Vec<proto::ExecuteResponse>>> = Arc::new(Mutex::new(vec![]));
-
-        let mut final_result = results.clone();
+        // Use channel to send results back.
+        let (sender, receiver) = mpsc::channel();
 
         let execute = make_client
             .make_service(dst)
@@ -68,8 +65,8 @@ impl Client {
                 }))
             })
             .and_then(move |response| {
-                let mut lock = results.borrow_mut().lock().unwrap();
-                lock.push(response.get_ref().clone());
+                let sender = sender.clone();
+                sender.send(response).unwrap();
                 Ok(())
             })
             .map_err(|e| {
@@ -78,7 +75,7 @@ impl Client {
 
         tokio::run(execute);
 
-        let lock = final_result.borrow_mut().lock().unwrap();
-        Ok(lock[0].clone())
+        let result = receiver.recv().unwrap();
+        Ok(result.get_ref().clone())
     }
 }

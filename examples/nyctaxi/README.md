@@ -10,10 +10,15 @@ This tutorial walks through running the included nyc taxi example.
 
 # Download data
 
-Download the CSV files and store in `/mnt/ssd/nyc_taxis/csv` for now since this is hard-coded in a few places.
+Download the CSV files and store in a directory. This directory will need to be mounted into minikube so that the Ballista executors can access it.
+
+In a new terminal:
 
 ```bash
 ./bin/download-yellow-2018.sh
+mkdir -p data
+mv yellow_tripdata_* data
+minikube mount $PWD/data:/mnt/ssd/nyc_taxis/csv
 ```
 
 # Run

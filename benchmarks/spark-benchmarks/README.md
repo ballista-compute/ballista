@@ -35,5 +35,9 @@ $SPARK_HOME/bin/spark-submit \
   --executor-memory 1G \
   --conf spark.executor.instances=2 \
   --conf spark.kubernetes.container.image=andygrove/spark:2.4.3 \
-  local://`pwd`/target/spark-benchmarks-1.0-SNAPSHOT.jar
+  --conf spark.kubernetes.driver.volumes.hostPath.jar.mount.path=/mnt/spark-benchmarks-1.0-SNAPSHOT.jar \
+  --conf spark.kubernetes.driver.volumes.hostPath.jar.options.path=`pwd`/target/spark-benchmarks-1.0-SNAPSHOT.jar \
+  --conf spark.kubernetes.driver.volumes.hostPath.data.mount.path=/mnt/ssd/nyc_taxis/csv \
+  --conf spark.kubernetes.driver.volumes.hostPath.data.options.path=/mnt/ssd/nyc_taxis/csv \
+    local:///mnt/spark-benchmarks-1.0-SNAPSHOT.jar  
 ```

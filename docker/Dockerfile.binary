@@ -3,7 +3,12 @@ ARG REPO=andygrove
 FROM $REPO/ballista-platform as build
 
 # Copy the statically-linked binary into a scratch container.
-FROM scratch
+FROM alpine:3.10
+
+# Install Tini for better signal handling
+RUN apk add --no-cache tini
+ENTRYPOINT ["/sbin/tini", "--"]
+
 COPY --from=build /tmp/ballista/target/x86_64-unknown-linux-musl/release/ballista-server /
 USER 1000
 

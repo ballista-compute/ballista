@@ -7,10 +7,6 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/ballista.rs"));
 }
 
-#[macro_use]
-extern crate gtmpl_derive;
-use gtmpl_value;
-
 pub mod client;
 pub mod cluster;
 pub mod error;

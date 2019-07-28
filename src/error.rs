@@ -18,6 +18,8 @@ pub enum BallistaError {
     ReqwestError(reqwest::Error),
     IoError(io::Error),
     HttpError(http::Error),
+    KubeAPIRequestError(k8s_openapi::RequestError),
+    KubeAPIResponseError(k8s_openapi::ResponseError),
 }
 
 impl From<String> for BallistaError {
@@ -47,5 +49,17 @@ impl From<io::Error> for BallistaError {
 impl From<http::Error> for BallistaError {
     fn from(e: http::Error) -> Self {
         BallistaError::HttpError(e)
+    }
+}
+
+impl From<k8s_openapi::RequestError> for BallistaError {
+    fn from(e: k8s_openapi::RequestError) -> Self {
+        BallistaError::KubeAPIRequestError(e)
+    }
+}
+
+impl From<k8s_openapi::ResponseError> for BallistaError {
+    fn from(e: k8s_openapi::ResponseError) -> Self {
+        BallistaError::KubeAPIResponseError(e)
     }
 }

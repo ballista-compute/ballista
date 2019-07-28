@@ -18,8 +18,8 @@ extern crate log;
 pub fn main() -> Result<()> {
     let _ = ::env_logger::init();
 
-    // discover available executors
-    let executors = cluster::get_executors("NYCTAXI").unwrap();
+    // discover available executors.
+    let executors = cluster::get_executors("nyctaxi", "default").unwrap();
 
     let now = Instant::now();
 
@@ -58,11 +58,10 @@ pub fn main() -> Result<()> {
         // create DataFusion query plan to execute on each partition
         let mut ctx = ExecutionContext::new();
         ctx.register_csv("tripdata", &filename, &schema, true);
-        let logical_plan = ctx
-            .create_logical_plan(
-                "SELECT passenger_count, MIN(fare_amount), MAX(fare_amount) \
-                 FROM tripdata GROUP BY passenger_count",
-            )?;
+        let logical_plan = ctx.create_logical_plan(
+            "SELECT passenger_count, MIN(fare_amount), MAX(fare_amount) \
+             FROM tripdata GROUP BY passenger_count",
+        )?;
 
         let logical_plan = ctx.optimize(&logical_plan)?;
 
@@ -122,12 +121,11 @@ pub fn main() -> Result<()> {
     ]);
     ctx.register_csv("tripdata", results_file, &results_schema, true);
 
-    let relation = ctx
-        .sql(
-            "SELECT passenger_count, MIN(min_fare_amount), MAX(max_fare_amount) \
-             FROM tripdata GROUP BY passenger_count",
-            1024,
-        )?;
+    let relation = ctx.sql(
+        "SELECT passenger_count, MIN(min_fare_amount), MAX(max_fare_amount) \
+         FROM tripdata GROUP BY passenger_count",
+        1024,
+    )?;
 
     let mut relation = relation.borrow_mut();
 

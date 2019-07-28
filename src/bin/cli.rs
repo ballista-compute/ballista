@@ -26,20 +26,29 @@ pub fn main() {
                         .help("Ballista cluster name"),
                 )
                 .arg(
-                    Arg::with_name("template")
-                        .required(true)
-                        .takes_value(true)
-                        .short("t")
-                        .long("template")
-                        .help("Kubernetes template for executor pods"),
-                )
-                .arg(
                     Arg::with_name("executors")
                         .short("e")
                         .long("num-executors")
                         .required(true)
                         .takes_value(true)
                         .help("number of executor pods to create"),
+                )
+                .arg(
+                    Arg::with_name("volumes")
+                        .required(false)
+                        .multiple(true)
+                        .takes_value(true)
+                        .short("v")
+                        .long("volumes")
+                        .help("Persistent Volumes to mount into the executor pods. Syntax should be '<pv-name>:<mount-path>'"),
+                )
+                .arg(
+                    Arg::with_name("image")
+                        .required(false)
+                        .takes_value(true)
+                        .short("i")
+                        .long("image")
+                        .help("Custom Ballista Docker image to use for executors"),
                 ),
         )
         .subcommand(
@@ -66,12 +75,12 @@ pub fn main() {
                         .help("Ballista cluster name"),
                 )
                 .arg(
-                    Arg::with_name("template")
+                    Arg::with_name("image")
                         .required(true)
                         .takes_value(true)
-                        .short("t")
-                        .long("template")
-                        .help("Kubernetes template for application pod"),
+                        .short("i")
+                        .long("image")
+                        .help("Docker image for application pod"),
                 ),
         )
         .get_matches();
@@ -94,42 +103,37 @@ pub fn main() {
 }
 
 fn create_cluster(matches: &ArgMatches<'_>) {
-    let cluster_name = matches.value_of("name").unwrap();
-    let template = matches.value_of("template").unwrap();
-    let exec_node_count = matches
+    let cluster_name = matches.value_of("name").unwrap().to_string();
+    let replicas = matches
         .value_of("executors")
         .unwrap()
         .parse::<usize>()
         .unwrap();
-    let namespace = "default";
+    let volumes = matches
+        .values_of("volumes")
+        .map(|v| v.into_iter().map(|i| i.to_string()).collect());
+    let image = matches.value_of("image").map(|i| i.to_string());
+    let namespace = "default".to_string();
 
-    // create a cluster with 12 pods (one per month)
-    for i in 1..=exec_node_count {
-        let pod_name = format!("ballista-{}-{}", cluster_name, i);
-        cluster::create_ballista_executor(namespace, &pod_name, template).unwrap();
-    }
+    cluster::ClusterBuilder::new(cluster_name, namespace, replicas)
+        .image(image)
+        .volumes(volumes)
+        .create()
+        .expect("Could not create cluster");
 }
 
 fn delete_cluster(matches: &ArgMatches<'_>) {
     let cluster_name = matches.value_of("name").unwrap();
-    let pod_name_prefix = format!("ballista-{}-", cluster_name);
     let namespace = "default";
-    let all_pods = cluster::list_pods(namespace).unwrap();
-
-    for name in all_pods {
-        if name.starts_with(&pod_name_prefix) && !name.contains("app") {
-            cluster::delete_pod(namespace, &name).unwrap();
-            cluster::delete_service(namespace, &name).unwrap();
-        }
-    }
+    cluster::delete_cluster(cluster_name, namespace).expect("Could not delete cluster");
 }
 
 fn execute(matches: &ArgMatches<'_>) {
     let cluster_name = matches.value_of("name").unwrap();
-    let template = matches.value_of("template").unwrap();
+    let image = matches.value_of("image").unwrap();
     let namespace = "default";
 
     let pod_name = format!("ballista-{}-app", cluster_name);
 
-    cluster::create_ballista_application(namespace, &pod_name, template).unwrap();
+    cluster::create_ballista_application(namespace, pod_name, image.to_string()).unwrap();
 }

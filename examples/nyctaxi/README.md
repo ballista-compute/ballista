@@ -2,13 +2,13 @@
 
 This tutorial walks through running the included nyc taxi example.
 
-# Set up environment
+## Set up environment
 
 - Create a minikube cluster
+- Create required RBAC roles/rolebindings and persistent volume: `kubectl create -f ./templates`
 - Install ingress controller (https://kubernetes.io/docs/tasks/access-application-cluster/ingress-minikube/#enable-the-ingress-controller)
-- Run `kubectl proxy` so that Kubernetes API is accessible on localhost:8001
 
-# Download data
+## Download data
 
 Download the CSV files and store in a directory. This directory will need to be mounted into minikube so that the Ballista executors can access it.
 
@@ -21,18 +21,20 @@ mv yellow_tripdata_* data
 minikube mount $PWD/data:/mnt/ssd/nyc_taxis/csv
 ```
 
-# Run
+## Run
 
 From the root of this project, run these commands:
 
+**TODO - update the images mentioned below so these commands work.**
+
 ```bash
-cargo run --bin ballista -- create-cluster --name nyctaxi --num-executors 12 --template examples/nyctaxi/templates/executor.yaml
-cargo run --bin ballista -- run --name nyctaxi --template examples/nyctaxi/templates/application.yaml
+cargo run --bin ballista -- create-cluster --name nyctaxi --num-executors 12 --volumes nyctaxi:/mnt/ssd/nyc_taxis/csv --image andygrove/ballista:0.2.0
+cargo run --bin ballista -- run --name nyctaxi --image andygrove/ballista-nyctaxi:0.2.0
 cargo run --bin ballista -- delete-cluster --name nyctaxi
-kubectl delete job ballista-nyctaxi-app 
+kubectl delete job ballista-nyctaxi-app
 ```
 
-# Notes
+## Notes
 
 ```bash
 docker tag ballista-nyctaxi:latest andygrove/ballista-nyctaxi:0.1.3

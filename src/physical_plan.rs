@@ -1,23 +1,57 @@
 //! Ballista physical query plan
 
-use arrow::datatypes::Schema;
+use std::sync::Arc;
 
-pub trait PhysicalPlan {}
+use arrow::datatypes::Schema;
+use arrow::record_batch::RecordBatch;
+
+use crate::error::Result;
+
+// NOTE that the ExecutionPlan, Partition, and BatchIterator traits are hopefully moving to Arrow (see https://github.com/apache/arrow/pull/4975)
+
+/// Partition-aware execution plan for a relation
+pub trait ExecutionPlan {
+    /// Get the schema for this execution plan
+    fn schema(&self) -> Arc<Schema>;
+    /// Get the partitions for this execution plan. Each partition can be executed in parallel.
+    fn partitions(&self) -> Result<Vec<Arc<dyn Partition>>>;
+}
+
+/// Represents a partition of an execution plan that can be executed on a thread
+pub trait Partition: Send + Sync {
+    /// Execute this partition and return an iterator over RecordBatch
+    fn execute(&self) -> Result<Arc<dyn BatchIterator>>;
+}
+
+/// Iterator over RecordBatch that can be sent between threads
+pub trait BatchIterator: Send + Sync {
+    /// Get the next RecordBatch
+    fn next(&self) -> Result<Option<RecordBatch>>;
+}
 
 /// Projection filters the input by column
 #[allow(dead_code)]
 pub struct Projection {
     columns: Vec<usize>,
-    input: Box<dyn PhysicalPlan>,
+    input: Box<dyn ExecutionPlan>,
 }
 
-impl PhysicalPlan for Projection {}
+impl ExecutionPlan for Projection {
+    fn schema(&self) -> Arc<Schema> {
+        unimplemented!()
+    }
+
+    fn partitions(&self) -> Result<Vec<Arc<dyn Partition>>> {
+        unimplemented!()
+    }
+
+}
 
 /// Selection filters the input by row
 #[allow(dead_code)]
 pub struct Selection {
     filter: Box<dyn PhysicalExpr>,
-    input: Box<dyn PhysicalPlan>,
+    input: Box<dyn ExecutionPlan>,
 }
 
 /// GroupAggregate assumes inputs are ordered by the grouping expression and merges the
@@ -26,7 +60,7 @@ pub struct Selection {
 pub struct GroupAggregate {
     group_expr: Vec<Box<dyn PhysicalExpr>>,
     aggr_expr: Vec<Box<dyn PhysicalExpr>>,
-    input: Box<dyn PhysicalPlan>,
+    input: Box<dyn ExecutionPlan>,
 }
 
 /// HashAggregate assumes that the input is unordered and uses a hash map to maintain
@@ -35,14 +69,14 @@ pub struct GroupAggregate {
 pub struct HashAggregate {
     group_expr: Vec<Box<dyn PhysicalExpr>>,
     aggr_expr: Vec<Box<dyn PhysicalExpr>>,
-    input: Box<dyn PhysicalPlan>,
+    input: Box<dyn ExecutionPlan>,
 }
 
 impl HashAggregate {
     pub fn new(
         group_expr: Vec<Box<dyn PhysicalExpr>>,
         aggr_expr: Vec<Box<dyn PhysicalExpr>>,
-        input: Box<dyn PhysicalPlan>,
+        input: Box<dyn ExecutionPlan>,
     ) -> Self {
         Self {
             group_expr,
@@ -52,21 +86,38 @@ impl HashAggregate {
     }
 }
 
-impl PhysicalPlan for HashAggregate {}
+impl ExecutionPlan for HashAggregate {
+    fn schema(&self) -> Arc<Schema> {
+        unimplemented!()
+    }
+
+    fn partitions(&self) -> Result<Vec<Arc<dyn Partition>>> {
+        unimplemented!()
+    }
+
+}
 
 /// Merge to a single partition
 #[allow(dead_code)]
 pub struct Merge {
-    input: Box<dyn PhysicalPlan>,
+    input: Box<dyn ExecutionPlan>,
 }
 
 impl Merge {
-    pub fn new(input: Box<dyn PhysicalPlan>) -> Self {
+    pub fn new(input: Box<dyn ExecutionPlan>) -> Self {
         Self { input }
     }
 }
 
-impl PhysicalPlan for Merge {}
+impl ExecutionPlan for Merge {
+    fn schema(&self) -> Arc<Schema> {
+        unimplemented!()
+    }
+
+    fn partitions(&self) -> Result<Vec<Arc<dyn Partition>>> {
+        unimplemented!()
+    }
+}
 
 /// Represents a partitioned file scan
 #[allow(dead_code)]
@@ -86,7 +137,16 @@ impl FileScan {
     }
 }
 
-impl PhysicalPlan for FileScan {}
+impl ExecutionPlan for FileScan {
+    fn schema(&self) -> Arc<Schema> {
+        unimplemented!()
+    }
+
+    fn partitions(&self) -> Result<Vec<Arc<dyn Partition>>> {
+        unimplemented!()
+    }
+
+}
 
 pub trait PhysicalExpr {}
 

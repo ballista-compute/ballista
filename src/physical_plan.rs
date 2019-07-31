@@ -42,7 +42,10 @@ impl ExecutionPlan for Projection {
     }
 
     fn partitions(&self) -> Result<Vec<Arc<dyn Partition>>> {
-        unimplemented!()
+        Ok(self.input.partitions()?.iter().map(|p| {
+            //TODO inject projection logic
+            p.clone()
+        }).collect())
     }
 
 }
@@ -52,6 +55,20 @@ impl ExecutionPlan for Projection {
 pub struct Selection {
     filter: Box<dyn PhysicalExpr>,
     input: Box<dyn ExecutionPlan>,
+}
+
+impl ExecutionPlan for Selection {
+    fn schema(&self) -> Arc<Schema> {
+        unimplemented!()
+    }
+
+    fn partitions(&self) -> Result<Vec<Arc<dyn Partition>>> {
+        Ok(self.input.partitions()?.iter().map(|p| {
+            //TODO inject selection logic
+            p.clone()
+        }).collect())
+    }
+
 }
 
 /// GroupAggregate assumes inputs are ordered by the grouping expression and merges the
@@ -92,7 +109,10 @@ impl ExecutionPlan for HashAggregate {
     }
 
     fn partitions(&self) -> Result<Vec<Arc<dyn Partition>>> {
-        unimplemented!()
+        Ok(self.input.partitions()?.iter().map(|p| {
+            //TODO inject hash aggregate logic
+            p.clone()
+        }).collect())
     }
 
 }
@@ -115,6 +135,7 @@ impl ExecutionPlan for Merge {
     }
 
     fn partitions(&self) -> Result<Vec<Arc<dyn Partition>>> {
+        //TODO run each partition on a thread and merge the results
         unimplemented!()
     }
 }

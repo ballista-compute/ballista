@@ -34,6 +34,7 @@ tower-util = "0.1"
 k8s-openapi = { version = "0.4.0", features = ["v1_13"] }
 reqwest = "0.9.18"
 clap = "2.33.0"
+structopt = "0.2"
 arrow = { git = "https://github.com/apache/arrow" }
 datafusion = { git = "https://github.com/apache/arrow" }
 kube = "0.14"

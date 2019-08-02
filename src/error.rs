@@ -1,7 +1,6 @@
 //! Ballista error types
 
-use std::io;
-use std::result;
+use std::{fmt, io, result};
 
 use arrow::error::ArrowError;
 use datafusion::error::ExecutionError;
@@ -22,6 +21,22 @@ pub enum BallistaError {
     HttpError(http::Error),
     KubeAPIRequestError(k8s_openapi::RequestError),
     KubeAPIResponseError(k8s_openapi::ResponseError),
+}
+
+impl fmt::Display for BallistaError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            BallistaError::NotImplemented(s) => s.clone(),
+            BallistaError::General(s) => s.clone(),
+            BallistaError::DataFusionError(e) => format!("{:?}", e),
+            BallistaError::ReqwestError(e) => e.to_string(),
+            BallistaError::IoError(e) => e.to_string(),
+            BallistaError::HttpError(e) => e.to_string(),
+            BallistaError::KubeAPIRequestError(e) => e.to_string(),
+            BallistaError::KubeAPIResponseError(e) => e.to_string(),
+        };
+        f.write_str(&s)
+    }
 }
 
 impl From<String> for BallistaError {

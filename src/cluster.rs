@@ -142,6 +142,41 @@ macro_rules! check_delete_response {
     }};
 }
 
+/// A Volume to be attached to a cluster.
+#[derive(Debug)]
+pub struct Volume {
+    /// The name of the volume.
+    ///
+    /// For now, this must match the name of an existing Persistent Volume
+    /// in the Kubernetes cluster. It will be used as the name for a
+    /// Persistent Volume Claim and for the Volume in the executor pods.
+    name: String,
+    /// The path to mount the volume in the executor pods.
+    mount_path: String,
+}
+
+impl std::str::FromStr for Volume {
+    type Err = BallistaError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut split = s.splitn(2, ":");
+        let name = split
+            .next()
+            .ok_or_else(|| BallistaError::General(format!(
+                "Invalid volume spec '{}'. Volumes should be in the format '<volume name>:<mount path>'.",
+                s)))?
+            .to_string();
+        let mount_path = split
+            .next()
+            .ok_or_else(|| BallistaError::General(format!(
+                "Invalid volume spec '{}'. Volumes should be in the format '<volume name>:<mount path>'.",
+                s)))?
+            .to_string();
+        Ok(Volume { name, mount_path })
+    }
+}
+
+#[derive(Debug)]
 pub struct ClusterBuilder {
     /// The name of the executor cluster.
     name: String,
@@ -152,7 +187,7 @@ pub struct ClusterBuilder {
     /// The image to use.
     image: Option<String>,
     /// Volumes to mount into the executors.
-    volumes: Option<Vec<(String, String)>>,
+    volumes: Option<Vec<Volume>>,
 }
 
 impl ClusterBuilder {
@@ -173,18 +208,12 @@ impl ClusterBuilder {
         self
     }
 
-    pub fn volumes(&mut self, volumes: Option<Vec<String>>) -> &mut Self {
-        self.volumes = volumes.map(|vs| {
-            vs.into_iter()
-                .map(|v| {
-                    let mut split = v.splitn(2, ':');
-                    (
-                        split.next().unwrap().to_string(),
-                        split.next().unwrap().to_string(),
-                    )
-                })
-                .collect()
-        });
+    /// Create a persistent volume claim and mount into the executors.
+    ///
+    /// The name of the volume is assumed to match the name of an
+    /// existing Persistent Volume in Kubernetes.
+    pub fn volumes(&mut self, volumes: Option<Vec<Volume>>) -> &mut Self {
+        self.volumes = volumes;
         self
     }
 
@@ -322,8 +351,8 @@ impl ClusterBuilder {
                                 vs.clone()
                                     .into_iter()
                                     .map(|v| VolumeMount {
-                                        name: v.0,
-                                        mount_path: v.1,
+                                        name: v.name.clone(),
+                                        mount_path: v.mount_path.clone(),
                                         ..Default::default()
                                     })
                                     .collect()
@@ -334,10 +363,10 @@ impl ClusterBuilder {
                             vs.clone()
                                 .into_iter()
                                 .map(|v| Volume {
-                                    name: v.0.clone(),
+                                    name: v.name.clone(),
                                     persistent_volume_claim: Some(
                                         PersistentVolumeClaimVolumeSource {
-                                            claim_name: v.0,
+                                            claim_name: v.name.clone(),
                                             ..Default::default()
                                         },
                                     ),
@@ -374,7 +403,7 @@ impl ClusterBuilder {
         let labels = self.get_labels();
         if let Some(vs) = self.volumes.as_ref() {
             for volume in vs {
-                self.create_persistent_volume_claim(volume.0.clone(), labels.clone())?;
+                self.create_persistent_volume_claim(volume.name.clone(), labels.clone())?;
             }
         }
         self.create_service(name.clone(), labels.clone())?;

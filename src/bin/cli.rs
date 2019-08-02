@@ -41,7 +41,7 @@ pub struct CreateCluster {
         long = "volumes",
         help = "Persistent Volumes to mount into the executor pods. Syntax should be '<pv-name>:<mount-path>'"
     )]
-    pub volumes: Vec<String>,
+    pub volumes: Vec<cluster::Volume>,
 
     #[structopt(
         name = "image",

@@ -40,7 +40,7 @@ where
     let mut response = req.send()?;
     let status = response.status();
     let mut r = response_body(status);
-    r.append_slice(dbg!(response.text()?).as_bytes());
+    r.append_slice(response.text()?.as_bytes());
     Ok(r.parse()?)
 }
 

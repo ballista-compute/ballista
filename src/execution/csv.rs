@@ -103,10 +103,8 @@ impl CsvExec {
             let path_name = path.as_os_str().to_str().unwrap();
             if path.is_dir() {
                 self.build_file_list(path_name, filenames)?;
-            } else {
-                if path_name.ends_with(".csv") {
-                    filenames.push(path_name.to_string());
-                }
+            } else if path_name.ends_with(".csv") {
+                filenames.push(path_name.to_string());
             }
         }
         Ok(())

@@ -4,9 +4,11 @@ use std::thread;
 use std::thread::JoinHandle;
 
 /// Execution Context
+#[derive(Default)]
 pub struct Context {}
 
 impl Context {
+    /// Create a new execution context
     pub fn new() -> Self {
         Self {}
     }
@@ -58,6 +60,7 @@ mod tests {
     use std::io::prelude::*;
     use std::io::{BufReader, BufWriter};
     use std::path::Path;
+    use std::sync::Arc;
 
     #[test]
     fn project_first_column() -> Result<()> {

@@ -3,6 +3,7 @@
 use std::io;
 use std::result;
 
+use arrow::error::ArrowError;
 use datafusion::error::ExecutionError;
 use k8s_openapi::http;
 use reqwest;
@@ -14,6 +15,7 @@ pub type Result<T> = result::Result<T, BallistaError>;
 pub enum BallistaError {
     NotImplemented(String),
     General(String),
+    ArrowError(ArrowError),
     DataFusionError(ExecutionError),
     ReqwestError(reqwest::Error),
     IoError(io::Error),
@@ -23,6 +25,12 @@ pub enum BallistaError {
 impl From<String> for BallistaError {
     fn from(e: String) -> Self {
         BallistaError::General(e)
+    }
+}
+
+impl From<ArrowError> for BallistaError {
+    fn from(e: ArrowError) -> Self {
+        BallistaError::ArrowError(e)
     }
 }
 

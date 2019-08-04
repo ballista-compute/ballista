@@ -59,6 +59,7 @@ pub trait PhysicalExpr: Send + Sync {
     fn evaluate(&self, batch: &RecordBatch) -> Result<ArrayRef>;
 }
 
+pub mod context;
 pub mod csv;
 pub mod expressions;
 pub mod projection;

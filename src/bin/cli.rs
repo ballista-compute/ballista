@@ -111,7 +111,7 @@ fn create_cluster(matches: &ArgMatches<'_>) {
         .unwrap();
     let volumes = matches
         .values_of("volumes")
-        .map(|v| v.into_iter().map(|i| i.to_string()).collect());
+        .map(|v| v.map(|i| i.to_string()).collect());
     let image = matches.value_of("image").map(|i| i.to_string());
     let namespace = "default".to_string();
 

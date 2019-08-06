@@ -177,7 +177,7 @@ impl ClusterBuilder {
         self.volumes = volumes.map(|vs| {
             vs.into_iter()
                 .map(|v| {
-                    let mut split = v.splitn(2, ":");
+                    let mut split = v.splitn(2, ':');
                     (
                         split.next().unwrap().to_string(),
                         split.next().unwrap().to_string(),

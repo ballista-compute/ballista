@@ -159,7 +159,7 @@ impl std::str::FromStr for Volume {
     type Err = BallistaError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut split = s.splitn(2, ":");
+        let mut split = s.splitn(2, ':');
         let name = split
             .next()
             .ok_or_else(|| BallistaError::General(format!(
@@ -348,8 +348,7 @@ impl ClusterBuilder {
                                 ..Default::default()
                             }]),
                             volume_mounts: self.volumes.as_ref().map(|vs| {
-                                vs.clone()
-                                    .into_iter()
+                                vs.iter()
                                     .map(|v| VolumeMount {
                                         name: v.name.clone(),
                                         mount_path: v.mount_path.clone(),
@@ -360,8 +359,7 @@ impl ClusterBuilder {
                             ..Default::default()
                         }],
                         volumes: self.volumes.as_ref().map(|vs| {
-                            vs.clone()
-                                .into_iter()
+                            vs.iter()
                                 .map(|v| Volume {
                                     name: v.name.clone(),
                                     persistent_volume_claim: Some(

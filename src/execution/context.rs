@@ -110,6 +110,7 @@ mod tests {
     /// Generated partitioned copy of a CSV file
     fn create_partitioned_csv(filename: &str, partitions: usize) -> Result<String> {
         let testdata = env::var("ARROW_TEST_DATA").expect("ARROW_TEST_DATA not defined");
+        let testdata = "testdata";
         let path = format!("{}/csv/{}", testdata, filename);
 
         let mut dir = env::temp_dir();

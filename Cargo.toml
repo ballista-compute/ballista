@@ -36,7 +36,7 @@ reqwest = "0.9.18"
 clap = "2.33.0"
 arrow = { git = "https://github.com/apache/arrow" }
 datafusion = { git = "https://github.com/apache/arrow" }
-kubernetes = { git = "https://github.com/ynqa/kubernetes-rust" }
+kube = "0.14"
 
 [build-dependencies]
 tower-grpc-build = { version = "0.1.0", features = ["tower-hyper"] }

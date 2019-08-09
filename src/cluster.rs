@@ -7,7 +7,7 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta},
     http, Response, ResponseBody,
 };
-use kubernetes::config;
+use kube::config;
 
 use crate::error::BallistaError;
 

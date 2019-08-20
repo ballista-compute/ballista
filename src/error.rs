@@ -28,6 +28,7 @@ impl fmt::Display for BallistaError {
         let s = match self {
             BallistaError::NotImplemented(s) => s.clone(),
             BallistaError::General(s) => s.clone(),
+            BallistaError::ArrowError(e) => format!("{:?}", e),
             BallistaError::DataFusionError(e) => format!("{:?}", e),
             BallistaError::ReqwestError(e) => e.to_string(),
             BallistaError::IoError(e) => e.to_string(),

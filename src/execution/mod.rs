@@ -17,52 +17,16 @@
 
 //! Traits for physical query plan, supporting parallel execution for partitioned relations.
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::error::{BallistaError, Result};
 use crate::proto;
-use arrow::array::ArrayRef;
 use arrow::datatypes::{DataType, Field, Schema};
-use arrow::record_batch::RecordBatch;
 
 use datafusion::execution::table_impl::TableImpl;
 use datafusion::logicalplan::{Expr, LogicalPlan as DFPlan};
 use datafusion::table::Table;
 
-/// Partition-aware execution plan for a relation
-pub trait ExecutionPlan {
-    /// Get the schema for this execution plan
-    fn schema(&self) -> Arc<Schema>;
-    /// Get the partitions for this execution plan. Each partition can be executed in parallel.
-    fn partitions(&self) -> Result<Vec<Arc<dyn Partition>>>;
-}
-
-/// Represents a partition of an execution plan that can be executed on a thread
-pub trait Partition: Send + Sync {
-    /// Execute this partition and return an iterator over RecordBatch
-    fn execute(&self) -> Result<Arc<Mutex<dyn BatchIterator>>>;
-}
-
-/// Iterator over RecordBatch that can be sent between threads
-pub trait BatchIterator: Send + Sync {
-    /// Get the next RecordBatch
-    fn next(&mut self) -> Result<Option<RecordBatch>>;
-}
-
-/// Expression that can be evaluated against a RecordBatch
-pub trait PhysicalExpr: Send + Sync {
-    /// Get the name to use in a schema to represent the result of this expression
-    fn name(&self) -> String;
-    /// Get the data type of this expression, given the schema of the input
-    fn data_type(&self, input_schema: &Schema) -> Result<DataType>;
-    /// Evaluate an expression against a RecordBatch
-    fn evaluate(&self, batch: &RecordBatch) -> Result<ArrayRef>;
-}
-
-pub mod context;
-pub mod csv;
-pub mod expressions;
-pub mod projection;
 
 /// Convert a Ballista protobuf data type to an Arrow DataType
 fn to_arrow_type(proto_type: i32) -> Result<DataType> {

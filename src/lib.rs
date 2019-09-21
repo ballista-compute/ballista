@@ -12,7 +12,6 @@ pub mod cluster;
 pub mod error;
 pub mod execution;
 pub mod logical_plan;
-pub mod physical_plan;
 
 pub use arrow;
 pub use datafusion;

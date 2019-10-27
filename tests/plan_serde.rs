@@ -82,9 +82,10 @@ fn round_trip(plan: &LogicalPlan) -> Result<Arc<LogicalPlan>> {
 #[allow(dead_code)]
 fn execute(ctx: &mut ExecutionContext, logical_plan: &LogicalPlan) -> Result<()> {
     println!("Executing query: {:?}", logical_plan);
-    let result = ctx.execute(logical_plan, 1024)?;
-    let mut result = result.borrow_mut();
-    while let Some(batch) = result.next()? {
+    let batch_size = 4096;
+    let plan = ctx.create_physical_plan(&Arc::new(logical_plan.clone()), batch_size)?;
+    let results = ctx.collect(plan.as_ref())?;
+    for batch in results {
         println!(
             "Fetched {} rows x {} columns",
             batch.num_rows(),

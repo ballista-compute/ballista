@@ -5,6 +5,8 @@ extern crate log;
 
 use crate::proto::{server, ExecuteRequest, ExecuteResponse, TableMeta};
 
+use std::sync::Arc;
+
 use futures::{future, Future, Stream};
 use log::error;
 use tokio::net::TcpListener;
@@ -82,12 +84,13 @@ fn execute_query(
 
     println!("Executing: {:?}", df_plan);
 
-    let relation = context.execute(&df_plan, 1024)?;
+    let batch_size = 4096;
+    let plan = context.create_physical_plan(&Arc::new(df_plan.clone()), batch_size)?;
 
-    let mut x = relation.borrow_mut();
+    let results = context.collect(plan.as_ref())?;
 
-    let mut batches = vec![];
-    while let Some(batch) = x.next()? {
+    let mut batches = Vec::with_capacity(results.len());
+    for batch in results {
         println!(
             "Reading batch with {} rows x {} columns",
             batch.num_rows(),

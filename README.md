@@ -3,16 +3,31 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Version](https://img.shields.io/crates/v/ballista.svg)](https://crates.io/crates/ballista)
-[![Build Status](https://travis-ci.com/andygrove/ballista.svg?branch=master)](https://travis-ci.com/andygrove/ballista)
 [![Gitter Chat](https://badges.gitter.im/ballista-rs/community.svg)](https://gitter.im/ballista-rs/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-Ballista is a proof-of-concept distributed compute platform based on Kubernetes and the Rust implementation of [Apache Arrow](https://arrow.apache.org/).
+# Overview
 
-This is not my first attempt at building something like this. I originally wanted [DataFusion](https://github.com/apache/arrow/tree/master/rust/datafusion) to be a distributed compute platform but this was overly ambitious at the time, and it ended up becoming an in-memory single-threaded query execution engine for the Rust implementation of Apache Arrow. However, DataFusion now provides a good foundation to have another attempt at building a [modern distributed compute platform](https://andygrove.io/how_to_build_a_modern_distributed_compute_platform/) in Rust.
+Ballista is a proof-of-concept distributed compute platform based on [Kubernetes](https://kubernetes.io/) and [Apache Arrow](https://arrow.apache.org/). 
 
-My goal is to use this repo to move fast and try out ideas that help drive requirements for Apache Arrow and DataFusion.
+Note that the project has pivoted since the original PoC and is currently being re-implemented. The most significant change is that this is no longer a pure Rust project. I still believe that Rust is a great language for this project, but it can't be the only language. One of the key benefits of Arrow is that it supports multiple languages, including C, C++, C#, Go, Java, JavaScript, MATLAB, Python, R, Ruby, and Rust. It should therefore be possible for the Ballista architecture to support more than one language. User's need the ability to execute custom code as part of a distributed compute job and likely have existing code. User's are also likely to want compatibility with more traditional data science languages such as Python or R, as well as Java.
 
-# Demo
+# Ballista Goals
+
+- Define a physical query plan in protobuf format
+- Use Apache Flight for sending query plans between nodes, and streaming results between nodes
+- Allow clusters to be created, consisting of executors implemented in any language that supports Flight
+- Distributed compute jobs should be capable of invoking code in more than one language (with some performance trade-offs for IPC overhead)
+- Provide clients and connectors for Java, Rust, Python, and Apache Spark
+
+# Ballista Anti Goals
+
+- Ballista is not intended to replace Apache Spark but to augment it
+
+# Status
+
+I learned a lot from the initial PoC (see below for a demo and more info) but have decided to start the project again due to the changes in scope mentioned above.
+
+# PoC #1
 
 This demo shows a Ballista cluster being created in Minikube and then shows the [nyctaxi example](examples/nyctaxi) being executed, causing a distributed query to run in the cluster, with each executor pod performing an aggregate query on one partition of the data, and then the driver merges the results and runs a secondary aggregate query to get the final result. 
 
@@ -37,37 +52,7 @@ kubectl get pods
 kubectl logs -f ballista-nyctaxi-app-n5kxl
 ```
 
-# PoC Status
-
-- [X] README describing project
-- [X] Define service and minimal query plan in protobuf file
-- [X] Generate code from protobuf file
-- [X] Implement skeleton gRPC server
-- [X] Implement skeleton gRPC client
-- [X] Client can send query plan
-- [X] Server can receive query plan
-- [X] Server can translate protobuf query plan to DataFusion query plan
-- [X] Server can execute query plan using DataFusion
-- [X] Create Dockerfile for server
-- [X] Ballista CLI - create cluster
-- [X] Ballista CLI - delete cluster
-- [X] Ballista CLI - run application
-- [X] Simple example application works end to end
-- [X] Add support for aggregate queries 
-- [X] Server can return Arrow data back to the application (in CSV format for now)
-- [X] Example application can aggregate the aggregate results from each partition/node
-- [X] Write blog post and announce Ballista
-
-# v1.0.0 Plan 
-
-- [ ] Distributed query planner
-- [ ] Implement support for all DataFusion logical plan and expressions
-- [ ] Server can write results to CSV files
-- [ ] Server can write results to Parquet files
-- [ ] Implement Flight protocol
-- [ ] Support user code as part of distributed query execution
-- [ ] Interactive SQL support
-- [ ] Java bindings (supporting Java, Kotlin, Scala)
+Note that PoC #1 is now archived [here](archive/poc1).
 
 # Contributing
 

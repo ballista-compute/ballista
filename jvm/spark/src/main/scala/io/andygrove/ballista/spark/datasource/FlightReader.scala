@@ -1,4 +1,4 @@
-package io.andygrove.ballista.spark
+package io.andygrove.ballista.spark.datasource
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.sources.Filter
@@ -6,7 +6,7 @@ import org.apache.spark.sql.sources.v2.DataSourceOptions
 import org.apache.spark.sql.sources.v2.reader.{DataSourceReader, InputPartition, SupportsPushDownFilters, SupportsPushDownRequiredColumns}
 import org.apache.spark.sql.types.{DataTypes, StructField, StructType}
 
-import collection.JavaConverters._
+import scala.collection.JavaConverters._
 
 class FlightReader(options: DataSourceOptions) extends DataSourceReader with SupportsPushDownFilters with SupportsPushDownRequiredColumns {
 

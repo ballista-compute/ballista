@@ -39,15 +39,13 @@ enum ArrowType {
 }
 
 message ExprNode {
-
-  ColumnIndex column_index = 11;
-
+  Column column = 10;
   BinaryExpr binary_expr = 20;
   AggregateExpr aggregate_expr = 21;
 }
 
-message ColumnIndex {
-  uint32 index = 1;
+message Column {
+  string name = 1;
 }
 
 message BinaryExpr {

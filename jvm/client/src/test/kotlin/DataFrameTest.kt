@@ -1,5 +1,6 @@
-import io.andygrove.ballista.client.DefaultDataFrame
-import io.andygrove.ballista.client.Expr.*
+import io.andygrove.ballista.client.Client
+import io.andygrove.kquery.datasource.CsvDataSource
+import io.andygrove.kquery.logical.*
 import org.junit.Ignore
 import org.junit.Test
 import org.junit.jupiter.api.TestInstance
@@ -8,17 +9,15 @@ import org.junit.jupiter.api.TestInstance
 class DataFrameTest {
 
     @Test
-    @Ignore
     fun test() {
 
-        val df = DefaultDataFrame()
+        val df = DataFrameImpl(Scan("", CsvDataSource("", 0), listOf()))
 
-        val df2 = df.parquet("/foo/bar")
-            .filter(Eq(Column("a"), LiteralInt(123)))
-            .select(listOf(Column("a"), Column("b"), Column("c")))
+        val df2 = df
+            .filter(col("a") eq lit(123))
+            .select(listOf(col("a"), col("b"), col("c")))
 
-        df2.collect().forEach {
-            println("Received batch")
-        }
+        val client = Client("localhost", 50001)
+        client.execute(df2.logicalPlan())
     }
 }

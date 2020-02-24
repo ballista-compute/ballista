@@ -1,5 +1,7 @@
 dependencies {
 
+    implementation(project(":datasource"))
+    implementation(project(":logical-plan"))
     implementation(project(":protobuf"))
 
     implementation("org.apache.arrow:flight-core:0.16.0")

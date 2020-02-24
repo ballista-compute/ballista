@@ -1,9 +1,8 @@
-package io.andygrove.ballista.spark
-
-import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.sources.v2.reader.InputPartitionReader
+package io.andygrove.ballista.spark.datasource
 
 import io.andygrove.ballista.jdbc.FlightConnection
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.sources.v2.reader.InputPartitionReader
 
 class FlightPartitionReader extends InputPartitionReader[InternalRow] {
 

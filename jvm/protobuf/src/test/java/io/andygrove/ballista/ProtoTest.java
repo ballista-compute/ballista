@@ -7,7 +7,7 @@ public class ProtoTest {
   @Test
   public void test() {
 
-    ColumnIndex columnIndex = ColumnIndex.newBuilder().build();
+    Column column = Column.newBuilder().setName("foo").build();
 
   }
 }

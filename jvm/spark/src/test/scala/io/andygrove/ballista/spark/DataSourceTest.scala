@@ -5,7 +5,6 @@ import org.apache.spark.sql.SparkSession
 
 class DataSourceTest {
 
-  @Ignore
   @Test
   def testSomething() {
 
@@ -14,7 +13,7 @@ class DataSourceTest {
       .getOrCreate()
 
     val df = spark.read
-      .format("io.andygrove.ballista.spark")
+      .format("io.andygrove.ballista.spark.datasource")
       .option("table", "alltypes_plain")
       .load()
 

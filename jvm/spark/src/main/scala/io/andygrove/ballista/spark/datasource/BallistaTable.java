@@ -1,8 +1,7 @@
 package io.andygrove.ballista.spark.datasource;
 
 import com.google.common.collect.ImmutableSet;
-import org.apache.spark.rdd.RDD;
-import org.apache.spark.sql.Row;
+import org.apache.arrow.flight.FlightClient;
 import org.apache.spark.sql.connector.catalog.SupportsRead;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCapability;
@@ -14,10 +13,16 @@ import java.util.Set;
 
 public class BallistaTable implements Table, SupportsRead {
 
-  private String tableName;
+  private final FlightClient flightClient;
 
-  public BallistaTable(String table) {
-    this.tableName = table;
+  private final String tableName;
+
+  private final StructType schema;
+
+  public BallistaTable(FlightClient flightClient, String tableName, StructType schema) {
+    this.flightClient = flightClient;
+    this.tableName = tableName;
+    this.schema = schema;
   }
 
   @Override
@@ -27,7 +32,7 @@ public class BallistaTable implements Table, SupportsRead {
 
   @Override
   public StructType schema() {
-    throw new UnsupportedOperationException();
+    return schema;
   }
 
   @Override

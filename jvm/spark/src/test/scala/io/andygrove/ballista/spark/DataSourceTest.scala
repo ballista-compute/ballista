@@ -15,6 +15,8 @@ class DataSourceTest {
     val df = spark.read
       .format("io.andygrove.ballista.spark.datasource")
       .option("table", "alltypes_plain")
+      .option("host", "localhost")
+      .option("port", "50001")
       .load()
 
     val query = df

@@ -21,6 +21,8 @@ use futures::Stream;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status, Streaming};
 
+use datafusion::datasource::TableProvider;
+use datafusion::datasource::parquet::ParquetTable;
 use datafusion::execution::context::ExecutionContext;
 
 use flight::{
@@ -28,6 +30,8 @@ use flight::{
     Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo,
     HandshakeRequest, HandshakeResponse, PutResult, SchemaResult, Ticket,
 };
+
+use arrow::ipc::writer::schema_to_bytes;
 
 #[derive(Clone)]
 pub struct FlightServiceImpl {}
@@ -49,6 +53,44 @@ impl FlightService for FlightServiceImpl {
     type ListActionsStream =
         Pin<Box<dyn Stream<Item = Result<ActionType, Status>> + Send + Sync + 'static>>;
 
+    async fn get_schema(
+        &self,
+        request: Request<FlightDescriptor>,
+    ) -> Result<Response<SchemaResult>, Status> {
+
+        println!("get_schema()");
+
+        let request = request.into_inner();
+
+        let table = ParquetTable::try_new(&request.path[0]).unwrap();
+
+        Ok(Response::new(SchemaResult::from(table.schema().as_ref())))
+    }
+
+    async fn get_flight_info(
+        &self,
+        request: Request<FlightDescriptor>,
+    ) -> Result<Response<FlightInfo>, Status> {
+
+        println!("get_flight_info");
+
+        let request = request.into_inner();
+
+        let table = ParquetTable::try_new(&request.path[0]).unwrap();
+
+        let schema_bytes = schema_to_bytes(table.schema().as_ref());
+
+        Ok(Response::new(FlightInfo {
+            schema: schema_bytes,
+            endpoint: vec![],
+            flight_descriptor: None,
+            total_bytes: -1,
+            total_records: -1,
+
+        }))
+    }
+
+
     async fn do_get(
         &self,
         request: Request<Ticket>,
@@ -56,6 +98,7 @@ impl FlightService for FlightServiceImpl {
         let ticket = request.into_inner();
         match String::from_utf8(ticket.ticket.to_vec()) {
             Ok(sql) => {
+
                 println!("do_get: {}", sql);
 
                 // create local execution context
@@ -116,20 +159,6 @@ impl FlightService for FlightServiceImpl {
         &self,
         _request: Request<Criteria>,
     ) -> Result<Response<Self::ListFlightsStream>, Status> {
-        Err(Status::unimplemented("Not yet implemented"))
-    }
-
-    async fn get_flight_info(
-        &self,
-        _request: Request<FlightDescriptor>,
-    ) -> Result<Response<FlightInfo>, Status> {
-        Err(Status::unimplemented("Not yet implemented"))
-    }
-
-    async fn get_schema(
-        &self,
-        _request: Request<FlightDescriptor>,
-    ) -> Result<Response<SchemaResult>, Status> {
         Err(Status::unimplemented("Not yet implemented"))
     }
 

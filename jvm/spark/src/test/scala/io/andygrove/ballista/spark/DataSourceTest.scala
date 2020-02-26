@@ -14,18 +14,20 @@ class DataSourceTest {
 
     val df = spark.read
       .format("io.andygrove.ballista.spark.datasource")
-      .option("table", "alltypes_plain")
-      .option("host", "localhost")
-      .option("port", "50001")
+      .option("table", "/home/andy/git/andygrove/arrow/cpp/submodules/parquet-testing/data/alltypes_plain.parquet")
+      .option("host", "127.0.0.1")
+      .option("port", "50051")
       .load()
 
-    val query = df
-      .select("a", "b")
-      .filter("c < d")
+    df.printSchema()
 
-    query.explain()
-
-    val results = query.collect()
+//    val query = df
+//      .select("a", "b")
+//      .filter("c < d")
+//
+//    query.explain()
+//
+//    val results = query.collect()
 
   }
 }

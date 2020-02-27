@@ -57,6 +57,7 @@ checksum = "cff77d8686867eceff3105329d4698d96c2391c176d5d03adc90c7389162b5b8"
 [[package]]
 name = "arrow"
 version = "1.0.0-SNAPSHOT"
+source = "git+https://github.com/andygrove/arrow#3a4023a2385416024d9a7c7a626f3401d380e3d0"
 dependencies = [
  "arrow-flight",
  "chrono",
@@ -78,6 +79,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "1.0.0-SNAPSHOT"
+source = "git+https://github.com/andygrove/arrow#3a4023a2385416024d9a7c7a626f3401d380e3d0"
 dependencies = [
  "bytes 0.4.12",
  "futures",
@@ -436,6 +438,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "1.0.0-SNAPSHOT"
+source = "git+https://github.com/andygrove/arrow#3a4023a2385416024d9a7c7a626f3401d380e3d0"
 dependencies = [
  "arrow",
  "clap",
@@ -1106,6 +1109,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "1.0.0-SNAPSHOT"
+source = "git+https://github.com/andygrove/arrow#3a4023a2385416024d9a7c7a626f3401d380e3d0"
 dependencies = [
  "arrow",
  "brotli",

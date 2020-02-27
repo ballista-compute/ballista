@@ -13,26 +13,20 @@ import java.util.Set;
 
 public class BallistaTable implements Table, SupportsRead {
 
-  private final FlightClient flightClient;
+  private TableMeta tableMeta;
 
-  private final String tableName;
-
-  private final StructType schema;
-
-  public BallistaTable(FlightClient flightClient, String tableName, StructType schema) {
-    this.flightClient = flightClient;
-    this.tableName = tableName;
-    this.schema = schema;
+  public BallistaTable(TableMeta tableMeta) {
+    this.tableMeta = tableMeta;
   }
 
   @Override
   public String name() {
-    return tableName;
+    return tableMeta.tableName;
   }
 
   @Override
   public StructType schema() {
-    return schema;
+    return tableMeta.schema;
   }
 
   @Override
@@ -42,6 +36,6 @@ public class BallistaTable implements Table, SupportsRead {
 
   @Override
   public ScanBuilder newScanBuilder(CaseInsensitiveStringMap options) {
-    throw new UnsupportedOperationException();
+    return new BallistaScanBuilder(tableMeta);
   }
 }

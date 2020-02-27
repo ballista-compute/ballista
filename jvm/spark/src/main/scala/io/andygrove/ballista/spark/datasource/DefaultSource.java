@@ -1,10 +1,14 @@
 package io.andygrove.ballista.spark.datasource;
 
+import org.apache.arrow.flight.CallOption;
+import org.apache.arrow.flight.CallOptions;
 import org.apache.arrow.flight.FlightClient;
 import org.apache.arrow.flight.FlightDescriptor;
 import org.apache.arrow.flight.FlightInfo;
+import org.apache.arrow.flight.FlightStream;
 import org.apache.arrow.flight.Location;
 import org.apache.arrow.flight.SchemaResult;
+import org.apache.arrow.flight.Ticket;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.spark.sql.connector.catalog.Table;
@@ -32,12 +36,16 @@ public class DefaultSource implements TableProvider {
 //    SchemaResult schemaResult = client.getSchema(FlightDescriptor.path(tableName));
 //    Schema arrowSchema = schemaResult.getSchema();
 
-    FlightInfo info = client.getInfo(FlightDescriptor.path(tableName));
-    Schema arrowSchema = info.getSchema();
+//    FlightInfo info = client.getInfo(FlightDescriptor.path(tableName));
+//    Schema arrowSchema = info.getSchema();
+
+    Ticket ticket = new Ticket("SELECT id FROM alltypes_plain".getBytes());
+    FlightStream stream = client.getStream(ticket);
+    Schema arrowSchema = stream.getSchema();
 
     StructType sparkSchema = ArrowUtils.fromArrowSchema(arrowSchema);
 
-    return new BallistaTable(client, tableName, sparkSchema);
+    return new BallistaTable(new TableMeta(host, port, tableName, sparkSchema));
   }
 
 }

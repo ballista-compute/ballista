@@ -15,13 +15,13 @@ tokio = { version = "0.2", features = ["full"] }
 tonic = "0.1.1"
 flatbuffers = "0.6.0"
 
-arrow = { path="../../arrow/rust/arrow" }
-arrow-flight = { path="../../arrow/rust/arrow-flight" }
-datafusion = { path="../../arrow/rust/datafusion" }
+#arrow = { path="../../arrow/rust/arrow" }
+#arrow-flight = { path="../../arrow/rust/arrow-flight" }
+#datafusion = { path="../../arrow/rust/datafusion" }
 
-#arrow = { git = "https://github.com/andygrove/arrow", branch = "ARROW-7947" }
-#arrow-flight = { git = "https://github.com/andygrove/arrow", branch = "ARROW-7947" }
-#datafusion = { git = "https://github.com/andygrove/arrow", branch = "ARROW-7947" }
+arrow = { git = "https://github.com/andygrove/arrow", branch = "master" }
+arrow-flight = { git = "https://github.com/andygrove/arrow", branch = "master" }
+datafusion = { git = "https://github.com/andygrove/arrow", branch = "master" }
 
 [[bin]]
 name = "executor"

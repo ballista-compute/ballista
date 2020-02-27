@@ -31,7 +31,7 @@ use flight::{
     HandshakeRequest, HandshakeResponse, PutResult, SchemaResult, Ticket,
 };
 
-use arrow::ipc::writer::schema_to_bytes;
+//use arrow::ipc::writer::schema_to_bytes;
 
 #[derive(Clone)]
 pub struct FlightServiceImpl {}
@@ -60,11 +60,13 @@ impl FlightService for FlightServiceImpl {
 
         println!("get_schema()");
 
-        let request = request.into_inner();
+        // let request = request.into_inner();
+        //
+        // let table = ParquetTable::try_new(&request.path[0]).unwrap();
+        //
+        // Ok(Response::new(SchemaResult::from(table.schema().as_ref())))
 
-        let table = ParquetTable::try_new(&request.path[0]).unwrap();
-
-        Ok(Response::new(SchemaResult::from(table.schema().as_ref())))
+        Err(Status::unimplemented("Not yet implemented"))
     }
 
     async fn get_flight_info(
@@ -74,20 +76,22 @@ impl FlightService for FlightServiceImpl {
 
         println!("get_flight_info");
 
-        let request = request.into_inner();
+        // let request = request.into_inner();
+        //
+        // let table = ParquetTable::try_new(&request.path[0]).unwrap();
+        //
+        // let schema_bytes = schema_to_bytes(table.schema().as_ref());
+        //
+        // Ok(Response::new(FlightInfo {
+        //     schema: schema_bytes,
+        //     endpoint: vec![],
+        //     flight_descriptor: None,
+        //     total_bytes: -1,
+        //     total_records: -1,
+        //
+        // }))
 
-        let table = ParquetTable::try_new(&request.path[0]).unwrap();
-
-        let schema_bytes = schema_to_bytes(table.schema().as_ref());
-
-        Ok(Response::new(FlightInfo {
-            schema: schema_bytes,
-            endpoint: vec![],
-            flight_descriptor: None,
-            total_bytes: -1,
-            total_records: -1,
-
-        }))
+        Err(Status::unimplemented("Not yet implemented"))
     }
 
 

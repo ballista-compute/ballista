@@ -44,6 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // all the remaining stream messages should be dictionary and record batches
     while let Some(flight_data) = stream.message().await? {
+
         // the unwrap is infallible and thus safe
         let record_batch = flight_data_to_batch(&flight_data, schema.clone())?.unwrap();
 

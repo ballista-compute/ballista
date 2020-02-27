@@ -21,13 +21,8 @@ class DataSourceTest {
 
     df.printSchema()
 
-//    val query = df
-//      .select("a", "b")
-//      .filter("c < d")
-//
-//    query.explain()
-//
-//    val results = query.collect()
+    val results = df.collect()
+    results.foreach(println)
 
   }
 }

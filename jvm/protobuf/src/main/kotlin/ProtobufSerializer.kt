@@ -5,7 +5,7 @@ import org.ballistacompute.logical.*
 /**
  * Utility to convert between logical plan and protobuf representation.
  */
-class ProtoUtils {
+class ProtobufSerializer {
 
     /** Convert a logical plan to a protobuf representation */
     fun toProto(plan: LogicalPlan): LogicalPlanNode {
@@ -51,9 +51,18 @@ class ProtoUtils {
             is Column -> {
                 LogicalExprNode.newBuilder().setColumnName(expr.name).build()
             }
+            is LiteralString -> {
+                LogicalExprNode.newBuilder().setLiteralString(expr.str).build()
+            }
             is Eq -> {
-                LogicalExprNode.newBuilder().setBinaryExpr(
-                        BinaryExprNode.newBuilder().build()).build()
+                LogicalExprNode
+                        .newBuilder().setBinaryExpr(
+                        BinaryExprNode.newBuilder()
+                                .setL(toProto(expr.l))
+                                .setOp("=")
+                                .setR(toProto(expr.r))
+                                .build())
+                        .build()
             }
             else -> TODO(expr.javaClass.name)
         }

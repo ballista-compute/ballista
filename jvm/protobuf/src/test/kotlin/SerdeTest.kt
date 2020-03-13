@@ -2,9 +2,11 @@ package org.ballistacompute.protobuf.test
 
 import org.ballistacompute.datasource.CsvDataSource
 import org.ballistacompute.logical.*
-import org.ballistacompute.protobuf.ProtoUtils
+import org.ballistacompute.protobuf.ProtobufDeserializer
+import org.ballistacompute.protobuf.ProtobufSerializer
 import org.junit.Test
 import org.junit.jupiter.api.TestInstance
+import kotlin.test.assertEquals
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SerdeTest {
@@ -16,14 +18,19 @@ class SerdeTest {
                 .filter(col("state") eq lit("CO"))
                 .select(listOf(col("id"), col("first_name"), col("last_name")))
 
-        val protobuf = ProtoUtils().toProto(df.logicalPlan())
+        val logicalPlan = roundtrip(df)
 
-//    val expected =
-//            "Projection: #id, #first_name, #last_name\n" +
-//                    "\tSelection: #state = 'CO'\n" +
-//                    "\t\tScan: employee; projection=None\n"
-//
-//    assertEquals(expected, format(df.logicalPlan()))
+        val expected =
+            "Projection: #id, #first_name, #last_name\n" +
+                    "\tSelection: #state = 'CO'\n" +
+                    "\t\tScan: employee; projection=None\n"
+
+        assertEquals(expected, format(logicalPlan))
+    }
+
+    private fun roundtrip(df: DataFrame) : LogicalPlan {
+        val protobuf = ProtobufSerializer().toProto(df.logicalPlan())
+        return ProtobufDeserializer().fromProto(protobuf)
     }
 
     private fun csv(): DataFrame {

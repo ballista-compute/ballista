@@ -9,6 +9,7 @@ option java_outer_classname = "BallistaProto";
 // logical expression
 message LogicalExprNode {
   string column_name = 10;
+  string literal_string = 11;
   BinaryExprNode binary_expr = 20;
   AggregateExprNode aggregate_expr = 21;
 }

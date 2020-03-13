@@ -49,10 +49,14 @@ class ProtobufSerializer {
     fun toProto(expr: LogicalExpr): LogicalExprNode {
         return when (expr) {
             is Column -> {
-                LogicalExprNode.newBuilder().setColumnName(expr.name).build()
+                LogicalExprNode.newBuilder()
+                        .setHasColumnName(true)
+                        .setColumnName(expr.name).build()
             }
             is LiteralString -> {
-                LogicalExprNode.newBuilder().setLiteralString(expr.str).build()
+                LogicalExprNode.newBuilder()
+                        .setHasLiteralString(true)
+                        .setLiteralString(expr.str).build()
             }
             is Eq -> {
                 LogicalExprNode

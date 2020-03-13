@@ -30,9 +30,9 @@ class ProtobufDeserializer {
                 "=" -> Eq(fromProto(binaryNode.l), fromProto(binaryNode.r))
                 else -> TODO("binary expr ${binaryNode.op}")
             }
-        } else if (node.columnName != null && node.columnName.isNotEmpty()) {
+        } else if (node.hasColumnName) {
             col(node.columnName)
-        } else if (node.literalString != null) {
+        } else if (node.hasLiteralString) {
             lit(node.literalString)
         } else {
             TODO(node.toString())

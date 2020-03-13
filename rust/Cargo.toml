@@ -3,6 +3,7 @@ name = "server"
 version = "0.1.0"
 authors = ["Andy Grove <andygrove73@gmail.com>"]
 edition = "2018"
+build = "build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -10,10 +11,12 @@ edition = "2018"
 env_logger = { version = "0.6", default-features = false }
 futures = "0.3"
 log = "0.4"
-prost = "0.5"
 tokio = { version = "0.2", features = ["full"] }
 tonic = "0.1.1"
 flatbuffers = "0.6.0"
+prost = "0.6"
+# Only necessary if using Protobuf well-known types:
+prost-types = "0.6"
 
 #arrow = { path="../../arrow/rust/arrow" }
 #arrow-flight = { path="../../arrow/rust/arrow-flight" }
@@ -26,3 +29,7 @@ datafusion = { git = "https://github.com/andygrove/arrow", branch = "master" }
 [[bin]]
 name = "executor"
 path = "src/bin/executor.rs"
+
+[build-dependencies]
+#tower-grpc-build = { version = "0.1.0", features = ["tower-hyper"] }
+prost-build = { version = "0.6.1" }

@@ -2,9 +2,6 @@ package org.ballistacompute.datasource
 
 import org.ballistacompute.datatypes.RecordBatch
 
-import com.github.doyaaaaaken.kotlincsv.client.CsvFileReader
-import com.github.doyaaaaaken.kotlincsv.client.CsvReader
-import com.github.doyaaaaaken.kotlincsv.dsl.csvReader
 import org.apache.arrow.memory.RootAllocator
 import org.apache.arrow.vector.VarCharVector
 import org.apache.arrow.vector.VectorSchemaRoot

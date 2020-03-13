@@ -1,6 +1,5 @@
 package org.ballistacompute.client
 
-import io.andygrove.ballista.*
 import org.ballistacompute.logical.Column as KQColumn
 import org.ballistacompute.logical.LogicalExpr
 import org.ballistacompute.logical.LogicalPlan
@@ -10,6 +9,8 @@ import org.apache.arrow.flight.FlightClient
 import org.apache.arrow.flight.Location
 import org.apache.arrow.flight.Ticket
 import org.apache.arrow.memory.RootAllocator
+import org.ballistacompute.protobuf.LogicalPlanNode
+import org.ballistacompute.protobuf.ProtoUtils
 
 import java.util.concurrent.TimeUnit
 
@@ -27,7 +28,7 @@ class Client(val host: String, val port: Int) {
 
     fun execute(plan: LogicalPlan) {
 
-        val protoBuf = toProto(plan)
+        val protoBuf = ProtoUtils().toProto(plan)
 
         var ticket = Ticket(protoBuf.toByteArray())
 
@@ -35,27 +36,5 @@ class Client(val host: String, val port: Int) {
 
     }
 
-    /** Convert a Kotlin LogicalPlan to a protobuf LogicalPlan */
-    fun toProto(plan: LogicalPlan): LogicalPlanNode {
-        return when (plan) {
-            is KQProjection -> {
-                LogicalPlanNode.newBuilder()
-                        .setProjection(Projection.newBuilder()
-                            .addAllExpr(plan.expr.map { toProto(it) }).build())
-                        .build()
-            }
-            else -> throw IllegalStateException()
-        }
-    }
-
-    /** Convert a Kotlin Expr to a protobuf ExprNode */
-    fun toProto(expr: LogicalExpr): ExprNode {
-        return when (expr) {
-            is KQColumn -> {
-                ExprNode.newBuilder().setColumn(Column.newBuilder().setName(expr.name).build()).build()
-            }
-            else -> throw IllegalStateException()
-        }
-    }
 
 }

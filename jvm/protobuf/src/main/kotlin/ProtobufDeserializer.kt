@@ -27,7 +27,7 @@ class ProtobufDeserializer {
         return if (node.hasBinaryExpr()) {
             val binaryNode = node.binaryExpr
             when (binaryNode.op) {
-                "=" -> Eq(fromProto(binaryNode.l), fromProto(binaryNode.r))
+                "eq" -> Eq(fromProto(binaryNode.l), fromProto(binaryNode.r))
                 else -> TODO("binary expr ${binaryNode.op}")
             }
         } else if (node.hasColumnName) {

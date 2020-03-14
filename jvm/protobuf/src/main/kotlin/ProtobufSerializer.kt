@@ -63,7 +63,7 @@ class ProtobufSerializer {
                         .newBuilder().setBinaryExpr(
                         BinaryExprNode.newBuilder()
                                 .setL(toProto(expr.l))
-                                .setOp("=")
+                                .setOp("eq")
                                 .setR(toProto(expr.r))
                                 .build())
                         .build()

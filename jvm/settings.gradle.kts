@@ -18,6 +18,7 @@ include("physical-plan")
 include("query-planner")
 include("sql")
 include("execution")
+include("executor")
 include("examples")
 include("spark-examples")
 

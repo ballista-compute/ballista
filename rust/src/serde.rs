@@ -1,29 +1,35 @@
-use crate::error::{BallistaError, Result};
+use crate::error::BallistaError;
 use crate::logical_plan::LogicalExpr;
 use crate::logical_plan::LogicalPlan;
 use crate::protobuf;
 
-fn from_plan(plan: &LogicalPlan) -> Result<protobuf::LogicalPlanNode> {
-    match plan {
-        LogicalPlan::Scan { filename } => {
-            let node = empty_plan_node();
-            Ok(node)
+use std::convert::TryInto;
+
+impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
+    type Error = BallistaError;
+
+    fn try_into(self) -> Result<protobuf::LogicalPlanNode, Self::Error> {
+        match self {
+            LogicalPlan::Scan { filename } => {
+                let node = empty_plan_node();
+                Ok(node)
+            }
+            LogicalPlan::Projection { expr, input } => {
+                //let input = from_plan(&input)?;
+                let node = empty_plan_node();
+                Ok(node)
+            }
+            LogicalPlan::Selection { expr, input } => {
+                //let input = from_plan(&input)?;
+                let node = empty_plan_node();
+                Ok(node)
+            }
+            _ => Err(BallistaError::NotImplemented(format!("{:?}", self))),
         }
-        LogicalPlan::Projection { expr, input } => {
-            let input = from_plan(&input)?;
-            let node = empty_plan_node();
-            Ok(node)
-        }
-        LogicalPlan::Selection { expr, input } => {
-            let input = from_plan(&input)?;
-            let node = empty_plan_node();
-            Ok(node)
-        }
-        _ => Err(BallistaError::NotImplemented(format!("{:?}", plan))),
     }
 }
 
-fn from_expr(expr: &LogicalExpr) -> Result<protobuf::LogicalExprNode> {
+fn from_expr(expr: &LogicalExpr) -> Result<protobuf::LogicalExprNode, BallistaError> {
     match expr {
         LogicalExpr::Column(name) => {
             let mut expr = empty_expr_node();
@@ -63,11 +69,10 @@ fn empty_plan_node() -> protobuf::LogicalPlanNode {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use super::LogicalExpr::*;
-    use super::LogicalPlan::*;
-    use crate::logical_plan::*;
     use crate::error::Result;
+    use crate::logical_plan::*;
+    use crate::protobuf;
+    use std::convert::TryInto;
 
     #[test]
     fn roundtrip() -> Result<()> {
@@ -77,7 +82,7 @@ mod tests {
             .project(vec![col("state")])?
             .build()?;
 
-        let proto = from_plan(&plan)?;
+        let proto: protobuf::LogicalPlanNode = plan.try_into()?;
 
         Ok(())
     }

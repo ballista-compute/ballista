@@ -128,7 +128,6 @@ pub struct LogicalPlanBuilder {
 }
 
 impl LogicalPlanBuilder {
-
     pub fn new() -> Self {
         Self { plan: None }
     }

@@ -1,3 +1,4 @@
+use crate::error::{BallistaError, Result, ballista_error};
 
 #[derive(Debug,Clone)]
 pub enum LogicalExpr {
@@ -55,31 +56,53 @@ trait Relation {
 }
 
 struct LogicalPlanBuilder {
-    plan: LogicalPlan
+    plan: Option<LogicalPlan>
 }
 
 impl LogicalPlanBuilder {
 
+    fn new() -> Self {
+        Self { plan: None }
+    }
+
     fn from(plan: LogicalPlan) -> Self {
-        Self { plan }
+        Self { plan: Some(plan) }
     }
 
-    fn project(&self, expr: Vec<LogicalExpr>) -> LogicalPlanBuilder {
-        LogicalPlanBuilder::from(LogicalPlan::Projection {
-            expr,
-            input: Box::new(self.plan.clone())
-        })
+    fn project(&self, expr: Vec<LogicalExpr>) -> Result<LogicalPlanBuilder> {
+        match &self.plan {
+            Some(plan) => Ok(LogicalPlanBuilder::from(LogicalPlan::Projection {
+                expr,
+                input: Box::new(plan.clone())
+            })),
+            _ => Err(ballista_error("Cannot apply a projection to an empty plan"))
+        }
     }
 
-    fn filter(&self, expr: LogicalExpr) -> LogicalPlanBuilder {
-        LogicalPlanBuilder::from(LogicalPlan::Selection {
-            expr: Box::new(expr),
-            input: Box::new(self.plan.clone())
-        })
+    fn filter(&self, expr: LogicalExpr) -> Result<LogicalPlanBuilder> {
+        match &self.plan {
+            Some(plan) => Ok(LogicalPlanBuilder::from(LogicalPlan::Selection {
+                expr: Box::new(expr),
+                input: Box::new(plan.clone())
+            })),
+            _ => Err(ballista_error("Cannot apply a selection to an empty plan"))
+        }
     }
 
-    fn build(&self) -> LogicalPlan {
-        self.plan.clone()
+    fn scan(&self, filename: &str) -> Result<LogicalPlanBuilder> {
+        match &self.plan {
+            None => Ok(LogicalPlanBuilder::from(LogicalPlan::Scan {
+                filename: filename.to_owned()
+            })),
+            _ => Err(ballista_error("Cannot apply a scan to a non-empty plan"))
+        }
+    }
+
+    fn build(&self) -> Result<LogicalPlan> {
+        match &self.plan {
+            Some(plan) => Ok(plan.clone()),
+            _ => Err(ballista_error("Cannot build an empty plan"))
+        }
     }
 }
 
@@ -98,20 +121,16 @@ fn eq(l: LogicalExpr, r: LogicalExpr) -> LogicalExpr {
 mod tests {
     use super::*;
     use super::LogicalPlan::*;
-    use super::LogicalExpr::*;
     use crate::logical_plan::LogicalPlanBuilder;
 
     #[test]
-    fn build_plan_manually() {
+    fn plan_builder() -> Result<()> {
 
-        let scan = Scan {
-            filename: "employee.csv".to_owned()
-        };
-
-        let plan = LogicalPlanBuilder::from(scan)
-            .filter(eq(col("state"), lit_str("CO")))
-            .project(vec![col("state")])
-            .build();
+        let plan = LogicalPlanBuilder::new()
+            .scan("employee.csv")?
+            .filter(eq(col("state"), lit_str("CO")))?
+            .project(vec![col("state")])?
+            .build()?;
 
         let plan_str = format!("{:?}", plan);
         let expected_str =
@@ -126,6 +145,8 @@ mod tests {
             }";
 
         assert_eq!(expected_str, plan_str);
+
+        Ok(())
     }
 
 }

@@ -22,6 +22,10 @@ pub enum BallistaError {
     // KubeAPIResponseError(k8s_openapi::ResponseError),
 }
 
+pub fn ballista_error(message: &str) -> BallistaError {
+    BallistaError::General(message.to_owned())
+}
+
 impl From<String> for BallistaError {
     fn from(e: String) -> Self {
         BallistaError::General(e)

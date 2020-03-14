@@ -1,4 +1,4 @@
-use crate::error::{ballista_error, BallistaError, Result};
+use crate::error::{ballista_error, Result};
 
 #[derive(Debug, Clone)]
 pub enum LogicalExpr {
@@ -188,7 +188,6 @@ pub fn eq(l: LogicalExpr, r: LogicalExpr) -> LogicalExpr {
 
 #[cfg(test)]
 mod tests {
-    use super::LogicalPlan::*;
     use super::*;
     use crate::logical_plan::LogicalPlanBuilder;
 

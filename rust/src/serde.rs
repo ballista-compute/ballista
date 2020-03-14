@@ -11,17 +11,28 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
     fn try_into(self) -> Result<protobuf::LogicalPlanNode, Self::Error> {
         match self {
             LogicalPlan::Scan { filename } => {
-                let node = empty_plan_node();
+                let mut node = empty_plan_node();
+                node.file = Some(protobuf::FileNode {
+                    filename: filename.clone(),
+                    schema: None,
+                    projection: vec![],
+                });
                 Ok(node)
             }
             LogicalPlan::Projection { expr, input } => {
-                //let input = from_plan(&input)?;
-                let node = empty_plan_node();
+                let input: protobuf::LogicalPlanNode = input.as_ref().clone().try_into()?;
+                let mut node = empty_plan_node();
+                node.input = Some(Box::new(input));
                 Ok(node)
             }
             LogicalPlan::Selection { expr, input } => {
-                //let input = from_plan(&input)?;
-                let node = empty_plan_node();
+                let input: protobuf::LogicalPlanNode = input.as_ref().clone().try_into()?;
+                let selection = protobuf::SelectionNode {
+                    expr: Some(expr.as_ref().clone().try_into()?)
+                };
+                let mut node = empty_plan_node();
+                node.input = Some(Box::new(input));
+                node.selection = Some(selection);
                 Ok(node)
             }
             _ => Err(BallistaError::NotImplemented(format!("{:?}", self))),
@@ -29,15 +40,19 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
     }
 }
 
-fn from_expr(expr: &LogicalExpr) -> Result<protobuf::LogicalExprNode, BallistaError> {
-    match expr {
-        LogicalExpr::Column(name) => {
-            let mut expr = empty_expr_node();
-            expr.has_column_name = true;
-            expr.column_name = name.clone();
-            Ok(expr)
+impl TryInto<protobuf::LogicalExprNode> for LogicalExpr {
+    type Error = BallistaError;
+
+    fn try_into(self) -> Result<protobuf::LogicalExprNode, Self::Error> {
+        match self {
+            LogicalExpr::Column(name) => {
+                let mut expr = empty_expr_node();
+                expr.has_column_name = true;
+                expr.column_name = name.clone();
+                Ok(expr)
+            }
+            _ => Err(BallistaError::NotImplemented(format!("{:?}", self))),
         }
-        _ => Err(BallistaError::NotImplemented(format!("{:?}", expr))),
     }
 }
 

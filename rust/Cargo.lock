@@ -168,6 +168,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "ballista"
+version = "0.2.0-dev"
+dependencies = [
+ "arrow",
+ "arrow-flight",
+ "datafusion",
+ "env_logger",
+ "flatbuffers",
+ "futures",
+ "log 0.4.8",
+ "prost",
+ "prost-build",
+ "prost-types",
+ "tokio",
+ "tonic",
+]
+
+[[package]]
 name = "base64"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1659,24 +1677,6 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
-]
-
-[[package]]
-name = "server"
-version = "0.1.0"
-dependencies = [
- "arrow",
- "arrow-flight",
- "datafusion",
- "env_logger",
- "flatbuffers",
- "futures",
- "log 0.4.8",
- "prost",
- "prost-build",
- "prost-types",
- "tokio",
- "tonic",
 ]
 
 [[package]]

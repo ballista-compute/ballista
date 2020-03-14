@@ -20,19 +20,24 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
                 Ok(node)
             }
             LogicalPlan::Projection { expr, input } => {
-                let input: protobuf::LogicalPlanNode = input.as_ref().clone().try_into()?;
+                let input: protobuf::LogicalPlanNode = input.as_ref().to_owned().try_into()?;
                 let mut node = empty_plan_node();
                 node.input = Some(Box::new(input));
+                node.projection = Some(protobuf::ProjectionNode {
+                    expr: expr
+                        .iter()
+                        .map(|expr| expr.to_owned().try_into())
+                        .collect::<Result<Vec<_>, BallistaError>>()?,
+                });
                 Ok(node)
             }
             LogicalPlan::Selection { expr, input } => {
-                let input: protobuf::LogicalPlanNode = input.as_ref().clone().try_into()?;
-                let selection = protobuf::SelectionNode {
-                    expr: Some(expr.as_ref().clone().try_into()?)
-                };
+                let input: protobuf::LogicalPlanNode = input.as_ref().to_owned().try_into()?;
                 let mut node = empty_plan_node();
                 node.input = Some(Box::new(input));
-                node.selection = Some(selection);
+                node.selection = Some(protobuf::SelectionNode {
+                    expr: Some(expr.as_ref().to_owned().try_into()?),
+                });
                 Ok(node)
             }
             _ => Err(BallistaError::NotImplemented(format!("{:?}", self))),
@@ -49,6 +54,21 @@ impl TryInto<protobuf::LogicalExprNode> for LogicalExpr {
                 let mut expr = empty_expr_node();
                 expr.has_column_name = true;
                 expr.column_name = name.clone();
+                Ok(expr)
+            }
+            LogicalExpr::LiteralString(str) => {
+                let mut expr = empty_expr_node();
+                expr.has_literal_string = true;
+                expr.literal_string = str.clone();
+                Ok(expr)
+            }
+            LogicalExpr::Eq(l, r) => {
+                let mut expr = empty_expr_node();
+                expr.binary_expr = Some(Box::new(protobuf::BinaryExprNode {
+                    l: Some(Box::new(l.as_ref().to_owned().try_into()?)),
+                    r: Some(Box::new(r.as_ref().to_owned().try_into()?)),
+                    op: "eq".to_owned(),
+                }));
                 Ok(expr)
             }
             _ => Err(BallistaError::NotImplemented(format!("{:?}", self))),

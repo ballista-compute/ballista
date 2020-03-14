@@ -123,20 +123,21 @@ trait Relation {
     fn filter(&self, expr: LogicalExpr) -> Box<dyn Relation>;
 }
 
-struct LogicalPlanBuilder {
+pub struct LogicalPlanBuilder {
     plan: Option<LogicalPlan>,
 }
 
 impl LogicalPlanBuilder {
-    fn new() -> Self {
+
+    pub fn new() -> Self {
         Self { plan: None }
     }
 
-    fn from(plan: LogicalPlan) -> Self {
+    pub fn from(plan: LogicalPlan) -> Self {
         Self { plan: Some(plan) }
     }
 
-    fn project(&self, expr: Vec<LogicalExpr>) -> Result<LogicalPlanBuilder> {
+    pub fn project(&self, expr: Vec<LogicalExpr>) -> Result<LogicalPlanBuilder> {
         match &self.plan {
             Some(plan) => Ok(LogicalPlanBuilder::from(LogicalPlan::Projection {
                 expr,
@@ -146,7 +147,7 @@ impl LogicalPlanBuilder {
         }
     }
 
-    fn filter(&self, expr: LogicalExpr) -> Result<LogicalPlanBuilder> {
+    pub fn filter(&self, expr: LogicalExpr) -> Result<LogicalPlanBuilder> {
         match &self.plan {
             Some(plan) => Ok(LogicalPlanBuilder::from(LogicalPlan::Selection {
                 expr: Box::new(expr),
@@ -156,7 +157,7 @@ impl LogicalPlanBuilder {
         }
     }
 
-    fn scan(&self, filename: &str) -> Result<LogicalPlanBuilder> {
+    pub fn scan(&self, filename: &str) -> Result<LogicalPlanBuilder> {
         match &self.plan {
             None => Ok(LogicalPlanBuilder::from(LogicalPlan::Scan {
                 filename: filename.to_owned(),
@@ -165,7 +166,7 @@ impl LogicalPlanBuilder {
         }
     }
 
-    fn build(&self) -> Result<LogicalPlan> {
+    pub fn build(&self) -> Result<LogicalPlan> {
         match &self.plan {
             Some(plan) => Ok(plan.clone()),
             _ => Err(ballista_error("Cannot build an empty plan")),
@@ -173,16 +174,16 @@ impl LogicalPlanBuilder {
     }
 }
 
-fn col(name: &str) -> LogicalExpr {
+pub fn col(name: &str) -> LogicalExpr {
     LogicalExpr::Column(name.to_owned())
 }
 
-fn lit_str(str: &str) -> LogicalExpr {
+pub fn lit_str(str: &str) -> LogicalExpr {
     LogicalExpr::LiteralString(str.to_owned())
 }
 
 //TODO use macros to implement the other binary expressions
-fn eq(l: LogicalExpr, r: LogicalExpr) -> LogicalExpr {
+pub fn eq(l: LogicalExpr, r: LogicalExpr) -> LogicalExpr {
     LogicalExpr::Eq(Box::new(l), Box::new(r))
 }
 

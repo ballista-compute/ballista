@@ -63,30 +63,21 @@ fn empty_plan_node() -> protobuf::LogicalPlanNode {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use super::LogicalExpr::*;
     use super::LogicalPlan::*;
-    use super::*;
+    use crate::logical_plan::*;
+    use crate::error::Result;
 
     #[test]
     fn roundtrip() -> Result<()> {
-        let scan = Scan {
-            filename: "employee.csv".to_owned(),
-        };
+        let plan = LogicalPlanBuilder::new()
+            .scan("employee.csv")?
+            .filter(eq(col("state"), lit_str("CO")))?
+            .project(vec![col("state")])?
+            .build()?;
 
-        let filter = Selection {
-            input: Box::new(scan),
-            expr: Box::new(Eq(
-                Box::new(Column("state".to_owned())),
-                Box::new(LiteralString("CO".to_owned())),
-            )),
-        };
-
-        let projection = Projection {
-            input: Box::new(filter),
-            expr: vec![Column("state".to_owned())],
-        };
-
-        let proto = from_plan(&projection)?;
+        let proto = from_plan(&plan)?;
 
         Ok(())
     }

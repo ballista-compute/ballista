@@ -21,14 +21,14 @@ use futures::Stream;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status, Streaming};
 
-use datafusion::datasource::TableProvider;
 use datafusion::datasource::parquet::ParquetTable;
+use datafusion::datasource::TableProvider;
 use datafusion::execution::context::ExecutionContext;
 
 use flight::{
-    flight_service_server::FlightService, flight_service_server::FlightServiceServer,
-    Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo,
-    HandshakeRequest, HandshakeResponse, PutResult, SchemaResult, Ticket,
+    flight_service_server::FlightService, flight_service_server::FlightServiceServer, Action,
+    ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo, HandshakeRequest,
+    HandshakeResponse, PutResult, SchemaResult, Ticket,
 };
 
 //use arrow::ipc::writer::schema_to_bytes;
@@ -38,18 +38,16 @@ pub struct FlightServiceImpl {}
 
 #[tonic::async_trait]
 impl FlightService for FlightServiceImpl {
-    type HandshakeStream = Pin<
-        Box<dyn Stream<Item = Result<HandshakeResponse, Status>> + Send + Sync + 'static>,
-    >;
+    type HandshakeStream =
+        Pin<Box<dyn Stream<Item = Result<HandshakeResponse, Status>> + Send + Sync + 'static>>;
     type ListFlightsStream =
         Pin<Box<dyn Stream<Item = Result<FlightInfo, Status>> + Send + Sync + 'static>>;
     type DoGetStream =
         Pin<Box<dyn Stream<Item = Result<FlightData, Status>> + Send + Sync + 'static>>;
     type DoPutStream =
         Pin<Box<dyn Stream<Item = Result<PutResult, Status>> + Send + Sync + 'static>>;
-    type DoActionStream = Pin<
-        Box<dyn Stream<Item = Result<flight::Result, Status>> + Send + Sync + 'static>,
-    >;
+    type DoActionStream =
+        Pin<Box<dyn Stream<Item = Result<flight::Result, Status>> + Send + Sync + 'static>>;
     type ListActionsStream =
         Pin<Box<dyn Stream<Item = Result<ActionType, Status>> + Send + Sync + 'static>>;
 
@@ -57,7 +55,6 @@ impl FlightService for FlightServiceImpl {
         &self,
         request: Request<FlightDescriptor>,
     ) -> Result<Response<SchemaResult>, Status> {
-
         println!("get_schema()");
 
         // let request = request.into_inner();
@@ -73,7 +70,6 @@ impl FlightService for FlightServiceImpl {
         &self,
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
-
         println!("get_flight_info");
 
         // let request = request.into_inner();
@@ -94,7 +90,6 @@ impl FlightService for FlightServiceImpl {
         Err(Status::unimplemented("Not yet implemented"))
     }
 
-
     async fn do_get(
         &self,
         request: Request<Ticket>,
@@ -102,14 +97,13 @@ impl FlightService for FlightServiceImpl {
         let ticket = request.into_inner();
         match String::from_utf8(ticket.ticket.to_vec()) {
             Ok(sql) => {
-
                 println!("do_get: {}", sql);
 
                 // create local execution context
                 let mut ctx = ExecutionContext::new();
 
-                let testdata = std::env::var("PARQUET_TEST_DATA")
-                    .expect("PARQUET_TEST_DATA not defined");
+                let testdata =
+                    std::env::var("PARQUET_TEST_DATA").expect("PARQUET_TEST_DATA not defined");
 
                 // register parquet file with the execution context
                 ctx.register_parquet(

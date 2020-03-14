@@ -1,25 +1,25 @@
-use crate::protobuf;
-use crate::logical_plan::LogicalPlan;
+use crate::error::{BallistaError, Result};
 use crate::logical_plan::LogicalExpr;
-use crate::error::{Result, BallistaError};
+use crate::logical_plan::LogicalPlan;
+use crate::protobuf;
 
 fn from_plan(plan: &LogicalPlan) -> Result<protobuf::LogicalPlanNode> {
     match plan {
         LogicalPlan::Scan { filename } => {
             let node = empty_plan_node();
             Ok(node)
-        },
+        }
         LogicalPlan::Projection { expr, input } => {
             let input = from_plan(&input)?;
             let node = empty_plan_node();
             Ok(node)
-        },
+        }
         LogicalPlan::Selection { expr, input } => {
             let input = from_plan(&input)?;
             let node = empty_plan_node();
             Ok(node)
-        },
-        _ => Err(BallistaError::NotImplemented(format!("{:?}", plan)))
+        }
+        _ => Err(BallistaError::NotImplemented(format!("{:?}", plan))),
     }
 }
 
@@ -31,7 +31,7 @@ fn from_expr(expr: &LogicalExpr) -> Result<protobuf::LogicalExprNode> {
             expr.column_name = name.clone();
             Ok(expr)
         }
-        _ => Err(BallistaError::NotImplemented(format!("{:?}", expr)))
+        _ => Err(BallistaError::NotImplemented(format!("{:?}", expr))),
     }
 }
 
@@ -63,15 +63,14 @@ fn empty_plan_node() -> protobuf::LogicalPlanNode {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use super::LogicalPlan::*;
     use super::LogicalExpr::*;
+    use super::LogicalPlan::*;
+    use super::*;
 
     #[test]
     fn roundtrip() -> Result<()> {
-
         let scan = Scan {
-            filename: "employee.csv".to_owned()
+            filename: "employee.csv".to_owned(),
         };
 
         let filter = Selection {
@@ -79,19 +78,16 @@ mod tests {
             expr: Box::new(Eq(
                 Box::new(Column("state".to_owned())),
                 Box::new(LiteralString("CO".to_owned())),
-            ))
+            )),
         };
 
         let projection = Projection {
             input: Box::new(filter),
-            expr: vec![
-                Column("state".to_owned())
-            ],
+            expr: vec![Column("state".to_owned())],
         };
 
         let proto = from_plan(&projection)?;
 
         Ok(())
     }
-
 }

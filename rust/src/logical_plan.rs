@@ -1,6 +1,6 @@
-use crate::error::{BallistaError, Result, ballista_error};
+use crate::error::{ballista_error, BallistaError, Result};
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub enum LogicalExpr {
     Column(String),
     ColumnIndex(usize),
@@ -17,10 +17,47 @@ pub enum LogicalExpr {
     Divide(Box<LogicalExpr>, Box<LogicalExpr>),
     Modulus(Box<LogicalExpr>, Box<LogicalExpr>),
     And(Box<LogicalExpr>, Box<LogicalExpr>),
-    Or(Box<LogicalExpr>, Box<LogicalExpr>)
+    Or(Box<LogicalExpr>, Box<LogicalExpr>),
 }
 
-#[derive(Debug,Clone)]
+impl Into<String> for LogicalExpr {
+    fn into(self) -> String {
+        format_expr(&self)
+    }
+}
+
+impl Into<String> for &LogicalExpr {
+    fn into(self) -> String {
+        format_expr(self)
+    }
+}
+
+/// Produce a human readable representation of an expression
+fn format_expr(expr: &LogicalExpr) -> String {
+    match expr {
+        LogicalExpr::Column(name) => format!("#{}", name),
+        LogicalExpr::LiteralString(str) => str.to_owned(),
+        LogicalExpr::Eq(l, r) => format!("{}=={}", format_expr(l), format_expr(r)),
+        _ => format!("{:?}", expr),
+    }
+}
+
+fn format_expr_list(expr: &Vec<LogicalExpr>) -> String {
+    expr.iter()
+        .map(|expr| expr.into())
+        .collect::<Vec<String>>()
+        .join(",")
+}
+
+/// Create a white space string to indent to the given indent level (two spaces per indent)
+fn indent_str(i: usize) -> String {
+    (0..i)
+        .map(|_| "".to_owned())
+        .collect::<Vec<String>>()
+        .join("  ")
+}
+
+#[derive(Debug, Clone)]
 pub enum LogicalAggregateExpr {
     Min(LogicalExpr),
     Max(LogicalExpr),
@@ -30,7 +67,7 @@ pub enum LogicalAggregateExpr {
     CountDistinct(LogicalExpr),
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub enum LogicalPlan {
     Aggregate {
         group_expr: Vec<LogicalExpr>,
@@ -47,6 +84,37 @@ pub enum LogicalPlan {
     },
     Scan {
         filename: String,
+    },
+}
+
+impl LogicalPlan {
+    /// Produce a human readable representation of the logical plan
+    pub fn pretty_print(&self) -> String {
+        self.to_string(0)
+    }
+
+    fn to_string(&self, indent: usize) -> String {
+        let tabs = indent_str(indent);
+        match &self {
+            Self::Scan { filename } => format!("{}Scan: {}", tabs, filename),
+            Self::Projection { expr, input } => format!(
+                "{}Projection: {}\n{}",
+                tabs,
+                format_expr_list(expr),
+                input.to_string(indent + 1)
+            ),
+            Self::Selection { expr, input } => format!(
+                "{}Selection: {}\n{}",
+                tabs,
+                format_expr(expr),
+                input.to_string(indent + 1)
+            ),
+            Self::Aggregate {
+                group_expr,
+                aggr_expr,
+                input,
+            } => format!("{}Aggregate", tabs),
+        }
     }
 }
 
@@ -56,11 +124,10 @@ trait Relation {
 }
 
 struct LogicalPlanBuilder {
-    plan: Option<LogicalPlan>
+    plan: Option<LogicalPlan>,
 }
 
 impl LogicalPlanBuilder {
-
     fn new() -> Self {
         Self { plan: None }
     }
@@ -73,9 +140,9 @@ impl LogicalPlanBuilder {
         match &self.plan {
             Some(plan) => Ok(LogicalPlanBuilder::from(LogicalPlan::Projection {
                 expr,
-                input: Box::new(plan.clone())
+                input: Box::new(plan.clone()),
             })),
-            _ => Err(ballista_error("Cannot apply a projection to an empty plan"))
+            _ => Err(ballista_error("Cannot apply a projection to an empty plan")),
         }
     }
 
@@ -83,25 +150,25 @@ impl LogicalPlanBuilder {
         match &self.plan {
             Some(plan) => Ok(LogicalPlanBuilder::from(LogicalPlan::Selection {
                 expr: Box::new(expr),
-                input: Box::new(plan.clone())
+                input: Box::new(plan.clone()),
             })),
-            _ => Err(ballista_error("Cannot apply a selection to an empty plan"))
+            _ => Err(ballista_error("Cannot apply a selection to an empty plan")),
         }
     }
 
     fn scan(&self, filename: &str) -> Result<LogicalPlanBuilder> {
         match &self.plan {
             None => Ok(LogicalPlanBuilder::from(LogicalPlan::Scan {
-                filename: filename.to_owned()
+                filename: filename.to_owned(),
             })),
-            _ => Err(ballista_error("Cannot apply a scan to a non-empty plan"))
+            _ => Err(ballista_error("Cannot apply a scan to a non-empty plan")),
         }
     }
 
     fn build(&self) -> Result<LogicalPlan> {
         match &self.plan {
             Some(plan) => Ok(plan.clone()),
-            _ => Err(ballista_error("Cannot build an empty plan"))
+            _ => Err(ballista_error("Cannot build an empty plan")),
         }
     }
 }
@@ -109,44 +176,36 @@ impl LogicalPlanBuilder {
 fn col(name: &str) -> LogicalExpr {
     LogicalExpr::Column(name.to_owned())
 }
+
 fn lit_str(str: &str) -> LogicalExpr {
     LogicalExpr::LiteralString(str.to_owned())
 }
 
+//TODO use macros to implement the other binary expressions
 fn eq(l: LogicalExpr, r: LogicalExpr) -> LogicalExpr {
     LogicalExpr::Eq(Box::new(l), Box::new(r))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::LogicalPlan::*;
+    use super::*;
     use crate::logical_plan::LogicalPlanBuilder;
 
     #[test]
     fn plan_builder() -> Result<()> {
-
         let plan = LogicalPlanBuilder::new()
             .scan("employee.csv")?
             .filter(eq(col("state"), lit_str("CO")))?
             .project(vec![col("state")])?
             .build()?;
 
-        let plan_str = format!("{:?}", plan);
-        let expected_str =
-            "Projection { \
-                expr: [Column(\"state\")], \
-                input: Selection { \
-                    expr: Eq(Column(\"state\"), LiteralString(\"CO\")), \
-                    input: Scan { \
-                        filename: \"employee.csv\" \
-                    } \
-                } \
-            }";
+        let expected_str = "Projection: #state\nSelection: #state==CO\n  Scan: employee.csv";
+
+        let plan_str = plan.pretty_print();
 
         assert_eq!(expected_str, plan_str);
 
         Ok(())
     }
-
 }

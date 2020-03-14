@@ -27,8 +27,7 @@ use flight::FlightDescriptor;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let testdata =
-        std::env::var("PARQUET_TEST_DATA").expect("PARQUET_TEST_DATA not defined");
+    let testdata = std::env::var("PARQUET_TEST_DATA").expect("PARQUET_TEST_DATA not defined");
 
     let mut client = FlightServiceClient::connect("http://localhost:50051").await?;
 

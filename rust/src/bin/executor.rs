@@ -88,9 +88,8 @@ impl FlightService for FlightServiceImpl {
     ) -> Result<Response<Self::DoGetStream>, Status> {
         let ticket = request.into_inner();
 
-        let bytes = ticket.ticket.to_vec();
-
         //TODO we really want to receive the logical plan here instead of SQL
+        //let bytes = ticket.ticket.to_vec();
         // let plan = decode_protobuf(bytes).unwrap();
         // println!("{}", plan.pretty_print());
 

@@ -3,7 +3,11 @@ use crate::logical_plan::LogicalExpr;
 use crate::logical_plan::LogicalPlan;
 use crate::protobuf;
 
+use prost::bytes::Buf;
+use prost::Message;
+
 use std::convert::TryInto;
+use std::io::Cursor;
 
 impl TryInto<LogicalPlan> for protobuf::LogicalPlanNode {
     type Error = BallistaError;
@@ -11,7 +15,11 @@ impl TryInto<LogicalPlan> for protobuf::LogicalPlanNode {
     fn try_into(self) -> Result<LogicalPlan, Self::Error> {
         if let Some(projection) = self.projection {
             Ok(LogicalPlan::Projection {
-                expr: vec![],
+                expr: projection
+                    .expr
+                    .iter()
+                    .map(|expr| expr.to_owned().try_into())
+                    .collect::<Result<Vec<_>, BallistaError>>()?,
                 input: Box::new(self.input.unwrap().as_ref().to_owned().try_into()?),
             })
         } else if let Some(selection) = self.selection {
@@ -168,6 +176,14 @@ fn empty_plan_node() -> protobuf::LogicalPlanNode {
     }
 }
 
+pub fn decode_protobuf(bytes: &Vec<u8>) -> Result<LogicalPlan, BallistaError> {
+    //TODO error handling
+    let mut buf = Cursor::new(bytes);
+    let plan_node: protobuf::LogicalPlanNode = protobuf::LogicalPlanNode::decode(&mut buf).unwrap();
+    let plan: LogicalPlan = plan_node.try_into().unwrap();
+    Ok(plan)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::error::Result;
@@ -183,7 +199,11 @@ mod tests {
             .project(vec![col("state")])?
             .build()?;
 
-        let proto: protobuf::LogicalPlanNode = plan.try_into()?;
+        let proto: protobuf::LogicalPlanNode = plan.clone().try_into()?;
+
+        let plan2: LogicalPlan = proto.try_into()?;
+
+        assert_eq!(plan.pretty_print(), plan2.pretty_print());
 
         Ok(())
     }

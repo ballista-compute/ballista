@@ -15,10 +15,8 @@ use futures::Stream;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status, Streaming};
 
-use prost::bytes::Buf;
-use prost::Message;
-
 use ballista::error::BallistaError::DataFusionError;
+use ballista::serde::decode_protobuf;
 use flight::{
     flight_service_server::FlightService, flight_service_server::FlightServiceServer, Action,
     ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo, HandshakeRequest,
@@ -89,64 +87,59 @@ impl FlightService for FlightServiceImpl {
         request: Request<Ticket>,
     ) -> Result<Response<Self::DoGetStream>, Status> {
         let ticket = request.into_inner();
+
         let bytes = ticket.ticket.to_vec();
-        let mut buf = Cursor::new(bytes);
-        let plan_node: protobuf::LogicalPlanNode =
-            protobuf::LogicalPlanNode::decode(&mut buf).unwrap();
 
-        println!("{:?}", plan_node);
+        //TODO we really want to receive the logical plan here instead of SQL
+        // let plan = decode_protobuf(bytes).unwrap();
+        // println!("{}", plan.pretty_print());
 
-        let plan: LogicalPlan = plan_node.try_into().unwrap();
-        println!("{}", plan.pretty_print());
+        match String::from_utf8(ticket.ticket.to_vec()) {
+            Ok(sql) => {
+                println!("do_get: {}", sql);
 
-        unimplemented!()
+                // create local execution context
+                let mut ctx = ExecutionContext::new();
 
-        // match String::from_utf8(ticket.ticket.to_vec()) {
-        //     Ok(sql) => {
-        //         println!("do_get: {}", sql);
-        //
-        //         // create local execution context
-        //         let mut ctx = ExecutionContext::new();
-        //
-        //         // let testdata =
-        //         //     std::env::var("PARQUET_TEST_DATA").expect("PARQUET_TEST_DATA not defined");
-        //
-        //         // register parquet file with the execution context
-        //         ctx.register_parquet("alltypes_plain", &format!("alltypes_plain.snappy.parquet"))
-        //             .map_err(|e| to_tonic_err(&e))?;
-        //
-        //         // create the query plan
-        //         let plan = ctx
-        //             .create_logical_plan(&sql)
-        //             .and_then(|plan| ctx.optimize(&plan))
-        //             .and_then(|plan| ctx.create_physical_plan(&plan, 1024 * 1024))
-        //             .map_err(|e| to_tonic_err(&e))?;
-        //
-        //         // execute the query
-        //         let results = ctx.collect(plan.as_ref()).map_err(|e| to_tonic_err(&e))?;
-        //         if results.is_empty() {
-        //             return Err(Status::internal("There were no results from ticket"));
-        //         }
-        //
-        //         // add an initial FlightData message that sends schema
-        //         let schema = plan.schema();
-        //         let mut flights: Vec<Result<FlightData, Status>> =
-        //             vec![Ok(FlightData::from(schema.as_ref()))];
-        //
-        //         let mut batches: Vec<Result<FlightData, Status>> = results
-        //             .iter()
-        //             .map(|batch| Ok(FlightData::from(batch)))
-        //             .collect();
-        //
-        //         // append batch vector to schema vector, so that the first message sent is the schema
-        //         flights.append(&mut batches);
-        //
-        //         let output = futures::stream::iter(flights);
-        //
-        //         Ok(Response::new(Box::pin(output) as Self::DoGetStream))
-        //     }
-        //     Err(e) => Err(Status::invalid_argument(format!("Invalid ticket: {:?}", e))),
-        // }
+                // let testdata =
+                //     std::env::var("PARQUET_TEST_DATA").expect("PARQUET_TEST_DATA not defined");
+
+                // register parquet file with the execution context
+                ctx.register_parquet("alltypes_plain", &format!("alltypes_plain.snappy.parquet"))
+                    .map_err(|e| to_tonic_err(&e))?;
+
+                // create the query plan
+                let plan = ctx
+                    .create_logical_plan(&sql)
+                    .and_then(|plan| ctx.optimize(&plan))
+                    .and_then(|plan| ctx.create_physical_plan(&plan, 1024 * 1024))
+                    .map_err(|e| to_tonic_err(&e))?;
+
+                // execute the query
+                let results = ctx.collect(plan.as_ref()).map_err(|e| to_tonic_err(&e))?;
+                if results.is_empty() {
+                    return Err(Status::internal("There were no results from ticket"));
+                }
+
+                // add an initial FlightData message that sends schema
+                let schema = plan.schema();
+                let mut flights: Vec<Result<FlightData, Status>> =
+                    vec![Ok(FlightData::from(schema.as_ref()))];
+
+                let mut batches: Vec<Result<FlightData, Status>> = results
+                    .iter()
+                    .map(|batch| Ok(FlightData::from(batch)))
+                    .collect();
+
+                // append batch vector to schema vector, so that the first message sent is the schema
+                flights.append(&mut batches);
+
+                let output = futures::stream::iter(flights);
+
+                Ok(Response::new(Box::pin(output) as Self::DoGetStream))
+            }
+            Err(e) => Err(Status::invalid_argument(format!("Invalid ticket: {:?}", e))),
+        }
     }
 
     async fn handshake(

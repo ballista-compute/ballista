@@ -3,11 +3,12 @@
 set -e
 
 pushd rust
-cargo build --release
+cargo test --release
 popd 
 
 pushd jvm
 ./gradlew assemble
 popd
 
-docker build -t ballista/executor-kotlin jvm/executor
+docker build -t ballista/jvm jvm/executor
+docker build -t ballista/rust rust

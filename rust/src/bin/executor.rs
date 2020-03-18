@@ -1,28 +1,15 @@
-use std::convert::TryInto;
-use std::io::Cursor;
 use std::pin::Pin;
 
-use ballista::protobuf;
-use datafusion::logicalplan::*;
-
-use datafusion::datasource::parquet::ParquetTable;
-use datafusion::execution::context::ExecutionContext;
-use datafusion::logicalplan::LogicalPlan as DataFusionPlan;
-
-use futures::Stream;
-
-use tonic::transport::Server;
-use tonic::{Request, Response, Status, Streaming};
-
-use ballista::error::BallistaError::DataFusionError;
 use ballista::serde::decode_protobuf;
+use datafusion::execution::context::ExecutionContext;
 use flight::{
     flight_service_server::FlightService, flight_service_server::FlightServiceServer, Action,
     ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo, HandshakeRequest,
     HandshakeResponse, PutResult, SchemaResult, Ticket,
 };
-
-//use arrow::ipc::writer::schema_to_bytes;
+use futures::Stream;
+use tonic::transport::Server;
+use tonic::{Request, Response, Status, Streaming};
 
 #[derive(Clone)]
 pub struct FlightServiceImpl {}

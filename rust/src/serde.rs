@@ -2,7 +2,6 @@ use crate::error::{ballista_error, BallistaError};
 use crate::protobuf;
 use datafusion::logicalplan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator, ScalarValue};
 
-use prost::bytes::Buf;
 use prost::Message;
 
 use arrow::datatypes::{DataType, Field, Schema};
@@ -95,11 +94,9 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
     fn try_into(self) -> Result<protobuf::LogicalPlanNode, Self::Error> {
         match self {
             LogicalPlan::TableScan {
-                schema_name,
                 table_name,
                 table_schema,
-                projected_schema,
-                projection,
+                ..
             } => {
                 let mut node = empty_plan_node();
 
@@ -128,7 +125,7 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
             LogicalPlan::Projection {
                 expr,
                 input,
-                schema,
+                ..
             } => {
                 let input: protobuf::LogicalPlanNode = input.as_ref().to_owned().try_into()?;
                 let mut node = empty_plan_node();

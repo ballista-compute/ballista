@@ -20,7 +20,7 @@ use std::convert::TryInto;
 use std::sync::Arc;
 
 use arrow::array::Int32Array;
-use arrow::datatypes::Schema;
+use arrow::datatypes::{DataType, Field, Schema};
 use arrow::flight::flight_data_to_batch;
 
 use ballista::protobuf;
@@ -37,12 +37,23 @@ use flight::Ticket;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut client = FlightServiceClient::connect("http://localhost:50051").await?;
 
-    let plan = LogicalPlanBuilder::scan("default", "employee", &Schema::empty(), None)
-        .and_then(|plan| plan.filter((col(0).eq(&lit_str("CO")))))
-        .and_then(|plan| plan.project(&vec![col(0)]))
-        .and_then(|plan| plan.build())
-        //.map_err(|e| Err(format!("{:?}", e)))
-        .unwrap(); //TODO
+    let plan = LogicalPlanBuilder::scan(
+        "default",
+        "employee",
+        &Schema::new(vec![
+            Field::new("id", DataType::Utf8, false),
+            Field::new("first_name", DataType::Utf8, false),
+            Field::new("last_name", DataType::Utf8, false),
+            Field::new("state", DataType::Utf8, false),
+            Field::new("salary", DataType::UInt32, false),
+        ]),
+        None,
+    )
+    .and_then(|plan| plan.filter(col(0).eq(&lit_str("CO"))))
+    .and_then(|plan| plan.project(&vec![col(0)]))
+    .and_then(|plan| plan.build())
+    //.map_err(|e| Err(format!("{:?}", e)))
+    .unwrap(); //TODO
 
     let serialized_plan: protobuf::LogicalPlanNode = plan.try_into().unwrap();
     let mut buf: Vec<u8> = Vec::with_capacity(serialized_plan.encoded_len());

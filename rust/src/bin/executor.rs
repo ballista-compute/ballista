@@ -87,14 +87,9 @@ impl FlightService for FlightServiceImpl {
     ) -> Result<Response<Self::DoGetStream>, Status> {
         let ticket = request.into_inner();
 
-        //TODO we really want to receive the logical plan here instead of SQL
-        //let bytes = ticket.ticket.to_vec();
-        // let plan = decode_protobuf(bytes).unwrap();
-        // println!("{}", plan.pretty_print());
-
-        match String::from_utf8(ticket.ticket.to_vec()) {
-            Ok(sql) => {
-                println!("do_get: {}", sql);
+        match decode_protobuf(&ticket.ticket.to_vec()) {
+            Ok(logical_plan) => {
+                println!("do_get: {:?}", logical_plan);
 
                 // create local execution context
                 let mut ctx = ExecutionContext::new();
@@ -108,8 +103,7 @@ impl FlightService for FlightServiceImpl {
 
                 // create the query plan
                 let plan = ctx
-                    .create_logical_plan(&sql)
-                    .and_then(|plan| ctx.optimize(&plan))
+                    .optimize(&logical_plan)
                     .and_then(|plan| ctx.create_physical_plan(&plan, 1024 * 1024))
                     .map_err(|e| to_tonic_err(&e))?;
 

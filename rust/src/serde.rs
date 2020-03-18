@@ -5,7 +5,7 @@ use datafusion::logicalplan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator, S
 use prost::bytes::Buf;
 use prost::Message;
 
-use arrow::datatypes::Schema;
+use arrow::datatypes::{DataType, Field, Schema};
 use std::convert::TryInto;
 use std::io::Cursor;
 use std::sync::Arc;
@@ -34,7 +34,16 @@ impl TryInto<LogicalPlan> for protobuf::LogicalPlanNode {
                 .build()
                 .map_err(|e| e.into())
         } else if let Some(scan) = self.file {
-            LogicalPlanBuilder::scan("", &scan.filename, &Schema::empty(), None)?
+            let schema = Schema::new(
+                scan.schema
+                    .unwrap()
+                    .columns
+                    .iter()
+                    .map(|field| Field::new(&field.name, DataType::Utf8, true))
+                    .collect(),
+            );
+
+            LogicalPlanBuilder::scan("", &scan.filename, &schema, None)?
                 .build()
                 .map_err(|e| e.into())
         } else {
@@ -93,9 +102,25 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
                 projection,
             } => {
                 let mut node = empty_plan_node();
+
+                let schema = protobuf::Schema {
+                    columns: table_schema
+                        .fields()
+                        .iter()
+                        .map(|field| {
+                            protobuf::Field {
+                                name: field.name().to_owned(),
+                                arrow_type: 12, //TODO
+                                nullable: true,
+                                children: vec![],
+                            }
+                        })
+                        .collect(),
+                };
+
                 node.file = Some(protobuf::FileNode {
                     filename: table_name.clone(),
-                    schema: None, //TODO
+                    schema: Some(schema),
                     projection: vec![],
                 });
                 Ok(node)
@@ -194,11 +219,10 @@ fn empty_plan_node() -> protobuf::LogicalPlanNode {
 }
 
 pub fn decode_protobuf(bytes: &Vec<u8>) -> Result<LogicalPlan, BallistaError> {
-    //TODO error handling
     let mut buf = Cursor::new(bytes);
-    let plan_node: protobuf::LogicalPlanNode = protobuf::LogicalPlanNode::decode(&mut buf).unwrap();
-    let plan: LogicalPlan = plan_node.try_into().unwrap();
-    Ok(plan)
+    protobuf::LogicalPlanNode::decode(&mut buf)
+        .map_err(|e| BallistaError::General(format!("{:?}", e)))
+        .and_then(|node| node.try_into())
 }
 
 #[cfg(test)]

@@ -2,13 +2,13 @@ use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::sync::Arc;
 
-use arrow::array::Int32Array;
 use arrow::datatypes::{Schema, Field, DataType};
 use arrow::flight::flight_data_to_batch;
 use arrow::record_batch::RecordBatch;
 
 use ballista::protobuf;
 use ballista::error::BallistaError;
+use datafusion::execution::context::ExecutionContext;
 use datafusion::logicalplan::*;
 
 use prost::bytes::BufMut;
@@ -20,6 +20,7 @@ use flight::Ticket;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+
     let schema = Schema::new(vec![
         Field::new("VendorID", DataType::Utf8, true),
         Field::new("tpep_pickup_datetime", DataType::Utf8, true),
@@ -51,9 +52,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             month + 1
         );
 
-        let plan = LogicalPlanBuilder::scan("default", "employee", &schema, None)
-            .and_then(|plan| plan.filter(col(0).eq(&lit_str("CO"))))
-            .and_then(|plan| plan.project(&vec![col(0)]))
+        let plan = LogicalPlanBuilder::scan("default", "tbd", &schema, None)
+            .and_then(|plan| plan.aggregate(vec![col(3)], vec![Expr::AggregateFunction {
+                name: "MAX".to_owned(), args: vec![col(10)], return_type: DataType::Float64 }]))
             .and_then(|plan| plan.build())
             //.map_err(|e| Err(format!("{:?}", e)))
             .unwrap(); //TODO
@@ -92,6 +93,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("Received {} batches", batches.len());
+
+    // perform secondary aggregate query on the results collected from the executors
+    let schema = Schema::new(vec![
+        Field::new("passenger_count", DataType::UInt32, true),
+        Field::new("fare_amount", DataType::Float64, true),
+    ]);
+
+    let plan = LogicalPlanBuilder::scan("default", "tbd", &schema, None)
+        .and_then(|plan| plan.aggregate(vec![col(0)], vec![Expr::AggregateFunction {
+            name: "MAX".to_owned(), args: vec![col(1)], return_type: DataType::Float64 }]))
+        .and_then(|plan| plan.build())
+        //.map_err(|e| Err(format!("{:?}", e)))
+        .unwrap(); //TODO
+
+    // create local execution context
+    let mut ctx = ExecutionContext::new();
+
+    // let testdata =
+    //     std::env::var("PARQUET_TEST_DATA").expect("PARQUET_TEST_DATA not defined");
+
+    // register parquet file with the execution context
+    // ctx.register_parquet("alltypes_plain", &format!("alltypes_plain.snappy.parquet"))
+    //     .map_err(|e| to_tonic_err(&e))?;
+
+    let results = ctx
+        .collect_plan(&plan, 1024*1024)
+        .unwrap(); // TODO
+    //    .map_err(|e| to_tonic_err(&e))?;
+
 
     Ok(())
 }

@@ -1,5 +1,7 @@
 # Ballista Example: Parallel Aggregate Query in Rust
 
+*NOTE: this is a work-in-progress and is not functional yet*
+
 This example shows how to manually create a Ballista cluster of Rust executors and run an aggregate query in parallel across those executors.
 
 ## Prerequisites

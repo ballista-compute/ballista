@@ -8,7 +8,7 @@ cp ../../proto/ballista.proto temp/ballista/proto/
 mkdir -p temp/ballista/rust
 cp -rf ../../rust/* temp/ballista/rust
 
-
+docker build -t ballista/example .
 
 
 

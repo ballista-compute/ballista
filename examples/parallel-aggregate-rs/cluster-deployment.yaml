@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ballista
+  labels:
+    app: ballista
+spec:
+  ports:
+    - port: 50051
+      name: flight
+  clusterIP: None
+  selector:
+    app: ballista
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: flight
+spec:
+  serviceName: "ballista"
+  replicas: 12
+  selector:
+    matchLabels:
+      app: ballista
+  template:
+    metadata:
+      labels:
+        app: ballista
+    spec:
+      containers:
+        - name: ballista
+          image: andygrove/ballista-rust:0.2.0-dev
+          ports:
+            - containerPort: 50051
+              name: flight
+#          volumeMounts:
+#            - name: www
+#              mountPath: /usr/share/ballista/html
+#  volumeClaimTemplates:
+#    - metadata:
+#        name: www
+#      spec:
+#        accessModes: [ "ReadWriteOnce" ]
+#        resources:
+#          requests:
+#            storage: 1Gi

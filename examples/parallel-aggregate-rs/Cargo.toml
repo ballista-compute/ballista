@@ -1,0 +1,17 @@
+[package]
+name = "parallel-aggregate"
+version = "0.2.0-dev"
+authors = ["Andy Grove <andygrove73@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+prost = "0.6"
+tokio = { version = "0.2", features = ["full"] }
+tonic = "0.1.1"
+
+ballista = { path = "../../rust" }
+
+arrow = { git = "https://github.com/andygrove/arrow", branch = "ARROW-8123" }
+arrow-flight = { git = "https://github.com/andygrove/arrow", branch = "ARROW-8123" }
+datafusion = { git = "https://github.com/andygrove/arrow", branch = "ARROW-8123" }
+

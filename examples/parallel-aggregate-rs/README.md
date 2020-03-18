@@ -1,4 +1,4 @@
-# Ballista Example 1
+# Ballista Example: Parallel Aggregate Query in Rust
 
 This example shows how to manually create a Ballista cluster of Rust executors and run an aggregate query in parallel across those executors.
 
@@ -25,5 +25,9 @@ From this directory.
 ```
 
 ## Step 3: Create Ballista cluster in k8s
+
+```bash
+kubectl apply -f cluster-deployment.yaml
+```
 
 ## Step 4: Deploy Example

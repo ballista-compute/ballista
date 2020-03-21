@@ -11,7 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+    - name: Check Formatting
+      run: cd rust && cargo fmt --all -- --check
     - name: Build
       run: cd rust && cargo build --verbose
     - name: Run tests
       run: cd rust && cargo test --verbose
+    - name: Build Example
+      run: cd examples/parallel-query-rs && cargo test --verbose
+

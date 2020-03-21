@@ -81,5 +81,6 @@ kubectl logs
 Remove cluster:
 
 ```bash
+kubectl delete -f parallel-aggregate-rs.yaml
 kubectl delete -f cluster-deployment.yaml
 ```

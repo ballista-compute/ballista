@@ -180,7 +180,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let svc = FlightServiceServer::new(service);
 
-    println!("Listening on {:?}", addr);
+    println!("Ballista Rust Executor listening on {:?}", addr);
 
     Server::builder().add_service(svc).serve(addr).await?;
 

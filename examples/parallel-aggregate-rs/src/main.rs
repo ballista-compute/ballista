@@ -16,9 +16,14 @@ use datafusion::logicalplan::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+
+    println!("Parallel Aggregate Query Example");
+
     // get a list of ballista executors from kubernetes
     let executors = cluster::get_executors("nyctaxi", "default").unwrap();
     let mut executor_index = 0;
+
+    println!("Found {} executors", executors.len());
 
     // execute aggregate query in parallel across all files
     let num_months: usize = 12;

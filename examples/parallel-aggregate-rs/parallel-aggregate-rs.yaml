@@ -1,0 +1,12 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: parallel-aggregate-rs
+spec:
+  template:
+    spec:
+      containers:
+        - name: parallel-aggregate-rs
+          image: ballistacompute/parallel-aggregate-rs
+      restartPolicy: Never
+  backoffLimit: 4

@@ -8,6 +8,7 @@ use arrow::record_batch::RecordBatch;
 use ballista::client;
 use ballista::cluster;
 use ballista::error::BallistaError;
+use ballista::plan::{Action, TableMeta};
 
 use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext;
@@ -52,7 +53,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 //.map_err(|e| Err(format!("{:?}", e)))
                 .unwrap(); //TODO
 
-            client::execute_query(&host, port, plan).await
+            let action = Action::RemoteQuery {
+                plan: plan.clone(),
+                tables: vec![TableMeta::Csv {
+                    has_header: true,
+                    path: filename,
+                    schema: schema.clone()
+                }]
+            };
+
+            client::execute_action(&host, port, action).await
                 .map_err(|e| BallistaError::General(format!("{:?}", e)))
         });
     }

@@ -1,28 +1,31 @@
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
+use crate::plan::Action;
 use crate::protobuf;
 
 use arrow::datatypes::Schema;
 use arrow::flight::flight_data_to_batch;
 use arrow::record_batch::RecordBatch;
+
 use datafusion::logicalplan::*;
+
 //use flight::flight_descriptor;
 use flight::flight_service_client::FlightServiceClient;
 use flight::Ticket;
 use prost::Message;
 
-pub async fn execute_query(
+pub async fn execute_action(
     host: &str,
     port: usize,
-    plan: LogicalPlan,
+    action: Action,
 ) -> Result<Vec<RecordBatch>, Box<dyn std::error::Error>> {
     //TODO need to avoid connecting per request
     let mut client = FlightServiceClient::connect(format!("http://{}:{}", host, port)).await?;
 
-    let serialized_plan: protobuf::LogicalPlanNode = plan.try_into().unwrap();
-    let mut buf: Vec<u8> = Vec::with_capacity(serialized_plan.encoded_len());
-    serialized_plan.encode(&mut buf).unwrap();
+    let serialized_action: protobuf::Action = action.try_into().unwrap();
+    let mut buf: Vec<u8> = Vec::with_capacity(serialized_action.encoded_len());
+    serialized_action.encode(&mut buf).unwrap();
 
     let request = tonic::Request::new(Ticket { ticket: buf });
 

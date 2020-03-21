@@ -9,4 +9,5 @@ pub mod protobuf {
 pub mod client;
 pub mod cluster;
 pub mod error;
+pub mod plan;
 pub mod serde;

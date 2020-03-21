@@ -1,10 +1,14 @@
+
 use crate::error::{ballista_error, BallistaError};
+use crate::plan::{Action, TableMeta};
 use crate::protobuf;
+
 use datafusion::logicalplan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator, ScalarValue};
 
 use prost::Message;
 
 use arrow::datatypes::{DataType, Field, Schema};
+
 use std::convert::TryInto;
 use std::io::Cursor;
 use std::sync::Arc;
@@ -85,6 +89,38 @@ fn parse_required_expr(p: Option<Box<protobuf::LogicalExprNode>>) -> Result<Expr
     match p {
         Some(expr) => expr.as_ref().to_owned().try_into(),
         None => Err(ballista_error("Missing required expression")),
+    }
+}
+
+impl TryInto<protobuf::Action> for Action {
+    type Error = BallistaError;
+
+    fn try_into(self) -> Result<protobuf::Action, Self::Error> {
+        match self {
+            Action::RemoteQuery { plan, tables } => {
+                let plan_proto: protobuf::LogicalPlanNode = plan.try_into()?;
+                Ok(protobuf::Action {
+                    query: Some(plan_proto),
+                    table_meta: vec![]
+                })
+            }
+        }
+    }
+}
+
+impl TryInto<Action> for protobuf::Action {
+    type Error = BallistaError;
+
+    fn try_into(self) -> Result<Action, Self::Error> {
+        if self.query.is_some() {
+            let plan: LogicalPlan = self.query.unwrap().try_into()?;
+            Ok(Action::RemoteQuery {
+                plan,
+                tables: vec![]
+            })
+        } else {
+            Err(BallistaError::NotImplemented(format!("{:?}", self)))
+        }
     }
 }
 
@@ -221,6 +257,7 @@ pub fn decode_protobuf(bytes: &Vec<u8>) -> Result<LogicalPlan, BallistaError> {
 #[cfg(test)]
 mod tests {
     use crate::error::Result;
+    use crate::plan::*;
     use crate::protobuf;
     use arrow::datatypes::{DataType, Field, Schema};
     use datafusion::logicalplan::{col, lit_str, LogicalPlan, LogicalPlanBuilder};
@@ -243,11 +280,21 @@ mod tests {
             //.map_err(|e| Err(format!("{:?}", e)))
             .unwrap(); //TODO
 
-        let proto: protobuf::LogicalPlanNode = plan.clone().try_into()?;
+        let action = Action::RemoteQuery {
+            plan: plan.clone(),
+            tables: vec![TableMeta::Csv {
+                table_name: "employee".to_owned(),
+                has_header: true,
+                path: "/foo/bar.csv".to_owned(),
+                schema: schema.clone()
+            }]
+        };
 
-        let plan2: LogicalPlan = proto.try_into()?;
+        let proto: protobuf::Action = action.clone().try_into()?;
 
-        assert_eq!(format!("{:?}", plan), format!("{:?}", plan2));
+        let action2: Action = proto.try_into()?;
+
+        assert_eq!(format!("{:?}", action), format!("{:?}", action2));
 
         Ok(())
     }

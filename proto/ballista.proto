@@ -105,8 +105,15 @@ message Schema {
 message TableMeta {
   string table_name = 1;
   string filename = 2;
-  string file_type = 3;
-  Schema schema = 4;
+
+  CsvFileMeta csv_meta = 10;
+  //TODO parquet
+
+}
+
+message CsvFileMeta {
+  bool has_header = 1;
+  Schema schema = 2;
 }
 
 // copied from GandivaType from Apache Arrow project

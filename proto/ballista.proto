@@ -6,6 +6,13 @@ option java_multiple_files = true;
 option java_package = "org.ballistacompute.protobuf";
 option java_outer_classname = "BallistaProto";
 
+message Action {
+  // meta-data for files to be registered as tables
+  repeated TableMeta table_meta = 1;
+  LogicalPlanNode query = 2;
+}
+
+
 // logical expression
 message LogicalExprNode {
 

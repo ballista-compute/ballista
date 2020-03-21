@@ -11,11 +11,10 @@ jobs:
 
     runs-on: ubuntu-latest
     env:
-      working-directory: ./rust
 
     steps:
     - uses: actions/checkout@v2
     - name: Build
-      run: cargo build --verbose
+      run: cd rust && cargo build --verbose
     - name: Run tests
-      run: cargo test --verbose
+      run: cd rust && cargo test --verbose

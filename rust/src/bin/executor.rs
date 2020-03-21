@@ -1,5 +1,6 @@
 use std::pin::Pin;
 
+use ballista::plan;
 use ballista::serde::decode_protobuf;
 use datafusion::execution::context::ExecutionContext;
 use flight::{
@@ -28,6 +29,70 @@ impl FlightService for FlightServiceImpl {
         Pin<Box<dyn Stream<Item = Result<flight::Result, Status>> + Send + Sync + 'static>>;
     type ListActionsStream =
         Pin<Box<dyn Stream<Item = Result<ActionType, Status>> + Send + Sync + 'static>>;
+
+    async fn do_get(
+        &self,
+        request: Request<Ticket>,
+    ) -> Result<Response<Self::DoGetStream>, Status> {
+        let ticket = request.into_inner();
+
+        match decode_protobuf(&ticket.ticket.to_vec()) {
+            Ok(action) => {
+                println!("do_get: {:?}", action);
+
+                match &action {
+                    plan::Action::RemoteQuery {
+                        plan: logical_plan,
+                        tables,
+                    } => {
+                        // create local execution context
+                        let mut ctx = ExecutionContext::new();
+
+                        // register tables
+                        tables.iter().for_each(|table| match table {
+                            plan::TableMeta::Csv {
+                                table_name,
+                                path,
+                                has_header,
+                                schema,
+                            } => ctx.register_csv(table_name, path, schema, *has_header),
+                            _ => unimplemented!(),
+                        });
+
+                        // create the query plan
+                        let plan = ctx
+                            .optimize(&logical_plan)
+                            .and_then(|plan| ctx.create_physical_plan(&plan, 1024 * 1024))
+                            .map_err(|e| to_tonic_err(&e))?;
+
+                        // execute the query
+                        let results = ctx.collect(plan.as_ref()).map_err(|e| to_tonic_err(&e))?;
+                        if results.is_empty() {
+                            return Err(Status::internal("There were no results from ticket"));
+                        }
+
+                        // add an initial FlightData message that sends schema
+                        let schema = plan.schema();
+                        let mut flights: Vec<Result<FlightData, Status>> =
+                            vec![Ok(FlightData::from(schema.as_ref()))];
+
+                        let mut batches: Vec<Result<FlightData, Status>> = results
+                            .iter()
+                            .map(|batch| Ok(FlightData::from(batch)))
+                            .collect();
+
+                        // append batch vector to schema vector, so that the first message sent is the schema
+                        flights.append(&mut batches);
+
+                        let output = futures::stream::iter(flights);
+
+                        Ok(Response::new(Box::pin(output) as Self::DoGetStream))
+                    } // other => Err(Status::invalid_argument(format!("Invalid Ballista action: {:?}", other))),
+                }
+            }
+            Err(e) => Err(Status::invalid_argument(format!("Invalid ticket: {:?}", e))),
+        }
+    }
 
     async fn get_schema(
         &self,
@@ -66,59 +131,6 @@ impl FlightService for FlightServiceImpl {
         // }))
 
         Err(Status::unimplemented("Not yet implemented"))
-    }
-
-    async fn do_get(
-        &self,
-        request: Request<Ticket>,
-    ) -> Result<Response<Self::DoGetStream>, Status> {
-        let ticket = request.into_inner();
-
-        match decode_protobuf(&ticket.ticket.to_vec()) {
-            Ok(logical_plan) => {
-                println!("do_get: {:?}", logical_plan);
-
-                // create local execution context
-                let mut ctx = ExecutionContext::new();
-
-                // let testdata =
-                //     std::env::var("PARQUET_TEST_DATA").expect("PARQUET_TEST_DATA not defined");
-
-                // register parquet file with the execution context
-                ctx.register_parquet("alltypes_plain", &format!("alltypes_plain.snappy.parquet"))
-                    .map_err(|e| to_tonic_err(&e))?;
-
-                // create the query plan
-                let plan = ctx
-                    .optimize(&logical_plan)
-                    .and_then(|plan| ctx.create_physical_plan(&plan, 1024 * 1024))
-                    .map_err(|e| to_tonic_err(&e))?;
-
-                // execute the query
-                let results = ctx.collect(plan.as_ref()).map_err(|e| to_tonic_err(&e))?;
-                if results.is_empty() {
-                    return Err(Status::internal("There were no results from ticket"));
-                }
-
-                // add an initial FlightData message that sends schema
-                let schema = plan.schema();
-                let mut flights: Vec<Result<FlightData, Status>> =
-                    vec![Ok(FlightData::from(schema.as_ref()))];
-
-                let mut batches: Vec<Result<FlightData, Status>> = results
-                    .iter()
-                    .map(|batch| Ok(FlightData::from(batch)))
-                    .collect();
-
-                // append batch vector to schema vector, so that the first message sent is the schema
-                flights.append(&mut batches);
-
-                let output = futures::stream::iter(flights);
-
-                Ok(Response::new(Box::pin(output) as Self::DoGetStream))
-            }
-            Err(e) => Err(Status::invalid_argument(format!("Invalid ticket: {:?}", e))),
-        }
     }
 
     async fn handshake(

@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::thread;
 
 use arrow::array::Int32Array;
-use arrow::datatypes::{Schema, Field, DataType};
+use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 
 use ballista::client;
@@ -16,7 +16,6 @@ use datafusion::logicalplan::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-
     // get a list of ballista executors from kubernetes
     let executors = cluster::get_executors("nyctaxi", "default").unwrap();
     let mut executor_index = 0;
@@ -25,7 +24,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let num_months: usize = 12;
     let threads: Vec<thread::JoinHandle<Result<Vec<RecordBatch>, BallistaError>>> = vec![];
     for month in 0..num_months {
-
         // round robin across the executors
         let executor = &executors[executor_index];
         executor_index += 1;
@@ -47,7 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let schema = nyctaxi_schema();
 
             // SELECT passenger_count, MAX(fare_amount) FROM <filename> GROUP BY passenger_count
-            let plan = LogicalPlanBuilder::scan("default", &filename, &schema, None)
+            let plan = LogicalPlanBuilder::scan("default", "tripdata", &schema, None)
                 .and_then(|plan| plan.aggregate(vec![col(0)], vec![max(col(1))]))
                 .and_then(|plan| plan.build())
                 //.map_err(|e| Err(format!("{:?}", e)))
@@ -56,13 +54,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let action = Action::RemoteQuery {
                 plan: plan.clone(),
                 tables: vec![TableMeta::Csv {
+                    table_name: "tripdata".to_owned(),
                     has_header: true,
                     path: filename,
-                    schema: schema.clone()
-                }]
+                    schema: schema.clone(),
+                }],
             };
 
-            client::execute_action(&host, port, action).await
+            client::execute_action(&host, port, action)
+                .await
                 .map_err(|e| BallistaError::General(format!("{:?}", e)))
         });
     }
@@ -93,10 +93,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         //.map_err(|e| Err(format!("{:?}", e)))
         .unwrap(); //TODO
 
-    let results = ctx
-        .collect_plan(&plan, 1024*1024)
-        .unwrap(); // TODO
-    //    .map_err(|e| to_tonic_err(&e))?;
+    let results = ctx.collect_plan(&plan, 1024 * 1024).unwrap(); // TODO
+                                                                 //    .map_err(|e| to_tonic_err(&e))?;
 
     // print results
     results.iter().for_each(|batch| {
@@ -122,7 +120,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("{}, {}", c1.value(i), c2.value(i),);
         }
     });
-
 
     Ok(())
 }
@@ -153,7 +150,6 @@ fn max(expr: Expr) -> Expr {
     Expr::AggregateFunction {
         name: "MAX".to_owned(),
         args: vec![expr],
-        return_type: DataType::Float64
+        return_type: DataType::Float64,
     }
 }
-

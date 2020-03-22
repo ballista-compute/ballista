@@ -8,6 +8,7 @@ use prost::Message;
 
 use arrow::datatypes::{DataType, Field, Schema};
 
+use datafusion::logicalplan::Expr::AggregateFunction;
 use std::convert::TryInto;
 use std::io::Cursor;
 use std::sync::Arc;
@@ -33,6 +34,22 @@ impl TryInto<LogicalPlan> for protobuf::LogicalPlanNode {
             let expr: protobuf::LogicalExprNode = selection.expr.expect("expression required");
             LogicalPlanBuilder::from(&input)
                 .filter(expr.try_into()?)?
+                .build()
+                .map_err(|e| e.into())
+        } else if let Some(aggregate) = self.aggregate {
+            let input: LogicalPlan = self.input.unwrap().as_ref().to_owned().try_into()?;
+            let group_expr = aggregate
+                .group_expr
+                .iter()
+                .map(|expr| expr.to_owned().try_into())
+                .collect::<Result<Vec<_>, _>>()?;
+            let aggr_expr = aggregate
+                .aggr_expr
+                .iter()
+                .map(|expr| expr.to_owned().try_into())
+                .collect::<Result<Vec<_>, _>>()?;
+            LogicalPlanBuilder::from(&input)
+                .aggregate(group_expr, aggr_expr)?
                 .build()
                 .map_err(|e| e.into())
         } else if let Some(scan) = self.file {
@@ -75,6 +92,12 @@ impl TryInto<Expr> for protobuf::LogicalExprNode {
             Ok(Expr::Literal(ScalarValue::Utf8(
                 self.literal_string.clone(),
             )))
+        } else if let Some(aggregate_expr) = self.aggregate_expr {
+            Ok(Expr::AggregateFunction {
+                name: "MAX".to_string(), //TODO
+                args: vec![parse_required_expr(aggregate_expr.expr)?],
+                return_type: DataType::Boolean, //TODO
+            })
         } else {
             Err(ballista_error(&format!(
                 "Unsupported logical expression '{:?}'",
@@ -295,6 +318,27 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
                 });
                 Ok(node)
             }
+            LogicalPlan::Aggregate {
+                input,
+                group_expr,
+                aggr_expr,
+                ..
+            } => {
+                let input: protobuf::LogicalPlanNode = input.as_ref().to_owned().try_into()?;
+                let mut node = empty_plan_node();
+                node.input = Some(Box::new(input));
+                node.aggregate = Some(protobuf::AggregateNode {
+                    group_expr: group_expr
+                        .iter()
+                        .map(|expr| expr.to_owned().try_into())
+                        .collect::<Result<Vec<_>, BallistaError>>()?,
+                    aggr_expr: aggr_expr
+                        .iter()
+                        .map(|expr| expr.to_owned().try_into())
+                        .collect::<Result<Vec<_>, BallistaError>>()?,
+                });
+                Ok(node)
+            }
             _ => Err(BallistaError::NotImplemented(format!("{:?}", self))),
         }
     }
@@ -329,6 +373,20 @@ impl TryInto<protobuf::LogicalExprNode> for Expr {
                     l: Some(Box::new(left.as_ref().to_owned().try_into()?)),
                     r: Some(Box::new(right.as_ref().to_owned().try_into()?)),
                     op: format!("{:?}", op),
+                }));
+                Ok(expr)
+            }
+            Expr::AggregateFunction {
+                name,
+                args,
+                return_type,
+            } => {
+                //TODO clean up this mess
+                let mut expr = empty_expr_node();
+                let x = args[0].clone();
+                expr.aggregate_expr = Some(Box::new(protobuf::AggregateExprNode {
+                    aggr_function: 1, //TODO protobuf::AggregateFunction::Max, //TODO parse aggr function
+                    expr: Some(Box::new(x.try_into()?)),
                 }));
                 Ok(expr)
             }
@@ -376,7 +434,7 @@ mod tests {
     use crate::plan::*;
     use crate::protobuf;
     use arrow::datatypes::{DataType, Field, Schema};
-    use datafusion::logicalplan::{col, lit_str, LogicalPlanBuilder};
+    use datafusion::logicalplan::{col, lit_str, Expr, LogicalPlanBuilder};
     use std::convert::TryInto;
 
     #[test]
@@ -413,5 +471,48 @@ mod tests {
         assert_eq!(format!("{:?}", action), format!("{:?}", action2));
 
         Ok(())
+    }
+
+    #[test]
+    fn roundtrip_aggregate() -> Result<()> {
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("first_name", DataType::Utf8, false),
+            Field::new("last_name", DataType::Utf8, false),
+            Field::new("state", DataType::Utf8, false),
+            Field::new("salary", DataType::Int32, false),
+        ]);
+
+        let plan = LogicalPlanBuilder::scan("default", "employee", &schema, None)
+            .and_then(|plan| plan.aggregate(vec![col(3)], vec![max(col(4))]))
+            .and_then(|plan| plan.build())
+            //.map_err(|e| Err(format!("{:?}", e)))
+            .unwrap(); //TODO
+
+        let action = Action::RemoteQuery {
+            plan: plan.clone(),
+            tables: vec![TableMeta::Csv {
+                table_name: "employee".to_owned(),
+                has_header: true,
+                path: "/foo/bar.csv".to_owned(),
+                schema: schema.clone(),
+            }],
+        };
+
+        let proto: protobuf::Action = action.clone().try_into()?;
+
+        let action2: Action = proto.try_into()?;
+
+        assert_eq!(format!("{:?}", action), format!("{:?}", action2));
+
+        Ok(())
+    }
+
+    fn max(expr: Expr) -> Expr {
+        Expr::AggregateFunction {
+            name: "MAX".to_owned(),
+            args: vec![expr],
+            return_type: DataType::Float64,
+        }
     }
 }

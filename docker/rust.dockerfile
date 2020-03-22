@@ -1,8 +1,10 @@
 FROM ballistacompute/rust-cached-deps as build
 
 # Compile Ballista
+RUN rm -rf /tmp/ballista/src/
 COPY rust/src/ /tmp/ballista/src/
 RUN cargo build --release --target x86_64-unknown-linux-musl
+RUN cargo build --release --target x86_64-unknown-linux-musl --examples
 
 # Copy the statically-linked binary into a scratch container.
 FROM alpine:3.10

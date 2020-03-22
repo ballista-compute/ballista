@@ -1,12 +1,12 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: parallel-aggregate-rs
+  name: parallel-aggregate
 spec:
   template:
     spec:
       containers:
-        - name: parallel-aggregate-rs
-          image: ballistacompute/parallel-aggregate-rs
+        - name: parallel-aggregate
+          image: ballistacompute/parallel-aggregate
       restartPolicy: Never
   backoffLimit: 4

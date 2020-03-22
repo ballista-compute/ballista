@@ -5,6 +5,8 @@ use arrow::array::Int32Array;
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 
+extern crate ballista;
+
 use ballista::client;
 use ballista::cluster;
 use ballista::error::BallistaError;

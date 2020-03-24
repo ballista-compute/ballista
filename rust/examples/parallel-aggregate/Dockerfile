@@ -1,4 +1,4 @@
-FROM ballistacompute/rust-cached-deps as build
+FROM ballistacompute/rust-cached-deps:0.2.0-alpha-1 as build
 
 WORKDIR /tmp/ballista
 

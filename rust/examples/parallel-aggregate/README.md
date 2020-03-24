@@ -16,9 +16,13 @@ kubectl apply -f rbac.yaml
 
 You will need to run [download-nyctaxi-files.sh](download-nyctaxi-files.sh) to download a subset of the [NYC Taxi data set](https://www1.nyc.gov/site/tlc/about/tlc-trip-record-data.page) and then edit [pv.yaml](pv.yaml) to provide the correct path to these files.
 
+Mount the host path into the Minikube VM.
+
 ```bash
 minikube mount /mnt/nyctaxi/:/mnt/nyctaxi
 ```
+
+Create a persistent volume.
 
 ```bash
 kubectl apply -f pv.yaml

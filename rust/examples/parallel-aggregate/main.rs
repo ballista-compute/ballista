@@ -71,7 +71,7 @@ async fn main() -> Result<(), BallistaError> {
 
             // SELECT passenger_count, MAX(fare_amount) FROM <filename> GROUP BY passenger_count
             let plan = LogicalPlanBuilder::scan("default", "tripdata", &schema, None)
-                .and_then(|plan| plan.aggregate(vec![col(3)], vec![max(col(1))]))
+                .and_then(|plan| plan.aggregate(vec![col(3)], vec![max(col(10))]))
                 .and_then(|plan| plan.build())
                 //.map_err(|e| Err(format!("{:?}", e)))
                 .unwrap(); //TODO
@@ -99,12 +99,21 @@ async fn main() -> Result<(), BallistaError> {
     }
     println!("Received {} batches", batches.len());
 
+    batches.iter().for_each(|batch| {
+        println!(
+            "RecordBatch has {} rows and {} columns and schema {:?}",
+            batch.num_rows(),
+            batch.num_columns(),
+            batch.schema()
+        );
+    });
+
     // perform secondary aggregate query on the results collected from the executors
     let mut ctx = ExecutionContext::new();
 
     let schema = Schema::new(vec![
-        Field::new("passenger_count", DataType::UInt32, true),
-        Field::new("fare_amount", DataType::Float64, true),
+        Field::new("c0", DataType::UInt32, true),
+        Field::new("MAX", DataType::Float64, true),
     ]);
     let provider = MemTable::new(Arc::new(schema.clone()), batches).unwrap();
     ctx.register_table("tripdata", Box::new(provider));

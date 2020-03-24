@@ -30,16 +30,16 @@ spec:
     spec:
       containers:
       - name: ballista
-        image: ballistacompute/rust:0.2.0-alpha-1
+        image: ballistacompute/rust:0.2.0-alpha-2
         # because we're testing in Minikube, we never want to pull remote images
         #imagePullPolicy: Never
         resources:
           requests:
             cpu: "1"
-            memory: "128Mi"
+            memory: "1024Mi"
           limits:
             cpu: "1"
-            memory: "256Mi"
+            memory: "1024Mi"
         ports:
           - containerPort: 50051
             name: flight

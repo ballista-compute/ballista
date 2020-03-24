@@ -1,7 +1,7 @@
 use std::process;
 use std::sync::Arc;
 
-use arrow::array::{Int32Array, UInt32Array, Float64Array};
+use arrow::array::{Float64Array, Int32Array, UInt32Array};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 
@@ -161,8 +161,11 @@ async fn main() -> Result<(), BallistaError> {
     Ok(())
 }
 
-async fn execute_remote_query(host: String, port: usize, action: Action) -> Result<Vec<RecordBatch>, BallistaError> {
-
+async fn execute_remote_query(
+    host: String,
+    port: usize,
+    action: Action,
+) -> Result<Vec<RecordBatch>, BallistaError> {
     println!("Sending plan to {}:{}", host, port);
 
     let response = client::execute_action(&host, port, action)

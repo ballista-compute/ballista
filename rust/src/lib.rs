@@ -6,6 +6,8 @@ pub mod protobuf {
     include!(concat!(env!("OUT_DIR"), "/ballista.protobuf.rs"));
 }
 
+pub const BALLISTA_VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
 pub mod client;
 pub mod cluster;
 pub mod error;

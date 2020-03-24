@@ -8,6 +8,7 @@ spec:
       containers:
         - name: parallel-aggregate
           image: ballistacompute/parallel-aggregate-rs
-          imagePullPolicy: IfNotPresent
+          # because we're testing in Minikube, we never want to pull remote images
+          imagePullPolicy: Never
       restartPolicy: Never
   backoffLimit: 4

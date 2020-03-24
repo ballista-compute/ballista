@@ -30,7 +30,9 @@ spec:
     spec:
       containers:
       - name: ballista
-        image: ballistacompute/rust:0.2.0
+        image: ballistacompute/rust
+        # because we're testing in Minikube, we never want to pull remote images
+        imagePullPolicy: Never
         resources:
           limits:
             memory: "256Mi"
@@ -40,10 +42,9 @@ spec:
           - containerPort: 50051
             name: flight
         volumeMounts:
-        - name: nyctaxi
-          mountPath: /mnt/nyctaxi
+          - mountPath: /mnt/nyctaxi
+            name: nyctaxi
       volumes:
       - name: nyctaxi
-        hostPath:
-          # change this to the path to the files on your host
-          path: /mnt/nyctaxi
+        persistentVolumeClaim:
+          claimName: nyctaxi-pv-claim

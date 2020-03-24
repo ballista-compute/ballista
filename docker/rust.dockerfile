@@ -6,7 +6,7 @@ COPY rust/src/ /tmp/ballista/src/
 RUN cargo build --release --target x86_64-unknown-linux-musl
 RUN cargo build --release --target x86_64-unknown-linux-musl --examples
 
-# Copy the statically-linked binary into a scratch container.
+## Copy the statically-linked binary into a scratch container.
 FROM alpine:3.10
 
 # Install Tini for better signal handling

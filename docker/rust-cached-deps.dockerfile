@@ -12,7 +12,6 @@ RUN mkdir -p /tmp/ballista/src/bin/ && echo 'fn main() {}' >> /tmp/ballista/src/
 COPY proto /tmp/proto/
 COPY rust/build.rs /tmp/ballista/
 RUN cargo build --release --target x86_64-unknown-linux-musl
-RUN cargo build --release --target x86_64-unknown-linux-musl --examples
 
 # Compile Ballista
 COPY rust/src/ /tmp/ballista/src/

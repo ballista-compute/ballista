@@ -69,7 +69,7 @@ async fn main() -> Result<(), BallistaError> {
 
         // SELECT passenger_count, MAX(fare_amount) FROM <filename> GROUP BY passenger_count
         let plan = LogicalPlanBuilder::scan("default", "tripdata", &schema, None)
-            .and_then(|plan| plan.aggregate(vec![col(0)], vec![max(col(1))]))
+            .and_then(|plan| plan.aggregate(vec![col(3)], vec![max(col(10))]))
             .and_then(|plan| plan.build())
             //.map_err(|e| Err(format!("{:?}", e)))
             .unwrap(); //TODO

@@ -60,19 +60,28 @@ impl FlightService for FlightServiceImpl {
                         });
 
                         // create the query plan
-                        let plan = ctx
-                            .optimize(&logical_plan)
-                            .and_then(|plan| ctx.create_physical_plan(&plan, 1024 * 1024))
+                        let optimized_plan =
+                            ctx.optimize(&logical_plan).map_err(|e| to_tonic_err(&e))?;
+
+                        println!("Executing: {:?}", optimized_plan.as_ref());
+
+                        let physical_plan = ctx
+                            .create_physical_plan(&optimized_plan, 1024 * 1024)
                             .map_err(|e| to_tonic_err(&e))?;
 
                         // execute the query
-                        let results = ctx.collect(plan.as_ref()).map_err(|e| to_tonic_err(&e))?;
+                        let results = ctx
+                            .collect(physical_plan.as_ref())
+                            .map_err(|e| to_tonic_err(&e))?;
+
+                        println!("Executed query");
+
                         if results.is_empty() {
                             return Err(Status::internal("There were no results from ticket"));
                         }
 
                         // add an initial FlightData message that sends schema
-                        let schema = plan.schema();
+                        let schema = physical_plan.schema();
                         let mut flights: Vec<Result<FlightData, Status>> =
                             vec![Ok(FlightData::from(schema.as_ref()))];
 

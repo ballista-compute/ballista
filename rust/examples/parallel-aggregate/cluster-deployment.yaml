@@ -18,7 +18,7 @@ metadata:
   name: ballista
 spec:
   serviceName: "ballista"
-  replicas: 2
+  replicas: 12
   selector:
     matchLabels:
       app: ballista
@@ -34,10 +34,12 @@ spec:
         # because we're testing in Minikube, we never want to pull remote images
         #imagePullPolicy: Never
         resources:
-          limits:
-            memory: "256Mi"
           requests:
+            cpu: "1"
             memory: "128Mi"
+          limits:
+            cpu: "1"
+            memory: "256Mi"
         ports:
           - containerPort: 50051
             name: flight

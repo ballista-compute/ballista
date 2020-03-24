@@ -1,8 +1,7 @@
 use std::process;
 use std::sync::Arc;
-use std::thread;
 
-use arrow::array::Int32Array;
+use arrow::array::{Int32Array, UInt32Array, Float64Array};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 
@@ -16,6 +15,8 @@ use ballista::{client, BALLISTA_VERSION};
 use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext;
 use datafusion::logicalplan::*;
+
+use tokio::task;
 
 #[tokio::main]
 async fn main() -> Result<(), BallistaError> {
@@ -44,7 +45,8 @@ async fn main() -> Result<(), BallistaError> {
 
     // execute aggregate query in parallel across all files
     let num_months: usize = 12;
-    let threads: Vec<thread::JoinHandle<Result<Vec<RecordBatch>, BallistaError>>> = vec![];
+    let mut tasks: Vec<task::JoinHandle<Result<Vec<RecordBatch>, BallistaError>>> = vec![];
+
     for month in 0..num_months {
         // round robin across the executors
         let executor = &executors[executor_index];
@@ -57,55 +59,44 @@ async fn main() -> Result<(), BallistaError> {
         let port = executor.port;
 
         // execute the query against the executor
-        //tokio::spawn(async move {
-        println!("Executing query against executor at {}:{}", host, port);
+        tasks.push(tokio::spawn(async move {
+            println!("Executing query against executor at {}:{}", host, port);
 
-        let filename = format!(
-            "{}/csv/yellow/2019/yellow_tripdata_2019-{:02}.csv",
-            nyc_taxi_path,
-            month + 1
-        );
-        let schema = nyctaxi_schema();
+            let filename = format!(
+                "{}/csv/yellow/2019/yellow_tripdata_2019-{:02}.csv",
+                nyc_taxi_path,
+                month + 1
+            );
+            let schema = nyctaxi_schema();
 
-        // SELECT passenger_count, MAX(fare_amount) FROM <filename> GROUP BY passenger_count
-        let plan = LogicalPlanBuilder::scan("default", "tripdata", &schema, None)
-            .and_then(|plan| plan.aggregate(vec![col(3)], vec![max(col(10))]))
-            .and_then(|plan| plan.build())
-            //.map_err(|e| Err(format!("{:?}", e)))
-            .unwrap(); //TODO
+            // SELECT passenger_count, MAX(fare_amount) FROM <filename> GROUP BY passenger_count
+            let plan = LogicalPlanBuilder::scan("default", "tripdata", &schema, None)
+                .and_then(|plan| plan.aggregate(vec![col(3)], vec![max(col(1))]))
+                .and_then(|plan| plan.build())
+                //.map_err(|e| Err(format!("{:?}", e)))
+                .unwrap(); //TODO
 
-        let action = Action::RemoteQuery {
-            plan: plan.clone(),
-            tables: vec![TableMeta::Csv {
-                table_name: "tripdata".to_owned(),
-                has_header: true,
-                path: filename,
-                schema: schema.clone(),
-            }],
-        };
+            let action = Action::RemoteQuery {
+                plan: plan.clone(),
+                tables: vec![TableMeta::Csv {
+                    table_name: "tripdata".to_owned(),
+                    has_header: true,
+                    path: filename,
+                    schema: schema.clone(),
+                }],
+            };
 
-        println!("Sending plan to {}:{}", host, port);
-
-        let response = client::execute_action(&host, port, action)
-            .await
-            .map_err(|e| BallistaError::General(format!("{:?}", e)))?;
-
-        println!("Received {} batches from {}:{}", response.len(), host, port);
-
-        for batch in response {
-            batches.push(batch);
-        }
-
-        //});
+            execute_remote_query(host, port, action).await
+        }));
     }
 
     // collect the results
-    // for handle in threads {
-    //     let response: Vec<RecordBatch> = handle.join().expect("thread panicked").unwrap();
-    //     for batch in response {
-    //         batches.push(batch);
-    //     }
-    // }
+    for handle in tasks {
+        let response: Vec<RecordBatch> = handle.await.expect("thread panicked")?;
+        for batch in response {
+            batches.push(batch);
+        }
+    }
     println!("Received {} batches", batches.len());
 
     // perform secondary aggregate query on the results collected from the executors
@@ -141,25 +132,37 @@ async fn main() -> Result<(), BallistaError> {
 
         println!("{:?}", batch.schema());
 
-        //
-        //     let c1 = batch
-        //         .column(0)
-        //         .as_any()
-        //         .downcast_ref::<Int32Array>()
-        //         .expect("Int type");
-        //
-        //     let c2 = batch
-        //         .column(1)
-        //         .as_any()
-        //         .downcast_ref::<Int32Array>()
-        //         .expect("Int type");
-        //
-        //     for i in 0..batch.num_rows() {
-        //         println!("{}, {}", c1.value(i), c2.value(i),);
-        //     }
+        let passenger_count = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<UInt32Array>()
+            .expect("UInt32 type");
+
+        let fare_amount = batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .expect("Float64 type");
+
+        for i in 0..batch.num_rows() {
+            println!("{}, {}", passenger_count.value(i), fare_amount.value(i),);
+        }
     });
 
     Ok(())
+}
+
+async fn execute_remote_query(host: String, port: usize, action: Action) -> Result<Vec<RecordBatch>, BallistaError> {
+
+    println!("Sending plan to {}:{}", host, port);
+
+    let response = client::execute_action(&host, port, action)
+        .await
+        .map_err(|e| BallistaError::General(format!("{:?}", e)))?;
+
+    println!("Received {} batches from {}:{}", response.len(), host, port);
+
+    Ok(response)
 }
 
 fn nyctaxi_schema() -> Schema {

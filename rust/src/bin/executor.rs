@@ -1,7 +1,7 @@
 use std::pin::Pin;
 
-use ballista::{plan, BALLISTA_VERSION};
 use ballista::serde::decode_protobuf;
+use ballista::{plan, BALLISTA_VERSION};
 use datafusion::execution::context::ExecutionContext;
 use flight::{
     flight_service_server::FlightService, flight_service_server::FlightServiceServer, Action,
@@ -180,7 +180,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let svc = FlightServiceServer::new(service);
 
-    println!("Ballista v{} Rust Executor listening on {:?}", BALLISTA_VERSION, addr);
+    println!(
+        "Ballista v{} Rust Executor listening on {:?}",
+        BALLISTA_VERSION, addr
+    );
 
     Server::builder().add_service(svc).serve(addr).await?;
 

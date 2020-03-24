@@ -8,10 +8,10 @@ use arrow::record_batch::RecordBatch;
 
 extern crate ballista;
 
-use ballista::{client, BALLISTA_VERSION};
 use ballista::cluster;
 use ballista::error::BallistaError;
 use ballista::plan::{Action, TableMeta};
+use ballista::{client, BALLISTA_VERSION};
 
 use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext;
@@ -19,7 +19,10 @@ use datafusion::logicalplan::*;
 
 #[tokio::main]
 async fn main() -> Result<(), BallistaError> {
-    println!("Ballista v{} Parallel Aggregate Query Example", BALLISTA_VERSION);
+    println!(
+        "Ballista v{} Parallel Aggregate Query Example",
+        BALLISTA_VERSION
+    );
 
     //TODO use env vars and/or command-line args
     let nyc_taxi_path = "/mnt/nyctaxi";

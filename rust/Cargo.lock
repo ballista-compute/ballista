@@ -178,7 +178,7 @@ dependencies = [
 
 [[package]]
 name = "ballista"
-version = "0.2.0-dev"
+version = "0.2.0-alpha-1"
 dependencies = [
  "arrow",
  "arrow-flight",

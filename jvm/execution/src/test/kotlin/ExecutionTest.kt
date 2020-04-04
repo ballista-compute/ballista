@@ -1,9 +1,7 @@
 package org.ballistacompute.execution
 
 import org.ballistacompute.logical.*
-import org.ballistacompute.physical.*
 import org.apache.arrow.vector.types.pojo.ArrowType
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.jupiter.api.TestInstance
 import java.io.File
@@ -24,7 +22,7 @@ class ExecutionTest {
         // Construct a query using the DataFrame API
         val df = ctx.csv(employeeCsv)
                 .filter(col("state") eq lit("CO"))
-                .select(listOf(col("id"), col("first_name"), col("last_name")))
+                .project(listOf(col("id"), col("first_name"), col("last_name")))
 
         val batches = ctx.execute(df).asSequence().toList()
         assertEquals(1, batches.size)
@@ -82,7 +80,7 @@ class ExecutionTest {
         // construct a query using the DataFrame API
         val caEmployees = ctx.csv(employeeCsv)
                 .filter(col("state") eq lit("CA"))
-                .select(listOf(col("id"), col("first_name"), col("last_name"), col("salary")))
+                .project(listOf(col("id"), col("first_name"), col("last_name"), col("salary")))
 
         // register the DataFrame as a table
         ctx.register("ca_employees", caEmployees)

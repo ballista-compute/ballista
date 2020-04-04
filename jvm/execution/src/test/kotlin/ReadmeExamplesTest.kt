@@ -1,7 +1,6 @@
 package org.ballistacompute.execution
 
 import org.ballistacompute.logical.*
-import org.ballistacompute.physical.*
 
 import org.junit.Test
 import org.junit.jupiter.api.TestInstance
@@ -46,7 +45,7 @@ class ReadmeExamplesTest {
         // Construct a query using the DataFrame API
         val df: DataFrame = ctx.csv(employeeCsv)
                 .filter(col("state") eq lit("CO"))
-                .select(listOf(col("id"), col("first_name"), col("last_name")))
+                .project(listOf(col("id"), col("first_name"), col("last_name")))
 
         val expected =
                 "Projection: #id, #first_name, #last_name\n" +

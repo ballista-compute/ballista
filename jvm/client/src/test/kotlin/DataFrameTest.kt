@@ -2,7 +2,6 @@ package org.ballistacompute.client
 
 import org.ballistacompute.datasource.CsvDataSource
 import org.ballistacompute.logical.*
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.jupiter.api.TestInstance
 
@@ -16,7 +15,7 @@ class DataFrameTest {
 
         val df2 = df
             .filter(col("a") eq lit(123))
-            .select(listOf(col("a"), col("b"), col("c")))
+            .project(listOf(col("a"), col("b"), col("c")))
 
         val client = Client("localhost", 50001)
         client.execute(df2.logicalPlan())

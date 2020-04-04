@@ -13,7 +13,7 @@ class OptimizerTest {
     fun `projection push down`() {
 
         val df = csv()
-                .select(listOf(col("id"), col("first_name"), col("last_name")))
+                .project(listOf(col("id"), col("first_name"), col("last_name")))
 
         val rule = ProjectionPushDownRule()
         val optimizedPlan = rule.optimize(df.logicalPlan())
@@ -30,7 +30,7 @@ class OptimizerTest {
 
         val df = csv()
                 .filter(col("state") eq lit("CO"))
-                .select(listOf(col("id"), col("first_name"), col("last_name")))
+                .project(listOf(col("id"), col("first_name"), col("last_name")))
 
         println(format(df.logicalPlan()));
 

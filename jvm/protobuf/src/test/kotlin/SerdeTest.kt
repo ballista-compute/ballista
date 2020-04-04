@@ -16,7 +16,7 @@ class SerdeTest {
 
         val df = csv()
                 .filter(col("state") eq lit("CO"))
-                .select(listOf(col("id"), col("first_name"), col("last_name")))
+                .project(listOf(col("id"), col("first_name"), col("last_name")))
 
         val logicalPlan = roundtrip(df)
 

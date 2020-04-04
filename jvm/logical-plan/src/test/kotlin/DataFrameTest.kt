@@ -14,7 +14,7 @@ class DataFrameTest {
 
         val df = csv()
                 .filter(col("state") eq lit("CO"))
-                .select(listOf(col("id"), col("first_name"), col("last_name")))
+                .project(listOf(col("id"), col("first_name"), col("last_name")))
 
         val expected =
                 "Projection: #id, #first_name, #last_name\n" +
@@ -29,7 +29,7 @@ class DataFrameTest {
 
         val df = csv()
                 .filter(col("state") eq lit("CO"))
-                .select(listOf(
+                .project(listOf(
                         col("id"),
                         col("first_name"),
                         col("last_name"),

@@ -41,6 +41,10 @@ class ExecutionContext {
         tables[tablename] = df
     }
 
+    /** Register a CSV data source with the context */
+    fun registerCsv(tablename: String, filename: String) {
+        register(tablename, csv(filename))
+    }
     /** Execute the logical plan represented by a DataFrame */
     fun execute(df: DataFrame) : Sequence<RecordBatch> {
         return execute(df.logicalPlan())

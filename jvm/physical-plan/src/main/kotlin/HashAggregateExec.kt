@@ -1,9 +1,7 @@
 package org.ballistacompute.physical
 
 import org.ballistacompute.datatypes.RecordBatch
-import org.ballistacompute.datatypes.ColumnVector
 import org.ballistacompute.datatypes.ArrowFieldVector
-import org.ballistacompute.datatypes.LiteralValueVector
 import org.ballistacompute.datatypes.ArrowVectorBuilder
 
 import org.apache.arrow.memory.RootAllocator
@@ -15,13 +13,23 @@ class HashAggregateExec(val input: PhysicalPlan,
                         val aggregateExpr: List<AggregatePExpr>,
                         val schema: Schema) : PhysicalPlan {
 
+    override fun schema(): Schema {
+        return schema
+    }
+
+    override fun children(): List<PhysicalPlan> {
+        return listOf(input)
+    }
+
+    override fun toString(): String {
+        return "HashAggregateExec: groupExpr=$groupExpr, aggrExpr=$aggregateExpr"
+    }
+
     override fun execute(): Sequence<RecordBatch> {
 
         val map = HashMap<List<Any?>, List<Accumulator>>()
 
         input.execute().iterator().forEach { batch ->
-
-            //println("HashAggregateExec input\n${batch.toCSV()}")
 
             // evaluate the grouping expressions
             val groupKeys = groupExpr.map { it.evaluate(batch) }

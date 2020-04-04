@@ -64,24 +64,35 @@ class SqlPlannerTest {
     @Test
     fun `plan aggregate query`() {
         val plan = plan("SELECT state, MAX(salary) FROM employee GROUP BY state")
-        assertEquals("Aggregate: groupExpr=[#state], aggregateExpr=[MAX(#salary)]\n" +
-                "\tScan: ; projection=None\n", format(plan))
+        assertEquals("Projection: #0, #1\n" +
+                "\tAggregate: groupExpr=[#state], aggregateExpr=[MAX(#salary)]\n" +
+                "\t\tScan: ; projection=None\n", format(plan))
+    }
+
+    @Test
+    fun `plan aggregate query aggr first`() {
+        val plan = plan("SELECT MAX(salary), state FROM employee GROUP BY state")
+        assertEquals("Projection: #1, #0\n" +
+                "\tAggregate: groupExpr=[#state], aggregateExpr=[MAX(#salary)]\n" +
+                "\t\tScan: ; projection=None\n", format(plan))
     }
 
     @Test
     fun `plan aggregate query with filter`() {
         val plan = plan("SELECT state, MAX(salary) FROM employee WHERE salary > 50000 GROUP BY state")
-        assertEquals("Aggregate: groupExpr=[#state], aggregateExpr=[MAX(#salary)]\n" +
-                "\tSelection: #salary > 50000\n" +
-                "\t\tProjection: #state, #salary\n" +
-                "\t\t\tScan: ; projection=None\n", format(plan))
+        assertEquals("Projection: #0, #1\n" +
+                "\tAggregate: groupExpr=[#state], aggregateExpr=[MAX(#salary)]\n" +
+                "\t\tSelection: #salary > 50000\n" +
+                "\t\t\tProjection: #state, #salary\n" +
+                "\t\t\t\tScan: ; projection=None\n", format(plan))
     }
 
     @Test
     fun `plan aggregate query with cast`() {
         val plan = plan("SELECT state, MAX(CAST(salary AS double)) FROM employee GROUP BY state")
-        assertEquals("Aggregate: groupExpr=[#state], aggregateExpr=[MAX(CAST(#salary AS FloatingPoint(DOUBLE)))]\n" +
-                "\tScan: ; projection=None\n", format(plan))
+        assertEquals("Projection: #0, #1\n" +
+                "\tAggregate: groupExpr=[#state], aggregateExpr=[MAX(CAST(#salary AS FloatingPoint(DOUBLE)))]\n" +
+                "\t\tScan: ; projection=None\n", format(plan))
     }
 
     private fun plan(sql: String) : LogicalPlan {

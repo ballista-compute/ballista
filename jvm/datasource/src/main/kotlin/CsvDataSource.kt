@@ -110,19 +110,21 @@ class ReaderIterator(private val schema: Schema,
         logger.fine("createBatch() rows=$rows")
 
         val root = VectorSchemaRoot.create(schema, RootAllocator(Long.MAX_VALUE))
-        root.allocateNew()
         root.rowCount = rows.size
+        root.allocateNew()
 
         root.fieldVectors.withIndex().forEach { field ->
-            when (field.value) {
+            val vector = field.value
+            when (vector) {
                 is VarCharVector -> rows.withIndex().forEach { row ->
                     val value = row.value[field.index]
-                    (field.value as VarCharVector).set(row.index, value.toByteArray())
+                    vector.set(row.index, value.toByteArray())
                 }
                 else -> TODO()
             }
             field.value.valueCount = rows.size
         }
+
 
         val batch = RecordBatch(schema, root.fieldVectors.map { ArrowFieldVector(it) })
 

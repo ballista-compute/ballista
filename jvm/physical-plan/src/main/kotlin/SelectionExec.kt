@@ -11,11 +11,21 @@ import org.apache.arrow.vector.BitVector
 import org.apache.arrow.vector.FieldVector
 import org.apache.arrow.vector.VarCharVector
 import org.apache.arrow.vector.VectorSchemaRoot
+import org.apache.arrow.vector.types.pojo.Schema
 
 /**
  * Execute a selection.
  */
 class SelectionExec(val input: PhysicalPlan, val expr: PhysicalExpr) : PhysicalPlan {
+
+    override fun schema(): Schema {
+        return input.schema()
+    }
+
+    override fun children(): List<PhysicalPlan> {
+        return listOf(input)
+    }
+
     override fun execute(): Sequence<RecordBatch> {
         val input = input.execute()
         return input.map { batch ->

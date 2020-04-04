@@ -43,33 +43,30 @@ class SqlPlanner {
         if (aggregateExprCount == 0) {
             return planNonAggregateQuery(select, plan, projectionExpr, columnNamesInSelection, columnNamesInProjection)
         } else {
-            val aggrExpr = projectionExpr.filter { isAggregateExpr(it) }
 
-            if (aggrExpr.count { it is Alias } > 0) {
-                val projection = mutableListOf<LogicalExpr>()
-                val numGroupCols = select.groupBy.size
-                (0 until numGroupCols).forEach { projection.add(ColumnIndex(it)) }
-                val aggregates = mutableListOf<AggregateExpr>()
-                aggrExpr.indices.forEach { i ->
-                    val e = aggrExpr[i]
-                    when (e) {
-                        is AggregateExpr -> {
-                            aggregates.add(e)
-                            projection.add(ColumnIndex(numGroupCols+i))
-                        }
-                        is Alias -> {
-                            aggregates.add(e.expr as AggregateExpr)
-                            projection.add(Alias(ColumnIndex(numGroupCols+i), e.alias))
-                        }
-                        else -> TODO()
+            val projection = mutableListOf<LogicalExpr>()
+            val aggrExpr = mutableListOf<AggregateExpr>()
+            val numGroupCols = select.groupBy.size
+            var groupCount = 0
+
+            projectionExpr.forEach { expr ->
+                when (expr) {
+                    is AggregateExpr -> {
+                        projection.add(ColumnIndex(numGroupCols + aggrExpr.size))
+                        aggrExpr.add(expr)
+                    }
+                    is Alias -> {
+                        projection.add(Alias(ColumnIndex(numGroupCols + aggrExpr.size), expr.alias))
+                        aggrExpr.add(expr.expr as AggregateExpr)
+                    }
+                    else -> {
+                        projection.add(ColumnIndex(groupCount))
+                        groupCount += 1
                     }
                 }
-                plan = planAggregateQuery(projectionExpr, select, columnNamesInSelection, plan, aggregates)
-                return plan.project(projection)
-            } else {
-                val aggrExpr = projectionExpr.filter { isAggregateExpr(it) }.map { it as AggregateExpr }
-                return planAggregateQuery(projectionExpr, select, columnNamesInSelection, plan, aggrExpr)
             }
+            plan = planAggregateQuery(projectionExpr, select, columnNamesInSelection, plan, aggrExpr)
+            return plan.project(projection)
         }
     }
 

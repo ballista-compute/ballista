@@ -41,7 +41,7 @@ fun main() {
     */
 
     val time = measureTimeMillis {
-        val df = ctx.csv("/home/andy/data/yellow_tripdata_2019-01.csv", 1*1024)
+        val df = ctx.csv("/home/andy/data/yellow_tripdata_2019-01.csv")
                 .aggregate(
                         listOf(col("passenger_count")),
                         listOf(Max(cast(col("fare_amount"), ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)))))

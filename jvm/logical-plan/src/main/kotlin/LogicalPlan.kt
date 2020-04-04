@@ -19,6 +19,9 @@ interface LogicalPlan {
      */
     fun children(): List<LogicalPlan>
 
+    fun pretty(): String {
+        return format(this)
+    }
 }
 
 /** Format a logical plan in human-readable form */

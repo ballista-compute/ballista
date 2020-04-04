@@ -12,7 +12,7 @@ import org.ballistacompute.sql.SqlSelect
 import org.ballistacompute.sql.SqlTokenizer
 
 /** Execution context */
-class ExecutionContext {
+class ExecutionContext(val batchSize: Int = 1024) {
 
     /** Tables registered with this context */
     private val tables = mutableMapOf<String, DataFrame>()
@@ -26,7 +26,7 @@ class ExecutionContext {
     }
 
     /** Get a DataFrame representing the specified CSV file */
-    fun csv(filename: String, batchSize: Int = 1000): DataFrame {
+    fun csv(filename: String): DataFrame {
         return DataFrameImpl(Scan(filename, CsvDataSource(filename, batchSize), listOf()))
     }
 
@@ -52,9 +52,17 @@ class ExecutionContext {
 
     /** Execute the provided logical plan */
     fun execute(plan: LogicalPlan) : Sequence<RecordBatch> {
+        println("ExecutionContext.execute() plan:" +
+                "\n${plan.pretty()}")
+
         val optimizedPlan = Optimizer().optimize(plan)
-        println(format(optimizedPlan))
+        println("ExecutionContext.execute() optimizedPlan:" +
+                "\n${optimizedPlan.pretty()}")
+
         val physicalPlan = QueryPlanner().createPhysicalPlan(optimizedPlan)
+        println("ExecutionContext.execute() physicalPlan:" +
+                "\n${physicalPlan.pretty()}")
+
         return physicalPlan.execute()
     }
 

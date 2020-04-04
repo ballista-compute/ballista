@@ -11,7 +11,7 @@ import java.sql.SQLException
 class Column(val name: String): LogicalExpr {
 
     override fun toField(input: LogicalPlan): Field {
-        return input.schema().fields.find { it.name == name } ?: throw SQLException("No column named '$name'")
+        return input.schema().fields.find { it.name == name } ?: throw SQLException("No column named '$name' in ${input.schema().fields.map { it.name }}")
     }
 
     override fun toString(): String {

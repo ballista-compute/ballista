@@ -15,10 +15,22 @@ class ProjectionExec(val input: PhysicalPlan,
                      val schema: Schema,
                      val expr: List<PhysicalExpr>) : PhysicalPlan {
 
+    override fun schema(): Schema {
+        return schema
+    }
+
+    override fun children(): List<PhysicalPlan> {
+        return listOf(input)
+    }
+
     override fun execute(): Sequence<RecordBatch> {
         return input.execute().map { batch ->
             val columns = expr.map { it.evaluate(batch) }
             RecordBatch(schema, columns)
         }
+    }
+
+    override fun toString(): String {
+        return "ProjectionExec: $expr"
     }
 }

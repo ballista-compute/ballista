@@ -6,13 +6,15 @@ import java.lang.IllegalStateException
 class ProjectionPushDownRule : OptimizerRule {
 
     override fun optimize(plan: LogicalPlan): LogicalPlan {
-        return pushDown(plan, mutableSetOf())
+        println("BEFORE ProjectionPushDownRule:\n${plan.pretty()}")
+        val optimized = pushDown(plan, mutableSetOf())
+        println("AFTER ProjectionPushDownRule:\n${optimized.pretty()}")
+        return optimized
     }
 
     private fun pushDown(plan: LogicalPlan,
                          columnNames: MutableSet<String>): LogicalPlan {
 
-        println("pushDown() plan=$plan")
         return when (plan) {
             is Projection -> {
                 extractColumns(plan.expr, plan.input, columnNames)

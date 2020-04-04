@@ -23,6 +23,9 @@ class Column(val name: String): LogicalExpr {
 /** Convenience method to create a Column reference */
 fun col(name: String) = Column(name)
 
+/** Convenience method to create a Column reference */
+fun max(expr: LogicalExpr) = Max(expr)
+
 /**
  * Logical expression representing a reference to a column by index.
  */

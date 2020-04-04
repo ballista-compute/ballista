@@ -59,13 +59,7 @@ class QueryPlanner {
             createPhysicalExpr(expr.expr, input)
         }
         is Column -> {
-            val fields = input.schema().fields
-            if (fields.first() == null) {
-                println(fields)
-            }
-            val i = fields.indexOfFirst {
-                it.name == expr.name
-            }
+            val i = input.schema().fields.indexOfFirst {it.name == expr.name }
             if (i == -1) {
                 throw SQLException("No column named '${expr.name}'")
             }

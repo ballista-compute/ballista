@@ -10,6 +10,11 @@ import org.ballistacompute.datatypes.ColumnVector
 import org.ballistacompute.datatypes.RecordBatch
 
 class CastPExpr(val expr: PhysicalExpr, val dataType: ArrowType) : PhysicalExpr {
+
+    override fun toString(): String {
+        return "CAST($expr AS $dataType)"
+    }
+
     override fun evaluate(input: RecordBatch): ColumnVector {
         val value = expr.evaluate(input)
         return when (dataType) {

@@ -15,7 +15,8 @@ import org.ballistacompute.datatypes.ArrowVectorBuilder
 class ScanExec(val ds: DataSource, val projection: List<String>) : PhysicalPlan {
 
     override fun schema(): Schema {
-        return ds.schema()
+        val fields = ds.schema().fields
+        return Schema(projection.map { name -> fields.findLast { it.name == name }})
     }
 
     override fun children(): List<PhysicalPlan> {
@@ -27,6 +28,6 @@ class ScanExec(val ds: DataSource, val projection: List<String>) : PhysicalPlan 
     }
 
     override fun toString(): String {
-        return "ScanExec: schema=${ds.schema()}, projection=$projection"
+        return "ScanExec: schema=${schema()}, projection=$projection"
     }
 }

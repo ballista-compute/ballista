@@ -24,8 +24,7 @@ class SqlPlanner {
         val projectionExpr = select.projection.map { createLogicalExpr(it, table) }
 
         // build a list of columns referenced in the projection
-        val columnNamesInProjection = mutableSetOf<String>()
-        projectionExpr.forEach { visit(it, columnNamesInProjection) }
+        val columnNamesInProjection = getReferencedColumns(projectionExpr)
         println("Projection references columns: $columnNamesInProjection")
 
         // does the filter expression reference anything not in the final projection?
@@ -56,15 +55,22 @@ class SqlPlanner {
             if (missing.isEmpty()) {
                 plan = plan.project(projectionExpr)
                 plan = plan.filter(createLogicalExpr(select.selection, plan))
-                return plan
+            } else {
+
+                // because the selection references some columns that are not in the projection output we need to create an
+                // interim projection that has the additional columns and then we need to remove them after the selection
+                // has been applied
+                val n = projectionExpr.size
+
+                plan = plan.project(projectionExpr + missing.map { Column(it) })
+                plan = plan.filter(createLogicalExpr(select.selection, plan))
+
+                // drop the columns that were added for the selection
+                val expr = (0 until n).map { i -> Column(plan.schema().fields[i].name) }
+                plan = plan.project(expr)
             }
 
-            // because the selection references some columns that are not in the projection output we need to create an
-            // interim projection that has the additional columns and then we need to remove them after the selection
-            // has been applied
-            plan = plan.project(projectionExpr + missing.map { Column(it) })
-            plan = plan.filter(createLogicalExpr(select.selection, plan))
-            return plan.project(projectionExpr.map { Column(it.toField(plan.logicalPlan()).name) })
+            return plan
 
         } else {
 
@@ -72,9 +78,9 @@ class SqlPlanner {
 
             if (select.selection != null) {
 
-                val columnNamesInProjectionWithoutAggregates = mutableSetOf<String>()
-                projectionWithoutAggregates.forEach { visit(it, columnNamesInProjectionWithoutAggregates) }
+                val columnNamesInProjectionWithoutAggregates = getReferencedColumns(projectionWithoutAggregates)
                 println("Projection without aggregate references columns: $columnNamesInProjectionWithoutAggregates")
+
                 val missing = (columnNamesInSelection - columnNamesInProjectionWithoutAggregates)
                 logger.info("** missing: $missing")
 
@@ -89,8 +95,6 @@ class SqlPlanner {
                     // has been applied
                     plan = plan.project(projectionWithoutAggregates + missing.map { Column(it) })
                     plan = plan.filter(createLogicalExpr(select.selection, plan))
-
-                    //plan = plan.project(projectionWithoutAggregates.map { Column(it.toField(plan.logicalPlan()).name) })
                 }
             }
 
@@ -99,8 +103,14 @@ class SqlPlanner {
         }
     }
 
+    private fun getReferencedColumns(exprs: List<LogicalExpr>) : Set<String> {
+        val accumulator = mutableSetOf<String>()
+        exprs.forEach { visit(it, accumulator) }
+        return accumulator
+    }
+
     private fun visit(expr: LogicalExpr, accumulator: MutableSet<String>) {
-        logger.info("BEFORE visit() $expr, accumulator=$accumulator")
+//        logger.info("BEFORE visit() $expr, accumulator=$accumulator")
         when (expr) {
             is Column -> accumulator.add(expr.name)
             is Alias -> visit(expr.expr, accumulator)
@@ -110,7 +120,7 @@ class SqlPlanner {
             }
             is AggregateExpr -> visit(expr.expr, accumulator)
         }
-        logger.info("AFTER visit() $expr, accumulator=$accumulator")
+//        logger.info("AFTER visit() $expr, accumulator=$accumulator")
     }
 
     private fun createLogicalExpr(expr: SqlExpr, input: DataFrame) : LogicalExpr {

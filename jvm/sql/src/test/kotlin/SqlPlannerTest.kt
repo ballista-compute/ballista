@@ -55,7 +55,10 @@ class SqlPlannerTest {
         val plan = plan("SELECT last_name AS foo " +
                 "FROM employee " +
                 "WHERE foo = 'Einstein' AND state = 'CA'")
-        assertEquals("TBD\n", format(plan))
+        assertEquals("Projection: #foo\n" +
+                "\tSelection: #foo = 'Einstein' AND #state = 'CA'\n" +
+                "\t\tProjection: #last_name as foo, #state\n" +
+                "\t\t\tScan: ; projection=None\n", format(plan))
     }
 
     @Test

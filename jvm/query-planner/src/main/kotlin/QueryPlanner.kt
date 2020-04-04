@@ -77,7 +77,7 @@ class QueryPlanner {
 //        is Modulus -> MultExpr(createPhysicalExpr(expr.l, input), createPhysicalExpr(expr.r, input))
 
         // boolean
-        //is And -> AndExpr(createPhysicalExpr(expr.l, input), createPhysicalExpr(expr.r, input))
+//        is And -> AndExpr(createPhysicalExpr(expr.l, input), createPhysicalExpr(expr.r, input))
         //is Or -> AndExpr(createPhysicalExpr(expr.l, input), createPhysicalExpr(expr.r, input))
         //is Not -> AndExpr(createPhysicalExpr(expr.l, input), createPhysicalExpr(expr.r, input))
 

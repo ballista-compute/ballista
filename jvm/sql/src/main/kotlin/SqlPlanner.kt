@@ -37,48 +37,52 @@ class SqlPlanner {
 
         var plan = table
 
-        if (select.groupBy.isEmpty() && aggregateExpr.isEmpty()) {
-
-            if (select.selection == null) {
-                return plan.project(projectionExpr)
-            }
-
-            val missing = (columnNamesInSelection - columnNamesInProjection)
-            logger.info("** missing: $missing")
-
-            // if the selection only references outputs from the projection we can simply apply the filter expression
-            // to the DataFrame representing the projection
-            if (missing.isEmpty()) {
-                plan = plan.project(projectionExpr)
-                plan = plan.filter(createLogicalExpr(select.selection, plan))
-            } else {
-
-                // because the selection references some columns that are not in the projection output we need to create an
-                // interim projection that has the additional columns and then we need to remove them after the selection
-                // has been applied
-                val n = projectionExpr.size
-
-                plan = plan.project(projectionExpr + missing.map { Column(it) })
-                plan = plan.filter(createLogicalExpr(select.selection, plan))
-
-                // drop the columns that were added for the selection
-                val expr = (0 until n).map { i -> Column(plan.schema().fields[i].name) }
-                plan = plan.project(expr)
-            }
-
-            return plan
-
+        if (aggregateExpr.isEmpty()) {
+            return planNonAggregateQuery(select, plan, projectionExpr, columnNamesInSelection, columnNamesInProjection)
         } else {
-            return aggregate(projectionExpr, select, columnNamesInSelection, plan, aggregateExpr)
+            return planAggregateQuery(projectionExpr, select, columnNamesInSelection, plan, aggregateExpr)
         }
     }
 
-    private fun aggregate(projectionExpr: List<LogicalExpr>,
-                          select: SqlSelect,
-                          columnNamesInSelection: Set<String>,
-                          plan: DataFrame,
-                          aggregateExpr:List<AggregateExpr>): DataFrame {
-        var plan1 = plan
+    private fun planNonAggregateQuery(select: SqlSelect, df: DataFrame, projectionExpr: List<LogicalExpr>, columnNamesInSelection: Set<String>, columnNamesInProjection: Set<String>): DataFrame {
+
+        var plan = df
+        if (select.selection == null) {
+            return plan.project(projectionExpr)
+        }
+
+        val missing = (columnNamesInSelection - columnNamesInProjection)
+        logger.info("** missing: $missing")
+
+        // if the selection only references outputs from the projection we can simply apply the filter expression
+        // to the DataFrame representing the projection
+        if (missing.isEmpty()) {
+            plan = plan.project(projectionExpr)
+            plan = plan.filter(createLogicalExpr(select.selection, plan))
+        } else {
+
+            // because the selection references some columns that are not in the projection output we need to create an
+            // interim projection that has the additional columns and then we need to remove them after the selection
+            // has been applied
+            val n = projectionExpr.size
+
+            plan = plan.project(projectionExpr + missing.map { Column(it) })
+            plan = plan.filter(createLogicalExpr(select.selection, plan))
+
+            // drop the columns that were added for the selection
+            val expr = (0 until n).map { i -> Column(plan.schema().fields[i].name) }
+            plan = plan.project(expr)
+        }
+
+        return plan
+    }
+
+    private fun planAggregateQuery(projectionExpr: List<LogicalExpr>,
+                                   select: SqlSelect,
+                                   columnNamesInSelection: Set<String>,
+                                   df: DataFrame,
+                                   aggregateExpr:List<AggregateExpr>): DataFrame {
+        var plan = df
         val projectionWithoutAggregates = projectionExpr.filterNot { it is AggregateExpr }
 
         if (select.selection != null) {
@@ -92,19 +96,19 @@ class SqlPlanner {
             // if the selection only references outputs from the projection we can simply apply the filter expression
             // to the DataFrame representing the projection
             if (missing.isEmpty()) {
-                plan1 = plan1.project(projectionWithoutAggregates)
-                plan1 = plan1.filter(createLogicalExpr(select.selection, plan1))
+                plan = plan.project(projectionWithoutAggregates)
+                plan = plan.filter(createLogicalExpr(select.selection, plan))
             } else {
                 // because the selection references some columns that are not in the projection output we need to create an
                 // interim projection that has the additional columns and then we need to remove them after the selection
                 // has been applied
-                plan1 = plan1.project(projectionWithoutAggregates + missing.map { Column(it) })
-                plan1 = plan1.filter(createLogicalExpr(select.selection, plan1))
+                plan = plan.project(projectionWithoutAggregates + missing.map { Column(it) })
+                plan = plan.filter(createLogicalExpr(select.selection, plan))
             }
         }
 
-        val groupByExpr = select.groupBy.map { createLogicalExpr(it, plan1) }
-        return plan1.aggregate(groupByExpr, aggregateExpr)
+        val groupByExpr = select.groupBy.map { createLogicalExpr(it, plan) }
+        return plan.aggregate(groupByExpr, aggregateExpr)
     }
 
     private fun getColumnsReferencedBySelection(select: SqlSelect, table: DataFrame): Set<String> {

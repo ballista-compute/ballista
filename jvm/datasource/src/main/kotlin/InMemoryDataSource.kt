@@ -9,7 +9,10 @@ class InMemoryDataSource(val schema: Schema, val data: List<RecordBatch>): DataS
         return schema
     }
 
-    override fun scan(columns: List<String>): Sequence<RecordBatch> {
-        return data.asSequence()
+    override fun scan(projection: List<String>): Sequence<RecordBatch> {
+        val projectionIndices = projection.map { name -> schema.fields.indexOfFirst { it.name == name } }
+        return data.asSequence().map { batch ->
+            RecordBatch(schema, projectionIndices.map { i -> batch.field(i) })
+        }
     }
 }

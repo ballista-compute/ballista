@@ -36,7 +36,7 @@ class QueryPlannerTest {
                 "\tScan: ; projection=[max_fare, passenger_count]\n")
 
         val physicalPlan = QueryPlanner().createPhysicalPlan(optimizedPlan)
-        assertEquals(physicalPlan.pretty(), "HashAggregateExec: groupExpr=[#0], aggrExpr=[MAX(#1)]\n" +
+        assertEquals(physicalPlan.pretty(), "HashAggregateExec: groupExpr=[#1], aggrExpr=[MAX(#0)]\n" +
                 "\tScanExec: schema=Schema<max_fare: FloatingPoint(DOUBLE), passenger_count: Utf8>, projection=[max_fare, passenger_count]\n")
 
     }

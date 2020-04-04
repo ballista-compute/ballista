@@ -1,5 +1,6 @@
 package org.ballistacompute.planner
 
+import org.apache.arrow.vector.types.pojo.Schema
 import org.ballistacompute.logical.*
 import org.ballistacompute.physical.*
 import java.sql.SQLException
@@ -25,7 +26,8 @@ class QueryPlanner {
             is Projection -> {
                 val input = createPhysicalPlan(plan.input)
                 val projectionExpr = plan.expr.map { createPhysicalExpr(it, plan.input) }
-                ProjectionExec(input, plan.schema(), projectionExpr)
+                val projectionSchema = Schema(plan.expr.map { it.toField(plan.input) })
+                ProjectionExec(input, projectionSchema, projectionExpr)
             }
             is Aggregate -> {
                 val input = createPhysicalPlan(plan.input)
@@ -57,7 +59,13 @@ class QueryPlanner {
             createPhysicalExpr(expr.expr, input)
         }
         is Column -> {
-            val i = input.schema().fields.indexOfFirst { it.name == expr.name }
+            val fields = input.schema().fields
+            if (fields.first() == null) {
+                println(fields)
+            }
+            val i = fields.indexOfFirst {
+                it.name == expr.name
+            }
             if (i == -1) {
                 throw SQLException("No column named '${expr.name}'")
             }

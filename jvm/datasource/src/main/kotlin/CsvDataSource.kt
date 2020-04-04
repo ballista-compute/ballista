@@ -11,6 +11,7 @@ import org.apache.arrow.vector.types.pojo.Schema
 import org.ballistacompute.datatypes.ArrowFieldVector
 import java.io.BufferedReader
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.FileReader
 import java.util.logging.Logger
 
@@ -20,13 +21,17 @@ import java.util.logging.Logger
  * Note that this implementation loads the entire CSV file into memory so is not scalable. I plan on implementing
  * a streaming version later on.
  */
-class CsvDataSource(private val filename: String, private val batchSize: Int) : DataSource {
+class CsvDataSource(val filename: String, private val batchSize: Int) : DataSource {
 
     private val logger = Logger.getLogger(CsvDataSource::class.simpleName)
 
     override fun schema(): Schema {
         logger.fine("schema()")
-        val b = BufferedReader(FileReader(filename))
+        val file = File(filename)
+        if (!file.exists()) {
+            throw FileNotFoundException(file.absolutePath)
+        }
+        val b = BufferedReader(FileReader(file))
         val header = b.readLine().split(",")
         val schema = Schema(header.map { Field.nullable(it, ArrowType.Utf8()) })
         return schema
@@ -35,7 +40,11 @@ class CsvDataSource(private val filename: String, private val batchSize: Int) : 
     override fun scan(projection: List<String>): Sequence<RecordBatch> {
         logger.fine("scan() projection=$projection")
 
-        val b = BufferedReader(FileReader(filename))
+        val file = File(filename)
+        if (!file.exists()) {
+            throw FileNotFoundException(file.absolutePath)
+        }
+        val b = BufferedReader(FileReader(file))
         val header = b.readLine().split(",")
         val fileColumns = header.map { Field.nullable(it, ArrowType.Utf8()) }.toList()
 

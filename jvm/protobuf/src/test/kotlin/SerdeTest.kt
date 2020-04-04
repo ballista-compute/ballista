@@ -23,7 +23,7 @@ class SerdeTest {
         val expected =
             "Projection: #id, #first_name, #last_name\n" +
                     "\tSelection: #state = 'CO'\n" +
-                    "\t\tScan: employee; projection=None\n"
+                    "\t\tScan: ../testdata/employee.csv; projection=None\n"
 
         assertEquals(expected, format(logicalPlan))
     }
@@ -35,6 +35,8 @@ class SerdeTest {
 
     private fun csv(): DataFrame {
         val employeeCsv = "../testdata/employee.csv"
-        return DataFrameImpl(Scan("employee", CsvDataSource(employeeCsv, 1024), listOf()))
+        val csv = CsvDataSource(employeeCsv, 1024)
+        println(csv.schema())
+        return DataFrameImpl(Scan("employee", csv, listOf()))
     }
 }

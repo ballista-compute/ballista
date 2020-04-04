@@ -69,6 +69,16 @@ class SqlParserTest {
     }
 
     @Test
+    fun `parse SELECT with aliased aggregates`() {
+        val select = parseSelect("SELECT state, MAX(salary) AS top_wage FROM employee GROUP BY state")
+        val max = SqlFunction("MAX", listOf(SqlIdentifier("salary")))
+        val alias = SqlAlias(max, SqlIdentifier("top_wage"))
+        assertEquals(listOf(SqlIdentifier("state"), alias), select.projection)
+        assertEquals(listOf(SqlIdentifier("state")), select.groupBy)
+        assertEquals("employee", select.tableName)
+    }
+
+    @Test
     fun `parse SELECT with aggregates and CAST`() {
         val select = parseSelect("SELECT state, MAX(CAST(salary AS double)) FROM employee GROUP BY state")
         assertEquals(listOf(SqlIdentifier("state"), SqlFunction("MAX", listOf(SqlCast(SqlIdentifier("salary"), SqlIdentifier("double"))))), select.projection)

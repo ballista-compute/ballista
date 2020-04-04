@@ -16,19 +16,20 @@ interface OptimizerRule {
     fun optimize(plan: LogicalPlan) : LogicalPlan
 }
 
-fun extractColumns(expr: List<LogicalExpr>, accum: MutableSet<String>) {
-    expr.forEach { extractColumns(it, accum) }
+fun extractColumns(expr: List<LogicalExpr>, input: LogicalPlan, accum: MutableSet<String>) {
+    expr.forEach { extractColumns(it, input, accum) }
 }
 
-fun extractColumns(expr: LogicalExpr, accum: MutableSet<String>) {
+fun extractColumns(expr: LogicalExpr, input: LogicalPlan, accum: MutableSet<String>) {
     when (expr) {
+        is ColumnIndex -> accum.add(input.schema().fields[expr.i].name)
         is Column -> accum.add(expr.name)
         is BinaryExpr -> {
-            extractColumns(expr.l, accum)
-            extractColumns(expr.r, accum)
+            extractColumns(expr.l, input, accum)
+            extractColumns(expr.r, input, accum)
         }
-        is Alias -> extractColumns(expr.expr, accum)
-        is CastExpr -> extractColumns(expr.expr, accum)
+        is Alias -> extractColumns(expr.expr, input, accum)
+        is CastExpr -> extractColumns(expr.expr, input, accum)
         is LiteralString -> {}
         is LiteralLong -> {}
         is LiteralDouble -> {}

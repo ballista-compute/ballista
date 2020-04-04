@@ -1,16 +1,10 @@
 package org.ballistacompute.execution
 
 import org.ballistacompute.datasource.CsvDataSource
+import org.ballistacompute.datasource.DataSource
 import org.ballistacompute.datatypes.RecordBatch
-import org.ballistacompute.datatypes.ColumnVector
-import org.ballistacompute.datatypes.ArrowFieldVector
-import org.ballistacompute.datatypes.LiteralValueVector
-import org.ballistacompute.datatypes.ArrowVectorBuilder
-
-import org.ballistacompute.logical.DataFrame
-import org.ballistacompute.logical.DataFrameImpl
-import org.ballistacompute.logical.LogicalPlan
-import org.ballistacompute.logical.Scan
+import org.ballistacompute.logical.*
+import org.ballistacompute.optimizer.Optimizer
 import org.ballistacompute.planner.QueryPlanner
 import org.ballistacompute.sql.SqlParser
 import org.ballistacompute.sql.SqlPlanner
@@ -42,9 +36,15 @@ class ExecutionContext {
     }
 
     /** Register a CSV data source with the context */
+    fun registerDataSource(tablename: String, datasource: DataSource) {
+        register(tablename, DataFrameImpl(Scan(tablename, datasource, listOf())))
+    }
+
+    /** Register a CSV data source with the context */
     fun registerCsv(tablename: String, filename: String) {
         register(tablename, csv(filename))
     }
+
     /** Execute the logical plan represented by a DataFrame */
     fun execute(df: DataFrame) : Sequence<RecordBatch> {
         return execute(df.logicalPlan())
@@ -52,7 +52,9 @@ class ExecutionContext {
 
     /** Execute the provided logical plan */
     fun execute(plan: LogicalPlan) : Sequence<RecordBatch> {
-        val physicalPlan = QueryPlanner().createPhysicalPlan(plan)
+        val optimizedPlan = Optimizer().optimize(plan)
+        println(format(optimizedPlan))
+        val physicalPlan = QueryPlanner().createPhysicalPlan(optimizedPlan)
         return physicalPlan.execute()
     }
 

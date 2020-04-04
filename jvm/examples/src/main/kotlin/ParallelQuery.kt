@@ -3,23 +3,56 @@ package org.ballistacompute.examples
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import org.ballistacompute.datasource.InMemoryDataSource
+import org.ballistacompute.datatypes.RecordBatch
 import org.ballistacompute.execution.ExecutionContext
+import kotlin.system.measureTimeMillis
 
 fun main() {
 
-    val deferred = (1..12).map {month ->
+    val path = "/mnt/nyctaxi/csv/yellow/2019"
+
+    val start = System.currentTimeMillis()
+    val deferred = (1..2).map {month ->
         GlobalScope.async {
-            val filename = "/mnt/nyctaxi/csv/yellow/2019/yellow_tripdata_2019-03.csv" //TODO month
-            println(filename)
-            val ctx = ExecutionContext()
-            ctx.registerCsv("tripdata", filename)
-            val df = ctx.sql("SELECT passenger_count, MAX(CAST(fare_amount AS double)) FROM tripdata GROUP BY passenger_count")
-            val results = ctx.execute(df)
-            results.forEach { println(it) }
+
+            val sql = "SELECT passenger_count, " +
+                    "MAX(CAST(fare_amount AS double)) AS max_fare " +
+                    "FROM tripdata " +
+                    "GROUP BY passenger_count"
+
+            val start = System.currentTimeMillis()
+            val result = executeQuery(path, month, sql)
+            val duration = System.currentTimeMillis() - start
+            println("Query against month $month took $duration ms")
+            result
         }
     }
-    runBlocking {
-        val results = deferred.map { it.await() }
-        println(results)
+    val results: List<RecordBatch> = runBlocking {
+        deferred.flatMap { it.await() }
     }
+    val duration = System.currentTimeMillis() - start
+    println("Collected ${results.size} batches in $duration ms")
+
+    println(results.first().schema)
+
+    val sql = "SELECT passenger_count, " +
+            "MAX(max_fare) " +
+            "FROM tripdata " +
+            "GROUP BY passenger_count"
+
+    val ctx = ExecutionContext()
+    ctx.registerDataSource("tripdata", InMemoryDataSource(results.first().schema, results))
+    val df = ctx.sql(sql)
+    ctx.execute(df).forEach { println(it) }
+
+}
+
+fun executeQuery(path: String, month: Int, sql: String): List<RecordBatch> {
+    val monthStr = String.format("%02d", month);
+    val filename = "$path/yellow_tripdata_2019-$monthStr.csv"
+    val ctx = ExecutionContext()
+    ctx.registerCsv("tripdata", filename)
+    val df = ctx.sql(sql)
+    return ctx.execute(df).toList()
 }

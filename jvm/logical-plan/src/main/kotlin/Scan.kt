@@ -6,13 +6,19 @@ import org.apache.arrow.vector.types.pojo.Schema
 /** Represents a scan of a data source */
 class Scan(val name: String, val dataSource: DataSource, val projection: List<String>): LogicalPlan {
 
+    val schema = deriveSchema()
 
     override fun schema(): Schema {
+        return schema
+    }
+
+    private fun deriveSchema() : Schema {
         val schema = dataSource.schema()
         if (projection.isEmpty()) {
             return schema
         } else {
-            return Schema(projection.map { name -> schema.fields.findLast { it.name == name } })
+            val fields = projection.map { name -> schema.fields.findLast { it.name == name } }
+            return Schema(fields)
         }
     }
 
@@ -27,4 +33,5 @@ class Scan(val name: String, val dataSource: DataSource, val projection: List<St
             "Scan: $name; projection=$projection"
         }
     }
+
 }

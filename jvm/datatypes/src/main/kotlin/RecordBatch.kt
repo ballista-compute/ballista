@@ -42,6 +42,10 @@ class RecordBatch(val schema: Schema, val fields: List<ColumnVector>) {
         }
         return b.toString()
     }
+
+    override fun toString(): String {
+        return toCSV()
+    }
 }
 
 

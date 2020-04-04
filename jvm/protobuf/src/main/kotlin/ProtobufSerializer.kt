@@ -1,5 +1,6 @@
 package org.ballistacompute.protobuf
 
+import org.ballistacompute.datasource.CsvDataSource
 import org.ballistacompute.logical.*
 
 /**
@@ -11,14 +12,21 @@ class ProtobufSerializer {
     fun toProto(plan: LogicalPlan): LogicalPlanNode {
         return when (plan) {
             is Scan -> {
-                LogicalPlanNode
-                        .newBuilder()
-                        .setFile(FileNode.newBuilder()
-                                .setFilename(plan.name)
-                                //TODO schema
-                                .addAllProjection(plan.projection)
-                                .build())
-                        .build()
+                val ds = plan.dataSource
+                when (ds) {
+                    is CsvDataSource -> {
+                        LogicalPlanNode
+                                .newBuilder()
+                                .setFile(FileNode.newBuilder()
+                                        .setFilename(ds.filename)
+                                        //TODO schema
+                                        .addAllProjection(plan.projection)
+                                        .build())
+                                .build()
+
+                    }
+                    else -> TODO()
+                }
             }
             is Projection -> {
                 LogicalPlanNode

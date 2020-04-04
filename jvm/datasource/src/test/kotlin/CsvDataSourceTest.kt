@@ -1,6 +1,5 @@
 package org.ballistacompute.datasource
 
-import org.apache.arrow.vector.VarCharVector
 import org.junit.Test
 import org.junit.jupiter.api.TestInstance
 import java.io.File
@@ -14,9 +13,9 @@ class CsvDataSourceTest {
     fun `read csv`() {
         val csv = CsvDataSource(File(dir, "employee.csv").absolutePath, 1024)
         val result = csv.scan(listOf())
-        val x = result.asSequence().map {
-            val id = it.field(0) as VarCharVector
-            println(id.valueCount)
+        result.asSequence().forEach {
+            val field = it.field(0)
+            println(field.size())
         }
     }
 

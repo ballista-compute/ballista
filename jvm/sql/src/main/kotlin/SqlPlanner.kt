@@ -1,5 +1,7 @@
 package org.ballistacompute.sql
 
+import org.apache.arrow.vector.types.FloatingPointPrecision
+import org.apache.arrow.vector.types.pojo.ArrowType
 import org.ballistacompute.logical.*
 
 import java.sql.SQLException
@@ -176,6 +178,7 @@ class SqlPlanner {
             //"NOT" -> Not(createLogicalExpr(expr.l, input))
             //}
             is SqlAlias -> Alias(createLogicalExpr(expr.expr, input), expr.alias.id)
+            is SqlCast -> CastExpr(createLogicalExpr(expr.expr, input), parseDataType(expr.dataType.id))
             is SqlFunction -> when(expr.id) {
                 "MAX" -> Max(createLogicalExpr(expr.args.first(), input))
                 else -> TODO()
@@ -184,4 +187,10 @@ class SqlPlanner {
         }
     }
 
+    private fun parseDataType(id: String): ArrowType {
+        return when (id) {
+            "double" -> ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)
+            else -> throw SQLException("Invalid data type $id")
+        }
+    }
 }

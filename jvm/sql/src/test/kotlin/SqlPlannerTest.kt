@@ -77,6 +77,13 @@ class SqlPlannerTest {
                 "\t\t\tScan: ; projection=None\n", format(plan))
     }
 
+    @Test
+    fun `plan aggregate query with cast`() {
+        val plan = plan("SELECT state, MAX(CAST(salary AS double)) FROM employee GROUP BY state")
+        assertEquals("Aggregate: groupExpr=[#state], aggregateExpr=[MAX(CAST(#salary AS FloatingPoint(DOUBLE)))]\n" +
+                "\tScan: ; projection=None\n", format(plan))
+    }
+
     private fun plan(sql: String) : LogicalPlan {
         println("parse() $sql")
 

@@ -3,10 +3,6 @@ package org.ballistacompute.sql
 import java.sql.SQLException
 import java.util.logging.Logger
 
-
-
-
-
 class SqlParser(val tokens: TokenStream) : PrattParser {
 
     private val logger = Logger.getLogger(SqlParser::class.simpleName)
@@ -44,6 +40,7 @@ class SqlParser(val tokens: TokenStream) : PrattParser {
             is KeywordToken -> {
               when (token.text) {
                   "SELECT" -> parseSelect()
+                  "CAST" -> parseCast()
                   else -> throw IllegalStateException("Unexpected keyword ${token.text}")
               }
             }
@@ -92,6 +89,14 @@ class SqlParser(val tokens: TokenStream) : PrattParser {
         }
         logger.fine("parseInfix() returning $expr")
         return expr
+    }
+
+    private fun parseCast() : SqlCast {
+        assert(tokens.consumeToken(LParenToken()))
+        val expr = parseExpr() ?: throw SQLException()
+        val alias = expr as SqlAlias
+        assert(tokens.consumeToken(RParenToken()))
+        return SqlCast(alias.expr, alias.alias)
     }
 
     private fun parseSelect() : SqlSelect {

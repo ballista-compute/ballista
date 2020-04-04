@@ -32,7 +32,7 @@ class ColumnPExpr(val i: Int) : PhysicalExpr {
     }
 }
 
-class CastPExpr(val expr: PhysicalExpr, val dataType: ArrowType.PrimitiveType) : PhysicalExpr {
+class CastPExpr(val expr: PhysicalExpr, val dataType: ArrowType) : PhysicalExpr {
     override fun evaluate(input: RecordBatch): ColumnVector {
         val value = expr.evaluate(input)
         return when (dataType) {
@@ -278,7 +278,8 @@ class MaxAccumulator : Accumulator {
                 val isMax = when (value) {
                     is Int -> value > this.value as Int
                     is Double -> value > this.value as Double
-                    else -> throw UnsupportedOperationException()
+                    is ByteArray -> throw UnsupportedOperationException("MAX is not implemented for String yet")
+                    else -> throw UnsupportedOperationException(value.javaClass.name)
                 }
                 if (isMax) {
                     this.value = value

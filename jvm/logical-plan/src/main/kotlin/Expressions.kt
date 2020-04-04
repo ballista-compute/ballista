@@ -92,9 +92,9 @@ class LiteralDouble(val n: Double): LogicalExpr {
 /** Convenience method to create a LiteralDouble */
 fun lit(value: Double) = LiteralDouble(value)
 
-class CastExpr(val expr: LogicalExpr, val dataType: ArrowType.PrimitiveType) : LogicalExpr {
+class CastExpr(val expr: LogicalExpr, val dataType: ArrowType) : LogicalExpr {
     override fun toField(input: LogicalPlan): Field {
-        return Field.nullablePrimitive(expr.toField(input).name, dataType)
+        return Field.nullable(expr.toField(input).name, dataType)
     }
 
     override fun toString(): String {

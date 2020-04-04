@@ -68,6 +68,14 @@ class SqlParserTest {
         assertEquals("employee", select.tableName)
     }
 
+    @Test
+    fun `parse SELECT with aggregates and CAST`() {
+        val select = parseSelect("SELECT state, MAX(CAST(salary AS double)) FROM employee GROUP BY state")
+        assertEquals(listOf(SqlIdentifier("state"), SqlFunction("MAX", listOf(SqlCast(SqlIdentifier("salary"), SqlIdentifier("double"))))), select.projection)
+        assertEquals(listOf(SqlIdentifier("state")), select.groupBy)
+        assertEquals("employee", select.tableName)
+    }
+
     private fun parseSelect(sql: String) : SqlSelect {
         return parse(sql) as SqlSelect
     }

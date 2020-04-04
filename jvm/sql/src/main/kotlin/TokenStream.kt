@@ -48,6 +48,16 @@ class TokenStream(val tokens: List<Token>) {
         }
     }
 
+    fun consumeToken(t: Token): Boolean {
+        val peek = peek()
+        return if (peek == t) {
+            i++
+            true
+        } else {
+            false
+        }
+    }
+
     override fun toString(): String {
         return tokens.withIndex().map { (index,token) ->
             if (index == i) {

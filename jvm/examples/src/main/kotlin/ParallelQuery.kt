@@ -13,7 +13,7 @@ fun main() {
             println(filename)
             val ctx = ExecutionContext()
             ctx.registerCsv("tripdata", filename)
-            val df = ctx.sql("SELECT passenger_count, MAX(fare_amount) FROM tripdata GROUP BY passenger_count")
+            val df = ctx.sql("SELECT passenger_count, MAX(CAST(fare_amount AS double)) FROM tripdata GROUP BY passenger_count")
             val results = ctx.execute(df)
             results.forEach { println(it) }
         }

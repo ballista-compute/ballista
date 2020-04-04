@@ -22,17 +22,15 @@ class SqlPlannerTest {
     fun `simple select`() {
         val plan = plan("SELECT state FROM employee")
         assertEquals("Projection: #state\n" +
-                "\tProjection: #state\n" +
-                "\t\tScan: ; projection=None\n", format(plan))
+                "\tScan: ; projection=None\n", format(plan))
     }
 
     @Test
     fun `select with filter`() {
         val plan = plan("SELECT state FROM employee WHERE state = 'CA'")
-        assertEquals("Projection: #state\n" +
-                "\tSelection: #state = 'CA'\n" +
-                "\t\tProjection: #state\n" +
-                "\t\t\tScan: ; projection=None\n", format(plan))
+        assertEquals("Selection: #state = 'CA'\n" +
+                "\tProjection: #state\n" +
+                "\t\tScan: ; projection=None\n", format(plan))
     }
 
     @Test
@@ -45,16 +43,14 @@ class SqlPlannerTest {
     }
 
     @Test
-    @Ignore
     fun `select filter on projection`() {
         val plan = plan("SELECT last_name AS foo FROM employee WHERE foo = 'Einstein'")
         assertEquals("Selection: #foo = 'Einstein'\n" +
-                "\t\tProjection: #last_name as foo\n" +
-                "\t\t\tScan: ; projection=None\n", format(plan))
+                "\tProjection: #last_name as foo\n" +
+                "\t\tScan: ; projection=None\n", format(plan))
     }
 
     @Test
-    @Ignore
     fun `select filter on projection and not`() {
         val plan = plan("SELECT last_name AS foo " +
                 "FROM employee " +
@@ -66,8 +62,7 @@ class SqlPlannerTest {
     fun `plan aggregate query`() {
         val plan = plan("SELECT state, MAX(salary) FROM employee GROUP BY state")
         assertEquals("Aggregate: groupExpr=[#state], aggregateExpr=[MAX(#salary)]\n" +
-                "\tProjection: #state, #salary\n" +
-                "\t\tScan: ; projection=None\n", format(plan))
+                "\tScan: ; projection=None\n", format(plan))
     }
 
     @Test

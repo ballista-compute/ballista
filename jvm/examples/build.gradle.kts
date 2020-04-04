@@ -8,10 +8,12 @@ dependencies {
     implementation(project(":datatypes"))
     implementation(project(":datasource"))
     implementation(project(":logical-plan"))
+    implementation(project(":query-planner"))
     implementation(project(":optimizer"))
     implementation(project(":physical-plan"))
-    implementation(project(":sql"))
     implementation(project(":execution"))
+    implementation(project(":sql"))
 
     implementation("org.apache.arrow:arrow-vector:0.16.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.4")
 }

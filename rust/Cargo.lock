@@ -66,7 +66,7 @@ checksum = "cff77d8686867eceff3105329d4698d96c2391c176d5d03adc90c7389162b5b8"
 [[package]]
 name = "arrow"
 version = "1.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow#197a3c28eceb272ebce909152ffc165fc413b73b"
+source = "git+https://github.com/apache/arrow#e39326b2445b5c86ad1464a4fc0767bac933fb94"
 dependencies = [
  "arrow-flight",
  "chrono",
@@ -88,7 +88,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "1.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow#197a3c28eceb272ebce909152ffc165fc413b73b"
+source = "git+https://github.com/apache/arrow#e39326b2445b5c86ad1464a4fc0767bac933fb94"
 dependencies = [
  "bytes 0.5.4",
  "futures 0.3.1",
@@ -527,7 +527,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "1.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow#197a3c28eceb272ebce909152ffc165fc413b73b"
+source = "git+https://github.com/apache/arrow#e39326b2445b5c86ad1464a4fc0767bac933fb94"
 dependencies = [
  "arrow",
  "clap",
@@ -1537,7 +1537,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "1.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow#197a3c28eceb272ebce909152ffc165fc413b73b"
+source = "git+https://github.com/apache/arrow#e39326b2445b5c86ad1464a4fc0767bac933fb94"
 dependencies = [
  "arrow",
  "brotli",

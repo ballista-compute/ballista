@@ -11,24 +11,16 @@ class AggregateTest {
     @Test
     fun `min accumulator`() {
         val a = MinExpression(ColumnExpression(0)).createAccumulator()
-        assertEquals(null, a.finalValue())
-        a.accumulate(10)
-        assertEquals(10, a.finalValue())
-        a.accumulate(14)
-        assertEquals(10, a.finalValue())
-        a.accumulate(4)
+        val values = listOf(10, 14, 4)
+        values.forEach { a.accumulate(it) }
         assertEquals(4, a.finalValue())
     }
 
     @Test
     fun `max accumulator`() {
         val a = MaxExpression(ColumnExpression(0)).createAccumulator()
-        assertEquals(null, a.finalValue())
-        a.accumulate(10)
-        assertEquals(10, a.finalValue())
-        a.accumulate(4)
-        assertEquals(10, a.finalValue())
-        a.accumulate(14)
+        val values = listOf(10, 14, 4)
+        values.forEach { a.accumulate(it) }
         assertEquals(14, a.finalValue())
     }
 

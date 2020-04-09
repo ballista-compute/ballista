@@ -9,22 +9,5 @@
 
 rootProject.name = "ballista"
 
-// Ballista JVM Query Engine
-include("datatypes")
-include("datasource")
-include("logical-plan")
-include("optimizer")
-include("physical-plan")
-include("query-planner")
-include("sql")
-include("execution")
-include("protobuf")
-include("executor")
-
-include("examples")
-
-// Ballista JVM Connectors
-include("client")
-include("jdbc")
-
+include("spark")
 

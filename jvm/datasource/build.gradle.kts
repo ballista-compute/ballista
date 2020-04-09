@@ -1,4 +1,18 @@
+plugins {
+    `maven-publish`
+}
 
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            groupId = "org.ballistacompute"
+            artifactId = "datasource"
+            version = "0.2.0-SNAPSHOT"
+
+            from(components["kotlin"])
+        }
+    }
+}
 dependencies {
 
     implementation(project(":datatypes"))

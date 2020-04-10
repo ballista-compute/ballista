@@ -1,7 +1,7 @@
 plugins {
     scala
+    kotlin("jvm") version "1.3.50" apply false
 }
-
 allprojects {
     repositories {
         mavenLocal()
@@ -10,7 +10,15 @@ allprojects {
     }
 }
 
+apply {
+    plugin("org.jetbrains.kotlin.jvm")
+}
+
 dependencies {
+
+    implementation(kotlin("stdlib-jdk8"))
+    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
+    implementation("org.jetbrains.kotlin:kotlin-reflect")
 
     // note that this project depends on the kotlin artifacts being published to a local maven repository
     // see ../jvm/README.md for instructions on publishing those artifacts

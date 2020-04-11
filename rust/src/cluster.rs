@@ -49,6 +49,12 @@ pub struct Executor {
     pub port: usize,
 }
 
+impl Executor {
+    pub fn new(host: &str, port: usize) -> Self {
+        Self { host: host.to_owned(), port }
+    }
+}
+
 /// Get a list of executor nodes in a cluster by listing pods in the stateful set.
 pub fn get_executors(cluster_name: &str, namespace: &str) -> Result<Vec<Executor>, BallistaError> {
     use api::core::v1::{ListNamespacedPodOptional, ListNamespacedPodResponse, Pod};

@@ -8,7 +8,7 @@ use arrow::record_batch::RecordBatch;
 extern crate ballista;
 
 use ballista::cluster;
-use ballista::error::BallistaError;
+use ballista::error::Result;
 use ballista::plan::{Action, TableMeta};
 use ballista::utils;
 use ballista::{client, BALLISTA_VERSION};
@@ -18,9 +18,10 @@ use datafusion::execution::context::ExecutionContext;
 use datafusion::logicalplan::*;
 
 use tokio::task;
+use ballista::cluster::Executor;
 
 #[tokio::main]
-async fn main() -> Result<(), BallistaError> {
+async fn main() -> Result<()> {
     println!(
         "Ballista v{} Parallel Aggregate Query Example",
         BALLISTA_VERSION
@@ -31,9 +32,17 @@ async fn main() -> Result<(), BallistaError> {
     let cluster_name = "ballista";
     let namespace = "default";
 
+    // for switching between local mode and k8s
+    // let mode = "local";
+    let mode = "k8s";
+
     // get a list of ballista executors from kubernetes
-    let mut executor_index = 0;
-    let executors = cluster::get_executors(cluster_name, namespace)?;
+    let executors = match mode {
+        "local" => vec![Executor::new("localhost", 50051)],
+        "k8s" => cluster::get_executors(cluster_name, namespace)?,
+        _ => panic!("Invalid mode")
+    };
+
     if executors.is_empty() {
         println!("No executors found");
         process::exit(1);
@@ -45,7 +54,8 @@ async fn main() -> Result<(), BallistaError> {
     // execute aggregate query in parallel across all files
     let num_months: usize = 12;
     let mut batches: Vec<RecordBatch> = vec![];
-    let mut tasks: Vec<task::JoinHandle<Result<Vec<RecordBatch>, BallistaError>>> = vec![];
+    let mut tasks: Vec<task::JoinHandle<Result<Vec<RecordBatch>>>> = vec![];
+    let mut executor_index = 0;
     for month in 0..num_months {
         // round robin across the executors
         let executor = &executors[executor_index];
@@ -59,41 +69,14 @@ async fn main() -> Result<(), BallistaError> {
 
         // execute the query against the executor
         tasks.push(tokio::spawn(async move {
-            println!("Executing query against executor at {}:{}", host, port);
-            let start = Instant::now();
 
             let filename = format!(
                 "{}/csv/yellow/2019/yellow_tripdata_2019-{:02}.csv",
                 nyc_taxi_path,
                 month + 1
             );
-            let schema = nyctaxi_schema();
 
-            // SELECT passenger_count, MAX(fare_amount) FROM <filename> GROUP BY passenger_count
-            let plan = LogicalPlanBuilder::scan("default", "tripdata", &schema, None)?
-                .aggregate(vec![col("passenger_count")], vec![max(col("fare_amt"))])?
-                .build()?;
-
-            let action = Action::RemoteQuery {
-                plan: plan.clone(),
-                tables: vec![TableMeta::Csv {
-                    table_name: "tripdata".to_owned(),
-                    has_header: true,
-                    path: filename,
-                    schema: schema.clone(),
-                }],
-            };
-
-            let response = client::execute_action(&host, port, action).await?;
-
-            println!(
-                "Executed query against executor at {}:{} in {} seconds",
-                host,
-                port,
-                start.elapsed().as_secs()
-            );
-
-            Ok(response)
+            execute_remote(&host, port, &filename).await
         }));
     }
 
@@ -136,6 +119,42 @@ async fn main() -> Result<(), BallistaError> {
     println!("Parallel query took {} seconds", start.elapsed().as_secs());
 
     Ok(())
+}
+
+/// Execute a query against a remote executor
+async fn execute_remote(host: &str, port: usize, filename: &str) -> Result<Vec<RecordBatch>> {
+
+    println!("Executing query against executor at {}:{}", host, port);
+    let start = Instant::now();
+
+    let schema = nyctaxi_schema();
+
+    // SELECT passenger_count, MAX(fare_amount) FROM <filename> GROUP BY passenger_count
+    let plan = LogicalPlanBuilder::scan("default", "tripdata", &schema, None)?
+        .aggregate(vec![col("passenger_count")], vec![max(col("fare_amt"))])?
+        .build()?;
+
+    let action = Action::RemoteQuery {
+        plan: plan.clone(),
+        tables: vec![TableMeta::Csv {
+            table_name: "tripdata".to_owned(),
+            has_header: true,
+            path: filename.to_owned(),
+            schema: schema.clone(),
+        }],
+    };
+
+    let response = client::execute_action(&host, port, action).await?;
+
+    println!(
+        "Executed query against executor at {}:{} in {} seconds",
+        host,
+        port,
+        start.elapsed().as_secs()
+    );
+
+    Ok(response)
+
 }
 
 fn nyctaxi_schema() -> Schema {

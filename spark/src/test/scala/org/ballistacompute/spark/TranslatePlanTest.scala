@@ -29,7 +29,7 @@ class TranslatePlanTest {
 
     println(plan.pretty())
 
-    val ctx = new BallistaSparkContext(spark)
+    val ctx = new BallistaSparkContext(spark, Map())
     val df = ctx.createDataFrame(plan, None)
     df.explain()
   }

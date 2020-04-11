@@ -23,14 +23,14 @@ class SerdeTest {
         val expected =
             "Projection: #id, #first_name, #last_name\n" +
                     "\tSelection: #state = 'CO'\n" +
-                    "\t\tScan: ../testdata/employee.csv; projection=None\n"
+                    "\t\tScan: employee; projection=None\n"
 
         assertEquals(expected, format(logicalPlan))
     }
 
     private fun roundtrip(df: DataFrame) : LogicalPlan {
         val protobuf = ProtobufSerializer().toProto(df.logicalPlan())
-        return ProtobufDeserializer(mapOf()).fromProto(protobuf)
+        return ProtobufDeserializer(mapOf(Pair("employee", "../testdata/employee.csv"))).fromProto(protobuf)
     }
 
     private fun csv(): DataFrame {

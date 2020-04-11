@@ -7,7 +7,4 @@
  * in the user manual at https://docs.gradle.org/5.6.4/userguide/multi_project_builds.html
  */
 
-rootProject.name = "ballista"
-
-include("spark")
-
+rootProject.name = "ballista-spark"

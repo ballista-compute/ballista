@@ -51,7 +51,7 @@ impl TryInto<LogicalPlan> for protobuf::LogicalPlanNode {
                 .aggregate(group_expr, aggr_expr)?
                 .build()
                 .map_err(|e| e.into())
-        } else if let Some(scan) = self.file {
+        } else if let Some(scan) = self.scan {
             let schema = Schema::new(
                 scan.schema
                     .unwrap()
@@ -61,7 +61,7 @@ impl TryInto<LogicalPlan> for protobuf::LogicalPlanNode {
                     .collect(),
             );
 
-            LogicalPlanBuilder::scan("", &scan.filename, &schema, None)?
+            LogicalPlanBuilder::scan("", &scan.table_name, &schema, None)?
                 .build()
                 .map_err(|e| e.into())
         } else {
@@ -289,10 +289,10 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
 
                 let schema: protobuf::Schema = table_schema.as_ref().to_owned().try_into()?;
 
-                node.file = Some(protobuf::FileNode {
-                    filename: table_name.clone(),
-                    schema: Some(schema),
+                node.scan = Some(protobuf::ScanNode {
+                    table_name: table_name.clone(),
                     projection: vec![],
+                    schema: Some(schema)
                 });
                 Ok(node)
             }
@@ -414,7 +414,7 @@ fn empty_expr_node() -> protobuf::LogicalExprNode {
 /// Create an empty LogicalPlanNode
 fn empty_plan_node() -> protobuf::LogicalPlanNode {
     protobuf::LogicalPlanNode {
-        file: None,
+        scan: None,
         input: None,
         projection: None,
         selection: None,

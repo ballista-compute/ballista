@@ -2,6 +2,7 @@ package org.ballistacompute.protobuf
 
 import org.ballistacompute.datasource.CsvDataSource
 import org.ballistacompute.logical.*
+import java.lang.UnsupportedOperationException
 
 /**
  * Utility to convert between logical plan and protobuf representation.
@@ -17,15 +18,14 @@ class ProtobufSerializer {
                     is CsvDataSource -> {
                         LogicalPlanNode
                                 .newBuilder()
-                                .setFile(FileNode.newBuilder()
-                                        .setFilename(ds.filename)
-                                        //TODO schema
+                                .setScan(ScanNode.newBuilder()
+                                        .setTableName(plan.name)
                                         .addAllProjection(plan.projection)
                                         .build())
                                 .build()
 
                     }
-                    else -> TODO()
+                    else -> throw UnsupportedOperationException("Unsupported datasource used in scan")
                 }
             }
             is Projection -> {

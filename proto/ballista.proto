@@ -59,17 +59,19 @@ message LogicalPlanNode {
 
   LogicalPlanNode input = 1;
 
-  FileNode file = 10;
+  ScanNode scan = 10;
   ProjectionNode projection = 20;
   SelectionNode selection = 21;
   LimitNode limit = 22;
   AggregateNode aggregate = 23;
 }
 
-message FileNode {
-  string filename = 1;
-  Schema schema = 2;
-  repeated string projection = 3;
+message ScanNode {
+  string table_name = 1;
+  repeated string projection = 2;
+
+  //TODO should not really need this since the schema comes from the registered data sources in the context
+  Schema schema = 3;
 }
 
 message ProjectionNode {
@@ -117,6 +119,7 @@ message CsvFileMeta {
   bool has_header = 1;
   Schema schema = 2;
 }
+
 
 // copied from GandivaType from Apache Arrow project
 enum ArrowType {

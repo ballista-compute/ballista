@@ -292,7 +292,7 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
                 node.scan = Some(protobuf::ScanNode {
                     table_name: table_name.clone(),
                     projection: vec![],
-                    schema: Some(schema)
+                    schema: Some(schema),
                 });
                 Ok(node)
             }

@@ -51,7 +51,10 @@ pub struct Executor {
 
 impl Executor {
     pub fn new(host: &str, port: usize) -> Self {
-        Self { host: host.to_owned(), port }
+        Self {
+            host: host.to_owned(),
+            port,
+        }
     }
 }
 

@@ -17,8 +17,8 @@ use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext;
 use datafusion::logicalplan::*;
 
-use tokio::task;
 use ballista::cluster::Executor;
+use tokio::task;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -41,7 +41,7 @@ async fn main() -> Result<()> {
     let executors = match mode {
         "local" => vec![Executor::new("localhost", 50051)],
         "k8s" => cluster::get_executors(cluster_name, namespace)?,
-        _ => panic!("Invalid mode")
+        _ => panic!("Invalid mode"),
     };
 
     if executors.is_empty() {
@@ -69,7 +69,6 @@ async fn main() -> Result<()> {
 
         // execute the query against the executor
         tasks.push(tokio::spawn(async move {
-
             let filename = format!(
                 "{}/csv/yellow/2019/yellow_tripdata_2019-{:02}.csv",
                 nyc_taxi_path,
@@ -123,7 +122,6 @@ async fn main() -> Result<()> {
 
 /// Execute a query against a remote executor
 async fn execute_remote(host: &str, port: usize, filename: &str) -> Result<Vec<RecordBatch>> {
-
     println!("Executing query against executor at {}:{}", host, port);
     let start = Instant::now();
 
@@ -154,7 +152,6 @@ async fn execute_remote(host: &str, port: usize, filename: &str) -> Result<Vec<R
     );
 
     Ok(response)
-
 }
 
 fn nyctaxi_schema() -> Schema {

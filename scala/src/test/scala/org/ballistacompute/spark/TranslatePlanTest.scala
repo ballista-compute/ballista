@@ -11,6 +11,7 @@ import scala.collection.JavaConverters._
 class TranslatePlanTest {
 
   @Test
+  @Ignore
   def testSomething() {
 
     val spark = SparkSession.builder()
@@ -22,8 +23,8 @@ class TranslatePlanTest {
     val projection = List[String]().asJava
 
     val plan = new ballista.DataFrameImpl(new ballista.Scan(filename, new CsvDataSource(filename, 1024), projection))
-      .filter(new ballista.Eq(new ballista.Column("passenger_count"), new ballista.LiteralLong(1)))
-      .project(List[ballista.LogicalExpr](new ballista.Column("fare_amt")).asJava)
+      .filter(new ballista.Eq(new ballista.Column("_c0"), new ballista.LiteralString("foo")))
+      .project(List[ballista.LogicalExpr](new ballista.Column("_c1")).asJava)
       .logicalPlan()
 
     println(plan.pretty())

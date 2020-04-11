@@ -1,5 +1,6 @@
-  package org.ballistacompute.spark.executor
+package org.ballistacompute.spark.executor
 
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import org.ballistacompute.{logical => ballista}
 
@@ -16,8 +17,9 @@ class BallistaSparkContext(spark: SparkSession) {
         assert(input.isEmpty)
         val df = spark.read.csv(s.getName)
         val projection: Seq[String] = s.getProjection().asScala
-        assert(projection.length>0)
-        if (projection.length == 1) {
+        if (projection.isEmpty) {
+          df
+        } else if (projection.length == 1) {
           df.select(projection.head)
         } else {
           df.select(projection.head, projection.tail: _*)
@@ -50,6 +52,11 @@ class BallistaSparkContext(spark: SparkSession) {
   /** Translate Ballista logical expression into a Spark logical expression */
   def createExpression(expr: ballista.LogicalExpr, input: DataFrame): Column = {
     expr match {
+
+      case c: ballista.LiteralDouble => lit(c.getN)
+      case c: ballista.LiteralLong => lit(c.getN)
+      case c: ballista.LiteralString => lit(c.getStr)
+
       case c: ballista.Column =>
         input.col(c.getName)
 
@@ -57,12 +64,22 @@ class BallistaSparkContext(spark: SparkSession) {
         val l = createExpression(b.getL, input)
         val r = createExpression(b.getR, input)
         b match {
+
           case _: ballista.Add => l.plus(r)
           case _: ballista.Subtract => l.minus(r)
           case _: ballista.Multiply => l.multiply(r)
           case _: ballista.Divide => l.divide(r)
+
+          case _: ballista.Eq => l.or(r)
+          case _: ballista.Neq => l.or(r)
+          case _: ballista.Gt => l.or(r)
+          case _: ballista.GtEq => l.or(r)
+          case _: ballista.Lt => l.or(r)
+          case _: ballista.LtEq => l.or(r)
+
           case _: ballista.And => l.and(r)
           case _: ballista.Or => l.or(r)
+
           case other =>
             throw new UnsupportedOperationException(s"Ballista logical binary expression can not be converted to Spark: $other")
         }

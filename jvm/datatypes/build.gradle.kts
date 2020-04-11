@@ -13,6 +13,7 @@ publishing {
         }
     }
 }
+
 dependencies {
 
     implementation("org.apache.arrow:arrow-memory:0.16.0")

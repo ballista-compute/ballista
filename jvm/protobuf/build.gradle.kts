@@ -2,6 +2,19 @@ plugins {
     java
     id("com.google.protobuf") version "0.8.11"
     id("idea")
+    `maven-publish`
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            groupId = "org.ballistacompute"
+            artifactId = "protobuf"
+            version = "0.2.0-SNAPSHOT"
+
+            from(components["kotlin"])
+        }
+    }
 }
 
 sourceSets {

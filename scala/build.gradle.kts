@@ -25,6 +25,8 @@ dependencies {
     implementation("org.ballistacompute:datatypes:0.2.0-SNAPSHOT")
     implementation("org.ballistacompute:datasource:0.2.0-SNAPSHOT")
     implementation("org.ballistacompute:logical-plan:0.2.0-SNAPSHOT")
+    implementation("org.ballistacompute:protobuf:0.2.0-SNAPSHOT")
+    implementation("org.ballistacompute:executor:0.2.0-SNAPSHOT")
 
     implementation("org.apache.arrow:flight-core:0.16.0")
     implementation("org.apache.arrow:flight-grpc:0.16.0")

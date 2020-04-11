@@ -1,7 +1,19 @@
 plugins {
     kotlin("plugin.serialization") version "1.3.61"
+    `maven-publish`
 }
 
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            groupId = "org.ballistacompute"
+            artifactId = "execution"
+            version = "0.2.0-SNAPSHOT"
+
+            from(components["kotlin"])
+        }
+    }
+}
 
 dependencies {
     implementation(project(":datatypes"))

@@ -30,7 +30,7 @@ class SerdeTest {
 
     private fun roundtrip(df: DataFrame) : LogicalPlan {
         val protobuf = ProtobufSerializer().toProto(df.logicalPlan())
-        return ProtobufDeserializer().fromProto(protobuf)
+        return ProtobufDeserializer(mapOf()).fromProto(protobuf)
     }
 
     private fun csv(): DataFrame {

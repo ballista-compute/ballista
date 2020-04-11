@@ -31,10 +31,11 @@ async fn main() -> Result<()> {
     let nyc_taxi_path = "/mnt/nyctaxi";
     let cluster_name = "ballista";
     let namespace = "default";
+    let num_months: usize = 1;
 
     // for switching between local mode and k8s
-    // let mode = "local";
-    let mode = "k8s";
+    let mode = "local";
+    // let mode = "k8s";
 
     // get a list of ballista executors from kubernetes
     let executors = match mode {
@@ -52,7 +53,6 @@ async fn main() -> Result<()> {
     let start = Instant::now();
 
     // execute aggregate query in parallel across all files
-    let num_months: usize = 12;
     let mut batches: Vec<RecordBatch> = vec![];
     let mut tasks: Vec<task::JoinHandle<Result<Vec<RecordBatch>>>> = vec![];
     let mut executor_index = 0;

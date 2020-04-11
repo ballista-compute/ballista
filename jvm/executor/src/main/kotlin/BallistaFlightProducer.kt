@@ -5,12 +5,8 @@ import org.apache.arrow.memory.RootAllocator
 import org.apache.arrow.vector.IntVector
 import org.apache.arrow.vector.VarCharVector
 import org.apache.arrow.vector.VectorSchemaRoot
-import org.apache.arrow.vector.ipc.message.ArrowRecordBatch
-import org.ballistacompute.datatypes.RecordBatch
 import org.ballistacompute.execution.ExecutionContext
 import org.ballistacompute.logical.format
-import org.ballistacompute.protobuf.LogicalPlanNode
-import org.ballistacompute.protobuf.ProtobufDeserializer
 
 class BallistaFlightProducer : FlightProducer {
 
@@ -25,8 +21,14 @@ class BallistaFlightProducer : FlightProducer {
 //        ctx.register("employee", )
 
         try {
-            val protobufPlan = LogicalPlanNode.parseFrom(ticket?.bytes ?: throw IllegalArgumentException())
-            val logicalPlan = ProtobufDeserializer().fromProto(protobufPlan)
+
+            val action = org.ballistacompute.protobuf.Action.parseFrom(ticket?.bytes ?: throw IllegalArgumentException())
+            val tables = mutableMapOf<String,String>()
+            action.tableMetaList.forEach {
+                tables.put(it.tableName, it.filename)
+            }
+
+            val logicalPlan = org.ballistacompute.protobuf.ProtobufDeserializer(tables).fromProto(action.query)
             println(format(logicalPlan))
 
             val schema = logicalPlan.schema()

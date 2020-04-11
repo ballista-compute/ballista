@@ -82,6 +82,8 @@ message SelectionNode {
 
 message AggregateNode {
   repeated LogicalExprNode group_expr = 1;
+
+  //TODO this should really use AggregateExprNode directly
   repeated LogicalExprNode aggr_expr = 2;
 }
 

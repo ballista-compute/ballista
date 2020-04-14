@@ -6,10 +6,10 @@ pub trait DataFrame {
 
     // transformations
 
-    fn project(&self, expr: &Vec<Expr>) -> Result<Box<dyn DataFrame>>;
-    fn filter(&self, expr: &Expr) -> Result<Box<dyn DataFrame>>;
-    fn aggregate(&self, group_expr: &Vec<Expr>, aggr_expr: &Vec<Expr>) -> Result<Box<dyn DataFrame>>;
-    fn limit(&self, n: usize);
+    fn project(&self, expr: Vec<Expr>) -> Result<Box<dyn DataFrame>>;
+    fn filter(&self, expr: Expr) -> Result<Box<dyn DataFrame>>;
+    fn aggregate(&self, group_expr: Vec<Expr>, aggr_expr: Vec<Expr>) -> Result<Box<dyn DataFrame>>;
+    fn limit(&self, n: usize) -> Result<Box<dyn DataFrame>>;
 
     // actions
 

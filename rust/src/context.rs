@@ -9,6 +9,7 @@ use crate::dataframe::DataFrame;
 use crate::error::{Result, BallistaError};
 
 use std::fmt;
+use std::collections::HashMap;
 
 pub struct Context {
 
@@ -16,11 +17,19 @@ pub struct Context {
 
 impl Context {
 
-    pub fn read_csv(path: &str, schema: Option<Schema>, projection: Option<Vec<usize>>, has_header: bool) -> Result<Box<dyn DataFrame>> {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn spark(master: &str, settings: HashMap<&str, &str>) -> Self {
+        Self {}
+    }
+
+    pub fn read_csv(&self, path: &str, schema: Option<Schema>, projection: Option<Vec<usize>>, has_header: bool) -> Result<Box<dyn DataFrame>> {
         Ok(Box::new(DataFrameImpl::scan_csv(path, &schema.unwrap(), projection)?) as Box<dyn DataFrame>)
     }
 
-    pub fn read_parquet(path: &str) -> Result<Box<dyn DataFrame>> {
+    pub fn read_parquet(&self, path: &str) -> Result<Box<dyn DataFrame>> {
         unimplemented!()
     }
 
@@ -132,6 +141,8 @@ impl DataFrame for DataFrameImpl {
         })))
     }
 
+
+
     fn collect(&self) -> Result<Vec<RecordBatch>> {
         unimplemented!()
     }
@@ -141,6 +152,14 @@ impl DataFrame for DataFrameImpl {
     }
 
     fn write_parquet(&self, path: &str) -> Result<()> {
+        unimplemented!()
+    }
+
+    fn schema(&self) -> Box<Schema> {
+        unimplemented!()
+    }
+
+    fn explain(&self) {
         unimplemented!()
     }
 }

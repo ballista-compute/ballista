@@ -13,7 +13,7 @@ message Action {
 }
 
 
-// logical expression
+// logical expressi
 message LogicalExprNode {
 
   // column references

@@ -1,3 +1,4 @@
+use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use datafusion::logicalplan::Expr;
 use crate::error::Result;
@@ -12,7 +13,8 @@ pub trait DataFrame {
     fn limit(&self, n: usize) -> Result<Box<dyn DataFrame>>;
 
     // actions
-
+    fn schema(&self) -> Box<Schema>;
+    fn explain(&self);
     fn collect(&self) -> Result<Vec<RecordBatch>>;
     fn write_csv(&self, path: &str) -> Result<()>;
     fn write_parquet(&self, path: &str) -> Result<()>;

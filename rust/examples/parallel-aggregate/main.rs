@@ -9,13 +9,13 @@ extern crate ballista;
 
 use ballista::cluster;
 use ballista::error::Result;
-use ballista::plan::{Action, TableMeta};
+use ballista::logicalplan::*;
+use ballista::plan::Action;
 use ballista::utils;
-use ballista::{client, BALLISTA_VERSION};
 
+use ballista::{client, BALLISTA_VERSION};
 use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext;
-use datafusion::logicalplan::*;
 
 use ballista::cluster::Executor;
 use tokio::task;
@@ -105,9 +105,12 @@ async fn main() -> Result<()> {
     let schema = (&batches[0]).schema();
     let provider = MemTable::new(Arc::new(schema.as_ref().clone()), batches.clone())?;
     ctx.register_table("tripdata", Box::new(provider));
-    let plan = LogicalPlanBuilder::scan("default", "tripdata", &schema, None)?
+
+    let plan = LogicalPlanBuilder::scan_csv("tripdata", &schema, None)?
         .aggregate(vec![col_index(0)], vec![max(col_index(1))])?
         .build()?;
+
+    let plan = translate_plan(&plan);
     let results = ctx.collect_plan(&plan, 1024 * 1024)?;
 
     // print the results
@@ -128,19 +131,11 @@ async fn execute_remote(host: &str, port: usize, filename: &str) -> Result<Vec<R
     let schema = nyctaxi_schema();
 
     // SELECT passenger_count, MAX(fare_amount) FROM <filename> GROUP BY passenger_count
-    let plan = LogicalPlanBuilder::scan("default", "tripdata", &schema, None)?
+    let plan = LogicalPlanBuilder::scan_csv(filename, &schema, None)?
         .aggregate(vec![col("passenger_count")], vec![max(col("fare_amt"))])?
         .build()?;
 
-    let action = Action::RemoteQuery {
-        plan: plan.clone(),
-        tables: vec![TableMeta::Csv {
-            table_name: "tripdata".to_owned(),
-            has_header: true,
-            path: filename.to_owned(),
-            schema: schema.clone(),
-        }],
-    };
+    let action = Action::Collect { plan: plan.clone() };
 
     let response = client::execute_action(&host, port, action).await?;
 

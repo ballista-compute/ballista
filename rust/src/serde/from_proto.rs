@@ -1,13 +1,12 @@
 use crate::error::{ballista_error, BallistaError};
-use crate::plan::{Action, TableMeta};
+use crate::plan::Action;
 use crate::protobuf;
 
-use datafusion::logicalplan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator, ScalarValue};
+use crate::logicalplan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator, ScalarValue};
 
 use arrow::datatypes::{DataType, Field, Schema};
 
 use std::convert::TryInto;
-use std::sync::Arc;
 
 impl TryInto<LogicalPlan> for protobuf::LogicalPlanNode {
     type Error = BallistaError;
@@ -58,7 +57,7 @@ impl TryInto<LogicalPlan> for protobuf::LogicalPlanNode {
                     .collect(),
             );
 
-            LogicalPlanBuilder::scan("", &scan.table_name, &schema, None)?
+            LogicalPlanBuilder::scan_csv(&scan.path, &schema, None)?
                 .build()
                 .map_err(|e| e.into())
         } else {
@@ -76,9 +75,9 @@ impl TryInto<Expr> for protobuf::LogicalExprNode {
     fn try_into(self) -> Result<Expr, Self::Error> {
         if let Some(binary_expr) = self.binary_expr {
             Ok(Expr::BinaryExpr {
-                left: Arc::new(parse_required_expr(binary_expr.l)?),
+                left: Box::new(parse_required_expr(binary_expr.l)?),
                 op: Operator::Eq, //TODO parse binary_expr.op.clone(),
-                right: Arc::new(parse_required_expr(binary_expr.r)?),
+                right: Box::new(parse_required_expr(binary_expr.r)?),
             })
         } else if self.has_column_index {
             Ok(Expr::Column(self.column_index as usize))
@@ -109,30 +108,30 @@ impl TryInto<Action> for protobuf::Action {
     fn try_into(self) -> Result<Action, Self::Error> {
         if self.query.is_some() {
             let plan: LogicalPlan = self.query.unwrap().try_into()?;
-            let tables = self
-                .table_meta
-                .iter()
-                .map(|t| {
-                    if t.csv_meta.is_some() {
-                        //TODO fix the ugly code and make safe
-                        let csv_meta = t.csv_meta.as_ref().unwrap();
-                        let schema: Result<Schema, _> =
-                            csv_meta.schema.as_ref().unwrap().clone().try_into();
-                        schema.and_then(|schema| {
-                            Ok(TableMeta::Csv {
-                                table_name: t.table_name.to_owned(),
-                                path: t.filename.to_owned(),
-                                has_header: csv_meta.has_header,
-                                schema: schema,
-                            })
-                        })
-                    } else {
-                        unimplemented!()
-                    }
-                })
-                .collect::<Result<Vec<_>, _>>()?;
+            // let tables = self
+            //     .table_meta
+            //     .iter()
+            //     .map(|t| {
+            //         if t.csv_meta.is_some() {
+            //             //TODO fix the ugly code and make safe
+            //             let csv_meta = t.csv_meta.as_ref().unwrap();
+            //             let schema: Result<Schema, _> =
+            //                 csv_meta.schema.as_ref().unwrap().clone().try_into();
+            //             schema.and_then(|schema| {
+            //                 Ok(TableMeta::Csv {
+            //                     table_name: t.table_name.to_owned(),
+            //                     path: t.filename.to_owned(),
+            //                     has_header: csv_meta.has_header,
+            //                     schema: schema,
+            //                 })
+            //             })
+            //         } else {
+            //             unimplemented!()
+            //         }
+            //     })
+            //     .collect::<Result<Vec<_>, _>>()?;
 
-            Ok(Action::RemoteQuery { plan, tables })
+            Ok(Action::Collect { plan })
         } else {
             Err(BallistaError::NotImplemented(format!("{:?}", self)))
         }

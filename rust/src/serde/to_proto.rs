@@ -1,8 +1,8 @@
 use crate::error::BallistaError;
-use crate::plan::{Action, TableMeta};
+use crate::plan::Action;
 use crate::protobuf;
 
-use datafusion::logicalplan::{Expr, LogicalPlan, ScalarValue};
+use crate::logicalplan::{Expr, LogicalPlan, ScalarValue};
 
 use arrow::datatypes::{DataType, Schema};
 
@@ -13,40 +13,39 @@ impl TryInto<protobuf::Action> for Action {
 
     fn try_into(self) -> Result<protobuf::Action, Self::Error> {
         match self {
-            Action::RemoteQuery { plan, tables } => {
+            Action::Collect { plan } => {
                 let plan_proto: protobuf::LogicalPlanNode = plan.try_into()?;
 
-                let table_meta: Vec<protobuf::TableMeta> = tables
-                    .iter()
-                    .map(|t| match t {
-                        TableMeta::Csv {
-                            table_name,
-                            path,
-                            has_header,
-                            schema,
-                        } => {
-                            let schema: Result<protobuf::Schema, _> = schema.clone().try_into();
-
-                            schema.and_then(|schema| {
-                                let csv_meta = protobuf::CsvFileMeta {
-                                    has_header: *has_header,
-                                    schema: Some(schema),
-                                };
-
-                                Ok(protobuf::TableMeta {
-                                    table_name: table_name.to_owned(),
-                                    filename: path.to_owned(),
-                                    csv_meta: Some(csv_meta),
-                                })
-                            })
-                        }
-                        _ => unimplemented!(),
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
+                // let table_meta: Vec<protobuf::TableMeta> = tables
+                //     .iter()
+                //     .map(|t| match t {
+                //         TableMeta::Csv {
+                //             table_name,
+                //             path,
+                //             has_header,
+                //             schema,
+                //         } => {
+                //             let schema: Result<protobuf::Schema, _> = schema.clone().try_into();
+                //
+                //             schema.and_then(|schema| {
+                //                 let csv_meta = protobuf::CsvFileMeta {
+                //                     has_header: *has_header,
+                //                     schema: Some(schema),
+                //                 };
+                //
+                //                 Ok(protobuf::TableMeta {
+                //                     table_name: table_name.to_owned(),
+                //                     filename: path.to_owned(),
+                //                     csv_meta: Some(csv_meta),
+                //                 })
+                //             })
+                //         }
+                //         _ => unimplemented!(),
+                //     })
+                //     .collect::<Result<Vec<_>, _>>()?;
 
                 Ok(protobuf::Action {
                     query: Some(plan_proto),
-                    table_meta: table_meta,
                 })
             }
         }
@@ -102,18 +101,14 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
 
     fn try_into(self) -> Result<protobuf::LogicalPlanNode, Self::Error> {
         match self {
-            LogicalPlan::TableScan {
-                table_name,
-                table_schema,
-                ..
-            } => {
+            LogicalPlan::FileScan { path, schema, .. } => {
                 let mut node = empty_plan_node();
 
-                let schema: protobuf::Schema = table_schema.as_ref().to_owned().try_into()?;
+                let schema: protobuf::Schema = schema.as_ref().to_owned().try_into()?;
 
                 node.scan = Some(protobuf::ScanNode {
-                    table_name: table_name.clone(),
-                    projection: vec![],
+                    path: path.clone(),
+                    projection: vec![], //TODO
                     schema: Some(schema),
                 });
                 Ok(node)

@@ -20,10 +20,10 @@ pub fn decode_protobuf(bytes: &Vec<u8>) -> Result<Action, BallistaError> {
 #[cfg(test)]
 mod tests {
     use crate::error::Result;
+    use crate::logicalplan::{col, lit_str, Expr, LogicalPlanBuilder};
     use crate::plan::*;
     use crate::protobuf;
     use arrow::datatypes::{DataType, Field, Schema};
-    use datafusion::logicalplan::{col, lit_str, Expr, LogicalPlanBuilder};
     use std::convert::TryInto;
 
     #[test]
@@ -36,21 +36,21 @@ mod tests {
             Field::new("salary", DataType::Int32, false),
         ]);
 
-        let plan = LogicalPlanBuilder::scan("default", "employee", &schema, None)
+        let plan = LogicalPlanBuilder::scan_csv("employee.csv", &schema, None)
             .and_then(|plan| plan.filter(col("state").eq(&lit_str("CO"))))
             .and_then(|plan| plan.project(vec![col("id")]))
             .and_then(|plan| plan.build())
             //.map_err(|e| Err(format!("{:?}", e)))
             .unwrap(); //TODO
 
-        let action = Action::RemoteQuery {
+        let action = Action::Collect {
             plan: plan.clone(),
-            tables: vec![TableMeta::Csv {
-                table_name: "employee".to_owned(),
-                has_header: true,
-                path: "/foo/bar.csv".to_owned(),
-                schema: schema.clone(),
-            }],
+            // tables: vec![TableMeta::Csv {
+            //     table_name: "employee".to_owned(),
+            //     has_header: true,
+            //     path: "/foo/bar.csv".to_owned(),
+            //     schema: schema.clone(),
+            // }],
         };
 
         let proto: protobuf::Action = action.clone().try_into()?;
@@ -72,20 +72,20 @@ mod tests {
             Field::new("salary", DataType::Int32, false),
         ]);
 
-        let plan = LogicalPlanBuilder::scan("default", "employee", &schema, None)
+        let plan = LogicalPlanBuilder::scan_csv("employee.csv", &schema, None)
             .and_then(|plan| plan.aggregate(vec![col("state")], vec![max(col("salary"))]))
             .and_then(|plan| plan.build())
             //.map_err(|e| Err(format!("{:?}", e)))
             .unwrap(); //TODO
 
-        let action = Action::RemoteQuery {
+        let action = Action::Collect {
             plan: plan.clone(),
-            tables: vec![TableMeta::Csv {
-                table_name: "employee".to_owned(),
-                has_header: true,
-                path: "/foo/bar.csv".to_owned(),
-                schema: schema.clone(),
-            }],
+            // tables: vec![TableMeta::Csv {
+            //     table_name: "employee".to_owned(),
+            //     has_header: true,
+            //     path: "/foo/bar.csv".to_owned(),
+            //     schema: schema.clone(),
+            // }],
         };
 
         let proto: protobuf::Action = action.clone().try_into()?;

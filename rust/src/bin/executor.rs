@@ -1,8 +1,11 @@
 use std::pin::Pin;
 
+use ballista::logicalplan::translate_plan;
 use ballista::serde::decode_protobuf;
 use ballista::{plan, BALLISTA_VERSION};
+
 use datafusion::execution::context::ExecutionContext;
+
 use flight::{
     flight_service_server::FlightService, flight_service_server::FlightServiceServer, Action,
     ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo, HandshakeRequest,
@@ -43,27 +46,27 @@ impl FlightService for FlightServiceImpl {
                 println!("do_get: {:?}", action);
 
                 match &action {
-                    plan::Action::RemoteQuery {
-                        plan: logical_plan,
-                        tables,
-                    } => {
+                    plan::Action::Collect { plan: logical_plan } => {
                         // create local execution context
                         let mut ctx = ExecutionContext::new();
 
                         // register tables
-                        tables.iter().for_each(|table| match table {
-                            plan::TableMeta::Csv {
-                                table_name,
-                                path,
-                                has_header,
-                                schema,
-                            } => ctx.register_csv(table_name, path, schema, *has_header),
-                            _ => unimplemented!(),
-                        });
+                        // tables.iter().for_each(|table| match table {
+                        //     plan::TableMeta::Csv {
+                        //         table_name,
+                        //         path,
+                        //         has_header,
+                        //         schema,
+                        //     } => ctx.register_csv(table_name, path, schema, *has_header),
+                        //     _ => unimplemented!(),
+                        // });
+
+                        let datafusion_plan = translate_plan(logical_plan);
 
                         // create the query plan
-                        let optimized_plan =
-                            ctx.optimize(&logical_plan).map_err(|e| to_tonic_err(&e))?;
+                        let optimized_plan = ctx
+                            .optimize(&datafusion_plan)
+                            .map_err(|e| to_tonic_err(&e))?;
 
                         println!("Executing: {:?}", optimized_plan);
 

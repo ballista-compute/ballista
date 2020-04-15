@@ -1,24 +1,14 @@
-use std::process;
-use std::sync::Arc;
-use std::time::Instant;
+use std::collections::HashMap;
 
-use arrow::datatypes::{DataType, Field, Schema};
-use arrow::record_batch::RecordBatch;
+use arrow::datatypes::DataType;
 
 extern crate ballista;
 
-use ballista::context::Context;
-use ballista::cluster;
+use ballista::dataframe::Context;
 use ballista::error::Result;
-use ballista::plan::{Action, TableMeta};
-use ballista::utils;
-use ballista::{client, BALLISTA_VERSION};
-
-use datafusion::logicalplan::{Expr, col};
-use std::collections::HashMap;
+use ballista::logicalplan::{col, Expr};
 
 fn main() -> Result<()> {
-
     let spark_master = "local[*]";
 
     let mut spark_settings = HashMap::new();
@@ -28,14 +18,14 @@ fn main() -> Result<()> {
 
     let ctx = Context::spark(spark_master, spark_settings);
 
-    let df = ctx.read_csv("/foo/input.csv", None, None, true)?
+    let df = ctx
+        .read_csv("/foo/input.csv", None, None, true)?
         .filter(col("a").lt(&col("b")))?
         .aggregate(vec![col("c")], vec![sum(col("d"))])?;
 
     df.explain();
 
     df.write_csv("/foo/output.csv")
-
 }
 
 //TODO move into crate

@@ -4,7 +4,7 @@ import org.ballistacompute.datasource.DataSource
 import org.apache.arrow.vector.types.pojo.Schema
 
 /** Represents a scan of a data source */
-class Scan(val name: String, val dataSource: DataSource, val projection: List<String>): LogicalPlan {
+class Scan(val path: String, val dataSource: DataSource, val projection: List<String>): LogicalPlan {
 
     val schema = deriveSchema()
 
@@ -28,9 +28,9 @@ class Scan(val name: String, val dataSource: DataSource, val projection: List<St
 
     override fun toString(): String {
         return if (projection.isEmpty()) {
-            "Scan: $name; projection=None"
+            "Scan: $path; projection=None"
         } else {
-            "Scan: $name; projection=$projection"
+            "Scan: $path; projection=$projection"
         }
     }
 

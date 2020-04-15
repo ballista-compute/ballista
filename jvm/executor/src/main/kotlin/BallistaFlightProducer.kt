@@ -18,17 +18,10 @@ class BallistaFlightProducer : FlightProducer {
             throw IllegalArgumentException()
         }
 
-//        ctx.register("employee", )
-
         try {
 
             val action = org.ballistacompute.protobuf.Action.parseFrom(ticket?.bytes ?: throw IllegalArgumentException())
-            val tables = mutableMapOf<String,String>()
-            action.tableMetaList.forEach {
-                tables.put(it.tableName, it.filename)
-            }
-
-            val logicalPlan = org.ballistacompute.protobuf.ProtobufDeserializer(tables).fromProto(action.query)
+            val logicalPlan = org.ballistacompute.protobuf.ProtobufDeserializer().fromProto(action.query)
             println(format(logicalPlan))
 
             val schema = logicalPlan.schema()

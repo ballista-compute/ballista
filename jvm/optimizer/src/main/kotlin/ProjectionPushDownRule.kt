@@ -1,7 +1,6 @@
 package org.ballistacompute.optimizer
 
 import org.ballistacompute.logical.*
-import java.lang.IllegalStateException
 
 class ProjectionPushDownRule : OptimizerRule {
 
@@ -35,7 +34,7 @@ class ProjectionPushDownRule : OptimizerRule {
             is Scan -> {
                 val validFieldNames = plan.dataSource.schema().fields.map { it.name }.toSet()
                 val pushDown = validFieldNames.filter { columnNames.contains(it) }.toSet().sorted()
-                Scan(plan.name, plan.dataSource, pushDown)
+                Scan(plan.path, plan.dataSource, pushDown)
             }
             else -> TODO(plan.javaClass.name)
         }

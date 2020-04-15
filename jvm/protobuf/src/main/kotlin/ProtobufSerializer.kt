@@ -19,7 +19,7 @@ class ProtobufSerializer {
                         LogicalPlanNode
                                 .newBuilder()
                                 .setScan(ScanNode.newBuilder()
-                                        .setTableName(plan.name)
+                                        .setPath(plan.path)
                                         .addAllProjection(plan.projection)
                                         .build())
                                 .build()

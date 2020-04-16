@@ -17,11 +17,12 @@
 
 ///! This file was forked from Apache Arrow.
 use std::fmt;
+use std::sync::Arc;
 
 use arrow::datatypes::{DataType, Field, Schema};
 
 use datafusion::error::{ExecutionError, Result};
-use datafusion::logicalplan as dflogicalplan;
+use datafusion::logicalplan::{LogicalPlan as DFLogicalPlan, Expr as DFExpr};
 
 /// The LogicalPlan represents different types of relations (such as Projection,
 /// Selection, etc) and can be created by the SQL query planner and the DataFrame API.
@@ -899,6 +900,21 @@ fn _get_supertype(l: &DataType, r: &DataType) -> Option<DataType> {
 }
 
 /// Translate Ballista plan to DataFusion plan
-pub fn translate_plan(_plan: &LogicalPlan) -> dflogicalplan::LogicalPlan {
-    unimplemented!()
+pub fn translate_plan(plan: &LogicalPlan) -> DFLogicalPlan {
+    match plan {
+        LogicalPlan::Projection { expr, input, schema } => DFLogicalPlan::Projection {
+            expr: expr.iter().map(|e| translate_expr(e)).collect(),
+            input: Arc::new(translate_plan(input)),
+            schema: Arc::new(schema.as_ref().clone())
+        },
+        _ => unimplemented!()
+    }
+}
+
+/// Translate Ballista expression to DataFusion expression
+pub fn translate_expr(expr: &Expr) -> DFExpr {
+    match expr {
+        Expr::Column(name) => DFExpr::Column(name.clone()),
+        _ => unimplemented!()
+    }
 }

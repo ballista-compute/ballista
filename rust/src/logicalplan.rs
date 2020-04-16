@@ -23,7 +23,10 @@ use arrow::datatypes::{DataType, Field, Schema};
 
 use datafusion::error::{ExecutionError, Result};
 use datafusion::execution::context::ExecutionContext;
-use datafusion::logicalplan::{Expr as DFExpr, LogicalPlan as DFLogicalPlan};
+use datafusion::logicalplan::{
+    Expr as DFExpr, LogicalPlan as DFLogicalPlan, Operator as DFOperator,
+    ScalarValue as DFScalarValue,
+};
 
 /// The LogicalPlan represents different types of relations (such as Projection,
 /// Selection, etc) and can be created by the SQL query planner and the DataFrame API.
@@ -934,6 +937,27 @@ pub fn translate_plan(ctx: &mut ExecutionContext, plan: &LogicalPlan) -> Result<
             input: Arc::new(translate_plan(ctx, input)?),
             schema: Arc::new(schema.as_ref().clone()),
         }),
+        LogicalPlan::Selection { expr, input } => Ok(DFLogicalPlan::Selection {
+            expr: translate_expr(expr)?,
+            input: Arc::new(translate_plan(ctx, input)?),
+        }),
+        LogicalPlan::Aggregate {
+            group_expr,
+            aggr_expr,
+            input,
+            schema,
+        } => Ok(DFLogicalPlan::Aggregate {
+            group_expr: group_expr
+                .iter()
+                .map(|e| translate_expr(e))
+                .collect::<Result<Vec<_>>>()?,
+            aggr_expr: aggr_expr
+                .iter()
+                .map(|e| translate_expr(e))
+                .collect::<Result<Vec<_>>>()?,
+            input: Arc::new(translate_plan(ctx, input)?),
+            schema: Arc::new(schema.as_ref().clone()),
+        }),
         other => Err(ExecutionError::General(format!(
             "Cannot translate operator to DataFusion: {:?}",
             other
@@ -942,11 +966,75 @@ pub fn translate_plan(ctx: &mut ExecutionContext, plan: &LogicalPlan) -> Result<
 }
 
 /// Translate Ballista expression to DataFusion expression
-pub fn translate_expr(expr: &Expr) -> Result<DFExpr> {
+fn translate_expr(expr: &Expr) -> Result<DFExpr> {
     match expr {
-        Expr::Column(name) => Ok(DFExpr::Column(name.clone())),
+        Expr::Alias(expr, alias) => Ok(DFExpr::Alias(
+            Arc::new(translate_expr(expr.as_ref())?),
+            alias.clone(),
+        )),
+        Expr::Column(index) => Ok(DFExpr::Column(*index)),
+        Expr::UnresolvedColumn(name) => Ok(DFExpr::UnresolvedColumn(name.clone())),
+        Expr::Literal(value) => {
+            let value = translate_scalar_value(value)?;
+            Ok(DFExpr::Literal(value.clone()))
+        }
+        Expr::BinaryExpr { left, op, right } => {
+            let left = translate_expr(left)?;
+            let right = translate_expr(right)?;
+            let op = translate_operator(op)?;
+            Ok(DFExpr::BinaryExpr {
+                left: Arc::new(left),
+                op,
+                right: Arc::new(right),
+            })
+        }
         other => Err(ExecutionError::General(format!(
             "Cannot translate expression to DataFusion: {:?}",
+            other
+        ))),
+    }
+}
+
+fn translate_operator(op: &Operator) -> Result<DFOperator> {
+    match op {
+        Operator::Eq => Ok(DFOperator::Eq),
+        Operator::NotEq => Ok(DFOperator::NotEq),
+        Operator::Lt => Ok(DFOperator::Lt),
+        Operator::LtEq => Ok(DFOperator::LtEq),
+        Operator::Gt => Ok(DFOperator::Gt),
+        Operator::GtEq => Ok(DFOperator::GtEq),
+        Operator::And => Ok(DFOperator::And),
+        Operator::Or => Ok(DFOperator::Or),
+        Operator::Plus => Ok(DFOperator::Plus),
+        Operator::Minus => Ok(DFOperator::Minus),
+        Operator::Multiply => Ok(DFOperator::Multiply),
+        Operator::Divide => Ok(DFOperator::Divide),
+        Operator::Like => Ok(DFOperator::Like),
+        Operator::NotLike => Ok(DFOperator::NotLike),
+        Operator::Modulus => Ok(DFOperator::Modulus),
+        other => Err(ExecutionError::General(format!(
+            "Cannot translate binary operator to DataFusion: {:?}",
+            other
+        ))),
+    }
+}
+
+fn translate_scalar_value(value: &ScalarValue) -> Result<DFScalarValue> {
+    match value {
+        ScalarValue::Boolean(v) => Ok(DFScalarValue::Boolean(*v)),
+        ScalarValue::UInt8(v) => Ok(DFScalarValue::UInt8(*v)),
+        ScalarValue::UInt16(v) => Ok(DFScalarValue::UInt16(*v)),
+        ScalarValue::UInt32(v) => Ok(DFScalarValue::UInt32(*v)),
+        ScalarValue::UInt64(v) => Ok(DFScalarValue::UInt64(*v)),
+        ScalarValue::Int8(v) => Ok(DFScalarValue::Int8(*v)),
+        ScalarValue::Int16(v) => Ok(DFScalarValue::Int16(*v)),
+        ScalarValue::Int32(v) => Ok(DFScalarValue::Int32(*v)),
+        ScalarValue::Int64(v) => Ok(DFScalarValue::Int64(*v)),
+        ScalarValue::Float32(v) => Ok(DFScalarValue::Float32(*v)),
+        ScalarValue::Float64(v) => Ok(DFScalarValue::Float64(*v)),
+        ScalarValue::Utf8(v) => Ok(DFScalarValue::Utf8(v.clone())),
+        other => Err(ExecutionError::General(format!(
+            "Cannot translate scalar value to DataFusion: {:?}",
             other
         ))),
     }

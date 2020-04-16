@@ -110,7 +110,7 @@ async fn main() -> Result<()> {
         .aggregate(vec![col_index(0)], vec![max(col_index(1))])?
         .build()?;
 
-    let plan = translate_plan(&plan);
+    let plan = translate_plan(&mut ctx, &plan)?;
     let results = ctx.collect_plan(&plan, 1024 * 1024)?;
 
     // print the results

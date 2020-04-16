@@ -61,7 +61,8 @@ impl FlightService for FlightServiceImpl {
                         //     _ => unimplemented!(),
                         // });
 
-                        let datafusion_plan = translate_plan(logical_plan);
+                        let datafusion_plan =
+                            translate_plan(&mut ctx, logical_plan).map_err(|e| to_tonic_err(&e))?;
 
                         // create the query plan
                         let optimized_plan = ctx

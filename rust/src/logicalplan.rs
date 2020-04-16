@@ -22,7 +22,8 @@ use std::sync::Arc;
 use arrow::datatypes::{DataType, Field, Schema};
 
 use datafusion::error::{ExecutionError, Result};
-use datafusion::logicalplan::{LogicalPlan as DFLogicalPlan, Expr as DFExpr};
+use datafusion::execution::context::ExecutionContext;
+use datafusion::logicalplan::{Expr as DFExpr, LogicalPlan as DFLogicalPlan};
 
 /// The LogicalPlan represents different types of relations (such as Projection,
 /// Selection, etc) and can be created by the SQL query planner and the DataFrame API.
@@ -900,21 +901,53 @@ fn _get_supertype(l: &DataType, r: &DataType) -> Option<DataType> {
 }
 
 /// Translate Ballista plan to DataFusion plan
-pub fn translate_plan(plan: &LogicalPlan) -> DFLogicalPlan {
+pub fn translate_plan(ctx: &mut ExecutionContext, plan: &LogicalPlan) -> Result<DFLogicalPlan> {
     match plan {
-        LogicalPlan::Projection { expr, input, schema } => DFLogicalPlan::Projection {
-            expr: expr.iter().map(|e| translate_expr(e)).collect(),
-            input: Arc::new(translate_plan(input)),
-            schema: Arc::new(schema.as_ref().clone())
-        },
-        _ => unimplemented!()
+        LogicalPlan::FileScan {
+            path,
+            schema,
+            projection,
+            projected_schema,
+        } => {
+            //TODO generate unique table name
+            let table_name = "tbd".to_owned();
+
+            ctx.register_csv(&table_name, path.as_str(), schema.as_ref(), true);
+
+            Ok(DFLogicalPlan::TableScan {
+                schema_name: "default".to_owned(),
+                table_name: table_name.clone(),
+                table_schema: Arc::new(schema.as_ref().clone()),
+                projected_schema: Arc::new(projected_schema.as_ref().clone()),
+                projection: projection.clone(),
+            })
+        }
+        LogicalPlan::Projection {
+            expr,
+            input,
+            schema,
+        } => Ok(DFLogicalPlan::Projection {
+            expr: expr
+                .iter()
+                .map(|e| translate_expr(e))
+                .collect::<Result<Vec<_>>>()?,
+            input: Arc::new(translate_plan(ctx, input)?),
+            schema: Arc::new(schema.as_ref().clone()),
+        }),
+        other => Err(ExecutionError::General(format!(
+            "Cannot translate operator to DataFusion: {:?}",
+            other
+        ))),
     }
 }
 
 /// Translate Ballista expression to DataFusion expression
-pub fn translate_expr(expr: &Expr) -> DFExpr {
+pub fn translate_expr(expr: &Expr) -> Result<DFExpr> {
     match expr {
-        Expr::Column(name) => DFExpr::Column(name.clone()),
-        _ => unimplemented!()
+        Expr::Column(name) => Ok(DFExpr::Column(name.clone())),
+        other => Err(ExecutionError::General(format!(
+            "Cannot translate expression to DataFusion: {:?}",
+            other
+        ))),
     }
 }

@@ -1,45 +1,65 @@
 use std::collections::HashMap;
 
-use arrow::datatypes::DataType;
+use arrow::datatypes::{Schema, Field, DataType};
 
 extern crate ballista;
 
-use ballista::dataframe::Context;
+use ballista::dataframe::{Context, max};
 use ballista::error::Result;
-use ballista::logicalplan::{col, Expr};
+use ballista::logicalplan::col;
+use datafusion::utils;
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
+
     let spark_master = "local[*]";
 
     let mut spark_settings = HashMap::new();
     spark_settings.insert("spark.app.name", "rust-client-demo");
+    spark_settings.insert("spark.ballista.host", "localhost");
+    spark_settings.insert("spark.ballista.port", "50051");
     spark_settings.insert("spark.executor.memory", "4g");
     spark_settings.insert("spark.executor.cores", "4");
 
     let ctx = Context::spark(spark_master, spark_settings);
 
-    let df = ctx
-        .read_csv("/foo/input.csv", None, None, true)?
-        .filter(col("a").lt(&col("b")))?
-        .aggregate(vec![col("c")], vec![sum(col("d"))])?;
+    let path = "/mnt/nyctaxi/csv/yellow/2019/yellow_tripdata_2019-01.csv";
 
+    let df = ctx
+        .read_csv(path, Some(nyctaxi_schema()), None, true)?
+        //.filter(col("passenger_count").gt(&lit))?
+        .aggregate(vec![col("passenger_count")], vec![max(col("fare_amount"))])?;
+
+    // print the query plan
     df.explain();
 
-    df.write_csv("/foo/output.csv")
+    // collect the results from the Spark executor
+    let results = df.collect().await?;
+
+    // display the results
+    utils::print_batches(&results)?;
+
+    Ok(())
 }
 
-//TODO move into crate
-
-fn sum(expr: Expr) -> Expr {
-    aggregate_expr("SUM", &expr)
-}
-
-/// Create an expression to represent a named aggregate function
-fn aggregate_expr(name: &str, expr: &Expr) -> Expr {
-    let return_type = DataType::Float64;
-    Expr::AggregateFunction {
-        name: name.to_string(),
-        args: vec![expr.clone()],
-        return_type,
-    }
+fn nyctaxi_schema() -> Schema {
+    Schema::new(vec![
+        Field::new("VendorID", DataType::Utf8, true),
+        Field::new("tpep_pickup_datetime", DataType::Utf8, true),
+        Field::new("tpep_dropoff_datetime", DataType::Utf8, true),
+        Field::new("passenger_count", DataType::UInt32, true),
+        Field::new("trip_distance", DataType::Utf8, true),
+        Field::new("RatecodeID", DataType::Utf8, true),
+        Field::new("store_and_fwd_flag", DataType::Utf8, true),
+        Field::new("PULocationID", DataType::Utf8, true),
+        Field::new("DOLocationID", DataType::Utf8, true),
+        Field::new("payment_type", DataType::Utf8, true),
+        Field::new("fare_amount", DataType::Float64, true),
+        Field::new("extra", DataType::Float64, true),
+        Field::new("mta_tax", DataType::Float64, true),
+        Field::new("tip_amount", DataType::Float64, true),
+        Field::new("tolls_amount", DataType::Float64, true),
+        Field::new("improvement_surcharge", DataType::Float64, true),
+        Field::new("total_amount", DataType::Float64, true),
+    ])
 }

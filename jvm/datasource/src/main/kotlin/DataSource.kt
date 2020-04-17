@@ -10,6 +10,6 @@ interface DataSource {
     fun schema(): Schema
 
     /** Scan the data source, selecting the specified columns */
-    fun scan(columns: List<String>): Sequence<RecordBatch>
+    fun scan(projection: List<String>): Sequence<RecordBatch>
 }
 

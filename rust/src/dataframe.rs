@@ -1,6 +1,7 @@
-use arrow::datatypes::Schema;
+use arrow::datatypes::{Schema, DataType};
 use arrow::record_batch::RecordBatch;
 
+use crate::client;
 use crate::error::Result;
 use crate::logicalplan::{exprlist_to_fields, Expr, LogicalPlan, ScalarValue};
 
@@ -10,8 +11,18 @@ use std::sync::Arc;
 use crate::plan::Action;
 
 pub struct ContextState {
-    //TODO: add real things here
-    _foo: usize,
+    settings: HashMap<String, String>,
+}
+
+impl ContextState {
+
+    pub fn new(settings: HashMap<&str, &str>) -> Self {
+        let mut s: HashMap<String, String> = HashMap::new();
+        for (k,v) in settings {
+            s.insert(k.to_owned(), v.to_owned());
+        }
+        Self { settings: s }
+    }
 }
 
 pub struct Context {
@@ -19,9 +30,10 @@ pub struct Context {
 }
 
 impl Context {
+
     pub fn new() -> Self {
         Self {
-            state: Arc::new(ContextState { _foo: 0 }),
+            state: Arc::new(ContextState::new(HashMap::new()) )
         }
     }
 
@@ -29,9 +41,9 @@ impl Context {
         Self { state }
     }
 
-    pub fn spark(_master: &str, _settings: HashMap<&str, &str>) -> Self {
+    pub fn spark(_spark_master: &str, spark_settings: HashMap<&str, &str>) -> Self {
         Self {
-            state: Arc::new(ContextState { _foo: 0 }),
+            state: Arc::new(ContextState::new(spark_settings)),
         }
     }
 
@@ -45,7 +57,7 @@ impl Context {
         Ok(DataFrame::scan_csv(
             self.state.clone(),
             path,
-            &schema.unwrap(),
+            &schema.unwrap(), //TODO schema should be optional here
             projection,
         )?)
     }
@@ -56,12 +68,12 @@ impl Context {
 
     pub async fn execute_action(
         &self,
-        _host: &str,
-        _port: usize,
-        _action: Action,
+        host: &str,
+        port: usize,
+        action: Action,
     ) -> Result<Vec<RecordBatch>> {
-        //TODO needs to return tokio Stream eventually
-        unimplemented!()
+
+        client::execute_action(host, port, action).await
     }
 }
 
@@ -183,6 +195,10 @@ impl DataFrame {
         ))
     }
 
+    pub fn explain(&self) {
+        println!("{:?}", self.plan);
+    }
+
     pub async fn collect(&self) -> Result<Vec<RecordBatch>> {
         let ctx = Context::from(self.ctx_state.clone());
 
@@ -190,9 +206,11 @@ impl DataFrame {
             plan: self.plan.clone(),
         };
 
-        ctx.execute_action("", 1234, action).await?;
+        //TODO should not use spark specific settings to discover executor
+        let host = &self.ctx_state.settings["spark.ballista.host"];
+        let port = &self.ctx_state.settings["spark.ballista.port"];
 
-        unimplemented!()
+        ctx.execute_action(host, port.parse::<usize>().unwrap(), action).await
     }
 
     pub fn write_csv(&self, _path: &str) -> Result<()> {
@@ -207,7 +225,26 @@ impl DataFrame {
         unimplemented!()
     }
 
-    pub fn explain(&self) {
-        unimplemented!()
+}
+
+pub fn min(expr: Expr) -> Expr {
+    aggregate_expr("MIN", &expr)
+}
+
+pub fn max(expr: Expr) -> Expr {
+    aggregate_expr("MAX", &expr)
+}
+
+pub fn sum(expr: Expr) -> Expr {
+    aggregate_expr("SUM", &expr)
+}
+
+/// Create an expression to represent a named aggregate function
+pub fn aggregate_expr(name: &str, expr: &Expr) -> Expr {
+    let return_type = DataType::Float64;
+    Expr::AggregateFunction {
+        name: name.to_string(),
+        args: vec![expr.clone()],
+        return_type,
     }
 }

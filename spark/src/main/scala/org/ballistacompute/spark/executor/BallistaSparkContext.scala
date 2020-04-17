@@ -1,6 +1,7 @@
 package org.ballistacompute.spark.executor
 
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.util.ArrowUtils
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import org.ballistacompute.{logical => ballista}
 
@@ -15,7 +16,14 @@ class BallistaSparkContext(spark: SparkSession) {
 
       case s: ballista.Scan =>
         assert(input.isEmpty)
-        val df = spark.read.csv(s.getPath)
+
+        val sparkSchema = ArrowUtils.fromArrowSchema(s.schema())
+
+        val df = spark.read
+          .format("csv")
+          .schema(sparkSchema)
+          .load(s.getPath)
+
         val projection: Seq[String] = s.getProjection().asScala
         if (projection.isEmpty) {
           df
@@ -38,9 +46,14 @@ class BallistaSparkContext(spark: SparkSession) {
       case a: ballista.Aggregate =>
         val df = createDataFrame(a.getInput, input)
         val groupExpr = a.getGroupExpr.asScala.map(e => createExpression(e, df))
+
+        // this assumes simple aggregate expressions of the form aggr_expr(field_expr)
         val aggrMap: Map[String, String]  = a.getAggregateExpr.asScala.map { aggr =>
-          aggr.toField(plan).getName() -> aggr.getName().toLowerCase
+          val aggrFunction = aggr.getName.toLowerCase
+          val fieldName = aggr.getExpr.toField(a.getInput).getName
+          fieldName -> aggrFunction
         }.toMap
+
         df.groupBy(groupExpr: _*).agg(aggrMap)
 
       case other =>

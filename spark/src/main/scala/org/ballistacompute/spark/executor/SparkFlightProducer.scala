@@ -40,6 +40,7 @@ class SparkFlightProducer(spark: SparkSession) extends FlightProducer {
       }
 
       listener.completed()
+
     } catch {
       case e: Exception =>
       e.printStackTrace()

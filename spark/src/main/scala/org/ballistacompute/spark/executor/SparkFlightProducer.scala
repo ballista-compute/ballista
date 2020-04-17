@@ -17,18 +17,11 @@ class SparkFlightProducer(spark: SparkSession) extends FlightProducer {
     try {
       val action: protobuf.Action = protobuf.Action.parseFrom(ticket.getBytes)
 
-      // register tables
-      val tables: Map[String,String] = action.getTableMetaList.asScala.map(tableMeta => {
-        tableMeta.getTableName -> tableMeta.getFilename
-      }).toMap
-
-      println(tables)
-
-      val logicalPlan = new protobuf.ProtobufDeserializer(tables.asJava).fromProto(action.getQuery)
+      val logicalPlan = new protobuf.ProtobufDeserializer().fromProto(action.getQuery)
 
       println(s"Ballista logical plan:\n${logicalPlan.pretty()}")
 
-      val ctx = new BallistaSparkContext(spark, tables)
+      val ctx = new BallistaSparkContext(spark)
       val df = ctx.createDataFrame(logicalPlan, None)
       df.explain()
 

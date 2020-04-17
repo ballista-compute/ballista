@@ -6,7 +6,7 @@ import org.ballistacompute.{logical => ballista}
 
 import scala.collection.JavaConverters._
 
-class BallistaSparkContext(spark: SparkSession, val tables: Map[String,String]) {
+class BallistaSparkContext(spark: SparkSession) {
 
   /** Translate Ballista logical plan step into a DataFrame transformation */
   def createDataFrame(plan: ballista.LogicalPlan, input: Option[DataFrame]): DataFrame = {
@@ -15,7 +15,7 @@ class BallistaSparkContext(spark: SparkSession, val tables: Map[String,String]) 
 
       case s: ballista.Scan =>
         assert(input.isEmpty)
-        val df = spark.read.csv(tables(s.getName))
+        val df = spark.read.csv(s.getPath)
         val projection: Seq[String] = s.getProjection().asScala
         if (projection.isEmpty) {
           df
@@ -70,12 +70,12 @@ class BallistaSparkContext(spark: SparkSession, val tables: Map[String,String]) 
           case _: ballista.Multiply => l.multiply(r)
           case _: ballista.Divide => l.divide(r)
 
-          case _: ballista.Eq => l.or(r)
-          case _: ballista.Neq => l.or(r)
-          case _: ballista.Gt => l.or(r)
-          case _: ballista.GtEq => l.or(r)
-          case _: ballista.Lt => l.or(r)
-          case _: ballista.LtEq => l.or(r)
+          case _: ballista.Eq => l.equalTo(r)
+          case _: ballista.Neq => l.notEqual(r)
+          case _: ballista.Gt => l > r
+          case _: ballista.GtEq => l >= r
+          case _: ballista.Lt => l < r
+          case _: ballista.LtEq => l <= r
 
           case _: ballista.And => l.and(r)
           case _: ballista.Or => l.or(r)

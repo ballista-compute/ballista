@@ -27,8 +27,10 @@ async fn main() -> Result<()> {
     let df = ctx
         .read_csv(path, Some(nyctaxi_schema()), None, true)?
         //.filter(col("passenger_count").gt(&lit))?
-        .aggregate(vec![col("passenger_count")],
-                   vec![min(col("fare_amount")), max(col("fare_amount"))])?;
+        .aggregate(
+            vec![col("passenger_count")],
+            vec![min(col("fare_amount")), max(col("fare_amount"))],
+        )?;
 
     // print the query plan
     df.explain();

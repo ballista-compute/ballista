@@ -1,5 +1,4 @@
 use std::process;
-use std::sync::Arc;
 use std::time::Instant;
 
 use arrow::datatypes::{DataType, Field, Schema};
@@ -8,16 +7,14 @@ use arrow::record_batch::RecordBatch;
 extern crate ballista;
 
 use ballista::cluster;
+use ballista::cluster::Executor;
+use ballista::dataframe::{max, Context};
 use ballista::error::Result;
 use ballista::logicalplan::*;
-use ballista::plan::Action;
-use ballista::utils;
+use ballista::BALLISTA_VERSION;
 
-use ballista::{client, BALLISTA_VERSION};
-use datafusion::datasource::MemTable;
-use datafusion::execution::context::ExecutionContext;
+use datafusion::utils;
 
-use ballista::cluster::Executor;
 use tokio::task;
 
 #[tokio::main]
@@ -101,22 +98,16 @@ async fn main() -> Result<()> {
     println!("Received {} batches from executors", batches.len());
 
     // perform secondary aggregate query on the results collected from the executors
-    let mut ctx = ExecutionContext::new();
-    let schema = (&batches[0]).schema();
-    let provider = MemTable::new(Arc::new(schema.as_ref().clone()), batches.clone())?;
-    ctx.register_table("tripdata", Box::new(provider));
+    let ctx = Context::local();
 
-    let plan = LogicalPlanBuilder::scan_csv("tripdata", &schema, None)?
-        .aggregate(vec![col_index(0)], vec![max(col_index(1))])?
-        .build()?;
-
-    let plan = translate_plan(&mut ctx, &plan)?;
-    let results = ctx.collect_plan(&plan, 1024 * 1024)?;
+    let results = ctx
+        .create_dataframe(&batches)?
+        .aggregate(vec![col("passenger_count")], vec![max(col("fare_amount"))])?
+        .collect()
+        .await?;
 
     // print the results
-    utils::result_str(&results)
-        .iter()
-        .for_each(|str| println!("{}", str));
+    utils::print_batches(&results)?;
 
     println!("Parallel query took {} seconds", start.elapsed().as_secs());
 
@@ -128,16 +119,13 @@ async fn execute_remote(host: &str, port: usize, filename: &str) -> Result<Vec<R
     println!("Executing query against executor at {}:{}", host, port);
     let start = Instant::now();
 
-    let schema = nyctaxi_schema();
+    let ctx = Context::remote(host, port);
 
-    // SELECT passenger_count, MAX(fare_amount) FROM <filename> GROUP BY passenger_count
-    let plan = LogicalPlanBuilder::scan_csv(filename, &schema, None)?
-        .aggregate(vec![col("passenger_count")], vec![max(col("fare_amt"))])?
-        .build()?;
-
-    let action = Action::Collect { plan: plan.clone() };
-
-    let response = client::execute_action(&host, port, action).await?;
+    let response = ctx
+        .read_csv(filename, Some(nyctaxi_schema()), None, true)?
+        .aggregate(vec![col("passenger_count")], vec![max(col("fare_amount"))])?
+        .collect()
+        .await?;
 
     println!(
         "Executed query against executor at {}:{} in {} seconds",
@@ -169,12 +157,4 @@ fn nyctaxi_schema() -> Schema {
         Field::new("improvement_surcharge", DataType::Float64, true),
         Field::new("total_amount", DataType::Float64, true),
     ])
-}
-
-fn max(expr: Expr) -> Expr {
-    Expr::AggregateFunction {
-        name: "MAX".to_owned(),
-        args: vec![expr],
-        return_type: DataType::Float64,
-    }
 }

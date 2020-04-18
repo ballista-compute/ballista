@@ -2,7 +2,7 @@ use arrow::datatypes::{DataType, Schema};
 use arrow::record_batch::RecordBatch;
 
 use crate::client;
-use crate::error::Result;
+use crate::error::{BallistaError, Result};
 use crate::logicalplan::{exprlist_to_fields, Expr, LogicalPlan, ScalarValue};
 
 use std::collections::HashMap;
@@ -10,28 +10,52 @@ use std::sync::Arc;
 
 use crate::plan::Action;
 
-pub struct ContextState {
-    settings: HashMap<String, String>,
-}
-
-impl ContextState {
-    pub fn new(settings: HashMap<&str, &str>) -> Self {
-        let mut s: HashMap<String, String> = HashMap::new();
-        for (k, v) in settings {
-            s.insert(k.to_owned(), v.to_owned());
-        }
-        Self { settings: s }
-    }
-}
-
 pub struct Context {
     state: Arc<ContextState>,
 }
 
+#[derive(Debug, Clone)]
+pub enum ContextState {
+    Local,
+    Remote {
+        host: String,
+        port: usize,
+    },
+    Spark {
+        master: String,
+        spark_settings: HashMap<String, String>,
+    },
+}
+
 impl Context {
-    pub fn new() -> Self {
+    /// Create a context for executing a query against a remote Spark executor
+    pub fn spark(master: &str, settings: HashMap<&str, &str>) -> Self {
+        let mut s: HashMap<String, String> = HashMap::new();
+        for (k, v) in settings {
+            s.insert(k.to_owned(), v.to_owned());
+        }
         Self {
-            state: Arc::new(ContextState::new(HashMap::new())),
+            state: Arc::new(ContextState::Spark {
+                master: master.to_owned(),
+                spark_settings: s,
+            }),
+        }
+    }
+
+    /// Create a context for executing a query against a local in-process executor
+    pub fn local() -> Self {
+        Self {
+            state: Arc::new(ContextState::Local),
+        }
+    }
+
+    /// Create a context for executing a query against a remote executor
+    pub fn remote(host: &str, port: usize) -> Self {
+        Self {
+            state: Arc::new(ContextState::Remote {
+                host: host.to_owned(),
+                port,
+            }),
         }
     }
 
@@ -39,10 +63,10 @@ impl Context {
         Self { state }
     }
 
-    pub fn spark(_spark_master: &str, spark_settings: HashMap<&str, &str>) -> Self {
-        Self {
-            state: Arc::new(ContextState::new(spark_settings)),
-        }
+    /// Create a DataFrame from an existing set of RecordBatch instances
+    pub fn create_dataframe(&self, batches: &Vec<RecordBatch>) -> Result<DataFrame> {
+        let plan = LogicalPlan::MemoryScan(batches.clone());
+        Ok(DataFrame::from(self.state.clone(), &plan))
     }
 
     pub fn read_csv(
@@ -94,7 +118,7 @@ impl DataFrame {
         Self::from(
             ctx,
             &LogicalPlan::EmptyRelation {
-                schema: Box::new(Schema::empty()),
+                schema: Schema::empty(),
             },
         )
     }
@@ -113,8 +137,8 @@ impl DataFrame {
             ctx,
             &LogicalPlan::FileScan {
                 path: path.to_owned(),
-                schema: Box::new(schema.clone()),
-                projected_schema: Box::new(projected_schema.or(Some(schema.clone())).unwrap()),
+                schema: schema.clone(),
+                projected_schema: projected_schema.or(Some(schema.clone())).unwrap(),
                 projection,
             },
         ))
@@ -137,14 +161,14 @@ impl DataFrame {
             expr.clone()
         };
 
-        let schema = Schema::new(exprlist_to_fields(&projected_expr, input_schema.as_ref())?);
+        let schema = Schema::new(exprlist_to_fields(&projected_expr, input_schema)?);
 
         let df = Self::from(
             self.ctx_state.clone(),
             &LogicalPlan::Projection {
                 expr: projected_expr,
                 input: Box::new(self.plan.clone()),
-                schema: Box::new(schema),
+                schema,
             },
         );
 
@@ -187,7 +211,7 @@ impl DataFrame {
                 input: Box::new(self.plan.clone()),
                 group_expr,
                 aggr_expr,
-                schema: Box::new(aggr_schema),
+                schema: aggr_schema,
             },
         ))
     }
@@ -203,24 +227,41 @@ impl DataFrame {
             plan: self.plan.clone(),
         };
 
-        //TODO should not use spark specific settings to discover executor
-        let host = &self.ctx_state.settings["spark.ballista.host"];
-        let port = &self.ctx_state.settings["spark.ballista.port"];
-
-        ctx.execute_action(host, port.parse::<usize>().unwrap(), action)
-            .await
+        match &self.ctx_state.as_ref() {
+            ContextState::Spark { spark_settings, .. } => {
+                let host = &spark_settings["spark.ballista.host"];
+                let port = &spark_settings["spark.ballista.port"];
+                ctx.execute_action(host, port.parse::<usize>().unwrap(), action)
+                    .await
+            }
+            ContextState::Remote { host, port } => ctx.execute_action(host, *port, action).await,
+            other => Err(BallistaError::NotImplemented(format!(
+                "collect() is not implemented for {:?} yet",
+                other
+            ))),
+        }
     }
 
     pub fn write_csv(&self, _path: &str) -> Result<()> {
-        unimplemented!()
+        match &self.ctx_state.as_ref() {
+            other => Err(BallistaError::NotImplemented(format!(
+                "write_csv() is not implemented for {:?} yet",
+                other
+            ))),
+        }
     }
 
     pub fn write_parquet(&self, _path: &str) -> Result<()> {
-        unimplemented!()
+        match &self.ctx_state.as_ref() {
+            other => Err(BallistaError::NotImplemented(format!(
+                "write_parquet() is not implemented for {:?} yet",
+                other
+            ))),
+        }
     }
 
-    pub fn schema(&self) -> Box<Schema> {
-        unimplemented!()
+    pub fn schema(&self) -> &Schema {
+        self.plan.schema()
     }
 }
 

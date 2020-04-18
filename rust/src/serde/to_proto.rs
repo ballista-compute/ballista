@@ -104,7 +104,7 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
             LogicalPlan::FileScan { path, schema, .. } => {
                 let mut node = empty_plan_node();
 
-                let schema: protobuf::Schema = schema.as_ref().to_owned().try_into()?;
+                let schema: protobuf::Schema = schema.to_owned().try_into()?;
 
                 node.scan = Some(protobuf::ScanNode {
                     path: path.clone(),

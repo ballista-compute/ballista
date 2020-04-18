@@ -21,6 +21,8 @@ use std::sync::Arc;
 
 use arrow::datatypes::{DataType, Field, Schema};
 
+use arrow::record_batch::RecordBatch;
+use datafusion::datasource::MemTable;
 use datafusion::error::{ExecutionError, Result};
 use datafusion::execution::context::ExecutionContext;
 use datafusion::logicalplan::{
@@ -39,7 +41,7 @@ pub enum LogicalPlan {
         /// The incoming logic plan
         input: Box<LogicalPlan>,
         /// The schema description
-        schema: Box<Schema>,
+        schema: Schema,
     },
     /// A Selection (essentially a WHERE clause with a predicate expression)
     Selection {
@@ -57,7 +59,7 @@ pub enum LogicalPlan {
         /// Aggregate expressions
         aggr_expr: Vec<Expr>,
         /// The schema description
-        schema: Box<Schema>,
+        schema: Schema,
     },
     /// Represents a list of sort expressions to be applied to a relation
     Sort {
@@ -66,23 +68,23 @@ pub enum LogicalPlan {
         /// The incoming logic plan
         input: Box<LogicalPlan>,
         /// The schema description
-        schema: Box<Schema>,
+        schema: Schema,
     },
     /// A table scan against a table that has been registered on a context
     FileScan {
         /// The path to the files
         path: String,
         /// The underlying table schema
-        schema: Box<Schema>,
+        schema: Schema,
         /// Optional column indices to use as a projection
         projection: Option<Vec<usize>>,
         /// The projected schema
-        projected_schema: Box<Schema>,
+        projected_schema: Schema,
     },
     /// An empty relation with an empty schema
     EmptyRelation {
         /// The schema description
-        schema: Box<Schema>,
+        schema: Schema,
     },
     /// Represents the maximum number of records to return
     Limit {
@@ -91,13 +93,14 @@ pub enum LogicalPlan {
         /// The logical plan
         input: Box<LogicalPlan>,
         /// The schema description
-        schema: Box<Schema>,
+        schema: Schema,
     },
+    MemoryScan(Vec<RecordBatch>),
 }
 
 impl LogicalPlan {
     /// Get a reference to the logical plan's schema
-    pub fn schema(&self) -> &Box<Schema> {
+    pub fn schema(&self) -> &Schema {
         match self {
             LogicalPlan::EmptyRelation { schema } => &schema,
             LogicalPlan::FileScan {
@@ -108,6 +111,7 @@ impl LogicalPlan {
             LogicalPlan::Aggregate { schema, .. } => &schema,
             LogicalPlan::Sort { schema, .. } => &schema,
             LogicalPlan::Limit { schema, .. } => &schema,
+            LogicalPlan::MemoryScan(batches) => (&batches[0]).schema(),
         }
     }
 }
@@ -122,6 +126,7 @@ impl LogicalPlan {
         }
         match *self {
             LogicalPlan::EmptyRelation { .. } => write!(f, "EmptyRelation"),
+            LogicalPlan::MemoryScan { .. } => write!(f, "MemoryScan"),
             LogicalPlan::FileScan {
                 path: ref table_name,
                 ref projection,
@@ -208,7 +213,7 @@ impl LogicalPlanBuilder {
     /// Create an empty relation
     pub fn empty() -> Self {
         Self::from(&LogicalPlan::EmptyRelation {
-            schema: Box::new(Schema::empty()),
+            schema: Schema::empty(),
         })
     }
 
@@ -219,8 +224,8 @@ impl LogicalPlanBuilder {
             .map(|p| Schema::new(p.iter().map(|i| schema.field(*i).clone()).collect()));
         Ok(Self::from(&LogicalPlan::FileScan {
             path: path.to_owned(),
-            schema: Box::new(schema.clone()),
-            projected_schema: Box::new(projected_schema.or(Some(schema.clone())).unwrap()),
+            schema: schema.clone(),
+            projected_schema: projected_schema.or(Some(schema.clone())).unwrap(),
             projection,
         }))
     }
@@ -242,12 +247,12 @@ impl LogicalPlanBuilder {
             expr.clone()
         };
 
-        let schema = Schema::new(exprlist_to_fields(&projected_expr, input_schema.as_ref())?);
+        let schema = Schema::new(exprlist_to_fields(&projected_expr, input_schema)?);
 
         Ok(Self::from(&LogicalPlan::Projection {
             expr: projected_expr,
             input: Box::new(self.plan.clone()),
-            schema: Box::new(schema),
+            schema: schema,
         }))
     }
 
@@ -288,7 +293,7 @@ impl LogicalPlanBuilder {
             input: Box::new(self.plan.clone()),
             group_expr,
             aggr_expr,
-            schema: Box::new(aggr_schema),
+            schema: aggr_schema,
         }))
     }
 
@@ -906,6 +911,19 @@ fn _get_supertype(l: &DataType, r: &DataType) -> Option<DataType> {
 /// Translate Ballista plan to DataFusion plan
 pub fn translate_plan(ctx: &mut ExecutionContext, plan: &LogicalPlan) -> Result<DFLogicalPlan> {
     match plan {
+        LogicalPlan::MemoryScan(batches) => {
+            let table_name = "df_t0"; //TODO generate unique table name
+            let schema = (&batches[0]).schema().as_ref();
+            let provider = MemTable::new(Arc::new(schema.clone()), batches.clone())?;
+            ctx.register_table(table_name, Box::new(provider));
+            Ok(DFLogicalPlan::TableScan {
+                schema_name: "default".to_owned(),
+                table_name: table_name.to_owned(),
+                table_schema: Arc::new(schema.clone()),
+                projected_schema: Arc::new(schema.clone()),
+                projection: None,
+            })
+        }
         LogicalPlan::FileScan {
             path,
             schema,
@@ -915,13 +933,13 @@ pub fn translate_plan(ctx: &mut ExecutionContext, plan: &LogicalPlan) -> Result<
             //TODO generate unique table name
             let table_name = "tbd".to_owned();
 
-            ctx.register_csv(&table_name, path.as_str(), schema.as_ref(), true);
+            ctx.register_csv(&table_name, path.as_str(), schema, true);
 
             Ok(DFLogicalPlan::TableScan {
                 schema_name: "default".to_owned(),
                 table_name: table_name.clone(),
-                table_schema: Arc::new(schema.as_ref().clone()),
-                projected_schema: Arc::new(projected_schema.as_ref().clone()),
+                table_schema: Arc::new(schema.clone()),
+                projected_schema: Arc::new(projected_schema.clone()),
                 projection: projection.clone(),
             })
         }
@@ -935,7 +953,7 @@ pub fn translate_plan(ctx: &mut ExecutionContext, plan: &LogicalPlan) -> Result<
                 .map(|e| translate_expr(e))
                 .collect::<Result<Vec<_>>>()?,
             input: Arc::new(translate_plan(ctx, input)?),
-            schema: Arc::new(schema.as_ref().clone()),
+            schema: Arc::new(schema.clone()),
         }),
         LogicalPlan::Selection { expr, input } => Ok(DFLogicalPlan::Selection {
             expr: translate_expr(expr)?,
@@ -956,7 +974,7 @@ pub fn translate_plan(ctx: &mut ExecutionContext, plan: &LogicalPlan) -> Result<
                 .map(|e| translate_expr(e))
                 .collect::<Result<Vec<_>>>()?,
             input: Arc::new(translate_plan(ctx, input)?),
-            schema: Arc::new(schema.as_ref().clone()),
+            schema: Arc::new(schema.clone()),
         }),
         other => Err(ExecutionError::General(format!(
             "Cannot translate operator to DataFusion: {:?}",

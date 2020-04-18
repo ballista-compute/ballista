@@ -1,4 +1,4 @@
-# Ballista Example: Parallel Aggregate Query in Rust
+# Parallel Aggregate Query in Rust
 
 *NOTE: this is a work-in-progress and is not functional yet*
 

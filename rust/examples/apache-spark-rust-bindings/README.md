@@ -9,7 +9,9 @@ See the top-level [Ballista README](../../../README.md) for an overview of the B
 - The executor translates the query plan into a Spark query and executes it
 - Results are returned to the client via Apache Arrow Flight protocol
 
-## Example
+## Rust Client
+
+The Rust client uses the Ballista DataFrame API to define a logical query plan. In this example the query is a simple aggregate query against a CSV file.
 
 ```rust
 let spark_master = "local[*]";
@@ -26,8 +28,10 @@ let ctx = Context::spark(spark_master, spark_settings);
 let path = "/mnt/nyctaxi/csv/yellow/2019/yellow_tripdata_2019-01.csv";
 
 let df = ctx
-    .read_csv(path, Some(nyctaxi_schema()), None, true)?
-    .aggregate(vec![col("passenger_count")], vec![min(col("fare_amount")), max(col("fare_amount"))])?;
+  .read_csv(path, Some(nyctaxi_schema()), None, true)?
+  .aggregate(
+     vec![col("passenger_count")], 
+     vec![min(col("fare_amount")), max(col("fare_amount"))])?;
 
 // print the query plan
 df.explain();
@@ -39,39 +43,36 @@ let results = df.collect().await?;
 utils::print_batches(&results)?;
 ```
 
-## Output
-
-Rust Client:
+The Rust client produces the following output:
 
 ```
-Aggregate: groupBy=[[#passenger_count]], aggr=[[MAX(#fare_amount)]]
+Aggregate: groupBy=[[#passenger_count]], aggr=[[MIN(#fare_amount), MAX(#fare_amount)]]
   TableScan: /mnt/nyctaxi/csv/yellow/2019/yellow_tripdata_2019-01.csv projection=None
-+-----------------+-------------+
-| passenger_count | MAX         |
-+-----------------+-------------+
-| 7               | 78          |
-| 3               | 99.75       |
-| 8               | 9           |
-| 0               | 99          |
-| 5               | 99.5        |
-| 6               | 98          |
-| 9               | 92          |
-| 1               | 99.99       |
-| 4               | 99          |
-| 2               | 99.75       |
-+-----------------+-------------+
++-----------------+-------+-----------+
+| passenger_count | MIN   | MAX       |
++-----------------+-------+-----------+
+| 1               | -362  | 623259.86 |
+| 6               | -52   | 262.5     |
+| 3               | -100  | 350       |
+| 5               | -52   | 760       |
+| 9               | 9     | 92        |
+| 4               | -52   | 500       |
+| 8               | 7     | 87        |
+| 7               | -75   | 78        |
+| 2               | -320  | 492.5     |
+| 0               | -52.5 | 36090.3   |
++-----------------+-------+-----------+
 ```
 
-Spark Executor:
+## Spark Executor
+
+The Ballista Spark Executor receives the protobuf-encoded logical query plan and translates it into the following Spark execution plan.
 
 ```
 == Physical Plan ==
-SortAggregate(key=[passenger_count#3], functions=[max(fare_amount#10)])
-+- *(2) Sort [passenger_count#3 ASC NULLS FIRST], false, 0
-   +- Exchange hashpartitioning(passenger_count#3, 200), true, [id=#23]
-      +- SortAggregate(key=[passenger_count#3], functions=[partial_max(fare_amount#10)])
-         +- *(1) Sort [passenger_count#3 ASC NULLS FIRST], false, 0
-            +- *(1) Project [passenger_count#3, fare_amount#10]
-               +- BatchScan[passenger_count#3, fare_amount#10] CSVScan Location: InMemoryFileIndex[file:/mnt/nyctaxi/csv/yellow/2019/yellow_tripdata_2019-01.csv], ReadSchema: struct<passenger_count:string,fare_amount:string>
-
+*(2) HashAggregate(keys=[passenger_count#3], functions=[min(fare_amount#10), max(fare_amount#10)])
++- Exchange hashpartitioning(passenger_count#3, 200), true, [id=#18]
+   +- *(1) HashAggregate(keys=[passenger_count#3], functions=[partial_min(fare_amount#10), partial_max(fare_amount#10)])
+      +- *(1) Project [passenger_count#3, fare_amount#10]
+         +- BatchScan[passenger_count#3, fare_amount#10] CSVScan Location: InMemoryFileIndex[file:/mnt/nyctaxi/csv/yellow/2019/yellow_tripdata_2019-01.csv], ReadSchema: struct<passenger_count:int,fare_amount:double>
 ```

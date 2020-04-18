@@ -46,15 +46,25 @@ class BallistaSparkContext(spark: SparkSession) {
       case a: ballista.Aggregate =>
         val df = createDataFrame(a.getInput, input)
         val groupExpr = a.getGroupExpr.asScala.map(e => createExpression(e, df))
+        val dfGrouped = df.groupBy(groupExpr: _*)
 
         // this assumes simple aggregate expressions of the form aggr_expr(field_expr)
-        val aggrMap: Map[String, String]  = a.getAggregateExpr.asScala.map { aggr =>
-          val aggrFunction = aggr.getName.toLowerCase
+        val aggrExpr = a.getAggregateExpr.asScala.map { aggr =>
           val fieldName = aggr.getExpr.toField(a.getInput).getName
-          fieldName -> aggrFunction
-        }.toMap
+          val aggrFunction = aggr.getName.toLowerCase
+          aggrFunction match {
+            case "min" => min(col(fieldName))
+            case "max" => max(col(fieldName))
+            case "sum" => max(col(fieldName))
+            case "avg" => max(col(fieldName))
+          }
+        }
 
-        df.groupBy(groupExpr: _*).agg(aggrMap)
+        if (aggrExpr.length == 1) {
+          dfGrouped.agg(aggrExpr.head)
+        } else {
+          dfGrouped.agg(aggrExpr.head, aggrExpr.tail: _*)
+        }
 
       case other =>
         throw new UnsupportedOperationException(s"Ballista logical plan step can not be converted to Spark: $other")

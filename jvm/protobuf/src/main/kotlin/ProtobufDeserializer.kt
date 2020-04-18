@@ -73,15 +73,23 @@ class ProtobufDeserializer {
         val arrowFields = schema.columnsList.map {
 
             //TODO add all types
-            val dt = when (it.arrowType) {
-                ArrowType.UTF8 -> ArrowTypes.StringType
-                ArrowType.INT32 -> ArrowTypes.Int32Type
-                ArrowType.INT64 -> ArrowTypes.Int64Type
-                ArrowType.UINT32 -> ArrowTypes.UInt32Type
-                ArrowType.UINT64 -> ArrowTypes.UInt64Type
-                ArrowType.HALF_FLOAT -> ArrowTypes.FloatType
-                ArrowType.FLOAT -> ArrowTypes.DoubleType
-                else -> TODO()
+            val dt = when (it.arrowTypeValue) {
+                ArrowType.UTF8_VALUE -> ArrowTypes.StringType
+
+                ArrowType.INT8_VALUE -> ArrowTypes.Int8Type
+                ArrowType.INT16_VALUE -> ArrowTypes.Int16Type
+                ArrowType.INT32_VALUE -> ArrowTypes.Int32Type
+                ArrowType.INT64_VALUE -> ArrowTypes.Int64Type
+
+                ArrowType.UINT8_VALUE -> ArrowTypes.UInt8Type
+                ArrowType.UINT16_VALUE -> ArrowTypes.UInt16Type
+                ArrowType.UINT32_VALUE -> ArrowTypes.UInt32Type
+                ArrowType.UINT64_VALUE -> ArrowTypes.UInt64Type
+
+                ArrowType.FLOAT_VALUE -> ArrowTypes.FloatType
+                ArrowType.DOUBLE_VALUE -> ArrowTypes.DoubleType
+
+                else -> throw IllegalStateException("Failed to parse Arrow data type enum from protobuf: ${it.arrowTypeValue}")
             }
 
             val fieldType = org.apache.arrow.vector.types.pojo.FieldType(true, dt, null)

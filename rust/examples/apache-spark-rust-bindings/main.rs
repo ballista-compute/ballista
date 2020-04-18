@@ -47,7 +47,7 @@ fn nyctaxi_schema() -> Schema {
         Field::new("VendorID", DataType::Utf8, true),
         Field::new("tpep_pickup_datetime", DataType::Utf8, true),
         Field::new("tpep_dropoff_datetime", DataType::Utf8, true),
-        Field::new("passenger_count", DataType::UInt32, true),
+        Field::new("passenger_count", DataType::Int32, true),
         Field::new("trip_distance", DataType::Utf8, true),
         Field::new("RatecodeID", DataType::Utf8, true),
         Field::new("store_and_fwd_flag", DataType::Utf8, true),

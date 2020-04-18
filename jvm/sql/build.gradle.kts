@@ -15,6 +15,7 @@ publishing {
 }
 
 dependencies {
+    implementation(project(":datatypes"))
     implementation(project(":datasource"))
     implementation(project(":logical-plan"))
 

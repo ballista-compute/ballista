@@ -1,7 +1,7 @@
 package org.ballistacompute.datasource
 
-import org.apache.arrow.vector.types.pojo.Schema
 import org.ballistacompute.datatypes.RecordBatch
+import org.ballistacompute.datatypes.Schema
 
 class InMemoryDataSource(val schema: Schema, val data: List<RecordBatch>): DataSource {
 

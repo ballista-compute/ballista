@@ -1,27 +1,23 @@
 package org.ballistacompute.datasource
 
-import org.ballistacompute.datatypes.RecordBatch
-
 import org.apache.arrow.memory.RootAllocator
-import org.apache.arrow.vector.IntVector
 import org.apache.arrow.vector.VectorSchemaRoot
-import org.apache.arrow.vector.types.pojo.Schema
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.arrow.schema.SchemaConverter
-import org.apache.parquet.example.data.Group
-import org.apache.parquet.example.data.simple.convert.GroupRecordConverter
 import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.hadoop.util.HadoopInputFile
-import org.apache.parquet.io.ColumnIOFactory
-import org.apache.parquet.io.RecordReader
 import org.ballistacompute.datatypes.ArrowFieldVector
+import org.ballistacompute.datatypes.Field
+import org.ballistacompute.datatypes.RecordBatch
+import org.ballistacompute.datatypes.Schema
 
 class ParquetDataSource(private val filename: String) : DataSource {
 
     override fun schema(): Schema {
         return ParquetScan(filename, listOf()).use {
-            SchemaConverter().fromParquet(it.schema).arrowSchema
+            val arrowSchema = SchemaConverter().fromParquet(it.schema).arrowSchema
+            org.ballistacompute.datatypes.SchemaConverter.fromArrow(arrowSchema)
         }
     }
 
@@ -54,7 +50,7 @@ class ParquetIterator(private val reader: ParquetFileReader, private val project
 
     val arrowSchema = SchemaConverter().fromParquet(schema).arrowSchema
 
-    val projectedArrowSchema = Schema(projectedColumns.map { name -> arrowSchema.fields.find { it.name == name } })
+    val projectedArrowSchema = org.apache.arrow.vector.types.pojo.Schema(projectedColumns.map { name -> arrowSchema.fields.find { it.name == name } })
 
     var batch: RecordBatch? = null
 
@@ -86,7 +82,9 @@ class ParquetIterator(private val reader: ParquetFileReader, private val project
         root.allocateNew()
         root.rowCount = rows
 
-        batch = RecordBatch(projectedArrowSchema, root.fieldVectors.map { ArrowFieldVector(it) })
+        val ballistaSchema = org.ballistacompute.datatypes.SchemaConverter.fromArrow(projectedArrowSchema)
+
+        batch = RecordBatch(ballistaSchema, root.fieldVectors.map { ArrowFieldVector(it) })
 
         //TODO we really want to read directly as columns not rows
 //        val columnIO = ColumnIOFactory().getColumnIO(schema)

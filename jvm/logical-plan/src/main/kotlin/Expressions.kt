@@ -1,8 +1,8 @@
 package org.ballistacompute.logical
 
-import org.apache.arrow.vector.types.FloatingPointPrecision
 import org.apache.arrow.vector.types.pojo.ArrowType
-import org.apache.arrow.vector.types.pojo.Field
+import org.ballistacompute.datatypes.ArrowTypes
+import org.ballistacompute.datatypes.Field
 import java.sql.SQLException
 
 /**
@@ -47,7 +47,7 @@ class ColumnIndex(val i: Int): LogicalExpr {
 class LiteralString(val str: String): LogicalExpr {
 
     override fun toField(input: LogicalPlan): Field {
-        return Field.nullable(str, ArrowType.Utf8())
+        return Field(str, ArrowType.Utf8())
     }
 
     override fun toString(): String {
@@ -65,7 +65,7 @@ fun lit(value: String) = LiteralString(value)
 class LiteralLong(val n: Long): LogicalExpr {
 
     override fun toField(input: LogicalPlan): Field {
-        return Field.nullable(n.toString(), ArrowType.Int(32, false))
+        return Field(n.toString(), ArrowTypes.Int64Type)
     }
 
     override fun toString(): String {
@@ -83,7 +83,7 @@ fun lit(value: Long) = LiteralLong(value)
 class LiteralDouble(val n: Double): LogicalExpr {
 
     override fun toField(input: LogicalPlan): Field {
-        return Field.nullable(n.toString(), ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE))
+        return Field(n.toString(), ArrowTypes.DoubleType)
     }
 
     override fun toString(): String {
@@ -97,7 +97,7 @@ fun lit(value: Double) = LiteralDouble(value)
 
 class CastExpr(val expr: LogicalExpr, val dataType: ArrowType) : LogicalExpr {
     override fun toField(input: LogicalPlan): Field {
-        return Field.nullable(expr.toField(input).name, dataType)
+        return Field(expr.toField(input).name, dataType)
     }
 
     override fun toString(): String {
@@ -130,7 +130,7 @@ abstract class UnaryExpr(val name: String,
 class Not(expr: LogicalExpr): UnaryExpr("not", "NOT", expr) {
 
     override fun toField(input: LogicalPlan): Field {
-        return Field.nullablePrimitive(name, ArrowType.Bool())
+        return Field(name, ArrowTypes.BooleanType)
     }
 
 }
@@ -142,7 +142,7 @@ abstract class BooleanBinaryExpr(name: String,
                                  r: LogicalExpr) : BinaryExpr(name, op, l, r) {
 
     override fun toField(input: LogicalPlan): Field {
-        return Field.nullablePrimitive(name, ArrowType.Bool())
+        return Field(name, ArrowTypes.BooleanType)
     }
 
 }
@@ -195,7 +195,7 @@ abstract class MathExpr(name: String,
                         r: LogicalExpr) : BinaryExpr(name, op, l, r) {
 
     override fun toField(input: LogicalPlan): Field {
-        return Field.nullablePrimitive("mult", l.toField(input).type as ArrowType.PrimitiveType)
+        return Field("mult", l.toField(input).dataType)
     }
 
 }
@@ -235,7 +235,7 @@ infix fun LogicalExpr.mod(rhs: LogicalExpr): LogicalExpr {
 /** Aliased expression e.g. `expr AS alias`. */
 class Alias(val expr: LogicalExpr, val alias: String) : LogicalExpr {
     override fun toField(input: LogicalPlan): Field {
-        return Field.nullable(alias, expr.toField(input).type)
+        return Field(alias, expr.toField(input).dataType)
     }
 
     override fun toString(): String {
@@ -251,7 +251,7 @@ infix fun LogicalExpr.alias(alias: String) : Alias {
 /** Scalar function */
 class ScalarFunction(val name: String, val args: List<LogicalExpr>, val returnType: ArrowType ) : LogicalExpr {
     override fun toField(input: LogicalPlan): Field {
-        return Field.nullable(name, returnType)
+        return Field(name, returnType)
     }
 
     override fun toString(): String {
@@ -263,7 +263,7 @@ class ScalarFunction(val name: String, val args: List<LogicalExpr>, val returnTy
 abstract class AggregateExpr(val name: String, val expr: LogicalExpr) : LogicalExpr {
 
     override fun toField(input: LogicalPlan): Field {
-        return Field.nullable(name, expr.toField(input).type)
+        return Field(name, expr.toField(input).dataType)
     }
 
     override fun toString(): String {
@@ -295,7 +295,7 @@ class Avg(input: LogicalExpr) : AggregateExpr("AVG", input)
 class Count(input: LogicalExpr) : AggregateExpr("COUNT", input) {
 
     override fun toField(input: LogicalPlan): Field {
-        return Field.nullable("COUNT", ArrowType.Int(32, false))
+        return Field("COUNT", ArrowType.Int(32, false))
     }
 
     override fun toString(): String {
@@ -307,7 +307,7 @@ class Count(input: LogicalExpr) : AggregateExpr("COUNT", input) {
 class CountDistinct(input: LogicalExpr) : AggregateExpr("COUNT DISTINCT", input) {
 
     override fun toField(input: LogicalPlan): Field {
-        return Field.nullable("COUNT_DISTINCT", ArrowType.Int(32, false))
+        return Field("COUNT_DISTINCT", ArrowType.Int(32, false))
     }
 
     override fun toString(): String {

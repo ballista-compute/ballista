@@ -1,6 +1,6 @@
 package org.ballistacompute.logical
 
-import org.apache.arrow.vector.types.pojo.Field
+import org.ballistacompute.datatypes.Field
 
 /**
  * Logical Expression for use in logical query plans. The logical expression provides information needed

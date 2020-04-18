@@ -1,6 +1,6 @@
 package org.ballistacompute.planner
 
-import org.apache.arrow.vector.types.pojo.Schema
+import org.ballistacompute.datatypes.Schema
 import org.ballistacompute.logical.*
 import org.ballistacompute.physical.*
 import org.ballistacompute.physical.expressions.*

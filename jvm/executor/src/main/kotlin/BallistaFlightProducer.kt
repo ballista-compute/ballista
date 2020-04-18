@@ -28,7 +28,7 @@ class BallistaFlightProducer : FlightProducer {
             println(schema)
 
             val allocator = RootAllocator(Long.MAX_VALUE)
-            val root = VectorSchemaRoot.create(schema, allocator)
+            val root = VectorSchemaRoot.create(schema.toArrow(), allocator)
 
             val results = ctx.execute(logicalPlan)
             listener.start(root, null)

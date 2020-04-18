@@ -1,7 +1,7 @@
 package org.ballistacompute.logical
 
 import org.ballistacompute.datasource.CsvDataSource
-import org.apache.arrow.vector.types.pojo.ArrowType
+import org.ballistacompute.datatypes.ArrowTypes
 import org.junit.Test
 import org.junit.jupiter.api.TestInstance
 import java.io.File
@@ -17,7 +17,7 @@ class LogicalPlanTest {
     @Test
     fun `build logicalPlan manually`() {
         // create a plan to represent the data source
-        val csv = CsvDataSource(employeeCsv, 10)
+        val csv = CsvDataSource(employeeCsv, null, 10)
         // create a plan to represent the scan of the data source (FROM)
         val scan = Scan("employee", csv, listOf())
         // create a plan to represent the selection (WHERE)
@@ -37,7 +37,7 @@ class LogicalPlanTest {
     fun `build logicalPlan nested`() {
         val plan = Projection(
                 Selection(
-                        Scan("employee", CsvDataSource(employeeCsv, 10), listOf()),
+                        Scan("employee", CsvDataSource(employeeCsv, null, 10), listOf()),
                         Eq(col("state"), LiteralString("CO"))
                 ),
                 listOf(col("id"), col("first_name"), col("last_name"))
@@ -52,13 +52,13 @@ class LogicalPlanTest {
     @Test
     fun `build aggregate plan`() {
         // create a plan to represent the data source
-        val csv = CsvDataSource(employeeCsv, 10)
+        val csv = CsvDataSource(employeeCsv, null, 10)
 
         // create a plan to represent the scan of the data source (FROM)
         val scan = Scan("employee", csv, listOf())
 
         val groupExpr = listOf(col("state"))
-        val aggregateExpr = listOf(Max(cast(col("salary"), ArrowType.Int(32, true))))
+        val aggregateExpr = listOf(Max(cast(col("salary"), ArrowTypes.Int32Type)))
         val plan = Aggregate(scan, groupExpr, aggregateExpr)
 
         assertEquals(

@@ -1,6 +1,7 @@
 package org.ballistacompute.physical
 
 import org.ballistacompute.datatypes.RecordBatch
+import org.ballistacompute.datatypes.Schema
 import org.ballistacompute.datatypes.ColumnVector
 import org.ballistacompute.datatypes.ArrowFieldVector
 import org.ballistacompute.datatypes.ArrowVectorBuilder
@@ -9,7 +10,6 @@ import org.apache.arrow.memory.RootAllocator
 import org.apache.arrow.vector.BitVector
 import org.apache.arrow.vector.FieldVector
 import org.apache.arrow.vector.VarCharVector
-import org.apache.arrow.vector.types.pojo.Schema
 import org.ballistacompute.physical.expressions.Expression
 
 /**

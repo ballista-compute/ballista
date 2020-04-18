@@ -1,40 +1,32 @@
 package org.ballistacompute.datasource
 
-import org.ballistacompute.datatypes.RecordBatch
-
 import org.apache.arrow.memory.RootAllocator
+import org.apache.arrow.vector.Float4Vector
+import org.apache.arrow.vector.Float8Vector
 import org.apache.arrow.vector.VarCharVector
 import org.apache.arrow.vector.VectorSchemaRoot
-import org.apache.arrow.vector.types.pojo.ArrowType
-import org.apache.arrow.vector.types.pojo.Field
-import org.apache.arrow.vector.types.pojo.Schema
-import org.ballistacompute.datatypes.ArrowFieldVector
+import org.ballistacompute.datatypes.*
 import java.io.BufferedReader
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileReader
+import java.lang.IllegalStateException
 import java.util.logging.Logger
 
 /**
- * Simple CSV data source that assumes that the first line contains field names and that all values are strings.
+ * Simple CSV data source. If no schema is provided then it assumes that the first line contains field names and that all values are strings.
  *
  * Note that this implementation loads the entire CSV file into memory so is not scalable. I plan on implementing
  * a streaming version later on.
  */
-class CsvDataSource(val filename: String, private val batchSize: Int) : DataSource {
+class CsvDataSource(val filename: String, val schema: Schema?, private val batchSize: Int) : DataSource {
 
     private val logger = Logger.getLogger(CsvDataSource::class.simpleName)
 
+    private val _schema = schema ?: inferSchema()
+
     override fun schema(): Schema {
-        logger.fine("schema()")
-        val file = File(filename)
-        if (!file.exists()) {
-            throw FileNotFoundException(file.absolutePath)
-        }
-        val b = BufferedReader(FileReader(file))
-        val header = b.readLine().split(",")
-        val schema = Schema(header.map { Field.nullable(it, ArrowType.Utf8()) })
-        return schema
+        return _schema
     }
 
     override fun scan(projection: List<String>): Sequence<RecordBatch> {
@@ -46,7 +38,7 @@ class CsvDataSource(val filename: String, private val batchSize: Int) : DataSour
         }
         val b = BufferedReader(FileReader(file))
         val header = b.readLine().split(",")
-        val fileColumns = header.map { Field.nullable(it, ArrowType.Utf8()) }.toList()
+        val fileColumns = header.map { Field(it, ArrowTypes.StringType) }.toList()
 
         val projectionIndices = projection.map { name -> fileColumns.indexOfFirst { it.name == name } }
 
@@ -56,6 +48,18 @@ class CsvDataSource(val filename: String, private val batchSize: Int) : DataSour
         }
 
         return ReaderAsSequence(schema, projectionIndices, b, batchSize)
+    }
+
+    private fun inferSchema(): Schema {
+        logger.fine("inferSchema()")
+        val file = File(filename)
+        if (!file.exists()) {
+            throw FileNotFoundException(file.absolutePath)
+        }
+        val b = BufferedReader(FileReader(file))
+        val header = b.readLine().split(",")
+        val schema = Schema(header.map { Field(it, ArrowTypes.StringType) })
+        return schema
     }
 
 }
@@ -109,22 +113,30 @@ class ReaderIterator(private val schema: Schema,
     private fun createBatch(rows: List<List<String>>) : RecordBatch {
         logger.fine("createBatch() rows=$rows")
 
-        val root = VectorSchemaRoot.create(schema, RootAllocator(Long.MAX_VALUE))
+        val root = VectorSchemaRoot.create(schema.toArrow(), RootAllocator(Long.MAX_VALUE))
         root.rowCount = rows.size
         root.allocateNew()
 
         root.fieldVectors.withIndex().forEach { field ->
             val vector = field.value
+            //TODO null handling
             when (vector) {
                 is VarCharVector -> rows.withIndex().forEach { row ->
                     val value = row.value[field.index]
                     vector.set(row.index, value.toByteArray())
                 }
-                else -> TODO()
+                is Float4Vector -> rows.withIndex().forEach { row ->
+                    val value = row.value[field.index].toFloat()
+                    vector.set(row.index, value)
+                }
+                is Float8Vector -> rows.withIndex().forEach { row ->
+                    val value = row.value[field.index].toDouble()
+                    vector.set(row.index, value)
+                }
+                else -> throw IllegalStateException("No support for reading CSV columns with data type $vector")
             }
             field.value.valueCount = rows.size
         }
-
 
         val batch = RecordBatch(schema, root.fieldVectors.map { ArrowFieldVector(it) })
 

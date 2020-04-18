@@ -27,7 +27,7 @@ let path = "/mnt/nyctaxi/csv/yellow/2019/yellow_tripdata_2019-01.csv";
 
 let df = ctx
     .read_csv(path, Some(nyctaxi_schema()), None, true)?
-    .aggregate(vec![col("passenger_count")], vec![max(col("fare_amount"))])?;
+    .aggregate(vec![col("passenger_count")], vec![min(col("fare_amount")), max(col("fare_amount"))])?;
 
 // print the query plan
 df.explain();

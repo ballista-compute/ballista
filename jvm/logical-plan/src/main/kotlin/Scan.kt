@@ -1,7 +1,7 @@
 package org.ballistacompute.logical
 
 import org.ballistacompute.datasource.DataSource
-import org.apache.arrow.vector.types.pojo.Schema
+import org.ballistacompute.datatypes.Schema
 
 /** Represents a scan of a data source */
 class Scan(val path: String, val dataSource: DataSource, val projection: List<String>): LogicalPlan {
@@ -17,8 +17,7 @@ class Scan(val path: String, val dataSource: DataSource, val projection: List<St
         if (projection.isEmpty()) {
             return schema
         } else {
-            val fields = projection.map { name -> schema.fields.findLast { it.name == name } }
-            return Schema(fields)
+            return schema.select(projection)
         }
     }
 

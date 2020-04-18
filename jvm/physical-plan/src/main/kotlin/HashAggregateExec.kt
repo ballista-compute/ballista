@@ -6,7 +6,7 @@ import org.ballistacompute.datatypes.ArrowVectorBuilder
 
 import org.apache.arrow.memory.RootAllocator
 import org.apache.arrow.vector.VectorSchemaRoot
-import org.apache.arrow.vector.types.pojo.Schema
+import org.ballistacompute.datatypes.Schema
 import org.ballistacompute.physical.expressions.Accumulator
 import org.ballistacompute.physical.expressions.AggregateExpression
 import org.ballistacompute.physical.expressions.Expression
@@ -65,7 +65,7 @@ class HashAggregateExec(val input: PhysicalPlan,
             }
         }
 
-        val root = VectorSchemaRoot.create(schema, RootAllocator(Long.MAX_VALUE))
+        val root = VectorSchemaRoot.create(schema.toArrow(), RootAllocator(Long.MAX_VALUE))
         root.allocateNew()
         root.rowCount = map.size
 

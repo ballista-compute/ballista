@@ -1,6 +1,7 @@
 package org.ballistacompute.protobuf
 
 import org.ballistacompute.datasource.CsvDataSource
+import org.ballistacompute.datatypes.ArrowTypes
 import org.ballistacompute.logical.*
 import java.lang.RuntimeException
 
@@ -8,7 +9,8 @@ class ProtobufDeserializer {
 
     fun fromProto(node: LogicalPlanNode): LogicalPlan {
         return if (node.hasScan()) {
-            val ds = CsvDataSource(node.scan.path, 1024)
+            val schema = fromProto(node.scan.schema)
+            val ds = CsvDataSource(node.scan.path, schema,1024)
             Scan(node.scan.path, ds, node.scan.projectionList.asByteStringList().map { it.toString() })
         } else if (node.hasSelection()) {
             Selection(fromProto(node.input),
@@ -64,5 +66,28 @@ class ProtobufDeserializer {
         } else {
             throw RuntimeException("Failed to parse logical expression: $node")
         }
+    }
+
+    fun fromProto(schema: Schema): org.ballistacompute.datatypes.Schema {
+
+        val arrowFields = schema.columnsList.map {
+
+            //TODO add all types
+            val dt = when (it.arrowType) {
+                ArrowType.UTF8 -> ArrowTypes.StringType
+                ArrowType.INT32 -> ArrowTypes.Int32Type
+                ArrowType.INT64 -> ArrowTypes.Int64Type
+                ArrowType.UINT32 -> ArrowTypes.UInt32Type
+                ArrowType.UINT64 -> ArrowTypes.UInt64Type
+                ArrowType.HALF_FLOAT -> ArrowTypes.FloatType
+                ArrowType.FLOAT -> ArrowTypes.DoubleType
+                else -> TODO()
+            }
+
+            val fieldType = org.apache.arrow.vector.types.pojo.FieldType(true, dt, null)
+            org.apache.arrow.vector.types.pojo.Field(it.name, fieldType, listOf())
+        }
+
+        return org.ballistacompute.datatypes.SchemaConverter.fromArrow(org.apache.arrow.vector.types.pojo.Schema(arrowFields))
     }
 }

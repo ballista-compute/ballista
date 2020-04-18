@@ -16,18 +16,7 @@ class ParquetDataSourceTest {
     @Test
     fun `read parquet schema`() {
         val parquet = ParquetDataSource(File(dir, "alltypes_plain.parquet").absolutePath)
-        assertEquals("Schema<" +
-                "id: Int(32, true), " +
-                "bool_col: Bool, " +
-                "tinyint_col: Int(32, true), " +
-                "smallint_col: Int(32, true), " +
-                "int_col: Int(32, true), " +
-                "bigint_col: Int(64, true), " +
-                "float_col: FloatingPoint(SINGLE), " +
-                "double_col: FloatingPoint(DOUBLE), " +
-                "date_string_col: Binary, " +
-                "string_col: Binary, " +
-                "timestamp_col: Binary>", parquet.schema().toString())
+        assertEquals("Schema(fields=[Field(name=id, dataType=Int(32, true)), Field(name=bool_col, dataType=Bool), Field(name=tinyint_col, dataType=Int(32, true)), Field(name=smallint_col, dataType=Int(32, true)), Field(name=int_col, dataType=Int(32, true)), Field(name=bigint_col, dataType=Int(64, true)), Field(name=float_col, dataType=FloatingPoint(SINGLE)), Field(name=double_col, dataType=FloatingPoint(DOUBLE)), Field(name=date_string_col, dataType=Binary), Field(name=string_col, dataType=Binary), Field(name=timestamp_col, dataType=Binary)])", parquet.schema().toString())
     }
 
     @Test

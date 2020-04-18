@@ -1,7 +1,6 @@
 package org.ballistacompute.logical
 
-import org.apache.arrow.vector.types.pojo.Schema
-
+import org.ballistacompute.datatypes.Schema
 
 /**
  * A logical plan represents a data transformation or action that returns a relation (a set of tuples).

@@ -62,6 +62,6 @@ class OptimizerTest {
 
     private fun csv() : DataFrame {
         val employeeCsv = "../testdata/employee.csv"
-        return DataFrameImpl(Scan("employee", CsvDataSource(employeeCsv, 1024), listOf()))
+        return DataFrameImpl(Scan("employee", CsvDataSource(employeeCsv, null, 1024), listOf()))
     }
 }

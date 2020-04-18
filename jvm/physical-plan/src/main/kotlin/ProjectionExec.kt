@@ -1,8 +1,8 @@
 package org.ballistacompute.physical
 
 import org.ballistacompute.datatypes.RecordBatch
+import org.ballistacompute.datatypes.Schema
 
-import org.apache.arrow.vector.types.pojo.Schema
 import org.ballistacompute.physical.expressions.Expression
 
 /**

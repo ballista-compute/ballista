@@ -196,7 +196,11 @@ impl TryInto<protobuf::LogicalExprNode> for Expr {
                 let mut expr = empty_expr_node();
 
                 let aggr_function = match name.as_str() {
+                    "MIN" => Ok(0), // TODO use protobuf enum
                     "MAX" => Ok(1), // TODO use protobuf enum
+                    "SUM" => Ok(2), // TODO use protobuf enum
+                    "AVG" => Ok(3), // TODO use protobuf enum
+                    "COUNT" => Ok(4), // TODO use protobuf enum
                     other => Err(BallistaError::NotImplemented(format!(
                         "Aggregate function {:?}",
                         other

@@ -1,12 +1,7 @@
 package org.ballistacompute.physical
 
-import org.apache.arrow.vector.types.pojo.Schema
 import org.ballistacompute.datatypes.RecordBatch
-import org.ballistacompute.datatypes.ColumnVector
-import org.ballistacompute.datatypes.ArrowFieldVector
-import org.ballistacompute.datatypes.LiteralValueVector
-import org.ballistacompute.datatypes.ArrowVectorBuilder
-import org.ballistacompute.logical.LogicalPlan
+import org.ballistacompute.datatypes.Schema
 
 
 /**

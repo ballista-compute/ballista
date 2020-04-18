@@ -27,7 +27,7 @@ class ExecutionContext(val batchSize: Int = 1024) {
 
     /** Get a DataFrame representing the specified CSV file */
     fun csv(filename: String): DataFrame {
-        return DataFrameImpl(Scan(filename, CsvDataSource(filename, batchSize), listOf()))
+        return DataFrameImpl(Scan(filename, CsvDataSource(filename, null, batchSize), listOf()))
     }
 
     /** Register a DataFrame with the context */

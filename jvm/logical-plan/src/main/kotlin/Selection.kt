@@ -1,6 +1,6 @@
 package org.ballistacompute.logical
 
-import org.apache.arrow.vector.types.pojo.Schema
+import org.ballistacompute.datatypes.Schema
 
 /**
  * Logical plan representing a selection (a.k.a. filter) against an input

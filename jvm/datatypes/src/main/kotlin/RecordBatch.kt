@@ -1,9 +1,5 @@
 package org.ballistacompute.datatypes
 
-import org.apache.arrow.vector.VarCharVector
-import org.apache.arrow.vector.VectorSchemaRoot
-import org.apache.arrow.vector.types.pojo.Schema
-
 /**
  * Batch of data organized in columns.
  */

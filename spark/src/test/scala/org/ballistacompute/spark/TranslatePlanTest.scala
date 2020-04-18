@@ -22,7 +22,7 @@ class TranslatePlanTest {
 
     val projection = List[String]().asJava
 
-    val plan = new ballista.DataFrameImpl(new ballista.Scan(filename, new CsvDataSource(filename, 1024), projection))
+    val plan = new ballista.DataFrameImpl(new ballista.Scan(filename, new CsvDataSource(filename, null, 1024), projection))
       .filter(new ballista.Eq(new ballista.Column("_c0"), new ballista.LiteralString("foo")))
       .project(List[ballista.LogicalExpr](new ballista.Column("_c1")).asJava)
       .logicalPlan()

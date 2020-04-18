@@ -17,7 +17,7 @@ class BallistaSparkContext(spark: SparkSession) {
       case s: ballista.Scan =>
         assert(input.isEmpty)
 
-        val sparkSchema = ArrowUtils.fromArrowSchema(s.schema())
+        val sparkSchema = ArrowUtils.fromArrowSchema(s.schema().toArrow())
 
         val df = spark.read
           .format("csv")

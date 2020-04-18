@@ -36,7 +36,7 @@ class SparkFlightProducer(spark: SparkSession) extends FlightProducer {
       val sparkSchema = df.schema
 
       val allocator = new RootAllocator(Long.MaxValue)
-      val root = VectorSchemaRoot.create(logicalPlan.schema(), allocator)
+      val root = VectorSchemaRoot.create(logicalPlan.schema().toArrow(), allocator)
       root.allocateNew()
 
       listener.start(root, null)

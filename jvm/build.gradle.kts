@@ -1,4 +1,6 @@
 plugins {
+    java
+    `java-library`
     kotlin("jvm") version "1.3.50" apply false
     `maven-publish`
     id("org.datlowe.maven-publish-auth") version "2.0.2"
@@ -55,6 +57,10 @@ subprojects {
     tasks.dokka {
         outputFormat = "html"
         outputDirectory = "$buildDir/javadoc"
+    }
+
+    tasks.register<Jar>("sourcesJar") {
+        from(sourceSets.main)
     }
 
     publishing {

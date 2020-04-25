@@ -64,6 +64,15 @@ subprojects {
         from(sourceSets.getByName("main").allSource)
     }
 
+    val javadocJar = tasks.create<Jar>("javadocJar") {
+        archiveClassifier.set("javadoc")
+        from("$buildDir/javadoc")
+    }
+
+    java {
+        withJavadocJar()
+    }
+
     publishing {
         repositories {
             maven {
@@ -107,6 +116,7 @@ subprojects {
 
                 from(components["kotlin"])
                 artifact(sourcesJar)
+                artifact(javadocJar)
             }
         }
     }

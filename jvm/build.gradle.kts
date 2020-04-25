@@ -57,12 +57,15 @@ subprojects {
                 val snapshotsRepoUrl = uri("https://oss.sonatype.org/content/repositories/snapshots")
                 name = if (project.hasProperty("release")) releasesRepoName else snapshotsRepoName
                 url = uri(if (project.hasProperty("release")) releasesRepoUrl else snapshotsRepoUrl)
+                credentials {
+                                 username = System.getenv("SONATYPE_USERNAME")
+                                 password = System.getenv("SONATYPE_PASSWORD")
+                             }
             }
         }
         publications {
             create<MavenPublication>("maven") {
                 groupId = "org.ballistacompute"
-                //artifactId = "optimizer"
                 version = rootProject.version as String?
 
                 pom {
@@ -72,6 +75,11 @@ subprojects {
                             url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
                         }
                     }
+                    scm {
+                        connection.set("scm:git:git://github.com/ballista-compute/ballista.git")
+                        developerConnection.set("scm:git:ssh://github.com/ballista-compute/ballista.git")
+                        url.set("https://github.com/ballista-compute/ballista/")
+                    }
                 }
 
                 from(components["kotlin"])
@@ -79,5 +87,17 @@ subprojects {
         }
     }
 
+//    uploadArchives {
+//        repositories {
+//            mavenDeployer {
+//                repository(url: "https://oss.sonatype.org/content/repositories/snapshots") {
+//                authentication(userName: nexusUsername, password: nexusPassword)
+//            }
+//                snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots") {
+//                authentication(userName: nexusUsername, password: nexusPassword)
+//            }
+//            }
+//        }
+//    }
 }
 

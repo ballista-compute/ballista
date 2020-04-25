@@ -59,8 +59,9 @@ subprojects {
         outputDirectory = "$buildDir/javadoc"
     }
 
-    tasks.register<Jar>("sourcesJar") {
-        from(sourceSets.main)
+    val sourcesJar = tasks.create<Jar>("sourcesJar") {
+        archiveClassifier.set("sources")
+        from(sourceSets.getByName("main").allSource)
     }
 
     publishing {
@@ -105,6 +106,7 @@ subprojects {
                 }
 
                 from(components["kotlin"])
+                artifact(sourcesJar)
             }
         }
     }

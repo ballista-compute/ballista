@@ -66,6 +66,9 @@ subprojects {
                 version = rootProject.version as String?
 
                 pom {
+                    name.set("Ballista Compute")
+                    description.set("JVM query engine based on Apache Arrow")
+                    url.set("https://github.com/ballista-compute/ballista")
                     licenses {
                         license {
                             name.set("The Apache License, Version 2.0")
@@ -84,17 +87,5 @@ subprojects {
         }
     }
 
-//    uploadArchives {
-//        repositories {
-//            mavenDeployer {
-//                repository(url: "https://oss.sonatype.org/content/repositories/snapshots") {
-//                authentication(userName: nexusUsername, password: nexusPassword)
-//            }
-//                snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots") {
-//                authentication(userName: nexusUsername, password: nexusPassword)
-//            }
-//            }
-//        }
-//    }
 }
 

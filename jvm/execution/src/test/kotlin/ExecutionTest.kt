@@ -2,6 +2,11 @@ package org.ballistacompute.execution
 
 import org.ballistacompute.logical.*
 import org.apache.arrow.vector.types.pojo.ArrowType
+import org.ballistacompute.datasource.InMemoryDataSource
+import org.ballistacompute.datatypes.ArrowTypes
+import org.ballistacompute.datatypes.Field
+import org.ballistacompute.datatypes.Schema
+import org.ballistacompute.fuzzer.Fuzzer
 import org.junit.Test
 import org.junit.jupiter.api.TestInstance
 import java.io.File
@@ -95,6 +100,41 @@ class ExecutionTest {
         val batch = batches.first()
         assertEquals("1,Bill,Hopkins,12000\n"
                 , batch.toCSV())
+    }
+
+    @Test
+    fun `min max sum float`() {
+        val schema = Schema(listOf(
+                Field("a", ArrowTypes.StringType),
+                Field("b", ArrowTypes.FloatType)
+        ))
+
+        //val batch = Fuzzer().createRecordBatch(schema, 1024)
+        val input = Fuzzer().createRecordBatch(schema, listOf(
+                listOf("a", "a", "b", "b"),
+                listOf(1.0f, 2.0f, 4.0f, 3.0f)
+        ))
+
+        val dataSource = InMemoryDataSource(schema, listOf(input))
+
+        val ctx = ExecutionContext()
+        val logicalPlan = DataFrameImpl(Scan("", dataSource, listOf()))
+                .aggregate(listOf(col("a")),
+                        listOf(
+                                Min(col("b")),
+                                Max(col("b")),
+                                Sum(col("b"))
+                        ))
+                .logicalPlan()
+
+        val batches = ctx.execute(logicalPlan).asSequence().toList()
+        assertEquals(1, batches.size)
+
+        val batch = batches.first()
+        assertEquals("a,1.0,2.0,3.0\n" +
+                "b,3.0,4.0,7.0\n"
+                , batch.toCSV())
+
     }
 
 }

@@ -83,8 +83,8 @@ class QueryPlanner {
                 is LtEq -> LtEqExpression(l, r)
 
                 // boolean
-//                is And -> AndExpression(l, r)
-//                is Or -> OrExpression(l, r)
+                is And -> AndExpression(l, r)
+                is Or -> OrExpression(l, r)
 
                 // math
                 is Add -> AddExpression(l, r)

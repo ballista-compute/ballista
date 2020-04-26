@@ -29,7 +29,7 @@ class ArrowFieldVector(val field: FieldVector) : ColumnVector {
         }
 
         return when (field) {
-            is BitVector -> field.get(i)
+            is BitVector -> if (field.get(i) == 1) true else false
             is TinyIntVector -> field.get(i)
             is SmallIntVector -> field.get(i)
             is IntVector -> field.get(i)

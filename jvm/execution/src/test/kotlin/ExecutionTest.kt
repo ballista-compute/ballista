@@ -174,4 +174,39 @@ class ExecutionTest {
                 , batch.toCSV())
 
     }
+
+    @Test
+    fun `boolean expressions`() {
+        val schema = Schema(listOf(
+                Field("a", ArrowTypes.BooleanType),
+                Field("b", ArrowTypes.BooleanType)
+        ))
+
+        val input = Fuzzer().createRecordBatch(schema, listOf(
+                listOf(false, false, true, true),
+                listOf(false, true, false, true)
+        ))
+
+        val dataSource = InMemoryDataSource(schema, listOf(input))
+
+        val ctx = ExecutionContext()
+        val logicalPlan = DataFrameImpl(Scan("", dataSource, listOf()))
+                .project(
+                        listOf(
+                                And(col("a"), col("b")),
+                                Or(col("a"), col("b"))
+                        ))
+                .logicalPlan()
+
+        val batches = ctx.execute(logicalPlan).asSequence().toList()
+        assertEquals(1, batches.size)
+
+        val batch = batches.first()
+        assertEquals("false,false\n" +
+                "false,true\n" +
+                "false,true\n" +
+                "true,true\n"
+                , batch.toCSV())
+
+    }
 }

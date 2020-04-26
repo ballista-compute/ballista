@@ -9,7 +9,7 @@ import org.ballistacompute.datatypes.ColumnVector
 import org.ballistacompute.datatypes.RecordBatch
 import java.lang.IllegalStateException
 
-abstract class ComparisonExpression(val l: Expression, val r: Expression) : Expression {
+abstract class BooleanExpression(val l: Expression, val r: Expression) : Expression {
 
     override fun evaluate(input: RecordBatch): ColumnVector {
         val ll = l.evaluate(input)
@@ -25,11 +25,8 @@ abstract class ComparisonExpression(val l: Expression, val r: Expression) : Expr
         val v = BitVector("v", RootAllocator(Long.MAX_VALUE))
         v.allocateNew()
         (0 until l.size()).forEach {
-            if (evaluate(l.getValue(it), r.getValue(it), l.getType())) {
-                v.set(it, 1)
-            } else {
-                v.set(it, 0)
-            }
+            val value = evaluate(l.getValue(it), r.getValue(it), l.getType())
+            v.set(it, if (value) 1 else 0)
         }
         v.valueCount = l.size()
         return ArrowFieldVector(v)
@@ -38,7 +35,19 @@ abstract class ComparisonExpression(val l: Expression, val r: Expression) : Expr
     abstract fun evaluate(l: Any?, r: Any?, arrowType: ArrowType) : Boolean
 }
 
-class EqExpression(l: Expression, r: Expression): ComparisonExpression(l,r) {
+class AndExpression(l: Expression, r: Expression): BooleanExpression(l,r) {
+    override fun evaluate(l: Any?, r: Any?, arrowType: ArrowType) : Boolean {
+        return toBool(l) && toBool(r)
+    }
+}
+
+class OrExpression(l: Expression, r: Expression): BooleanExpression(l,r) {
+    override fun evaluate(l: Any?, r: Any?, arrowType: ArrowType) : Boolean {
+        return toBool(l) || toBool(r)
+    }
+}
+
+class EqExpression(l: Expression, r: Expression): BooleanExpression(l,r) {
     override fun evaluate(l: Any?, r: Any?, arrowType: ArrowType) : Boolean {
         return when (arrowType) {
             ArrowTypes.Int8Type -> (l as Byte) == (r as Byte)
@@ -53,7 +62,7 @@ class EqExpression(l: Expression, r: Expression): ComparisonExpression(l,r) {
     }
 }
 
-class NeqExpression(l: Expression, r: Expression): ComparisonExpression(l,r) {
+class NeqExpression(l: Expression, r: Expression): BooleanExpression(l,r) {
     override fun evaluate(l: Any?, r: Any?, arrowType: ArrowType): Boolean {
         return when (arrowType) {
             ArrowTypes.Int8Type -> (l as Byte) != (r as Byte)
@@ -68,7 +77,7 @@ class NeqExpression(l: Expression, r: Expression): ComparisonExpression(l,r) {
     }
 }
 
-class LtExpression(l: Expression, r: Expression): ComparisonExpression(l,r) {
+class LtExpression(l: Expression, r: Expression): BooleanExpression(l,r) {
     override fun evaluate(l: Any?, r: Any?, arrowType: ArrowType): Boolean {
         return when (arrowType) {
             ArrowTypes.Int8Type -> (l as Byte) < (r as Byte)
@@ -83,7 +92,7 @@ class LtExpression(l: Expression, r: Expression): ComparisonExpression(l,r) {
     }
 }
 
-class LtEqExpression(l: Expression, r: Expression): ComparisonExpression(l,r) {
+class LtEqExpression(l: Expression, r: Expression): BooleanExpression(l,r) {
     override fun evaluate(l: Any?, r: Any?, arrowType: ArrowType): Boolean {
         return when (arrowType) {
             ArrowTypes.Int8Type -> (l as Byte) <= (r as Byte)
@@ -98,7 +107,7 @@ class LtEqExpression(l: Expression, r: Expression): ComparisonExpression(l,r) {
     }
 }
 
-class GtExpression(l: Expression, r: Expression): ComparisonExpression(l,r) {
+class GtExpression(l: Expression, r: Expression): BooleanExpression(l,r) {
     override fun evaluate(l: Any?, r: Any?, arrowType: ArrowType): Boolean {
         return when (arrowType) {
             ArrowTypes.Int8Type -> (l as Byte) > (r as Byte)
@@ -113,7 +122,7 @@ class GtExpression(l: Expression, r: Expression): ComparisonExpression(l,r) {
     }
 }
 
-class GtEqExpression(l: Expression, r: Expression): ComparisonExpression(l,r) {
+class GtEqExpression(l: Expression, r: Expression): BooleanExpression(l,r) {
     override fun evaluate(l: Any?, r: Any?, arrowType: ArrowType): Boolean {
         return when (arrowType) {
             ArrowTypes.Int8Type -> (l as Byte) >= (r as Byte)
@@ -132,5 +141,13 @@ private fun toString(v: Any?): String{
     return when (v) {
         is ByteArray -> String(v)
         else -> v.toString()
+    }
+}
+
+private fun toBool(v: Any?): Boolean {
+    return when (v) {
+        is Boolean -> v
+        is Number -> v.toInt() == 1
+        else -> throw IllegalStateException()
     }
 }

@@ -56,13 +56,14 @@ class Fuzzer {
                 val v = root.getVector(col)
                 val value = columns[col][row]
                 when (v) {
-                    is VarCharVector -> v.set(row, (value as String).toByteArray())
+                    is BitVector -> v.set(row, if (value as Boolean) 1 else 0)
                     is TinyIntVector -> v.set(row, value as Byte)
                     is SmallIntVector -> v.set(row, value as Short)
                     is IntVector -> v.set(row, value as Int)
                     is BigIntVector -> v.set(row, value as Long)
                     is Float4Vector -> v.set(row, value as Float)
                     is Float8Vector -> v.set(row, value as Double)
+                    is VarCharVector -> v.set(row, (value as String).toByteArray())
                     else -> TODO()
                 }
             }

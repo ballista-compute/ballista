@@ -9,7 +9,7 @@ import org.junit.jupiter.api.TestInstance
 import kotlin.test.assertEquals
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class ComparisonExpressionTest {
+class BooleanExpressionTest {
     
     @Test
     fun `gteq bytes`() {
@@ -29,7 +29,7 @@ class ComparisonExpressionTest {
 
         assertEquals(a.size, result.size())
         (0 until result.size()).forEach {
-            assertEquals(if (a[it] >= b[it]) 1 else 0, result.getValue(it))
+            assertEquals(a[it] >= b[it], result.getValue(it))
         }
     }
 
@@ -51,7 +51,7 @@ class ComparisonExpressionTest {
 
         assertEquals(a.size, result.size())
         (0 until result.size()).forEach {
-            assertEquals(if (a[it] >= b[it]) 1 else 0, result.getValue(it))
+            assertEquals(a[it] >= b[it], result.getValue(it))
         }
     }
 
@@ -73,7 +73,7 @@ class ComparisonExpressionTest {
 
         assertEquals(a.size, result.size())
         (0 until result.size()).forEach {
-            assertEquals(if (a[it] >= b[it]) 1 else 0, result.getValue(it))
+            assertEquals(a[it] >= b[it], result.getValue(it))
         }
     }
 
@@ -95,7 +95,7 @@ class ComparisonExpressionTest {
 
         assertEquals(a.size, result.size())
         (0 until result.size()).forEach {
-            assertEquals(if (a[it] >= b[it]) 1 else 0, result.getValue(it))
+            assertEquals(a[it] >= b[it], result.getValue(it))
         }
     }
 
@@ -117,7 +117,7 @@ class ComparisonExpressionTest {
 
         assertEquals(a.size, result.size())
         (0 until result.size()).forEach {
-            assertEquals(if (a[it] >= b[it]) 1 else 0, result.getValue(it))
+            assertEquals(a[it] >= b[it], result.getValue(it))
         }
     }
 
@@ -139,7 +139,7 @@ class ComparisonExpressionTest {
 
         assertEquals(a.size, result.size())
         (0 until result.size()).forEach {
-            assertEquals(if (a[it] >= b[it]) 1 else 0, result.getValue(it))
+            assertEquals(a[it] >= b[it], result.getValue(it))
         }
     }
 

@@ -3,7 +3,27 @@ package org.ballistacompute.datatypes
 import org.apache.arrow.memory.RootAllocator
 import org.apache.arrow.vector.*
 import org.apache.arrow.vector.types.pojo.ArrowType
+import java.lang.IllegalStateException
 
+object FieldVectorFactory {
+
+    fun create(arrowType: ArrowType): FieldVector {
+        val rootAllocator = RootAllocator(Long.MAX_VALUE)
+        val fieldVector: FieldVector = when (arrowType) {
+            ArrowTypes.BooleanType -> BitVector("v", rootAllocator)
+            ArrowTypes.Int8Type -> TinyIntVector("v", rootAllocator)
+            ArrowTypes.Int16Type -> SmallIntVector("v", rootAllocator)
+            ArrowTypes.Int32Type -> IntVector("v", rootAllocator)
+            ArrowTypes.Int64Type -> BigIntVector("v", rootAllocator)
+            ArrowTypes.FloatType -> Float4Vector("v", rootAllocator)
+            ArrowTypes.DoubleType -> Float8Vector("v", rootAllocator)
+            ArrowTypes.StringType -> VarCharVector("v", rootAllocator)
+            else -> throw IllegalStateException()
+        }
+        fieldVector.allocateNew()
+        return fieldVector
+    }
+}
 
 /** Wrapper around Arrow FieldVector */
 class ArrowFieldVector(val field: FieldVector) : ColumnVector {
@@ -36,7 +56,14 @@ class ArrowFieldVector(val field: FieldVector) : ColumnVector {
             is BigIntVector -> field.get(i)
             is Float4Vector -> field.get(i)
             is Float8Vector -> field.get(i)
-            is VarCharVector -> field.get(i)
+            is VarCharVector -> {
+                val bytes = field.get(i)
+                if (bytes == null) {
+                    null
+                } else {
+                    String(bytes)
+                }
+            }
             else -> TODO(field.javaClass.name)
         }
     }

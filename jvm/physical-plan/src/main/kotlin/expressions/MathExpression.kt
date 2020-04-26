@@ -9,17 +9,7 @@ import java.lang.IllegalStateException
 abstract class MathExpression(l: Expression, r: Expression): BinaryExpression(l,r) {
 
     override fun evaluate(l: ColumnVector, r: ColumnVector): ColumnVector {
-        val rootAllocator = RootAllocator(Long.MAX_VALUE)
-        val fieldVector = when (l.getType()) {
-            ArrowTypes.Int8Type -> TinyIntVector("v", rootAllocator)
-            ArrowTypes.Int16Type -> SmallIntVector("v", rootAllocator)
-            ArrowTypes.Int32Type -> IntVector("v", rootAllocator)
-            ArrowTypes.Int64Type -> BigIntVector("v", rootAllocator)
-            ArrowTypes.FloatType -> Float4Vector("v", rootAllocator)
-            ArrowTypes.DoubleType -> Float8Vector("v", rootAllocator)
-            else -> throw IllegalStateException()
-        }
-        fieldVector.allocateNew(l.size())
+        val fieldVector = FieldVectorFactory.create(l.getType())
         val builder = ArrowVectorBuilder(fieldVector)
         (0 until l.size()).forEach {
             val value = evaluate(l.getValue(it), r.getValue(it), l.getType())

@@ -1,13 +1,8 @@
 package org.ballistacompute.physical.expressions
 
-import org.apache.arrow.memory.RootAllocator
-import org.apache.arrow.vector.Float8Vector
-import org.apache.arrow.vector.IntVector
 import org.apache.arrow.vector.types.pojo.ArrowType
-import org.ballistacompute.datatypes.ArrowFieldVector
-import org.ballistacompute.datatypes.ArrowVectorBuilder
-import org.ballistacompute.datatypes.ColumnVector
-import org.ballistacompute.datatypes.RecordBatch
+import org.ballistacompute.datatypes.*
+import java.lang.IllegalStateException
 
 class CastExpression(val expr: Expression, val dataType: ArrowType) : Expression {
 
@@ -17,48 +12,120 @@ class CastExpression(val expr: Expression, val dataType: ArrowType) : Expression
 
     override fun evaluate(input: RecordBatch): ColumnVector {
         val value = expr.evaluate(input)
-        return when (dataType) {
-            is ArrowType.Int -> {
-                //TODO move this logic to separate source file
-                val v = IntVector("v", RootAllocator(Long.MAX_VALUE))
-                v.allocateNew()
+        val fieldVector = FieldVectorFactory.create(dataType)
+        val builder = ArrowVectorBuilder(fieldVector)
 
-                val builder = ArrowVectorBuilder(v)
+        when (dataType) {
+            ArrowTypes.Int8Type -> {
                 (0 until value.size()).forEach {
                     val vv = value.getValue(it)
                     if (vv == null) {
                         builder.set(it, null)
                     } else {
-                        when (vv) {
-                            is ByteArray -> builder.set(it, String(vv).toInt())
-                            else -> TODO()
+                        val value = when (vv) {
+                            is ByteArray -> String(vv).toByte()
+                            is String -> vv.toByte()
+                            is Number -> vv.toByte()
+                            else -> throw IllegalStateException("Cannot cast value to Byte: $vv")
                         }
+                        builder.set(it, value)
                     }
                 }
-                v.valueCount = value.size()
-                ArrowFieldVector(v)
             }
-            is ArrowType.FloatingPoint -> {
-                //TODO move this logic to separate source file
-                val v = Float8Vector("v", RootAllocator(Long.MAX_VALUE))
-                v.allocateNew()
-
-                val builder = ArrowVectorBuilder(v)
+            ArrowTypes.Int16Type -> {
                 (0 until value.size()).forEach {
                     val vv = value.getValue(it)
                     if (vv == null) {
                         builder.set(it, null)
                     } else {
-                        when (vv) {
-                            is ByteArray -> builder.set(it, String(vv).toDouble())
-                            else -> TODO()
+                        val value = when (vv) {
+                            is ByteArray -> String(vv).toShort()
+                            is String -> vv.toShort()
+                            is Number -> vv.toShort()
+                            else -> throw IllegalStateException("Cannot cast value to Short: $vv")
                         }
+                        builder.set(it, value)
                     }
                 }
-                v.valueCount = value.size()
-                ArrowFieldVector(v)
             }
-            else -> TODO()
+            ArrowTypes.Int32Type -> {
+                (0 until value.size()).forEach {
+                    val vv = value.getValue(it)
+                    if (vv == null) {
+                        builder.set(it, null)
+                    } else {
+                        val value = when (vv) {
+                            is ByteArray -> String(vv).toInt()
+                            is String -> vv.toInt()
+                            is Number -> vv.toInt()
+                            else -> throw IllegalStateException("Cannot cast value to Int: $vv")
+                        }
+                        builder.set(it, value)
+                    }
+                }
+            }
+            ArrowTypes.Int64Type -> {
+                (0 until value.size()).forEach {
+                    val vv = value.getValue(it)
+                    if (vv == null) {
+                        builder.set(it, null)
+                    } else {
+                        val value = when (vv) {
+                            is ByteArray -> String(vv).toLong()
+                            is String -> vv.toLong()
+                            is Number -> vv.toLong()
+                            else -> throw IllegalStateException("Cannot cast value to Long: $vv")
+                        }
+                        builder.set(it, value)
+                    }
+                }
+            }
+            ArrowTypes.FloatType -> {
+                (0 until value.size()).forEach {
+                    val vv = value.getValue(it)
+                    if (vv == null) {
+                        builder.set(it, null)
+                    } else {
+                        val value = when (vv) {
+                            is ByteArray -> String(vv).toFloat()
+                            is String -> vv.toFloat()
+                            is Number -> vv.toFloat()
+                            else -> throw IllegalStateException("Cannot cast value to Float: $vv")
+                        }
+                        builder.set(it, value)
+                    }
+                }
+            }
+            ArrowTypes.DoubleType -> {
+                (0 until value.size()).forEach {
+                    val vv = value.getValue(it)
+                    if (vv == null) {
+                        builder.set(it, null)
+                    } else {
+                        val value = when (vv) {
+                            is ByteArray -> String(vv).toDouble()
+                            is String -> vv.toDouble()
+                            is Number -> vv.toDouble()
+                            else -> throw IllegalStateException("Cannot cast value to Double: $vv")
+                        }
+                        builder.set(it, value)
+                    }
+                }
+            }
+            ArrowTypes.StringType -> {
+                (0 until value.size()).forEach {
+                    val vv = value.getValue(it)
+                    if (vv == null) {
+                        builder.set(it, null)
+                    } else {
+                        builder.set(it, vv.toString())
+                    }
+                }
+            }
+            else -> throw IllegalStateException("Cast to $dataType is not supported")
         }
+
+        builder.setValueCount(value.size())
+        return builder.build()
     }
 }

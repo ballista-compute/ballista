@@ -10,17 +10,8 @@ import kotlin.test.assertEquals
 class ColumnVectorTest {
 
     @Test
-    fun `add int vectors`() {
-        val l = createArrowIntVector(10)
-        val r = createArrowIntVector(10)
-        var result = l.add(r)
-        assertEquals(10, result.size())
-        (0 until result.size()).forEach {
-            assertEquals(it + it, result.getValue(it))
-        }
-    }
-
-    private fun createArrowIntVector(size: Int): ColumnVector {
+    fun `build int vector`() {
+        val size = 10
         val fieldVector = IntVector("foo", RootAllocator(Long.MAX_VALUE))
         fieldVector.allocateNew(size)
         fieldVector.valueCount = size
@@ -28,6 +19,12 @@ class ColumnVectorTest {
         (0 until size).forEach {
             b.set(it, it)
         }
-        return b.build()
+        val v = b.build()
+
+        assertEquals(10, v.size())
+        (0 until v.size()).forEach {
+            assertEquals(it, v.getValue(it))
+        }
     }
+
 }

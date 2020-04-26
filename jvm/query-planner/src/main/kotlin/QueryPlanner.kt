@@ -82,16 +82,15 @@ class QueryPlanner {
                 is Lt -> LtExpression(l, r)
                 is LtEq -> LtEqExpression(l, r)
 
-                // math
-//        is Add -> MultExpr(createPhysicalExpr(expr.l, input), createPhysicalExpr(expr.r, input))
-//        is Subtract -> MultExpr(createPhysicalExpr(expr.l, input), createPhysicalExpr(expr.r, input))
-//        is Multiply -> MultExpr(createPhysicalExpr(expr.l, input), createPhysicalExpr(expr.r, input))
-                is Divide -> MultExpression(l, r)
-//        is Modulus -> MultExpr(createPhysicalExpr(expr.l, input), createPhysicalExpr(expr.r, input))
-
                 // boolean
-//        is And -> AndExpr(createPhysicalExpr(expr.l, input), createPhysicalExpr(expr.r, input))
-                //is Or -> AndExpr(createPhysicalExpr(expr.l, input), createPhysicalExpr(expr.r, input))
+//                is And -> AndExpression(l, r)
+//                is Or -> OrExpression(l, r)
+
+                // math
+                is Add -> AddExpression(l, r)
+                is Subtract -> SubtractExpression(l, r)
+                is Multiply -> MultiplyExpression(l, r)
+                is Divide -> DivideExpression(l, r)
 
                 else -> TODO(expr.javaClass.toString())
             }

@@ -86,6 +86,10 @@ class ArrowVectorBuilder(val fieldVector: FieldVector) {
         }
     }
 
+    fun setValueCount(n: Int) {
+        fieldVector.valueCount = n
+    }
+
     fun build(): ColumnVector {
         return ArrowFieldVector(fieldVector)
     }

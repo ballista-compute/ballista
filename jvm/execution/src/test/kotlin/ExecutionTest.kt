@@ -137,4 +137,41 @@ class ExecutionTest {
 
     }
 
+    @Test
+    fun `float math`() {
+        val schema = Schema(listOf(
+                Field("a", ArrowTypes.FloatType),
+                Field("b", ArrowTypes.FloatType)
+        ))
+
+        //val batch = Fuzzer().createRecordBatch(schema, 1024)
+        val input = Fuzzer().createRecordBatch(schema, listOf(
+                listOf(1.0f, 2.0f, 4.0f, 3.0f),
+                listOf(11.0f, 22.0f, 44.0f, 33.0f)
+        ))
+
+        val dataSource = InMemoryDataSource(schema, listOf(input))
+
+        val ctx = ExecutionContext()
+        val logicalPlan = DataFrameImpl(Scan("", dataSource, listOf()))
+                .project(
+                        listOf(
+                                Add(col("a"), col("b")),
+                                Subtract(col("a"), col("b")),
+                                Multiply(col("a"), col("b")),
+                                Divide(col("a"), col("b"))
+                        ))
+                .logicalPlan()
+
+        val batches = ctx.execute(logicalPlan).asSequence().toList()
+        assertEquals(1, batches.size)
+
+        val batch = batches.first()
+        assertEquals("12.0,-10.0,11.0,0.09090909\n" +
+                "24.0,-20.0,44.0,0.09090909\n" +
+                "48.0,-40.0,176.0,0.09090909\n" +
+                "36.0,-30.0,99.0,0.09090909\n"
+                , batch.toCSV())
+
+    }
 }

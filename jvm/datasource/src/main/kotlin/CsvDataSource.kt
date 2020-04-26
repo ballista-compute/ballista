@@ -1,10 +1,7 @@
 package org.ballistacompute.datasource
 
 import org.apache.arrow.memory.RootAllocator
-import org.apache.arrow.vector.Float4Vector
-import org.apache.arrow.vector.Float8Vector
-import org.apache.arrow.vector.VarCharVector
-import org.apache.arrow.vector.VectorSchemaRoot
+import org.apache.arrow.vector.*
 import org.ballistacompute.datatypes.*
 import java.io.BufferedReader
 import java.io.File
@@ -23,10 +20,10 @@ class CsvDataSource(val filename: String, val schema: Schema?, private val batch
 
     private val logger = Logger.getLogger(CsvDataSource::class.simpleName)
 
-    private val _schema = schema ?: inferSchema()
+    private val finalSchema = schema ?: inferSchema()
 
     override fun schema(): Schema {
-        return _schema
+        return finalSchema
     }
 
     override fun scan(projection: List<String>): Sequence<RecordBatch> {
@@ -119,19 +116,58 @@ class ReaderIterator(private val schema: Schema,
 
         root.fieldVectors.withIndex().forEach { field ->
             val vector = field.value
-            //TODO null handling
             when (vector) {
                 is VarCharVector -> rows.withIndex().forEach { row ->
-                    val value = row.value[field.index]
-                    vector.set(row.index, value.toByteArray())
+                    val valueStr = row.value[field.index].trim()
+                    vector.set(row.index, valueStr.toByteArray())
+                }
+                is TinyIntVector -> rows.withIndex().forEach { row ->
+                    val valueStr = row.value[field.index].trim()
+                    if (valueStr.isEmpty()) {
+                        vector.setNull(row.index)
+                    } else {
+                        vector.set(row.index, valueStr.toByte())
+                    }
+                }
+                is SmallIntVector -> rows.withIndex().forEach { row ->
+                    val valueStr = row.value[field.index].trim()
+                    if (valueStr.isEmpty()) {
+                        vector.setNull(row.index)
+                    } else {
+                        vector.set(row.index, valueStr.toShort())
+                    }
+                }
+                is IntVector -> rows.withIndex().forEach { row ->
+                    val valueStr = row.value[field.index].trim()
+                    if (valueStr.isEmpty()) {
+                        vector.setNull(row.index)
+                    } else {
+                        vector.set(row.index, valueStr.toInt())
+                    }
+                }
+                is BigIntVector -> rows.withIndex().forEach { row ->
+                    val valueStr = row.value[field.index].trim()
+                    if (valueStr.isEmpty()) {
+                        vector.setNull(row.index)
+                    } else {
+                        vector.set(row.index, valueStr.toLong())
+                    }
                 }
                 is Float4Vector -> rows.withIndex().forEach { row ->
-                    val value = row.value[field.index].toFloat()
-                    vector.set(row.index, value)
+                    val valueStr = row.value[field.index].trim()
+                    if (valueStr.isEmpty()) {
+                        vector.setNull(row.index)
+                    } else {
+                        vector.set(row.index, valueStr.toFloat())
+                    }
                 }
                 is Float8Vector -> rows.withIndex().forEach { row ->
-                    val value = row.value[field.index].toDouble()
-                    vector.set(row.index, value)
+                    val valueStr = row.value[field.index].trim()
+                    if (valueStr.isEmpty()) {
+                        vector.setNull(row.index)
+                    } else {
+                        vector.set(row.index, valueStr.toDouble())
+                    }
                 }
                 else -> throw IllegalStateException("No support for reading CSV columns with data type $vector")
             }

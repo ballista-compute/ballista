@@ -11,7 +11,10 @@ class ArrowFieldVector(val field: FieldVector) : ColumnVector {
     override fun getType(): ArrowType {
         return when (field) {
             is BitVector -> ArrowTypes.BooleanType
+            is TinyIntVector -> ArrowTypes.Int8Type
+            is SmallIntVector -> ArrowTypes.Int16Type
             is IntVector -> ArrowTypes.Int32Type
+            is BigIntVector -> ArrowTypes.Int64Type
             is Float4Vector -> ArrowTypes.FloatType
             is Float8Vector -> ArrowTypes.DoubleType
             is VarCharVector -> ArrowTypes.StringType
@@ -27,7 +30,10 @@ class ArrowFieldVector(val field: FieldVector) : ColumnVector {
 
         return when (field) {
             is BitVector -> field.get(i)
+            is TinyIntVector -> field.get(i)
+            is SmallIntVector -> field.get(i)
             is IntVector -> field.get(i)
+            is BigIntVector -> field.get(i)
             is Float4Vector -> field.get(i)
             is Float8Vector -> field.get(i)
             is VarCharVector -> field.get(i)

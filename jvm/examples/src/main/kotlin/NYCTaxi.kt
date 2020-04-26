@@ -9,6 +9,7 @@ import org.ballistacompute.optimizer.Optimizer
 
 import org.apache.arrow.vector.types.FloatingPointPrecision
 import org.apache.arrow.vector.types.pojo.ArrowType
+import org.ballistacompute.datatypes.ArrowTypes
 
 import kotlin.system.measureTimeMillis
 
@@ -44,7 +45,7 @@ fun main() {
         val df = ctx.csv("/home/andy/data/yellow_tripdata_2019-01.csv")
                 .aggregate(
                         listOf(col("passenger_count")),
-                        listOf(Max(cast(col("fare_amount"), ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)))))
+                        listOf(Max(cast(col("fare_amount"), ArrowTypes.DoubleType))))
 
         println("Logical Plan:\t${format(df.logicalPlan())}")
 

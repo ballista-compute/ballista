@@ -50,17 +50,6 @@ impl FlightService for FlightServiceImpl {
                         // create local execution context
                         let mut ctx = ExecutionContext::new();
 
-                        // register tables
-                        // tables.iter().for_each(|table| match table {
-                        //     plan::TableMeta::Csv {
-                        //         table_name,
-                        //         path,
-                        //         has_header,
-                        //         schema,
-                        //     } => ctx.register_csv(table_name, path, schema, *has_header),
-                        //     _ => unimplemented!(),
-                        // });
-
                         let datafusion_plan =
                             translate_plan(&mut ctx, logical_plan).map_err(|e| to_tonic_err(&e))?;
 

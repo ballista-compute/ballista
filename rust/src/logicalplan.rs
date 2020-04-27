@@ -1006,6 +1006,13 @@ fn translate_expr(expr: &Expr) -> Result<DFExpr> {
                 right: Arc::new(right),
             })
         }
+        Expr::AggregateFunction { name, args, return_type } => {
+            let args = args
+                .iter()
+                .map(|e| translate_expr(e))
+                .collect::<Result<Vec<_>>>()?;
+            Ok(DFExpr::AggregateFunction { name: name.to_owned(), args, return_type: return_type.clone() })
+        }
         other => Err(ExecutionError::General(format!(
             "Cannot translate expression to DataFusion: {:?}",
             other

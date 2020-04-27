@@ -94,8 +94,19 @@ impl TryInto<Expr> for protobuf::LogicalExprNode {
         } else if self.has_literal_long {
             Ok(Expr::Literal(ScalarValue::Int64(self.literal_long.clone())))
         } else if let Some(aggregate_expr) = self.aggregate_expr {
+
+            let name = match aggregate_expr.aggr_function {
+                0 => Ok("MIN"),
+                1 => Ok("MAX"),
+                2 => Ok("SUM"),
+                other => Err(ballista_error(&format!(
+                    "Unsupported aggregate function '{:?}'",
+                    other
+                )))
+            }?;
+
             Ok(Expr::AggregateFunction {
-                name: "MAX".to_string(), //TODO
+                name: name.to_owned(),
                 args: vec![parse_required_expr(aggregate_expr.expr)?],
                 return_type: DataType::Boolean, //TODO
             })

@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "org.ballistacompute"
-version = "0.2.3"
+version = "0.2.3-SNAPSHOT"
 description = "Ballista Spark Executor"
 
 application {

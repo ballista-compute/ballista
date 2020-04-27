@@ -49,8 +49,7 @@ class CsvDataSource(val filename: String, val schema: Schema?, private val batch
         }
         val b = BufferedReader(FileReader(file))
         val header = b.readLine().split(",")
-        val schema = Schema(header.map { Field(it, ArrowTypes.StringType) })
-        return schema
+        return Schema(header.map { Field(it, ArrowTypes.StringType) })
     }
 
 }

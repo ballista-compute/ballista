@@ -1,4 +1,4 @@
-# Ballista Development Guide
+# Development Enviroment
 
 ## Setting up a JVM development environment
 

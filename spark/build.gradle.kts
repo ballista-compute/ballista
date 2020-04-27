@@ -1,7 +1,17 @@
 plugins {
     scala
     kotlin("jvm") version "1.3.50" apply false
+    application
 }
+
+group = "org.ballistacompute"
+version = "0.2.3"
+description = "Ballista Spark Executor"
+
+application {
+    mainClassName = "org.ballistacompute.spark.executor.SparkExecutor"
+}
+
 allprojects {
     repositories {
         mavenLocal()

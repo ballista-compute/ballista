@@ -17,13 +17,19 @@ object SparkExecutor {
 
     val flightProducer = new SparkFlightProducer(spark)
 
+    val bindHost = "0.0.0.0"
+    val port = 50051
+
     // start Flight server
     val server = FlightServer.builder(
       new RootAllocator(Long.MaxValue),
-      Location.forGrpcInsecure("localhost", 50051),
+      Location.forGrpcInsecure(bindHost, port),
       flightProducer)
       .build()
+
     server.start()
+
+    println(s"Ballista Spark Executor listening on $bindHost:$port")
 
     while (true) {
       Thread.sleep(1000)

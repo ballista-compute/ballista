@@ -82,7 +82,7 @@ class ArrowVectorBuilder(val fieldVector: FieldVector) {
                     throw IllegalStateException()
                 }
             }
-            else -> throw IllegalStateException()
+            else -> throw IllegalStateException(fieldVector.javaClass.name)
         }
     }
 

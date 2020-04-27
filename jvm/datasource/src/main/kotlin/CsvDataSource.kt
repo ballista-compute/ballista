@@ -34,17 +34,11 @@ class CsvDataSource(val filename: String, val schema: Schema?, private val batch
             throw FileNotFoundException(file.absolutePath)
         }
         val b = BufferedReader(FileReader(file))
-        val header = b.readLine().split(",")
-        val fileColumns = header.map { Field(it, ArrowTypes.StringType) }.toList()
+        b.readLine() // skip header
 
-        val projectionIndices = projection.map { name -> fileColumns.indexOfFirst { it.name == name } }
-
-        val schema = when (projectionIndices.size) {
-            0 -> Schema(fileColumns)
-            else -> Schema(projectionIndices.map { fileColumns[it] })
-        }
-
-        return ReaderAsSequence(schema, projectionIndices, b, batchSize)
+        val projectionIndices = projection.map { name -> finalSchema.fields.indexOfFirst { it.name == name } }
+        val readSchema = finalSchema.select(projection)
+        return ReaderAsSequence(readSchema, projectionIndices, b, batchSize)
     }
 
     private fun inferSchema(): Schema {

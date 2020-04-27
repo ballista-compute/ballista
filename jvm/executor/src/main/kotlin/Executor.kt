@@ -12,12 +12,17 @@ class Executor {
             // https://issues.apache.org/jira/browse/ARROW-5412
             System.setProperty( "io.netty.tryReflectionSetAccessible","true")
 
+            val bindHost = "0.0.0.0"
+            val port = 50051
+
             val server = FlightServer.builder(
                     RootAllocator(Long.MAX_VALUE),
-                    Location.forGrpcInsecure("localhost", 50051),
+                    Location.forGrpcInsecure(bindHost, port),
                     BallistaFlightProducer())
                     .build()
             server.start()
+
+            println("Listening on $bindHost:$port")
 
             while (true) {
                 Thread.sleep(1000)

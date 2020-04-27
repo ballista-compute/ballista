@@ -2,11 +2,10 @@ package org.ballistacompute.executor
 
 import org.apache.arrow.flight.*
 import org.apache.arrow.memory.RootAllocator
-import org.apache.arrow.vector.IntVector
-import org.apache.arrow.vector.VarCharVector
-import org.apache.arrow.vector.VectorSchemaRoot
+import org.apache.arrow.vector.*
 import org.ballistacompute.execution.ExecutionContext
 import org.ballistacompute.logical.format
+import java.lang.IllegalStateException
 
 class BallistaFlightProducer : FlightProducer {
 
@@ -22,7 +21,7 @@ class BallistaFlightProducer : FlightProducer {
 
             val action = org.ballistacompute.protobuf.Action.parseFrom(ticket?.bytes ?: throw IllegalArgumentException())
             val logicalPlan = org.ballistacompute.protobuf.ProtobufDeserializer().fromProto(action.query)
-            println(format(logicalPlan))
+            println(logicalPlan.pretty())
 
             val schema = logicalPlan.schema()
             println(schema)
@@ -49,8 +48,27 @@ class BallistaFlightProducer : FlightProducer {
                     val v = root.fieldVectors[columnIndex]
 
                     //TODO this is brute force copying that can be optimized if the underlying data is already in Arrow format
-
                     when (v) {
+                        is TinyIntVector -> {
+                            (0 until rowCount).forEach { rowIndex ->
+                                val value = sourceVector.getValue(rowIndex)
+                                if (value == null) {
+                                    v.setNull(rowIndex)
+                                } else {
+                                    v.set(rowIndex, value as Byte)
+                                }
+                            }
+                        }
+                        is SmallIntVector -> {
+                            (0 until rowCount).forEach { rowIndex ->
+                                val value = sourceVector.getValue(rowIndex)
+                                if (value == null) {
+                                    v.setNull(rowIndex)
+                                } else {
+                                    v.set(rowIndex, value as Short)
+                                }
+                            }
+                        }
                         is IntVector -> {
                             (0 until rowCount).forEach { rowIndex ->
                                 val value = sourceVector.getValue(rowIndex)
@@ -58,6 +76,36 @@ class BallistaFlightProducer : FlightProducer {
                                     v.setNull(rowIndex)
                                 } else {
                                     v.set(rowIndex, value as Int)
+                                }
+                            }
+                        }
+                        is BigIntVector -> {
+                            (0 until rowCount).forEach { rowIndex ->
+                                val value = sourceVector.getValue(rowIndex)
+                                if (value == null) {
+                                    v.setNull(rowIndex)
+                                } else {
+                                    v.set(rowIndex, value as Long)
+                                }
+                            }
+                        }
+                        is Float4Vector -> {
+                            (0 until rowCount).forEach { rowIndex ->
+                                val value = sourceVector.getValue(rowIndex)
+                                if (value == null) {
+                                    v.setNull(rowIndex)
+                                } else {
+                                    v.set(rowIndex, value as Float)
+                                }
+                            }
+                        }
+                        is Float8Vector -> {
+                            (0 until rowCount).forEach { rowIndex ->
+                                val value = sourceVector.getValue(rowIndex)
+                                if (value == null) {
+                                    v.setNull(rowIndex)
+                                } else {
+                                    v.set(rowIndex, value as Double)
                                 }
                             }
                         }
@@ -71,7 +119,7 @@ class BallistaFlightProducer : FlightProducer {
                                 }
                             }
                         }
-                        else -> TODO()
+                        else -> throw IllegalStateException(v.javaClass.name)
                     }
 
                 }

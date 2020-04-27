@@ -33,8 +33,8 @@ class MaxAccumulator : Accumulator {
                     is Long -> value > this.value as Long
                     is Float -> value > this.value as Float
                     is Double -> value > this.value as Double
-                    is ByteArray -> throw UnsupportedOperationException("MAX is not implemented for String yet: ${String(value)}")
-                    else -> throw UnsupportedOperationException("MAX is not implemented for String yet: ${value.javaClass.name}")
+                    is String -> value > this.value as String
+                    else -> throw UnsupportedOperationException("MAX is not implemented for data type: ${value.javaClass.name}")
                 }
                 if (isMax) {
                     this.value = value

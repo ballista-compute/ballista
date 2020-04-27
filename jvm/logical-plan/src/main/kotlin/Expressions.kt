@@ -105,7 +105,7 @@ class CastExpr(val expr: LogicalExpr, val dataType: ArrowType) : LogicalExpr {
     }
 }
 
-fun cast(expr: LogicalExpr, dataType: ArrowType.PrimitiveType) = CastExpr(expr, dataType)
+fun cast(expr: LogicalExpr, dataType: ArrowType) = CastExpr(expr, dataType)
 
 abstract class BinaryExpr(val name: String,
                           val op: String,

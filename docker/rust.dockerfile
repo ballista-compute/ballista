@@ -2,6 +2,8 @@ FROM ballistacompute/rust-cached-deps as build
 
 # Compile Ballista
 RUN rm -rf /tmp/ballista/src/
+COPY rust/Cargo.* /tmp/ballista/
+COPY rust/build.rs /tmp/ballista/
 COPY rust/src/ /tmp/ballista/src/
 RUN cargo build --release --target x86_64-unknown-linux-musl
 RUN cargo build --release --target x86_64-unknown-linux-musl --examples

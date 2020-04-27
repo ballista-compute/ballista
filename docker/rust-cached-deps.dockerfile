@@ -9,12 +9,13 @@ RUN cargo fetch
 
 # Compile Ballista dependencies
 RUN mkdir -p /tmp/ballista/src/bin/ && echo 'fn main() {}' >> /tmp/ballista/src/bin/executor.rs
-COPY proto /tmp/proto/
+RUN mkdir -p /tmp/ballista/proto
+COPY proto/ballista.proto /tmp/ballista/proto/
 COPY rust/build.rs /tmp/ballista/
-RUN cargo build --release --target x86_64-unknown-linux-musl
 
-# Compile Ballista
-COPY rust/src/ /tmp/ballista/src/
+# workaround for Arrow 0.17.0 build issue
+RUN mkdir /format
+COPY rust/format/Flight.proto /format
+
 RUN cargo build --release --target x86_64-unknown-linux-musl
-RUN cargo build --release --target x86_64-unknown-linux-musl --examples
 

@@ -27,7 +27,7 @@ This project uses the standard [GitHub Forking Workflow](https://gist.github.com
 
 ## Development Environment
 
-See the [Ballista Development Guide](docs/development-guide.md) for instructions on setting up a local build environment.
+See the [Ballista Development Guide](docs/user-guide/src/development-environment.md) for instructions on setting up a local build environment.
 
 ## Rust Code Formatting
 

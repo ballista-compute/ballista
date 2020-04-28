@@ -48,16 +48,16 @@ impl TryInto<LogicalPlan> for protobuf::LogicalPlanNode {
                 .build()
                 .map_err(|e| e.into())
         } else if let Some(scan) = self.scan {
-            let schema = Schema::new(
-                scan.schema
-                    .unwrap()
-                    .columns
-                    .iter()
-                    .map(|field| Field::new(&field.name, DataType::Utf8, true))
-                    .collect(),
-            );
+            let schema: Schema = scan.schema.unwrap().try_into()?;
+            println!("schema: {:?}", schema);
 
-            LogicalPlanBuilder::scan_csv(&scan.path, &schema, None)?
+            let projection: Vec<usize> = scan.projection.iter()
+                .map(|name| schema.index_of(name))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            println!("projection: {:?}", projection);
+
+            LogicalPlanBuilder::scan_csv(&scan.path, &schema, None)? //TODO
                 .build()
                 .map_err(|e| e.into())
         } else {

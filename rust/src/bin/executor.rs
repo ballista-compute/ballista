@@ -47,6 +47,8 @@ impl FlightService for FlightServiceImpl {
 
                 match &action {
                     plan::Action::Collect { plan: logical_plan } => {
+                        println!("Logical plan: {:?}", logical_plan);
+
                         // create local execution context
                         let mut ctx = ExecutionContext::new();
 
@@ -58,7 +60,7 @@ impl FlightService for FlightServiceImpl {
                             .optimize(&datafusion_plan)
                             .map_err(|e| to_tonic_err(&e))?;
 
-                        println!("Executing: {:?}", optimized_plan);
+                        println!("Optimized Plan: {:?}", optimized_plan);
 
                         let physical_plan = ctx
                             .create_physical_plan(&optimized_plan, 1024 * 1024)

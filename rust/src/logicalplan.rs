@@ -129,9 +129,9 @@ impl LogicalPlan {
             LogicalPlan::MemoryScan { .. } => write!(f, "MemoryScan"),
             LogicalPlan::FileScan {
                 path: ref table_name,
-                ref projection,
+                ref projected_schema,
                 ..
-            } => write!(f, "TableScan: {} projection={:?}", table_name, projection),
+            } => write!(f, "TableScan: '{}'; schema={:?}", table_name, projected_schema),
             LogicalPlan::Projection {
                 ref expr,
                 ref input,

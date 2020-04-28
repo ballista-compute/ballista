@@ -51,7 +51,9 @@ impl TryInto<LogicalPlan> for protobuf::LogicalPlanNode {
             let schema: Schema = scan.schema.unwrap().try_into()?;
             println!("schema: {:?}", schema);
 
-            let projection: Vec<usize> = scan.projection.iter()
+            let projection: Vec<usize> = scan
+                .projection
+                .iter()
                 .map(|name| schema.index_of(name))
                 .collect::<Result<Vec<_>, _>>()?;
 
@@ -94,7 +96,6 @@ impl TryInto<Expr> for protobuf::LogicalExprNode {
         } else if self.has_literal_long {
             Ok(Expr::Literal(ScalarValue::Int64(self.literal_long.clone())))
         } else if let Some(aggregate_expr) = self.aggregate_expr {
-
             let name = match aggregate_expr.aggr_function {
                 0 => Ok("MIN"),
                 1 => Ok("MAX"),
@@ -102,7 +103,7 @@ impl TryInto<Expr> for protobuf::LogicalExprNode {
                 other => Err(ballista_error(&format!(
                     "Unsupported aggregate function '{:?}'",
                     other
-                )))
+                ))),
             }?;
 
             Ok(Expr::AggregateFunction {

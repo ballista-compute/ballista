@@ -101,14 +101,17 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
 
     fn try_into(self) -> Result<protobuf::LogicalPlanNode, Self::Error> {
         match self {
-            LogicalPlan::FileScan { path, schema, projection, .. } => {
+            LogicalPlan::FileScan {
+                path,
+                schema,
+                projection,
+                ..
+            } => {
                 let mut node = empty_plan_node();
 
                 let projected_field_names = match projection {
-                    Some(p) => p.iter()
-                        .map(|i| schema.field(*i).name().clone())
-                        .collect(),
-                    _ => vec![]
+                    Some(p) => p.iter().map(|i| schema.field(*i).name().clone()).collect(),
+                    _ => vec![],
                 };
 
                 let schema: protobuf::Schema = schema.to_owned().try_into()?;

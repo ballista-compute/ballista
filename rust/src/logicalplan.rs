@@ -131,7 +131,11 @@ impl LogicalPlan {
                 path: ref table_name,
                 ref projected_schema,
                 ..
-            } => write!(f, "TableScan: '{}'; schema={:?}", table_name, projected_schema),
+            } => write!(
+                f,
+                "TableScan: '{}'; schema={:?}",
+                table_name, projected_schema
+            ),
             LogicalPlan::Projection {
                 ref expr,
                 ref input,
@@ -1006,12 +1010,20 @@ fn translate_expr(expr: &Expr) -> Result<DFExpr> {
                 right: Arc::new(right),
             })
         }
-        Expr::AggregateFunction { name, args, return_type } => {
+        Expr::AggregateFunction {
+            name,
+            args,
+            return_type,
+        } => {
             let args = args
                 .iter()
                 .map(|e| translate_expr(e))
                 .collect::<Result<Vec<_>>>()?;
-            Ok(DFExpr::AggregateFunction { name: name.to_owned(), args, return_type: return_type.clone() })
+            Ok(DFExpr::AggregateFunction {
+                name: name.to_owned(),
+                args,
+                return_type: return_type.clone(),
+            })
         }
         other => Err(ExecutionError::General(format!(
             "Cannot translate expression to DataFusion: {:?}",

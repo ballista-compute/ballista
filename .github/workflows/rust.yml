@@ -11,12 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-#    - name: Check Formatting
-#      run: cd rust && cargo fmt --all -- --check
-    - name: Install Flight.proto
-      run: cd rust && mkdir /format && cp format/Flight.proto /format
     - name: Build
-      run: cd rust && cargo build
-    - name: Run tests
-      run: cd rust && cargo test --verbose
+      run: ./cicd/build-rust.sh
 

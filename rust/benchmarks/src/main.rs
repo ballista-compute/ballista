@@ -15,27 +15,31 @@ use ballista::BALLISTA_VERSION;
 use datafusion::utils;
 
 use tokio::task;
+use clap::{App, Arg};
 
 #[tokio::main]
 async fn main() -> Result<()> {
 
-    let matches = App::new("Ballista Benchmark Client")
-        .version(BALLISTA_VERSION)
-        .arg(Arg::with_name("mode")
-            .short("m")
-            .long("mode")
-            .help("Benchmark mode: local or k8s")
-            .takes_value(true))
-        .arg(Arg::with_name("path")
-            .short("p")
-            .long("path")
-            .value_name("FILE")
-            .help("Path to data files")
-            .takes_value(true))
-        .get_matches();
+    // let matches = App::new("Ballista Benchmark Client")
+    //     .version(BALLISTA_VERSION)
+    //     .arg(Arg::with_name("mode")
+    //         .short("m")
+    //         .long("mode")
+    //         .help("Benchmark mode: local or k8s")
+    //         .takes_value(true))
+    //     .arg(Arg::with_name("path")
+    //         .short("p")
+    //         .long("path")
+    //         .value_name("FILE")
+    //         .help("Path to data files")
+    //         .takes_value(true))
+    //     .get_matches();
 
-    let mode = matches.value_of("mode").unwrap_or("k8s");
-    let nyc_taxi_path = matches.value_of("path").unwrap_or("/mnt/nyctaxi");
+    // let mode = matches.value_of("mode").unwrap_or("k8s");
+    // let nyc_taxi_path = matches.value_of("path").unwrap_or("/mnt/nyctaxi");
+
+    let _mode = "k8s";
+    let nyc_taxi_path = "/mnt/nyctaxi";
 
     let cluster_name = "ballista";
     let namespace = "default";

@@ -1,4 +1,4 @@
-# Run build-docker-image.sh to build this Dockerfile!
+# Run build-rust-benchmarks.sh to build this rust-benchmarks.dockerfile!
 FROM rustlang/rust:nightly
 
 ADD temp /opt

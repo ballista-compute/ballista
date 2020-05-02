@@ -179,7 +179,9 @@ dependencies = [
 
 [[package]]
 name = "ballista"
-version = "0.2.4-SNAPSHOT"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ffc98359e6f24e8545cfdb1504ea676cd19f1f41fa9db7382b1117f5147d0797"
 dependencies = [
  "arrow",
  "arrow-flight",
@@ -200,7 +202,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ballista-integration-tests"
+name = "ballista-benchmarks"
 version = "0.1.0"
 dependencies = [
  "arrow",

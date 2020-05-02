@@ -8,17 +8,20 @@ import org.apache.spark.sql.SparkSession
 object SparkExecutor {
 
   def main(arg: Array[String]): Unit = {
+
+    //TODO command-line params
+    val master = "local[1]" // single-threaded for benchmarks against Rust/JVM executors
+    val bindHost = "0.0.0.0"
+    val port = 50051
+
     // https://issues.apache.org/jira/browse/ARROW-5412
     System.setProperty( "io.netty.tryReflectionSetAccessible","true")
 
     val spark = SparkSession.builder()
-      .master("local[*]")
+      .master(master)
       .getOrCreate()
 
     val flightProducer = new SparkFlightProducer(spark)
-
-    val bindHost = "0.0.0.0"
-    val port = 50051
 
     // start Flight server
     val server = FlightServer.builder(

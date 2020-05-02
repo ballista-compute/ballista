@@ -41,12 +41,14 @@ async fn main() -> Result<()> {
             )?
             .collect()
             .await?;
+
+        let duration = start.elapsed();
         println!(
-            "Executed query against {} executor at {}:{} in {} seconds",
+            "Executed query against {} executor at {}:{} in {} ms",
             name,
             host,
             port,
-            start.elapsed().as_secs()
+            duration.as_millis()
         );
         print_batches(&response)?;
 

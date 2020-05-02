@@ -18,13 +18,25 @@ use tokio::task;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    println!(
-        "Ballista Benchmark Client. Compiled against Ballista version {}.",
-        BALLISTA_VERSION
-    );
 
-    //TODO use command-line args
-    let nyc_taxi_path = "/mnt/nyctaxi";
+    let matches = App::new("Ballista Benchmark Client")
+        .version(BALLISTA_VERSION)
+        .arg(Arg::with_name("mode")
+            .short("m")
+            .long("mode")
+            .help("Benchmark mode: local or k8s")
+            .takes_value(true))
+        .arg(Arg::with_name("path")
+            .short("p")
+            .long("path")
+            .value_name("FILE")
+            .help("Path to data files")
+            .takes_value(true))
+        .get_matches();
+
+    let mode = matches.value_of("mode").unwrap_or("k8s");
+    let nyc_taxi_path = matches.value_of("path").unwrap_or("/mnt/nyctaxi");
+
     let cluster_name = "ballista";
     let namespace = "default";
     let num_months: usize = 12;
@@ -87,6 +99,7 @@ async fn main() -> Result<()> {
         process::exit(3);
     }
     println!("Received {} batches from executors", batches.len());
+    utils::print_batches(&batches)?;
 
     // perform secondary aggregate query on the results collected from the executors
     let ctx = Context::local();
@@ -94,14 +107,14 @@ async fn main() -> Result<()> {
     let results = ctx
         .create_dataframe(&batches)?
         .aggregate(vec![col("passenger_count")],
-                   vec![min(col("fare_amount")), max(col("fare_amount")), sum(col("fare_amount"))])?
+                   vec![min(col("MIN")), max(col("MAX")), sum(col("SUM"))])?
         .collect()
         .await?;
 
     // print the results
+    println!("Parallel query took {} ms", start.elapsed().as_millis());
     utils::print_batches(&results)?;
 
-    println!("Parallel query took {} ms", start.elapsed().as_millis());
 
     Ok(())
 }
@@ -116,6 +129,7 @@ async fn execute_remote(host: &str, port: usize, filename: &str) -> Result<Vec<R
     let response = ctx
         .read_csv(filename, Some(nyctaxi_schema()), None, true)?
         .aggregate(vec![col("passenger_count")],
+                   //TODO use aliases for aggregates
                    vec![min(col("fare_amount")), max(col("fare_amount")), sum(col("fare_amount"))])?
         .collect()
         .await?;
@@ -135,7 +149,7 @@ fn nyctaxi_schema() -> Schema {
         Field::new("VendorID", DataType::Utf8, true),
         Field::new("tpep_pickup_datetime", DataType::Utf8, true),
         Field::new("tpep_dropoff_datetime", DataType::Utf8, true),
-        Field::new("passenger_count", DataType::UInt32, true),
+        Field::new("passenger_count", DataType::Int32, true),
         Field::new("trip_distance", DataType::Utf8, true),
         Field::new("RatecodeID", DataType::Utf8, true),
         Field::new("store_and_fwd_flag", DataType::Utf8, true),

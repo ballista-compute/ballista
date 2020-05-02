@@ -179,9 +179,7 @@ dependencies = [
 
 [[package]]
 name = "ballista"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffc98359e6f24e8545cfdb1504ea676cd19f1f41fa9db7382b1117f5147d0797"
+version = "0.2.4-SNAPSHOT"
 dependencies = [
  "arrow",
  "arrow-flight",

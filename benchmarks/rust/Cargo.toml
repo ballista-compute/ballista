@@ -5,10 +5,10 @@ authors = ["Andy Grove <andygrove73@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-ballista = "0.2.3"
-
+ballista = { path="../../rust" }
+#ballista = "0.2.3"
 arrow = "0.17"
 arrow-flight = "0.17"
 datafusion = "0.17"
-
+clap = "0.2"
 tokio = { version = "0.2", features = ["full"] }

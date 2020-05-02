@@ -1,14 +1,17 @@
 use arrow::datatypes::{DataType, Schema};
 use arrow::record_batch::RecordBatch;
 
+use datafusion;
+
 use crate::client;
 use crate::error::{BallistaError, Result};
-use crate::logicalplan::{exprlist_to_fields, Expr, LogicalPlan, ScalarValue};
+use crate::logicalplan::{exprlist_to_fields, Expr, LogicalPlan, ScalarValue, Operator};
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::plan::Action;
+use datafusion::datasource::MemTable;
 
 pub struct Context {
     state: Arc<ContextState>,
@@ -235,10 +238,28 @@ impl DataFrame {
                     .await
             }
             ContextState::Remote { host, port } => ctx.execute_action(host, *port, action).await,
-            other => Err(BallistaError::NotImplemented(format!(
-                "collect() is not implemented for {:?} yet",
-                other
-            ))),
+            ContextState::Local => {
+
+                // create local execution context
+                let mut ctx = datafusion::execution::context::ExecutionContext::new();
+
+                let datafusion_plan =
+                    translate_plan(&mut ctx, &self.plan)?;
+
+                // create the query plan
+                let optimized_plan = ctx
+                    .optimize(&datafusion_plan)?;
+
+                println!("Optimized Plan: {:?}", optimized_plan);
+
+                let physical_plan = ctx
+                    .create_physical_plan(&optimized_plan, 1024 * 1024)?;
+
+                // execute the query
+                ctx.collect(physical_plan.as_ref())
+                    .map_err(|e| BallistaError::DataFusionError(e))
+
+            },
         }
     }
 
@@ -284,5 +305,171 @@ pub fn aggregate_expr(name: &str, expr: &Expr) -> Expr {
         name: name.to_string(),
         args: vec![expr.clone()],
         return_type,
+    }
+}
+
+
+/// Translate Ballista plan to DataFusion plan
+pub fn translate_plan(ctx: &mut datafusion::execution::context::ExecutionContext, plan: &LogicalPlan) -> Result<datafusion::logicalplan::LogicalPlan> {
+    match plan {
+        LogicalPlan::MemoryScan(batches) => {
+            let table_name = "df_t0"; //TODO generate unique table name
+            let schema = (&batches[0]).schema().as_ref();
+            let provider = MemTable::new(Arc::new(schema.clone()), batches.clone())?;
+            ctx.register_table(table_name, Box::new(provider));
+            Ok(datafusion::logicalplan::LogicalPlan::TableScan {
+                schema_name: "default".to_owned(),
+                table_name: table_name.to_owned(),
+                table_schema: Arc::new(schema.clone()),
+                projected_schema: Arc::new(schema.clone()),
+                projection: None,
+            })
+        }
+        LogicalPlan::FileScan {
+            path,
+            schema,
+            projection,
+            projected_schema,
+        } => {
+            //TODO generate unique table name
+            let table_name = "tbd".to_owned();
+
+            ctx.register_csv(&table_name, path.as_str(), schema, true);
+
+            Ok(datafusion::logicalplan::LogicalPlan::TableScan {
+                schema_name: "default".to_owned(),
+                table_name: table_name.clone(),
+                table_schema: Arc::new(schema.clone()),
+                projected_schema: Arc::new(projected_schema.clone()),
+                projection: projection.clone(),
+            })
+        }
+        LogicalPlan::Projection {
+            expr,
+            input,
+            schema,
+        } => Ok(datafusion::logicalplan::LogicalPlan::Projection {
+            expr: expr
+                .iter()
+                .map(|e| translate_expr(e))
+                .collect::<Result<Vec<_>>>()?,
+            input: Arc::new(translate_plan(ctx, input)?),
+            schema: Arc::new(schema.clone()),
+        }),
+        LogicalPlan::Selection { expr, input } => Ok(datafusion::logicalplan::LogicalPlan::Selection {
+            expr: translate_expr(expr)?,
+            input: Arc::new(translate_plan(ctx, input)?),
+        }),
+        LogicalPlan::Aggregate {
+            group_expr,
+            aggr_expr,
+            input,
+            schema,
+        } => Ok(datafusion::logicalplan::LogicalPlan::Aggregate {
+            group_expr: group_expr
+                .iter()
+                .map(|e| translate_expr(e))
+                .collect::<Result<Vec<_>>>()?,
+            aggr_expr: aggr_expr
+                .iter()
+                .map(|e| translate_expr(e))
+                .collect::<Result<Vec<_>>>()?,
+            input: Arc::new(translate_plan(ctx, input)?),
+            schema: Arc::new(schema.clone()),
+        }),
+        other => Err(BallistaError::General(format!(
+            "Cannot translate operator to DataFusion: {:?}",
+            other
+        ))),
+    }
+}
+
+/// Translate Ballista expression to DataFusion expression
+fn translate_expr(expr: &Expr) -> Result<datafusion::logicalplan::Expr> {
+    match expr {
+        Expr::Alias(expr, alias) => Ok(datafusion::logicalplan::Expr::Alias(
+            Arc::new(translate_expr(expr.as_ref())?),
+            alias.clone(),
+        )),
+        Expr::Column(index) => Ok(datafusion::logicalplan::Expr::Column(*index)),
+        Expr::UnresolvedColumn(name) => Ok(datafusion::logicalplan::Expr::UnresolvedColumn(name.clone())),
+        Expr::Literal(value) => {
+            let value = translate_scalar_value(value)?;
+            Ok(datafusion::logicalplan::Expr::Literal(value.clone()))
+        }
+        Expr::BinaryExpr { left, op, right } => {
+            let left = translate_expr(left)?;
+            let right = translate_expr(right)?;
+            let op = translate_operator(op)?;
+            Ok(datafusion::logicalplan::Expr::BinaryExpr {
+                left: Arc::new(left),
+                op,
+                right: Arc::new(right),
+            })
+        }
+        Expr::AggregateFunction {
+            name,
+            args,
+            return_type,
+        } => {
+            let args = args
+                .iter()
+                .map(|e| translate_expr(e))
+                .collect::<Result<Vec<_>>>()?;
+            Ok(datafusion::logicalplan::Expr::AggregateFunction {
+                name: name.to_owned(),
+                args,
+                return_type: return_type.clone(),
+            })
+        }
+        other => Err(BallistaError::General(format!(
+            "Cannot translate expression to DataFusion: {:?}",
+            other
+        ))),
+    }
+}
+
+fn translate_operator(op: &Operator) -> Result<datafusion::logicalplan::Operator> {
+    match op {
+        Operator::Eq => Ok(datafusion::logicalplan::Operator::Eq),
+        Operator::NotEq => Ok(datafusion::logicalplan::Operator::NotEq),
+        Operator::Lt => Ok(datafusion::logicalplan::Operator::Lt),
+        Operator::LtEq => Ok(datafusion::logicalplan::Operator::LtEq),
+        Operator::Gt => Ok(datafusion::logicalplan::Operator::Gt),
+        Operator::GtEq => Ok(datafusion::logicalplan::Operator::GtEq),
+        Operator::And => Ok(datafusion::logicalplan::Operator::And),
+        Operator::Or => Ok(datafusion::logicalplan::Operator::Or),
+        Operator::Plus => Ok(datafusion::logicalplan::Operator::Plus),
+        Operator::Minus => Ok(datafusion::logicalplan::Operator::Minus),
+        Operator::Multiply => Ok(datafusion::logicalplan::Operator::Multiply),
+        Operator::Divide => Ok(datafusion::logicalplan::Operator::Divide),
+        Operator::Like => Ok(datafusion::logicalplan::Operator::Like),
+        Operator::NotLike => Ok(datafusion::logicalplan::Operator::NotLike),
+        Operator::Modulus => Ok(datafusion::logicalplan::Operator::Modulus),
+        other => Err(BallistaError::General(format!(
+            "Cannot translate binary operator to DataFusion: {:?}",
+            other
+        ))),
+    }
+}
+
+fn translate_scalar_value(value: &ScalarValue) -> Result<datafusion::logicalplan::ScalarValue> {
+    match value {
+        ScalarValue::Boolean(v) => Ok(datafusion::logicalplan::ScalarValue::Boolean(*v)),
+        ScalarValue::UInt8(v) => Ok(datafusion::logicalplan::ScalarValue::UInt8(*v)),
+        ScalarValue::UInt16(v) => Ok(datafusion::logicalplan::ScalarValue::UInt16(*v)),
+        ScalarValue::UInt32(v) => Ok(datafusion::logicalplan::ScalarValue::UInt32(*v)),
+        ScalarValue::UInt64(v) => Ok(datafusion::logicalplan::ScalarValue::UInt64(*v)),
+        ScalarValue::Int8(v) => Ok(datafusion::logicalplan::ScalarValue::Int8(*v)),
+        ScalarValue::Int16(v) => Ok(datafusion::logicalplan::ScalarValue::Int16(*v)),
+        ScalarValue::Int32(v) => Ok(datafusion::logicalplan::ScalarValue::Int32(*v)),
+        ScalarValue::Int64(v) => Ok(datafusion::logicalplan::ScalarValue::Int64(*v)),
+        ScalarValue::Float32(v) => Ok(datafusion::logicalplan::ScalarValue::Float32(*v)),
+        ScalarValue::Float64(v) => Ok(datafusion::logicalplan::ScalarValue::Float64(*v)),
+        ScalarValue::Utf8(v) => Ok(datafusion::logicalplan::ScalarValue::Utf8(v.clone())),
+        other => Err(BallistaError::General(format!(
+            "Cannot translate scalar value to DataFusion: {:?}",
+            other
+        ))),
     }
 }

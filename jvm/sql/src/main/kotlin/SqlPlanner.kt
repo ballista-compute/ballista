@@ -28,7 +28,6 @@ class SqlPlanner {
 
         // build a list of columns referenced in the projection
         val columnNamesInProjection = getReferencedColumns(projectionExpr)
-        println("Projection references columns: $columnNamesInProjection")
 
         val aggregateExprCount = projectionExpr.count { isAggregateExpr(it) }
         if (aggregateExprCount == 0 && select.groupBy.isNotEmpty()) {
@@ -123,7 +122,6 @@ class SqlPlanner {
         if (select.selection != null) {
 
             val columnNamesInProjectionWithoutAggregates = getReferencedColumns(projectionWithoutAggregates)
-            println("Projection without aggregate references columns: $columnNamesInProjectionWithoutAggregates")
 
             val missing = (columnNamesInSelection - columnNamesInProjectionWithoutAggregates)
             logger.info("** missing: $missing")
@@ -153,7 +151,6 @@ class SqlPlanner {
             visit(filterExpr, accumulator)
             val validColumnNames = table.schema().fields.map { it.name }
             accumulator.removeIf { name -> !validColumnNames.contains(name) }
-            println("Selection references additional columns: $accumulator")
         }
         return accumulator
     }

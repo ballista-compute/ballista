@@ -6,10 +6,7 @@ import java.lang.IllegalStateException
 class ProjectionPushDownRule : OptimizerRule {
 
     override fun optimize(plan: LogicalPlan): LogicalPlan {
-        println("BEFORE ProjectionPushDownRule:\n${plan.pretty()}")
-        val optimized = pushDown(plan, mutableSetOf())
-        println("AFTER ProjectionPushDownRule:\n${optimized.pretty()}")
-        return optimized
+        return pushDown(plan, mutableSetOf())
     }
 
     private fun pushDown(plan: LogicalPlan,

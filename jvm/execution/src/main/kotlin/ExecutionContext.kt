@@ -52,17 +52,8 @@ class ExecutionContext(val batchSize: Int = 1024 * 1024) {
 
     /** Execute the provided logical plan */
     fun execute(plan: LogicalPlan) : Sequence<RecordBatch> {
-        println("ExecutionContext.execute() plan:" +
-                "\n${plan.pretty()}")
-
         val optimizedPlan = Optimizer().optimize(plan)
-        println("ExecutionContext.execute() optimizedPlan:" +
-                "\n${optimizedPlan.pretty()}")
-
         val physicalPlan = QueryPlanner().createPhysicalPlan(optimizedPlan)
-        println("ExecutionContext.execute() physicalPlan:" +
-                "\n${physicalPlan.pretty()}")
-
         return physicalPlan.execute()
     }
 

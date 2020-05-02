@@ -22,6 +22,7 @@ include("protobuf")
 include("executor")
 include("fuzzer")
 
+include("benchmarks")
 include("examples")
 
 // Ballista JVM Connectors

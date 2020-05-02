@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ballista
+  labels:
+    app: ballista
+spec:
+  ports:
+    - port: 50051
+      name: flight
+  clusterIP: None
+  selector:
+    app: ballista
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ballista
+spec:
+  serviceName: "ballista"
+  replicas: 12
+  selector:
+    matchLabels:
+      app: ballista
+  template:
+    metadata:
+      labels:
+        app: ballista
+        ballista-cluster: ballista
+    spec:
+      containers:
+      - name: ballista
+        image: ballistacompute/ballista-spark
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2048Mi"
+          limits:
+            cpu: "1"
+            memory: "2048Mi"
+        ports:
+          - containerPort: 50051
+            name: flight
+        volumeMounts:
+          - mountPath: /mnt/nyctaxi
+            name: nyctaxi
+      volumes:
+      - name: nyctaxi
+        persistentVolumeClaim:
+          claimName: nyctaxi-pv-claim

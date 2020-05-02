@@ -67,8 +67,8 @@ class ProtobufDeserializer {
             return when (aggr.aggrFunction) {
                 AggregateFunction.MIN -> Min(expr)
                 AggregateFunction.MAX -> Max(expr)
-                AggregateFunction.SUM -> Max(expr)
-                AggregateFunction.AVG -> Max(expr)
+                AggregateFunction.SUM -> Sum(expr)
+                AggregateFunction.AVG -> Avg(expr)
                 else -> throw RuntimeException("Failed to parse logical aggregate expression: ${aggr.aggrFunction}")
             }
 

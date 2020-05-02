@@ -216,6 +216,7 @@ class SqlPlanner {
                 "MIN" -> Min(createLogicalExpr(expr.args.first(), input))
                 "MAX" -> Max(createLogicalExpr(expr.args.first(), input))
                 "SUM" -> Sum(createLogicalExpr(expr.args.first(), input))
+                "AVG" -> Avg(createLogicalExpr(expr.args.first(), input))
                 else -> throw SQLException("Invalid aggregate function: $expr")
             }
             else -> throw SQLException("Cannot create logical expression from sql expression: $expr")

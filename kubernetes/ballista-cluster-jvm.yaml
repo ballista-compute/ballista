@@ -30,9 +30,7 @@ spec:
     spec:
       containers:
       - name: ballista
-        image: ballistacompute/ballista-rust:0.2.3
-        # because we're testing in Minikube, we never want to pull remote images
-        #imagePullPolicy: Never
+        image: ballistacompute/ballista-jvm
         resources:
           requests:
             cpu: "1"

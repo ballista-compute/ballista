@@ -1,4 +1,4 @@
-FROM ballistacompute/rust-cached-deps as build
+FROM ballistacompute/rust-cached-deps:0.2.3 as build
 
 # Compile Ballista
 RUN rm -rf /tmp/ballista/src/
@@ -12,7 +12,6 @@ RUN mkdir /format
 COPY rust/format/Flight.proto /format
 
 RUN cargo build --release --target x86_64-unknown-linux-musl
-RUN cargo build --release --target x86_64-unknown-linux-musl --examples
 
 ## Copy the statically-linked binary into a scratch container.
 FROM alpine:3.10

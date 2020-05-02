@@ -8,7 +8,6 @@ COPY rust/src/ /tmp/ballista/src/
 COPY proto/ballista.proto /tmp/ballista/proto/
 
 # workaround for Arrow 0.17.0 build issue
-RUN mkdir /format
 COPY rust/format/Flight.proto /format
 
 RUN cargo build --release --target x86_64-unknown-linux-musl

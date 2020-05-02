@@ -5,7 +5,7 @@ use datafusion;
 
 use crate::client;
 use crate::error::{BallistaError, Result};
-use crate::logicalplan::{exprlist_to_fields, Expr, LogicalPlan, ScalarValue, Operator};
+use crate::logicalplan::{exprlist_to_fields, Expr, LogicalPlan, Operator, ScalarValue};
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -239,27 +239,22 @@ impl DataFrame {
             }
             ContextState::Remote { host, port } => ctx.execute_action(host, *port, action).await,
             ContextState::Local => {
-
                 // create local execution context
                 let mut ctx = datafusion::execution::context::ExecutionContext::new();
 
-                let datafusion_plan =
-                    translate_plan(&mut ctx, &self.plan)?;
+                let datafusion_plan = translate_plan(&mut ctx, &self.plan)?;
 
                 // create the query plan
-                let optimized_plan = ctx
-                    .optimize(&datafusion_plan)?;
+                let optimized_plan = ctx.optimize(&datafusion_plan)?;
 
                 println!("Optimized Plan: {:?}", optimized_plan);
 
-                let physical_plan = ctx
-                    .create_physical_plan(&optimized_plan, 1024 * 1024)?;
+                let physical_plan = ctx.create_physical_plan(&optimized_plan, 1024 * 1024)?;
 
                 // execute the query
                 ctx.collect(physical_plan.as_ref())
                     .map_err(|e| BallistaError::DataFusionError(e))
-
-            },
+            }
         }
     }
 
@@ -308,9 +303,11 @@ pub fn aggregate_expr(name: &str, expr: &Expr) -> Expr {
     }
 }
 
-
 /// Translate Ballista plan to DataFusion plan
-pub fn translate_plan(ctx: &mut datafusion::execution::context::ExecutionContext, plan: &LogicalPlan) -> Result<datafusion::logicalplan::LogicalPlan> {
+pub fn translate_plan(
+    ctx: &mut datafusion::execution::context::ExecutionContext,
+    plan: &LogicalPlan,
+) -> Result<datafusion::logicalplan::LogicalPlan> {
     match plan {
         LogicalPlan::MemoryScan(batches) => {
             let table_name = "df_t0"; //TODO generate unique table name
@@ -356,10 +353,12 @@ pub fn translate_plan(ctx: &mut datafusion::execution::context::ExecutionContext
             input: Arc::new(translate_plan(ctx, input)?),
             schema: Arc::new(schema.clone()),
         }),
-        LogicalPlan::Selection { expr, input } => Ok(datafusion::logicalplan::LogicalPlan::Selection {
-            expr: translate_expr(expr)?,
-            input: Arc::new(translate_plan(ctx, input)?),
-        }),
+        LogicalPlan::Selection { expr, input } => {
+            Ok(datafusion::logicalplan::LogicalPlan::Selection {
+                expr: translate_expr(expr)?,
+                input: Arc::new(translate_plan(ctx, input)?),
+            })
+        }
         LogicalPlan::Aggregate {
             group_expr,
             aggr_expr,
@@ -392,7 +391,9 @@ fn translate_expr(expr: &Expr) -> Result<datafusion::logicalplan::Expr> {
             alias.clone(),
         )),
         Expr::Column(index) => Ok(datafusion::logicalplan::Expr::Column(*index)),
-        Expr::UnresolvedColumn(name) => Ok(datafusion::logicalplan::Expr::UnresolvedColumn(name.clone())),
+        Expr::UnresolvedColumn(name) => Ok(datafusion::logicalplan::Expr::UnresolvedColumn(
+            name.clone(),
+        )),
         Expr::Literal(value) => {
             let value = translate_scalar_value(value)?;
             Ok(datafusion::logicalplan::Expr::Literal(value.clone()))

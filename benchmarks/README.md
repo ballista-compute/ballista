@@ -2,5 +2,11 @@
 
 This directory contains code to run benchmarks in Docker and collect results. The latest published benchmarks can be found [here](https://ballistacompute.org/benchmarks/).
 
+## Usage
  
+```bash
+cargo run -- --bench=spark --path=/mnt/nyctaxi/csv/year=2019 --cpus=12
+cargo run -- --bench=rust --path=/mnt/nyctaxi/csv/year=2019 --cpus=12
+cargo run -- --bench=jvm --path=/mnt/nyctaxi/csv/year=2019 --cpus=12
+``` 
 

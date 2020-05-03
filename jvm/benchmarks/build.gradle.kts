@@ -1,8 +1,12 @@
 plugins {
     kotlin("plugin.serialization") version "1.3.61"
     scala
+    application
 }
 
+application {
+    mainClassName = "org.ballistacompute.benchmarks.Benchmarks"
+}
 
 dependencies {
     implementation(project(":datatypes"))

@@ -11,15 +11,12 @@ object Main {
     val path = sys.env("BENCH_PATH")
     val sql = sys.env("BENCH_SQL")
     val resultFile = sys.env("BENCH_RESULT_FILE")
-
-    val iterations = 1
-    val threads = "*"
+    val iterations = sys.env("BENCH_ITERATIONS").toInt
 
     Benchmarks.run(format,
       path,
       sql,
       iterations,
-      threads,
       resultFile)
 
   }

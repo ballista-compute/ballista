@@ -1,5 +1,8 @@
 use std::process;
 use std::time::Instant;
+use std::env;
+use std::fs::File;
+use std::io::prelude::*;
 
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -19,26 +22,33 @@ use clap::{App, Arg};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let matches = App::new("Ballista Benchmark Client")
-        .version(BALLISTA_VERSION)
-        .arg(Arg::with_name("mode")
-            .short("m")
-            .long("mode")
-            .help("Benchmark mode: local or k8s")
-            .takes_value(true))
-        .arg(Arg::with_name("path")
-            .short("p")
-            .long("path")
-            .value_name("FILE")
-            .help("Path to data files")
-            .takes_value(true))
-        .get_matches();
 
-    let mode = matches.value_of("mode").unwrap_or("");
-    let path = matches.value_of("path").unwrap_or("").to_owned();
+    // let matches = App::new("Ballista Benchmark Client")
+    //     .version(BALLISTA_VERSION)
+    //     .arg(Arg::with_name("mode")
+    //         .short("m")
+    //         .long("mode")
+    //         .help("Benchmark mode: local or k8s")
+    //         .takes_value(true))
+    //     .arg(Arg::with_name("path")
+    //         .short("p")
+    //         .long("path")
+    //         .value_name("FILE")
+    //         .help("Path to data files")
+    //         .takes_value(true))
+    //     .get_matches();
+    //
+    //
+    //
+    // let mode = matches.value_of("mode").unwrap_or("");
+    // let path = matches.value_of("path").unwrap_or("").to_owned();
 
-    match mode {
-        "local" => local_mode_benchmark(&path).await?,
+    let mode = env::var("BENCH_MODE").unwrap();
+    let path = env::var("BENCH_PATH").unwrap();
+    let resultFile = env::var("BENCH_RESULT_FILE").unwrap();
+
+    match mode.as_str() {
+        "local" => local_mode_benchmark(&path, &resultFile).await?,
         "k8s" => k8s(&path).await?,
         _ => {
             println!("Invalid mode {}", mode);
@@ -48,13 +58,19 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn local_mode_benchmark(path: &str) -> Result<()> {
+async fn local_mode_benchmark(path: &str, results_filename: &str) -> Result<()> {
     let start = Instant::now();
     let ctx = Context::local();
     let df = create_csv_query(&ctx, path)?;
     let response = df.collect().await?;
     utils::print_batches(&response).map_err(|e| BallistaError::DataFusionError(e) )?;
-    println!("Local mode benchmark took {} ms", start.elapsed().as_millis());
+    let duration = start.elapsed().as_millis();
+    println!("Local mode benchmark took {} ms", duration);
+
+    let mut file = File::create(results_filename).unwrap();
+    file.write_all(b"iterations,time_millis\n").unwrap();
+    file.write_all(format!("1,{}\n", duration).as_bytes()).unwrap();
+
     Ok(())
 }
 

@@ -7,11 +7,11 @@ import org.apache.spark.sql.types.{DataTypes, StructField, StructType}
 
 object Benchmarks {
 
-  def run(format: String, path: String, sql: String, iterations: Int, threads: String, outputFile: String): Unit = {
+  def run(format: String, path: String, sql: String, iterations: Int, outputFile: String): Unit = {
 
     val spark: SparkSession = SparkSession.builder
       .appName(this.getClass.getName)
-      .master(s"local[$threads]")
+      .master(s"local[*]")
       .getOrCreate()
 
     format match {
@@ -35,13 +35,13 @@ object Benchmarks {
 
     spark.close()
 
-    //TODO write structured file with results, timings, memory usage, etc
     println(s"Writing results to $outputFile")
     val w = new FileWriter(new File(outputFile))
+    w.write("iteration,time_millis\n")
     durations.zipWithIndex.foreach {
       case (duration,iter) =>
         println(s"Iteration ${iter+1} took ${duration/1000.0} seconds")
-        w.write(s"Iteration ${iter+1} took ${duration/1000.0} seconds\n")
+        w.write(s"${iter+1},$duration\n")
     }
     w.close()
 

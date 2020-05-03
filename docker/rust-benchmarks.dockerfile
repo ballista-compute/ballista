@@ -17,7 +17,7 @@ COPY rust/benchmarks/Cargo.* /tmp/ballista/benchmarks/
 COPY rust/benchmarks/src/ /tmp/ballista/benchmarks/src/
 
 # Build
-RUN cargo build --target x86_64-unknown-linux-musl --release
+RUN cargo build --release --target x86_64-unknown-linux-musl
 
 # Copy the statically-linked binary into a scratch container.
 FROM alpine:3.10

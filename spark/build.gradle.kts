@@ -3,7 +3,7 @@ plugins {
     kotlin("jvm") version "1.3.50" apply false
 }
 
-group = "org.ballistacompute"
+group = "org.ballistacompute.spark"
 version = "0.2.4-SNAPSHOT"
 description = "Ballista Spark Support"
 
@@ -15,13 +15,10 @@ allprojects {
     }
 }
 
-
-
 subprojects {
+
     apply {
         plugin("org.jetbrains.kotlin.jvm")
-//        scala
-//        application
     }
 
     dependencies {
@@ -48,18 +45,6 @@ subprojects {
 
         testImplementation("junit:junit:4.12")
 
-        // Use Scala 2.11 in our library project
-//    implementation 'org.scala-lang:scala-library:2.12.8'
-//
-//    implementation('org.slf4j:slf4j-api:1.7.25')
-//
-//    implementation('com.datasift.dropwizard.scala:dropwizard-scala-core_2.12:1.3.7-1') {
-//        exclude group: 'org.slf4j', module: 'log4j-over-slf4j'
-//    }
-//
-//
-//    // Need scala-xml at test runtime
-//    testRuntime 'org.scala-lang.modules:scala-xml_2.11:1.0.6'
     }
 }
 

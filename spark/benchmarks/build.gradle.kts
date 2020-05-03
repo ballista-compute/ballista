@@ -1,6 +1,7 @@
 description = "Ballista Spark Benchmarks"
 
 plugins {
+    scala
     application
 }
 

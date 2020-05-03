@@ -1,4 +1,6 @@
-package org.ballistacompute.spark.datasource;
+package org.ballistacompute.spark.datasource
+
+import java.util.Optional
 
 object Utils {
 

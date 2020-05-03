@@ -1,4 +1,4 @@
-package org.ballistacompute.benchmarks.spark
+package org.ballistacompute.spark.benchmarks
 
 import org.rogach.scallop._
 

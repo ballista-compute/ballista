@@ -1,4 +1,7 @@
-package org.ballistacompute.spark.benchmarks;
+package org.ballistacompute.spark.benchmarks
+
+import org.apache.spark.sql.{DataFrame, SparkSession}
+;
 
 object SparkUtils {
 

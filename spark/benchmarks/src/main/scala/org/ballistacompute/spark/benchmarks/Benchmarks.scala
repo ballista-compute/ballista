@@ -1,4 +1,8 @@
-package org.ballistacompute.spark.benchmarks;
+package org.ballistacompute.spark.benchmarks
+
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.types.{DataTypes, StructField, StructType}
+;
 
 object Benchmarks {
 

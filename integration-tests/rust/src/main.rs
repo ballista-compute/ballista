@@ -17,7 +17,7 @@ use std::collections::HashMap;
 async fn main() -> Result<()> {
     println!("Ballista v{} Rust Integration Tests", BALLISTA_VERSION);
 
-    let filename = "/mnt/nyctaxi/yellow_tripdata_2019-01.csv";
+    let filename = "/mnt/nyctaxi/csv/year=2019/yellow_tripdata_2019-01.csv";
 
     let host = "localhost";
 

@@ -4,4 +4,4 @@ ADD build/distributions/benchmarks.tar /opt
 
 EXPOSE 50051
 
-CMD ["/opt/benchmarks/bin/benchmarks"]
+ENTRYPOINT ["/opt/benchmarks/bin/benchmarks"]

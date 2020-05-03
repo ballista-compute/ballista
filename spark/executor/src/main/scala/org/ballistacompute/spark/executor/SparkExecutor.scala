@@ -1,9 +1,4 @@
-package org.ballistacompute.spark.executor
-
-import org.apache.arrow.memory.RootAllocator
-import org.apache.arrow.flight.FlightServer
-import org.apache.arrow.flight.Location
-import org.apache.spark.sql.SparkSession
+package org.ballistacompute.spark.executor;
 
 object SparkExecutor {
 

@@ -1,10 +1,4 @@
-package org.ballistacompute.benchmarks.spark
-
-import java.util.concurrent.Executors
-
-import org.apache.spark.sql.{SaveMode, SparkSession}
-
-import scala.reflect.io.File
+package org.ballistacompute.spark.benchmarks;
 
 /**
   * Utility for converting CSV to Parquet and repartitioning files.

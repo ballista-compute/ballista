@@ -8,3 +8,7 @@
  */
 
 rootProject.name = "ballista-spark"
+
+include("datasource")
+include("executor")
+include("benchmarks")

@@ -1,7 +1,4 @@
-package org.ballistacompute.benchmarks.spark
-
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.types.{DataType, DataTypes, StructField, StructType}
+package org.ballistacompute.spark.benchmarks;
 
 object Benchmarks {
 
@@ -61,7 +58,7 @@ object Benchmarks {
       StructField("improvement_surcharge", DataTypes.DoubleType),
       StructField("total_amount", DataTypes.DoubleType)
     ))
-    
+
     val df = spark.read.format("csv")
       .option("header", "true")
       .schema(schema)

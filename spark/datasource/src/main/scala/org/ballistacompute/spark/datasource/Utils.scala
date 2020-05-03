@@ -1,6 +1,4 @@
-package io.andygrove.ballista.spark.datasource
-
-import java.util.Optional
+package org.ballistacompute.spark.datasource;
 
 object Utils {
 

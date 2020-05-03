@@ -1,6 +1,4 @@
-package org.ballistacompute.benchmarks.spark
-
-import org.apache.spark.sql.SparkSession
+package org.ballistacompute.spark.benchmarks;
 
 object SparkSqlJob {
 

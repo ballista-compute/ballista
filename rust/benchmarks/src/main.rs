@@ -19,6 +19,7 @@ use datafusion::utils;
 
 use tokio::task;
 use clap::{App, Arg};
+use std::collections::HashMap;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -60,7 +61,11 @@ async fn main() -> Result<()> {
 
 async fn local_mode_benchmark(path: &str, results_filename: &str) -> Result<()> {
     let start = Instant::now();
-    let ctx = Context::local();
+
+    let mut settings = HashMap::new();
+    settings.insert("ballista.csv.batchSize", "1000");
+
+    let ctx = Context::local(settings);
     let df = create_csv_query(&ctx, path)?;
     df.explain();
 
@@ -143,7 +148,9 @@ async fn k8s(path: &str) -> Result<()> {
     utils::print_batches(&batches)?;
 
     // perform secondary aggregate query on the results collected from the executors
-    let ctx = Context::local();
+    let mut settings = HashMap::new();
+
+    let ctx = Context::local(settings);
 
     let results = ctx
         .create_dataframe(&batches)?

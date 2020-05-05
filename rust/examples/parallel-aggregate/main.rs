@@ -15,6 +15,7 @@ use ballista::BALLISTA_VERSION;
 
 use datafusion::utils;
 
+use std::collections::HashMap;
 use tokio::task;
 
 #[tokio::main]
@@ -98,7 +99,7 @@ async fn main() -> Result<()> {
     println!("Received {} batches from executors", batches.len());
 
     // perform secondary aggregate query on the results collected from the executors
-    let ctx = Context::local();
+    let ctx = Context::local(HashMap::new());
 
     let results = ctx
         .create_dataframe(&batches)?

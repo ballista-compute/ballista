@@ -18,7 +18,7 @@ class ReadmeExamplesTest {
     fun `SQL example`() {
 
         // Create a context
-        val ctx = ExecutionContext()
+        val ctx = ExecutionContext(mapOf())
 
         // Register a CSV data source
         val csv = ctx.csv(employeeCsv)
@@ -40,7 +40,7 @@ class ReadmeExamplesTest {
     fun `DataFrame example`() {
 
         // Create a context
-        val ctx = ExecutionContext()
+        val ctx = ExecutionContext(mapOf())
 
         // Construct a query using the DataFrame API
         val df: DataFrame = ctx.csv(employeeCsv)

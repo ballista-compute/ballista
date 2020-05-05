@@ -16,6 +16,11 @@ class Benchmarks {
     companion object {
         @JvmStatic
         fun main(args: Array<String>) {
+
+            println("maxMemory=${Runtime.getRuntime().maxMemory()}")
+            println("totalMemory=${Runtime.getRuntime().totalMemory()}")
+            println("freeMemory=${Runtime.getRuntime().freeMemory()}")
+
 //    val sql = System.getenv("BENCH_SQL_PARTIAL")
 //    val sql = System.getenv("BENCH_SQL_FINAL")
 
@@ -37,9 +42,16 @@ class Benchmarks {
             val path = System.getenv("BENCH_PATH")
             val resultFile = System.getenv("BENCH_RESULT_FILE")
 
+            val settings = mapOf(Pair("ballista.csv.batchSize", "1024"))
+
             //TODO iterations
 
-            sqlAggregate(path, sqlPartial, sqlFinal, resultFile)
+            sqlAggregate(path, sqlPartial, sqlFinal, resultFile, settings)
+
+            println("maxMemory=${Runtime.getRuntime().maxMemory()}")
+            println("totalMemory=${Runtime.getRuntime().totalMemory()}")
+            println("freeMemory=${Runtime.getRuntime().freeMemory()}")
+
         }
     }
 }
@@ -49,14 +61,14 @@ private fun getFiles(path: String): List<String> {
     return dir.list().filter { it.endsWith(".csv") }
 }
 
-private fun sqlAggregate(path: String, sqlPartial: String, sqlFinal: String, resultFile: String) {
+private fun sqlAggregate(path: String, sqlPartial: String, sqlFinal: String, resultFile: String, settings: Map<String,String>) {
     val start = System.currentTimeMillis()
     val files = getFiles(path)
     val deferred = files.map { file ->
         GlobalScope.async {
             println("Executing query against $file ...")
             val partitionStart = System.currentTimeMillis()
-            val result = executeQuery(File(File(path), file).absolutePath, sqlPartial)
+            val result = executeQuery(File(File(path), file).absolutePath, sqlPartial, settings)
             val duration = System.currentTimeMillis() - partitionStart
             println("Query against $file took $duration ms")
             result
@@ -68,7 +80,7 @@ private fun sqlAggregate(path: String, sqlPartial: String, sqlFinal: String, res
 
     println(results.first().schema)
 
-    val ctx = ExecutionContext()
+    val ctx = ExecutionContext(settings)
     ctx.registerDataSource("tripdata", InMemoryDataSource(results.first().schema, results))
     val df = ctx.sql(sqlFinal)
     ctx.execute(df).forEach { println(it) }
@@ -82,8 +94,8 @@ private fun sqlAggregate(path: String, sqlPartial: String, sqlFinal: String, res
     w.close()
 }
 
-fun executeQuery(path: String, sql: String): List<RecordBatch> {
-    val ctx = ExecutionContext()
+fun executeQuery(path: String, sql: String, settings: Map<String,String>): List<RecordBatch> {
+    val ctx = ExecutionContext(settings)
     ctx.registerCsv("tripdata", path)
     val df = ctx.sql(sql)
     return ctx.execute(df).toList()

@@ -3,6 +3,7 @@ package org.ballistacompute.spark.benchmarks
 import java.io.{File, FileWriter}
 
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DataTypes, StructField, StructType}
 
 object Benchmarks {

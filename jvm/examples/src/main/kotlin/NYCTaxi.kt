@@ -16,8 +16,7 @@ import kotlin.system.measureTimeMillis
 
 fun main() {
 
-    val batchSize = 64 * 1024
-    val ctx = ExecutionContext(batchSize)
+    val ctx = ExecutionContext(mapOf())
 
     // wget https://s3.amazonaws.com/nyc-tlc/trip+data/yellow_tripdata_2019-01.csv
 

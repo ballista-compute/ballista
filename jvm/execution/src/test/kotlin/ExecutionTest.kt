@@ -22,7 +22,7 @@ class ExecutionTest {
     @Test
     fun `employees in CO using DataFrame`() {
         // Create a context
-        val ctx = ExecutionContext()
+        val ctx = ExecutionContext(mapOf())
 
         // Construct a query using the DataFrame API
         val df = ctx.csv(employeeCsv)
@@ -41,7 +41,7 @@ class ExecutionTest {
     @Test
     fun `employees in CA using SQL`() {
         // Create a context
-        val ctx = ExecutionContext()
+        val ctx = ExecutionContext(mapOf())
 
         val employee = ctx.csv(employeeCsv)
         ctx.register("employee", employee)
@@ -60,7 +60,7 @@ class ExecutionTest {
     @Test
     fun `aggregate query`() {
         // Create a context
-        val ctx = ExecutionContext()
+        val ctx = ExecutionContext(mapOf())
 
         // construct a query using the DataFrame API
         val df = ctx.csv(employeeCsv)
@@ -80,7 +80,7 @@ class ExecutionTest {
     @Test
     fun `bonuses in CA using SQL and DataFrame`() {
         // Create a context
-        val ctx = ExecutionContext()
+        val ctx = ExecutionContext(mapOf())
 
         // construct a query using the DataFrame API
         val caEmployees = ctx.csv(employeeCsv)
@@ -117,7 +117,7 @@ class ExecutionTest {
 
         val dataSource = InMemoryDataSource(schema, listOf(input))
 
-        val ctx = ExecutionContext()
+        val ctx = ExecutionContext(mapOf())
         val logicalPlan = DataFrameImpl(Scan("", dataSource, listOf()))
                 .aggregate(listOf(col("a")),
                         listOf(
@@ -152,7 +152,7 @@ class ExecutionTest {
 
         val dataSource = InMemoryDataSource(schema, listOf(input))
 
-        val ctx = ExecutionContext()
+        val ctx = ExecutionContext(mapOf())
         val logicalPlan = DataFrameImpl(Scan("", dataSource, listOf()))
                 .project(
                         listOf(
@@ -189,7 +189,7 @@ class ExecutionTest {
 
         val dataSource = InMemoryDataSource(schema, listOf(input))
 
-        val ctx = ExecutionContext()
+        val ctx = ExecutionContext(mapOf())
         val logicalPlan = DataFrameImpl(Scan("", dataSource, listOf()))
                 .project(
                         listOf(

@@ -13,16 +13,81 @@ use std::sync::Arc;
 use crate::plan::Action;
 use datafusion::datasource::MemTable;
 
+struct ConfigSetting {
+    key: String,
+    description: String,
+    default_value: Option<String>,
+}
+
+impl ConfigSetting {
+    pub fn new(key: &str, description: &str, default_value: Option<&str>) -> Self {
+        Self {
+            key: key.to_owned(),
+            description: description.to_owned(),
+            default_value: default_value.map(|s| s.to_owned()),
+        }
+    }
+
+    pub fn default_value(&self) -> Option<String> {
+        self.default_value.clone()
+    }
+}
+
+struct Configs {
+    configs: HashMap<String, ConfigSetting>,
+    settings: HashMap<String, String>,
+}
+
+impl Configs {
+    pub fn new(settings: HashMap<String, String>) -> Self {
+        let csv_batch_size: ConfigSetting = ConfigSetting::new(
+            "ballista.csv.batchSize",
+            "Number of rows to read per batch",
+            Some("10000"),
+        );
+
+        let configs = vec![csv_batch_size];
+
+        let mut m = HashMap::new();
+        for config in configs {
+            m.insert(config.key.clone(), config);
+        }
+
+        Self {
+            configs: m,
+            settings,
+        }
+    }
+
+    pub fn get_setting(&self, name: &str) -> Option<String> {
+        match self.settings.get(name) {
+            Some(value) => Some(value.clone()),
+            None => match self.configs.get(name) {
+                Some(value) => value.default_value(),
+                None => None,
+            },
+        }
+    }
+
+    pub fn csv_batch_size(&self) -> Option<String> {
+        self.get_setting("ballista.csv.batchSize")
+    }
+}
+
 pub struct Context {
     state: Arc<ContextState>,
 }
 
 #[derive(Debug, Clone)]
 pub enum ContextState {
-    Local,
+    Local {
+        settings: HashMap<String, String>,
+    },
     Remote {
         host: String,
         port: usize,
+        //TODO
+        //settings: HashMap<String, String>,
     },
     Spark {
         master: String,
@@ -46,9 +111,13 @@ impl Context {
     }
 
     /// Create a context for executing a query against a local in-process executor
-    pub fn local() -> Self {
+    pub fn local(settings: HashMap<&str, &str>) -> Self {
+        let mut s: HashMap<String, String> = HashMap::new();
+        for (k, v) in settings {
+            s.insert(k.to_owned(), v.to_owned());
+        }
         Self {
-            state: Arc::new(ContextState::Local),
+            state: Arc::new(ContextState::Local { settings: s }),
         }
     }
 
@@ -238,7 +307,7 @@ impl DataFrame {
                     .await
             }
             ContextState::Remote { host, port } => ctx.execute_action(host, *port, action).await,
-            ContextState::Local => {
+            ContextState::Local { settings } => {
                 // create local execution context
                 let mut ctx = datafusion::execution::context::ExecutionContext::new();
 
@@ -249,7 +318,13 @@ impl DataFrame {
 
                 println!("Optimized Plan: {:?}", optimized_plan);
 
-                let physical_plan = ctx.create_physical_plan(&optimized_plan, 1024 * 1024)?;
+                let x = Configs::new(settings.clone());
+
+                let batch_size = x.csv_batch_size().unwrap().parse::<usize>().unwrap();
+
+                println!("batch_size={}", batch_size);
+
+                let physical_plan = ctx.create_physical_plan(&optimized_plan, batch_size)?;
 
                 // execute the query
                 ctx.collect(physical_plan.as_ref())

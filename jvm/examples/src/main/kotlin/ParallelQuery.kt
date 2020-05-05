@@ -41,7 +41,7 @@ fun main() {
             "FROM tripdata " +
             "GROUP BY passenger_count"
 
-    val ctx = ExecutionContext()
+    val ctx = ExecutionContext(mapOf())
     ctx.registerDataSource("tripdata", InMemoryDataSource(results.first().schema, results))
     val df = ctx.sql(sql)
     ctx.execute(df).forEach { println(it) }
@@ -51,7 +51,7 @@ fun main() {
 fun executeQuery(path: String, month: Int, sql: String): List<RecordBatch> {
     val monthStr = String.format("%02d", month);
     val filename = "$path/yellow_tripdata_2019-$monthStr.csv"
-    val ctx = ExecutionContext()
+    val ctx = ExecutionContext(mapOf())
     ctx.registerCsv("tripdata", filename)
     val df = ctx.sql(sql)
     return ctx.execute(df).toList()

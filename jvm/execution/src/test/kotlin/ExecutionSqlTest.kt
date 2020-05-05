@@ -73,7 +73,7 @@ class ExecutionSqlTest {
     }
 
     private fun createContext() : ExecutionContext {
-        val ctx = ExecutionContext()
+        val ctx = ExecutionContext(mapOf())
         ctx.register("employee", ctx.csv(employeeCsv))
         return ctx
     }

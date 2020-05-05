@@ -12,7 +12,9 @@ import org.ballistacompute.sql.SqlSelect
 import org.ballistacompute.sql.SqlTokenizer
 
 /** Execution context */
-class ExecutionContext(val batchSize: Int = 1024 * 1024) {
+class ExecutionContext(val settings: Map<String,String>) {
+
+    val batchSize: Int = settings.getOrDefault("ballista.csv.batchSize", "1024").toInt()
 
     /** Tables registered with this context */
     private val tables = mutableMapOf<String, DataFrame>()

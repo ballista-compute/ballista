@@ -46,7 +46,7 @@ fn main() {
     let path = matches.value_of("path").unwrap();
     let cpus = matches.value_of("cpus").unwrap().parse::<usize>().unwrap();
 
-    let version = "0.2.4";
+    let version = "0.2.5-SNAPSHOT";
 
     match bench {
         "spark" => {

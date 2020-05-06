@@ -5,7 +5,7 @@ authors = ["Andy Grove <andygrove73@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-ballista = { path = "../../rust" }
+ballista = { path = "../../rust/ballista" }
 
 arrow = "0.17"
 arrow-flight = "0.17"

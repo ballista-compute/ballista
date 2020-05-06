@@ -1,0 +1,40 @@
+[package]
+name = "ballista"
+description = "Distributed compute platform based on Apache Arrow"
+license = "Apache-2.0"
+version = "0.2.5-SNAPSHOT"
+homepage = "https://github.com/ballista-compute/ballista"
+repository = "https://github.com/ballista-compute/ballista"
+authors = ["Andy Grove <andygrove73@gmail.com>"]
+edition = "2018"
+build = "build.rs"
+include = ["build.rs", "src/**/*", "Cargo.toml", "proto/ballista.proto"]
+
+[dependencies]
+env_logger = { version = "0.6", default-features = false }
+futures = "0.3"
+http = "0.1"
+k8s-openapi = { version = "0.4.0", features = ["v1_13"] }
+kube = "0.14"
+log = "0.4"
+tokio = { version = "0.2", features = ["full"] }
+tonic = "0.1.1"
+flatbuffers = "0.6.0"
+prost = "0.6"
+prost-types = "0.6"
+reqwest = "0.9.18"
+
+#arrow = { git = "https://github.com/apache/arrow" }
+#arrow-flight = { git = "https://github.com/apache/arrow" }
+#datafusion = { git = "https://github.com/apache/arrow" }
+
+arrow = "0.17"
+arrow-flight = "0.17"
+datafusion = "0.17"
+
+[[bin]]
+name = "executor"
+path = "src/bin/executor.rs"
+
+[build-dependencies]
+prost-build = { version = "0.6.1" }

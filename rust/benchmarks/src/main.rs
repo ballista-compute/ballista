@@ -1,8 +1,8 @@
-use std::process;
-use std::time::Instant;
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
+use std::process;
+use std::time::Instant;
 
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -10,19 +10,18 @@ use arrow::record_batch::RecordBatch;
 extern crate ballista;
 
 use ballista::cluster;
-use ballista::dataframe::{min, max, sum, Context, DataFrame, CSV_BATCH_SIZE};
-use ballista::error::{Result, BallistaError};
+use ballista::dataframe::{max, min, sum, Context, DataFrame, CSV_BATCH_SIZE};
+use ballista::error::{BallistaError, Result};
 use ballista::logicalplan::*;
 use ballista::BALLISTA_VERSION;
 
 use datafusion::utils;
 
-use tokio::task;
 use std::collections::HashMap;
+use tokio::task;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-
     println!("Ballista Rust Benchmarks v{}", BALLISTA_VERSION);
 
     let mode = env::var("BENCH_MODE").unwrap();
@@ -51,13 +50,14 @@ async fn local_mode_benchmark(path: &str, results_filename: &str) -> Result<()> 
     df.explain();
 
     let response = df.collect().await?;
-    utils::print_batches(&response).map_err(|e| BallistaError::DataFusionError(e) )?;
+    utils::print_batches(&response).map_err(|e| BallistaError::DataFusionError(e))?;
     let duration = start.elapsed().as_millis();
     println!("Local mode benchmark took {} ms", duration);
 
     let mut file = File::create(results_filename).unwrap();
     file.write_all(b"iterations,time_millis\n").unwrap();
-    file.write_all(format!("1,{}\n", duration).as_bytes()).unwrap();
+    file.write_all(format!("1,{}\n", duration).as_bytes())
+        .unwrap();
 
     Ok(())
 }
@@ -96,11 +96,7 @@ async fn k8s(path: &str) -> Result<()> {
 
         // execute the query against the executor
         tasks.push(tokio::spawn(async move {
-            let filename = format!(
-                "{}/yellow_tripdata_2019-{:02}.csv",
-                path,
-                month + 1
-            );
+            let filename = format!("{}/yellow_tripdata_2019-{:02}.csv", path, month + 1);
 
             execute_remote(&host, port, &filename).await
         }));
@@ -136,8 +132,10 @@ async fn k8s(path: &str) -> Result<()> {
 
     let results = ctx
         .create_dataframe(&batches)?
-        .aggregate(vec![col("passenger_count")],
-                   vec![min(col("MIN")), max(col("MAX")), sum(col("SUM"))])?
+        .aggregate(
+            vec![col("passenger_count")],
+            vec![min(col("MIN")), max(col("MAX")), sum(col("SUM"))],
+        )?
         .collect()
         .await?;
 
@@ -156,9 +154,7 @@ async fn execute_remote(host: &str, port: usize, filename: &str) -> Result<Vec<R
     settings.insert(CSV_BATCH_SIZE, "1024");
     let ctx = Context::remote(host, port, settings);
     let df = create_csv_query(&ctx, filename)?;
-    let response = df
-        .collect()
-        .await?;
+    let response = df.collect().await?;
     println!(
         "Executed query against executor at {}:{} in {} seconds",
         host,
@@ -169,11 +165,16 @@ async fn execute_remote(host: &str, port: usize, filename: &str) -> Result<Vec<R
 }
 
 fn create_csv_query(ctx: &Context, path: &str) -> Result<DataFrame> {
-    ctx
-        .read_csv(path, Some(nyctaxi_schema()), None, true)?
-        .aggregate(vec![col("passenger_count")],
-                   //TODO use aliases for aggregates
-                   vec![min(col("fare_amount")), max(col("fare_amount")), sum(col("fare_amount"))])
+    ctx.read_csv(path, Some(nyctaxi_schema()), None, true)?
+        .aggregate(
+            vec![col("passenger_count")],
+            //TODO use aliases for aggregates
+            vec![
+                min(col("fare_amount")),
+                max(col("fare_amount")),
+                sum(col("fare_amount")),
+            ],
+        )
 }
 
 fn nyctaxi_schema() -> Schema {

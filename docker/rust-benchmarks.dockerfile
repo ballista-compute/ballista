@@ -17,26 +17,14 @@ COPY rust/benchmarks/Cargo.* /tmp/ballista/benchmarks/
 COPY rust/benchmarks/src/ /tmp/ballista/benchmarks/src/
 
 RUN cargo build --release
-ENTRYPOINT ["target/release/ballista-benchmarks"]
 
-#TODO the following makes the runtime extremely slow!
+# Copy the binary into a new container for a smaller docker image
+FROM debian:buster-slim
 
-# Build
-#RUN cargo build --release --target x86_64-unknown-linux-musl
+COPY --from=build /tmp/ballista/benchmarks/target/release/ballista-benchmarks /
+USER root
 
-# Copy the statically-linked binary into a scratch container.
-#FROM alpine:3.10
-#
-## Install Tini for better signal handling
-#RUN apk add --no-cache tini
-#ENTRYPOINT ["/sbin/tini", "--"]
-#
-#COPY --from=build /tmp/ballista/benchmarks/target/x86_64-unknown-linux-musl/release/ballista-benchmarks /
-#USER 1000
-#
-#EXPOSE 9090
-#
-#ENV RUST_LOG=info
-#ENV RUST_BACKTRACE=full
-#
-#CMD ["/ballista-benchmarks"]
+ENV RUST_LOG=info
+ENV RUST_BACKTRACE=full
+
+CMD ["/ballista-benchmarks"]

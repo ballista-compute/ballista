@@ -206,7 +206,6 @@ dependencies = [
  "arrow",
  "arrow-flight",
  "ballista",
- "clap",
  "datafusion",
  "tokio 0.2.19",
 ]

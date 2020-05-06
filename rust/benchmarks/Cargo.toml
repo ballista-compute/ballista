@@ -9,5 +9,4 @@ ballista = { path=".." }
 arrow = "0.17"
 arrow-flight = "0.17"
 datafusion = "0.17"
-clap = "2.33"
 tokio = { version = "0.2", features = ["full"] }

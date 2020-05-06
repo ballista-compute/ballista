@@ -120,7 +120,7 @@ async fn execute_remote(host: &str, port: usize, filename: &str) -> Result<Vec<R
     println!("Executing query against executor at {}:{}", host, port);
     let start = Instant::now();
 
-    let ctx = Context::remote(host, port);
+    let ctx = Context::remote(host, port, HashMap::new());
 
     let response = ctx
         .read_csv(filename, Some(nyctaxi_schema()), None, true)?

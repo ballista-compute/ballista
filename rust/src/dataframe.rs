@@ -13,6 +13,9 @@ use std::sync::Arc;
 use crate::plan::Action;
 use datafusion::datasource::MemTable;
 
+pub const CSV_BATCH_SIZE: &'static str = "ballista.csv.batchSize";
+
+/// Configuration setting
 struct ConfigSetting {
     key: String,
     description: String,
@@ -41,9 +44,9 @@ struct Configs {
 impl Configs {
     pub fn new(settings: HashMap<String, String>) -> Self {
         let csv_batch_size: ConfigSetting = ConfigSetting::new(
-            "ballista.csv.batchSize",
+            CSV_BATCH_SIZE,
             "Number of rows to read per batch",
-            Some("10000"),
+            Some("1024"),
         );
 
         let configs = vec![csv_batch_size];
@@ -70,7 +73,7 @@ impl Configs {
     }
 
     pub fn csv_batch_size(&self) -> Option<String> {
-        self.get_setting("ballista.csv.batchSize")
+        self.get_setting(CSV_BATCH_SIZE)
     }
 }
 
@@ -86,8 +89,7 @@ pub enum ContextState {
     Remote {
         host: String,
         port: usize,
-        //TODO
-        //settings: HashMap<String, String>,
+        settings: HashMap<String, String>,
     },
     Spark {
         master: String,
@@ -98,35 +100,30 @@ pub enum ContextState {
 impl Context {
     /// Create a context for executing a query against a remote Spark executor
     pub fn spark(master: &str, settings: HashMap<&str, &str>) -> Self {
-        let mut s: HashMap<String, String> = HashMap::new();
-        for (k, v) in settings {
-            s.insert(k.to_owned(), v.to_owned());
-        }
         Self {
             state: Arc::new(ContextState::Spark {
                 master: master.to_owned(),
-                spark_settings: s,
+                spark_settings: parse_settings(settings),
             }),
         }
     }
 
     /// Create a context for executing a query against a local in-process executor
     pub fn local(settings: HashMap<&str, &str>) -> Self {
-        let mut s: HashMap<String, String> = HashMap::new();
-        for (k, v) in settings {
-            s.insert(k.to_owned(), v.to_owned());
-        }
         Self {
-            state: Arc::new(ContextState::Local { settings: s }),
+            state: Arc::new(ContextState::Local {
+                settings: parse_settings(settings),
+            }),
         }
     }
 
     /// Create a context for executing a query against a remote executor
-    pub fn remote(host: &str, port: usize) -> Self {
+    pub fn remote(host: &str, port: usize, settings: HashMap<&str, &str>) -> Self {
         Self {
             state: Arc::new(ContextState::Remote {
                 host: host.to_owned(),
                 port,
+                settings: parse_settings(settings),
             }),
         }
     }
@@ -170,6 +167,13 @@ impl Context {
     }
 }
 
+fn parse_settings(settings: HashMap<&str, &str>) -> HashMap<String, String> {
+    let mut s: HashMap<String, String> = HashMap::new();
+    for (k, v) in settings {
+        s.insert(k.to_owned(), v.to_owned());
+    }
+    s
+}
 /// Builder for logical plans
 pub struct DataFrame {
     ctx_state: Arc<ContextState>,
@@ -306,7 +310,9 @@ impl DataFrame {
                 ctx.execute_action(host, port.parse::<usize>().unwrap(), action)
                     .await
             }
-            ContextState::Remote { host, port } => ctx.execute_action(host, *port, action).await,
+            ContextState::Remote { host, port, .. } => {
+                ctx.execute_action(host, *port, action).await
+            }
             ContextState::Local { settings } => {
                 // create local execution context
                 let mut ctx = datafusion::execution::context::ExecutionContext::new();
@@ -547,5 +553,19 @@ fn translate_scalar_value(value: &ScalarValue) -> Result<datafusion::logicalplan
             "Cannot translate scalar value to DataFusion: {:?}",
             other
         ))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_context_ux() {
+        let mut settings = HashMap::new();
+        settings.insert(CSV_BATCH_SIZE, "2048");
+        settings.insert("custom.setting", "/foo/bar");
+
+        let ctx = Context::local(settings);
     }
 }

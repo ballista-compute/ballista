@@ -10,7 +10,7 @@ use arrow::record_batch::RecordBatch;
 extern crate ballista;
 
 use ballista::cluster;
-use ballista::dataframe::{min, max, sum, Context, DataFrame};
+use ballista::dataframe::{min, max, sum, Context, DataFrame, CSV_BATCH_SIZE};
 use ballista::error::{Result, BallistaError};
 use ballista::logicalplan::*;
 use ballista::BALLISTA_VERSION;
@@ -18,31 +18,12 @@ use ballista::BALLISTA_VERSION;
 use datafusion::utils;
 
 use tokio::task;
-use clap::{App, Arg};
 use std::collections::HashMap;
 
 #[tokio::main]
 async fn main() -> Result<()> {
 
-    // let matches = App::new("Ballista Benchmark Client")
-    //     .version(BALLISTA_VERSION)
-    //     .arg(Arg::with_name("mode")
-    //         .short("m")
-    //         .long("mode")
-    //         .help("Benchmark mode: local or k8s")
-    //         .takes_value(true))
-    //     .arg(Arg::with_name("path")
-    //         .short("p")
-    //         .long("path")
-    //         .value_name("FILE")
-    //         .help("Path to data files")
-    //         .takes_value(true))
-    //     .get_matches();
-    //
-    //
-    //
-    // let mode = matches.value_of("mode").unwrap_or("");
-    // let path = matches.value_of("path").unwrap_or("").to_owned();
+    println!("Ballista Rust Benchmarks v{}", BALLISTA_VERSION);
 
     let mode = env::var("BENCH_MODE").unwrap();
     let path = env::var("BENCH_PATH").unwrap();
@@ -63,7 +44,7 @@ async fn local_mode_benchmark(path: &str, results_filename: &str) -> Result<()> 
     let start = Instant::now();
 
     let mut settings = HashMap::new();
-    settings.insert("ballista.csv.batchSize", "1000");
+    settings.insert(CSV_BATCH_SIZE, "1024");
 
     let ctx = Context::local(settings);
     let df = create_csv_query(&ctx, path)?;
@@ -149,6 +130,7 @@ async fn k8s(path: &str) -> Result<()> {
 
     // perform secondary aggregate query on the results collected from the executors
     let mut settings = HashMap::new();
+    settings.insert(CSV_BATCH_SIZE, "1024");
 
     let ctx = Context::local(settings);
 
@@ -170,7 +152,9 @@ async fn k8s(path: &str) -> Result<()> {
 async fn execute_remote(host: &str, port: usize, filename: &str) -> Result<Vec<RecordBatch>> {
     println!("Executing query against executor at {}:{}", host, port);
     let start = Instant::now();
-    let ctx = Context::remote(host, port);
+    let mut settings = HashMap::new();
+    settings.insert(CSV_BATCH_SIZE, "1024");
+    let ctx = Context::remote(host, port, settings);
     let df = create_csv_query(&ctx, filename)?;
     let response = df
         .collect()

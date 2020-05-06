@@ -4,7 +4,7 @@ use arrow::datatypes::{DataType, Field, Schema};
 
 extern crate ballista;
 
-use ballista::dataframe::{max, min, Context};
+use ballista::dataframe::{max, min, Context, CSV_BATCH_SIZE};
 use ballista::error::Result;
 use ballista::logicalplan::*;
 use ballista::BALLISTA_VERSION;
@@ -32,7 +32,9 @@ async fn main() -> Result<()> {
             name, host, port
         );
         let start = Instant::now();
-        let ctx = Context::remote(host, *port);
+        let mut settings = HashMap::new();
+        settings.insert(CSV_BATCH_SIZE, "1024");
+        let ctx = Context::remote(host, *port, settings);
         let response = ctx
             .read_csv(filename, Some(nyctaxi_schema()), None, true)?
             .aggregate(

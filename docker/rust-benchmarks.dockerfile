@@ -1,3 +1,4 @@
+# Base image extends rust:nightly which extends debian:buster-slim
 FROM ballistacompute/rust-cached-deps:0.2.3 as build
 
 # Add Ballista

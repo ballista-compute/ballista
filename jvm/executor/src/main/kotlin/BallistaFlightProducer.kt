@@ -42,15 +42,14 @@ class BallistaFlightProducer : FlightProducer {
             //val loader = VectorLoader(root)
             var counter = 0
             results.iterator().forEach { batch ->
+                root.clear()
 
                 val rowCount = batch.rowCount()
                 println("Received batch with $rowCount rows")
 
-                if (rowCount > batchSize) {
-                    batchSize = rowCount
-                    root.fieldVectors.forEach { it.setInitialCapacity(batchSize) }
-                    root.allocateNew()
-                }
+                batchSize = rowCount
+                root.fieldVectors.forEach { it.setInitialCapacity(batchSize) }
+                root.allocateNew()
 
                 (0 until schema.fields.size).forEach { columnIndex ->
 
@@ -140,6 +139,7 @@ class BallistaFlightProducer : FlightProducer {
                 counter++
             }
 
+            root.close()
             listener.completed()
         } catch (ex: Exception) {
             ex.printStackTrace()

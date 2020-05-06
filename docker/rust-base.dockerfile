@@ -1,3 +1,4 @@
+# Base image extends debian:buster-slim
 FROM rustlang/rust:nightly AS build
 
 USER root

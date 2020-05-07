@@ -10,7 +10,7 @@ use std::io::Cursor;
 pub mod from_proto;
 pub mod to_proto;
 
-pub fn decode_protobuf(bytes: &Vec<u8>) -> Result<Action, BallistaError> {
+pub fn decode_protobuf(bytes: &[u8]) -> Result<Action, BallistaError> {
     let mut buf = Cursor::new(bytes);
     protobuf::Action::decode(&mut buf)
         .map_err(|e| BallistaError::General(format!("{:?}", e)))

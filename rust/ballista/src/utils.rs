@@ -3,7 +3,7 @@ use arrow::datatypes::DataType;
 use arrow::record_batch::RecordBatch;
 
 /** Create formatted result set from record batches */
-pub fn result_str(results: &Vec<RecordBatch>) -> Vec<String> {
+pub fn result_str(results: &[RecordBatch]) -> Vec<String> {
     let mut result = vec![];
     for batch in results {
         for row_index in 0..batch.num_rows() {

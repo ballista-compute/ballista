@@ -133,8 +133,8 @@ impl Context {
     }
 
     /// Create a DataFrame from an existing set of RecordBatch instances
-    pub fn create_dataframe(&self, batches: &Vec<RecordBatch>) -> Result<DataFrame> {
-        let plan = LogicalPlan::MemoryScan(batches.clone());
+    pub fn create_dataframe(&self, batches: &[RecordBatch]) -> Result<DataFrame> {
+        let plan = LogicalPlan::MemoryScan(batches.to_vec());
         Ok(DataFrame::from(self.state.clone(), &plan))
     }
 

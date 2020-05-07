@@ -3,4 +3,6 @@
 members = [
     "ballista",
     "benchmarks",
+    "examples/apache-spark-rust-bindings",
+    "examples/parallel-aggregate",
 ]

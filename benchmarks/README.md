@@ -5,8 +5,8 @@ This directory contains code to run benchmarks in Docker and collect results. Th
 ## Usage
  
 ```bash
-cargo run -- --bench=spark --path=/mnt/nyctaxi/csv/year=2019 --cpus=12
-cargo run -- --bench=rust --path=/mnt/nyctaxi/csv/year=2019 --cpus=12
-cargo run -- --bench=jvm --path=/mnt/nyctaxi/csv/year=2019 --cpus=12
+cargo run -- --bench=spark --format=csv --path=/mnt/nyctaxi/csv/year=2019 --cpus=12
+cargo run -- --bench=rust  --format=csv --path=/mnt/nyctaxi/csv/year=2019 --cpus=12
+cargo run -- --bench=jvm   --format=csv --path=/mnt/nyctaxi/csv/year=2019 --cpus=12
 ``` 
 

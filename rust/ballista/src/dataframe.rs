@@ -18,7 +18,7 @@ pub const CSV_BATCH_SIZE: &'static str = "ballista.csv.batchSize";
 /// Configuration setting
 struct ConfigSetting {
     key: String,
-    description: String,
+    _description: String,
     default_value: Option<String>,
 }
 
@@ -26,7 +26,7 @@ impl ConfigSetting {
     pub fn new(key: &str, description: &str, default_value: Option<&str>) -> Self {
         Self {
             key: key.to_owned(),
-            description: description.to_owned(),
+            _description: description.to_owned(),
             default_value: default_value.map(|s| s.to_owned()),
         }
     }
@@ -566,6 +566,6 @@ mod tests {
         settings.insert(CSV_BATCH_SIZE, "2048");
         settings.insert("custom.setting", "/foo/bar");
 
-        let ctx = Context::local(settings);
+        let _ = Context::local(settings);
     }
 }

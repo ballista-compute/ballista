@@ -26,11 +26,12 @@ async fn main() -> Result<()> {
 
     let mode = env::var("BENCH_MODE").unwrap();
     let path = env::var("BENCH_PATH").unwrap();
+    let format = env::var("BENCH_FORMAT").unwrap();
     let result_filename = env::var("BENCH_RESULT_FILE").unwrap();
 
     match mode.as_str() {
-        "local" => local_mode_benchmark(&path, &result_filename).await?,
-        "k8s" => k8s(&path).await?,
+        "local" => local_mode_benchmark(&path, &result_filename, &format).await?,
+        "k8s" => k8s(&path, &format).await?,
         _ => {
             println!("Invalid mode {}", mode);
         }
@@ -39,14 +40,14 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn local_mode_benchmark(path: &str, results_filename: &str) -> Result<()> {
+async fn local_mode_benchmark(path: &str, results_filename: &str, format: &str) -> Result<()> {
     let start = Instant::now();
 
     let mut settings = HashMap::new();
     settings.insert(CSV_BATCH_SIZE, "1024");
 
     let ctx = Context::local(settings);
-    let df = create_csv_query(&ctx, path)?;
+    let df = create_query(&ctx, path, format)?;
     df.explain();
 
     let response = df.collect().await?;
@@ -62,7 +63,7 @@ async fn local_mode_benchmark(path: &str, results_filename: &str) -> Result<()> 
     Ok(())
 }
 
-async fn k8s(path: &str) -> Result<()> {
+async fn k8s(path: &str, format: &str) -> Result<()> {
     let cluster_name = "ballista";
     let namespace = "default";
     let num_months: usize = 12;
@@ -93,12 +94,13 @@ async fn k8s(path: &str) -> Result<()> {
         let host = executor.host.clone();
         let port = executor.port;
         let path = path.to_owned();
+        let format = format.to_owned();
 
         // execute the query against the executor
         tasks.push(tokio::spawn(async move {
             let filename = format!("{}/yellow_tripdata_2019-{:02}.csv", path, month + 1);
 
-            execute_remote(&host, port, &filename).await
+            execute_remote(&host, port, &filename, &format).await
         }));
     }
 
@@ -147,13 +149,18 @@ async fn k8s(path: &str) -> Result<()> {
 }
 
 /// Execute a query against a remote executor
-async fn execute_remote(host: &str, port: usize, filename: &str) -> Result<Vec<RecordBatch>> {
+async fn execute_remote(
+    host: &str,
+    port: usize,
+    filename: &str,
+    format: &str,
+) -> Result<Vec<RecordBatch>> {
     println!("Executing query against executor at {}:{}", host, port);
     let start = Instant::now();
     let mut settings = HashMap::new();
     settings.insert(CSV_BATCH_SIZE, "1024");
     let ctx = Context::remote(host, port, settings);
-    let df = create_csv_query(&ctx, filename)?;
+    let df = create_query(&ctx, filename, format)?;
     let response = df.collect().await?;
     println!(
         "Executed query against executor at {}:{} in {} seconds",
@@ -164,17 +171,25 @@ async fn execute_remote(host: &str, port: usize, filename: &str) -> Result<Vec<R
     Ok(response)
 }
 
-fn create_csv_query(ctx: &Context, path: &str) -> Result<DataFrame> {
-    ctx.read_csv(path, Some(nyctaxi_schema()), None, true)?
-        .aggregate(
-            vec![col("passenger_count")],
-            //TODO use aliases for aggregates
-            vec![
-                min(col("fare_amount")),
-                max(col("fare_amount")),
-                sum(col("fare_amount")),
-            ],
-        )
+fn create_query(ctx: &Context, path: &str, format: &str) -> Result<DataFrame> {
+    let data = match format {
+        "csv" => ctx.read_csv(path, Some(nyctaxi_schema()), None, true),
+        "parquet" => ctx.read_parquet(path),
+        _ => Err(BallistaError::General(format!(
+            "Unsupported file format '{}'",
+            format
+        ))),
+    }?;
+
+    data.aggregate(
+        vec![col("passenger_count")],
+        //TODO use aliases for aggregates
+        vec![
+            min(col("fare_amount")),
+            max(col("fare_amount")),
+            sum(col("fare_amount")),
+        ],
+    )
 }
 
 fn nyctaxi_schema() -> Schema {

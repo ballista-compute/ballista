@@ -1517,6 +1517,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "parallel-aggregate"
+version = "0.2.5-SNAPSHOT"
+dependencies = [
+ "arrow",
+ "arrow-flight",
+ "ballista",
+ "datafusion",
+ "tokio 0.2.20",
+]
+
+[[package]]
 name = "parking_lot"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2292,6 +2303,17 @@ dependencies = [
  "libc",
  "redox_syscall",
  "winapi 0.3.8",
+]
+
+[[package]]
+name = "spark-rust-bindings"
+version = "0.2.5-SNAPSHOT"
+dependencies = [
+ "arrow",
+ "arrow-flight",
+ "ballista",
+ "datafusion",
+ "tokio 0.2.20",
 ]
 
 [[package]]

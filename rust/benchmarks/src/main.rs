@@ -174,7 +174,7 @@ async fn execute_remote(
 fn create_query(ctx: &Context, path: &str, format: &str) -> Result<DataFrame> {
     let data = match format {
         "csv" => ctx.read_csv(path, Some(nyctaxi_schema()), None, true),
-        "parquet" => ctx.read_parquet(path),
+        "parquet" => ctx.read_parquet(path, None),
         _ => Err(BallistaError::General(format!(
             "Unsupported file format '{}'",
             format

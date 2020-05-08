@@ -74,6 +74,8 @@ pub enum LogicalPlan {
     FileScan {
         /// The path to the files
         path: String,
+        /// File type (csv, parquet)
+        file_type: String,
         /// The underlying table schema
         schema: Schema,
         /// Optional column indices to use as a projection
@@ -228,6 +230,7 @@ impl LogicalPlanBuilder {
             .map(|p| Schema::new(p.iter().map(|i| schema.field(*i).clone()).collect()));
         Ok(Self::from(&LogicalPlan::FileScan {
             path: path.to_owned(),
+            file_type: "csv".to_owned(),
             schema: schema.clone(),
             projected_schema: projected_schema.or(Some(schema.clone())).unwrap(),
             projection,
@@ -930,6 +933,7 @@ pub fn translate_plan(ctx: &mut ExecutionContext, plan: &LogicalPlan) -> Result<
         }
         LogicalPlan::FileScan {
             path,
+            file_type,
             schema,
             projection,
             projected_schema,
@@ -937,7 +941,11 @@ pub fn translate_plan(ctx: &mut ExecutionContext, plan: &LogicalPlan) -> Result<
             //TODO generate unique table name
             let table_name = "tbd".to_owned();
 
-            ctx.register_csv(&table_name, path.as_str(), schema, true);
+            match file_type.as_str() {
+                "csv" => ctx.register_csv(&table_name, path.as_str(), schema, true),
+                "parquet" => ctx.register_parquet(&table_name, path.as_str())?,
+                _ => unimplemented!()
+            };
 
             Ok(DFLogicalPlan::TableScan {
                 schema_name: "default".to_owned(),

@@ -11,7 +11,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::plan::Action;
-use datafusion::datasource::MemTable;
+use datafusion::datasource::{MemTable, TableProvider};
+use datafusion::datasource::parquet::ParquetTable;
 
 pub const CSV_BATCH_SIZE: &'static str = "ballista.csv.batchSize";
 
@@ -153,8 +154,12 @@ impl Context {
         )?)
     }
 
-    pub fn read_parquet(&self, _path: &str) -> Result<DataFrame> {
-        unimplemented!()
+    pub fn read_parquet(&self, path: &str, projection: Option<Vec<usize>>) -> Result<DataFrame> {
+        Ok(DataFrame::scan_parquet(
+            self.state.clone(),
+            path,
+            projection,
+        )?)
     }
 
     pub async fn execute_action(
@@ -213,9 +218,35 @@ impl DataFrame {
             ctx,
             &LogicalPlan::FileScan {
                 path: path.to_owned(),
+                file_type: "csv".to_owned(),
                 schema: schema.clone(),
                 projected_schema: projected_schema.or(Some(schema.clone())).unwrap(),
                 projection,
+            },
+        ))
+    }
+
+    /// Scan a data source
+    pub fn scan_parquet (
+        ctx: Arc<ContextState>,
+        path: &str,
+        projection: Option<Vec<usize>>,
+    ) -> Result<Self> {
+
+        let p = ParquetTable::try_new(path)?;
+        let schema = p.schema().as_ref().to_owned();
+        let projected_schema = projection
+            .clone()
+            .map(|p| Schema::new(p.iter().map(|i| schema.field(*i).clone()).collect()));
+
+        Ok(Self::from(
+            ctx,
+            &LogicalPlan::FileScan {
+                path: path.to_owned(),
+                file_type: "parquet".to_owned(),
+                schema: schema.clone(),
+                projection,
+                projected_schema: projected_schema.or(Some(schema.clone())).unwrap(),
             },
         ))
     }
@@ -405,20 +436,28 @@ pub fn translate_plan(
         }
         LogicalPlan::FileScan {
             path,
+            file_type,
             schema,
             projection,
-            projected_schema,
+            ..
         } => {
             //TODO generate unique table name
             let table_name = "tbd".to_owned();
 
-            ctx.register_csv(&table_name, path.as_str(), schema, true);
+            match file_type.as_str() {
+                "csv" => ctx.register_csv(&table_name, path.as_str(), &schema, true),
+                "parquet" => ctx.register_parquet(&table_name, path.as_str())?,
+                _ => unimplemented!()
+            };
 
-            Ok(datafusion::logicalplan::LogicalPlan::TableScan {
+            let table = ctx.table(&table_name)?;
+            let schema = table.to_logical_plan().schema().clone();
+
+                Ok(datafusion::logicalplan::LogicalPlan::TableScan {
                 schema_name: "default".to_owned(),
                 table_name: table_name.clone(),
-                table_schema: Arc::new(schema.clone()),
-                projected_schema: Arc::new(projected_schema.clone()),
+                table_schema: schema.clone(),
+                projected_schema: schema.clone(), //TODO apply projection
                 projection: projection.clone(),
             })
         }

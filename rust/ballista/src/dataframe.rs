@@ -11,8 +11,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::plan::Action;
-use datafusion::datasource::{MemTable, TableProvider};
 use datafusion::datasource::parquet::ParquetTable;
+use datafusion::datasource::{MemTable, TableProvider};
 
 pub const CSV_BATCH_SIZE: &'static str = "ballista.csv.batchSize";
 
@@ -227,12 +227,11 @@ impl DataFrame {
     }
 
     /// Scan a data source
-    pub fn scan_parquet (
+    pub fn scan_parquet(
         ctx: Arc<ContextState>,
         path: &str,
         projection: Option<Vec<usize>>,
     ) -> Result<Self> {
-
         let p = ParquetTable::try_new(path)?;
         let schema = p.schema().as_ref().to_owned();
         let projected_schema = projection
@@ -447,13 +446,13 @@ pub fn translate_plan(
             match file_type.as_str() {
                 "csv" => ctx.register_csv(&table_name, path.as_str(), &schema, true),
                 "parquet" => ctx.register_parquet(&table_name, path.as_str())?,
-                _ => unimplemented!()
+                _ => unimplemented!(),
             };
 
             let table = ctx.table(&table_name)?;
             let schema = table.to_logical_plan().schema().clone();
 
-                Ok(datafusion::logicalplan::LogicalPlan::TableScan {
+            Ok(datafusion::logicalplan::LogicalPlan::TableScan {
                 schema_name: "default".to_owned(),
                 table_name: table_name.clone(),
                 table_schema: schema.clone(),

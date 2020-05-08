@@ -944,7 +944,7 @@ pub fn translate_plan(ctx: &mut ExecutionContext, plan: &LogicalPlan) -> Result<
             match file_type.as_str() {
                 "csv" => ctx.register_csv(&table_name, path.as_str(), schema, true),
                 "parquet" => ctx.register_parquet(&table_name, path.as_str())?,
-                _ => unimplemented!()
+                _ => unimplemented!(),
             };
 
             Ok(DFLogicalPlan::TableScan {

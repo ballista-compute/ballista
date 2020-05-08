@@ -44,7 +44,7 @@ async fn local_mode_benchmark(path: &str, results_filename: &str, format: &str) 
     let start = Instant::now();
 
     let mut settings = HashMap::new();
-    settings.insert(CSV_BATCH_SIZE, "1024");
+    settings.insert(CSV_BATCH_SIZE, "4096");
 
     let ctx = Context::local(settings);
     let df = create_query(&ctx, path, format)?;

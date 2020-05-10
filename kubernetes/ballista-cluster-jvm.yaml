@@ -30,7 +30,7 @@ spec:
     spec:
       containers:
       - name: ballista
-        image: ballistacompute/ballista-jvm:0.2.5-SNAPSHOT
+        image: ballistacompute/ballista-jvm:0.2.5
         resources:
           requests:
             cpu: "1"

@@ -1,6 +1,6 @@
 [package]
 name = "spark-rust-bindings"
-version = "0.2.5-SNAPSHOT"
+version = "0.2.5"
 authors = ["Andy Grove <andygrove73@gmail.com>"]
 edition = "2018"
 

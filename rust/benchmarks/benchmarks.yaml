@@ -7,6 +7,6 @@ spec:
     spec:
       containers:
         - name: ballista-benchmarks
-          image: ballistacompute/benchmarks:0.2.5-SNAPSHOT
+          image: ballistacompute/benchmarks:0.2.5
       restartPolicy: Never
   backoffLimit: 4

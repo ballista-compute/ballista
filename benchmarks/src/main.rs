@@ -15,7 +15,7 @@ struct BenchmarkConfig {
 
 impl BenchmarkConfig {
     fn result_file(&self) -> String {
-        format!("/results/{}-{}-{}cpu-{}mb.txt", self.name, self.format, self.cpus, self.memory_mb)
+        format!("/results/{}-{}-{}cpu.csv", self.name, self.format, self.cpus)
     }
 }
 
@@ -54,7 +54,7 @@ fn main() {
     let path = matches.value_of("path").unwrap();
     let cpus = matches.value_of("cpus").unwrap().parse::<usize>().unwrap();
 
-    let version = "0.2.5-SNAPSHOT";
+    let version = "0.2.5";
 
     match bench {
         "spark" => {

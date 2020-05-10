@@ -2,7 +2,7 @@
 name = "ballista"
 description = "Distributed compute platform based on Apache Arrow"
 license = "Apache-2.0"
-version = "0.2.5-SNAPSHOT"
+version = "0.2.5"
 homepage = "https://github.com/ballista-compute/ballista"
 repository = "https://github.com/ballista-compute/ballista"
 authors = ["Andy Grove <andygrove73@gmail.com>"]

@@ -7,6 +7,6 @@ spec:
     spec:
       containers:
         - name: parallel-aggregate
-          image: ballistacompute/parallel-aggregate-rs:0.2.5-SNAPSHOT
+          image: ballistacompute/parallel-aggregate-rs:0.2.5
       restartPolicy: Never
   backoffLimit: 4

@@ -28,24 +28,16 @@ class SelectionExec(val input: PhysicalPlan, val expr: Expression) : PhysicalPla
     override fun execute(): Sequence<RecordBatch> {
         val input = input.execute()
         return input.map { batch ->
-
-            //println("selection input:\n${batch.toCSV()}")
-
             val result = (expr.evaluate(batch) as ArrowFieldVector).field as BitVector
-
             val schema = batch.schema
             val columnCount = batch.schema.fields.size
             val filteredFields = (0 until columnCount).map { filter(batch.field(it), result) }
-            val filteredBatch = RecordBatch(schema, filteredFields.map { ArrowFieldVector(it) })
-
-            //println("selection output:\n${filteredBatch.toCSV()}")
-
-            filteredBatch
+            val fields = filteredFields.map { ArrowFieldVector(it) }
+            RecordBatch(schema, fields)
         }
     }
 
     private fun filter(v: ColumnVector, selection: BitVector) : FieldVector {
-        //println("filter() selection BitVector length = ${selection.valueCount}")
         val filteredVector = VarCharVector("v", RootAllocator(Long.MAX_VALUE))
         filteredVector.allocateNew()
 
@@ -55,15 +47,11 @@ class SelectionExec(val input: PhysicalPlan, val expr: Expression) : PhysicalPla
         (0 until selection.valueCount)
                 .forEach {
                     if (selection.get(it) == 1) {
-                        //println("match")
                         builder.set(count, v.getValue(it))
                         count++
-                    } else {
-                        //println("no match")
                     }
                 }
         filteredVector.valueCount = count
-
         return filteredVector
     }
 }

@@ -2,14 +2,10 @@ package org.ballistacompute.logical
 
 import org.ballistacompute.datatypes.Schema
 
-/**
- * A logical plan represents a data transformation or action that returns a relation (a set of tuples).
- */
+/** A logical plan represents a data transformation or action that returns a relation (a set of tuples). */
 interface LogicalPlan {
 
-    /**
-     * Returns the schema of the data that will be produced by this logical plan.
-     */
+    /** Returns the schema of the data that will be produced by this logical plan. */
     fun schema(): Schema
 
     /**

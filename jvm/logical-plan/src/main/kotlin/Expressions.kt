@@ -47,7 +47,7 @@ class ColumnIndex(val i: Int): LogicalExpr {
 class LiteralString(val str: String): LogicalExpr {
 
     override fun toField(input: LogicalPlan): Field {
-        return Field(str, ArrowType.Utf8())
+        return Field(str, ArrowTypes.StringType)
     }
 
     override fun toString(): String {
@@ -150,7 +150,7 @@ abstract class BooleanBinaryExpr(name: String,
 /** Logical expression representing a logical AND */
 class And(l: LogicalExpr, r: LogicalExpr): BooleanBinaryExpr("and", "AND", l, r)
 
-/** Logical expression representing a logical AND */
+/** Logical expression representing a logical OR */
 class Or(l: LogicalExpr, r: LogicalExpr): BooleanBinaryExpr("or", "OR", l, r)
 
 /** Logical expression representing an equality (`=`) comparison */
@@ -295,7 +295,7 @@ class Avg(input: LogicalExpr) : AggregateExpr("AVG", input)
 class Count(input: LogicalExpr) : AggregateExpr("COUNT", input) {
 
     override fun toField(input: LogicalPlan): Field {
-        return Field("COUNT", ArrowType.Int(32, false))
+        return Field("COUNT", ArrowTypes.Int32Type)
     }
 
     override fun toString(): String {

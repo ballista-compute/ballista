@@ -11,6 +11,7 @@ class Selection(val input: LogicalPlan, val expr: LogicalExpr): LogicalPlan {
     }
 
     override fun children(): List<LogicalPlan> {
+        // selection does not change the schema of the input
         return listOf(input)
     }
 

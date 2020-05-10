@@ -15,7 +15,9 @@ abstract class BinaryExpression(val l: Expression, val r: Expression) : Expressi
         val rr = r.evaluate(input)
         assert(ll.size() == rr.size())
         if (ll.getType() != rr.getType()) {
-            throw IllegalStateException("Binary expression operands do not have the same type: ${ll.getType()} != ${rr.getType()}")
+            throw IllegalStateException(
+                    "Binary expression operands do not have the same type: " +
+                            "${ll.getType()} != ${rr.getType()}")
         }
         return evaluate(ll, rr)
     }

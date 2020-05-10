@@ -8,6 +8,26 @@ import org.apache.spark.sql.types.{DataTypes, StructField, StructType}
 
 object Benchmarks {
 
+  def main(arg: Array[String]): Unit = {
+    queryUsingDataFrame()
+  }
+
+  def queryUsingDataFrame(): Unit = {
+
+    val spark: SparkSession = SparkSession.builder
+      .appName("Example")
+      .master("local[*]")
+      .getOrCreate()
+
+    val df = spark.read.parquet("/mnt/nyctaxi/parquet")
+      .groupBy("passenger_count")
+      .sum("fare_amount")
+      .orderBy("passenger_count")
+
+    df.show()
+
+  }
+
   def run(format: String, path: String, sql: String, iterations: Int, outputFile: String): Unit = {
 
     val spark: SparkSession = SparkSession.builder

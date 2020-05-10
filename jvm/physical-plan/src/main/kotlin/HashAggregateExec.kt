@@ -32,6 +32,7 @@ class HashAggregateExec(val input: PhysicalPlan,
 
         val map = HashMap<List<Any?>, List<Accumulator>>()
 
+        // for each batch from the input executor
         input.execute().iterator().forEach { batch ->
 
             // evaluate the grouping expressions
@@ -40,8 +41,10 @@ class HashAggregateExec(val input: PhysicalPlan,
             // evaluate the expressions that are inputs to the aggregate functions
             val aggrInputValues = aggregateExpr.map { it.inputExpression().evaluate(batch) }
 
+            // for each row in the batch
             (0 until batch.rowCount()).forEach { rowIndex ->
 
+                // create the key for the hash map
                 val rowKey = groupKeys.map {
                     val value = it.getValue(rowIndex)
                     when (value) {
@@ -59,12 +62,14 @@ class HashAggregateExec(val input: PhysicalPlan,
 
                 // perform accumulation
                 accumulators.withIndex().forEach { accum ->
-                    accum.value.accumulate(aggrInputValues[accum.index].getValue(rowIndex))
+                    val value = aggrInputValues[accum.index].getValue(rowIndex)
+                    accum.value.accumulate(value)
                 }
 
             }
         }
 
+        // create result batch containing final aggregate values
         val root = VectorSchemaRoot.create(schema.toArrow(), RootAllocator(Long.MAX_VALUE))
         root.allocateNew()
         root.rowCount = map.size

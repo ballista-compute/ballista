@@ -1,15 +1,12 @@
 package org.ballistacompute.examples;
 
 import org.ballistacompute.execution.ExecutionContext
-import org.ballistacompute.logical.Max
-import org.ballistacompute.logical.cast
-import org.ballistacompute.logical.col
-import org.ballistacompute.logical.format
 import org.ballistacompute.optimizer.Optimizer
 
 import org.apache.arrow.vector.types.FloatingPointPrecision
 import org.apache.arrow.vector.types.pojo.ArrowType
 import org.ballistacompute.datatypes.ArrowTypes
+import org.ballistacompute.logical.*
 
 import kotlin.system.measureTimeMillis
 
@@ -42,20 +39,24 @@ fun main() {
     */
 
     val time = measureTimeMillis {
-        val df = ctx.csv("/mnt/nyctaxi/yellow_tripdata_2019-01.csv")
+        val df = ctx.csv("/mnt/nyctaxi/csv/year=2019/yellow_tripdata_2019-01.csv")
                 .aggregate(
                         listOf(col("passenger_count")),
-                        listOf(Max(cast(col("fare_amount"), ArrowTypes.DoubleType))))
+                        listOf(max(cast(col("fare_amount"), ArrowTypes.FloatType))))
 
         println("Logical Plan:\t${format(df.logicalPlan())}")
 
-        val optimizedPlan = Optimizer().optimize(df.logicalPlan())
 
+//        var results = ctx.execute(df.logicalPlan())
+//        results.forEach {
+//            println(it.schema)
+//            println(it.toCSV())
+//        }
+
+        val optimizedPlan = Optimizer().optimize(df.logicalPlan())
         println("Optimized Plan:\t${format(optimizedPlan)}")
 
-        val results = ctx.execute(df.logicalPlan())
-        //val results = ctx.execute(optimizedPlan)
-
+        val results = ctx.execute(optimizedPlan)
         results.forEach {
             println(it.schema)
             println(it.toCSV())

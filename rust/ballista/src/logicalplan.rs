@@ -988,6 +988,15 @@ pub fn translate_plan(ctx: &mut ExecutionContext, plan: &LogicalPlan) -> Result<
             input: Arc::new(translate_plan(ctx, input)?),
             schema: Arc::new(schema.clone()),
         }),
+        LogicalPlan::Limit {
+            expr,
+            input,
+            schema,
+        } => Ok(DFLogicalPlan::Limit {
+            expr: translate_expr(expr)?,
+            input: Arc::new(translate_plan(ctx, input)?),
+            schema: Arc::new(schema.clone()),
+        }),
         other => Err(ExecutionError::General(format!(
             "Cannot translate operator to DataFusion: {:?}",
             other

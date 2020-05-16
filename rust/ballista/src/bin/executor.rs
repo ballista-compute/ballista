@@ -93,7 +93,8 @@ impl FlightService for FlightServiceImpl {
                         let output = futures::stream::iter(flights);
 
                         Ok(Response::new(Box::pin(output) as Self::DoGetStream))
-                    } // other => Err(Status::invalid_argument(format!("Invalid Ballista action: {:?}", other))),
+                    }
+                    other => Err(Status::invalid_argument(format!("Invalid Ballista action: {:?}", other))),
                 }
             }
             Err(e) => Err(Status::invalid_argument(format!("Invalid ticket: {:?}", e))),

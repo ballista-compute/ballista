@@ -15,39 +15,11 @@ impl TryInto<protobuf::Action> for Action {
         match self {
             Action::Collect { plan } => {
                 let plan_proto: protobuf::LogicalPlanNode = plan.try_into()?;
-
-                // let table_meta: Vec<protobuf::TableMeta> = tables
-                //     .iter()
-                //     .map(|t| match t {
-                //         TableMeta::Csv {
-                //             table_name,
-                //             path,
-                //             has_header,
-                //             schema,
-                //         } => {
-                //             let schema: Result<protobuf::Schema, _> = schema.clone().try_into();
-                //
-                //             schema.and_then(|schema| {
-                //                 let csv_meta = protobuf::CsvFileMeta {
-                //                     has_header: *has_header,
-                //                     schema: Some(schema),
-                //                 };
-                //
-                //                 Ok(protobuf::TableMeta {
-                //                     table_name: table_name.to_owned(),
-                //                     filename: path.to_owned(),
-                //                     csv_meta: Some(csv_meta),
-                //                 })
-                //             })
-                //         }
-                //         _ => unimplemented!(),
-                //     })
-                //     .collect::<Result<Vec<_>, _>>()?;
-
                 Ok(protobuf::Action {
                     query: Some(plan_proto),
                 })
             }
+            _ => unimplemented!(),
         }
     }
 }

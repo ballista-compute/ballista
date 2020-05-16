@@ -13,6 +13,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Setup
+      run: rustup component add rustfmt --toolchain nightly-x86_64-unknown-linux-gnu
     - name: Build
       run: cd rust && cargo build
     - name: Run tests

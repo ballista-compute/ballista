@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Setup
-      run: rustup default nightly && rustup component add rustfmt --toolchain nightly-x86_64-unknown-linux-gnu
+      run: rustup default nightly-2020-05-14 && rustup component add rustfmt --toolchain nightly-x86_64-unknown-linux-gnu
     - name: Build
       run: cd rust && cargo build
     - name: Run tests

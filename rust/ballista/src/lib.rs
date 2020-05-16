@@ -12,7 +12,6 @@ pub mod client;
 pub mod cluster;
 pub mod dataframe;
 pub mod error;
-pub mod logicalplan;
 pub mod plan;
 pub mod serde;
 pub mod utils;

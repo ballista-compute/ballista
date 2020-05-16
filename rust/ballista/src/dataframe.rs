@@ -5,8 +5,8 @@ use datafusion;
 
 use crate::client;
 use crate::error::{BallistaError, Result};
-use crate::logicalplan::{exprlist_to_fields, translate_plan, Expr, LogicalPlan, ScalarValue};
-
+use datafusion::logicalplan::{Expr, LogicalPlan, ScalarValue};
+use datafusion::optimizer::utils::exprlist_to_fields;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -347,7 +347,7 @@ impl DataFrame {
                 // create local execution context
                 let mut ctx = datafusion::execution::context::ExecutionContext::new();
 
-                let datafusion_plan = translate_plan(&mut ctx, &self.plan)?;
+                let datafusion_plan = &self.plan;
 
                 // create the query plan
                 let optimized_plan = ctx.optimize(&datafusion_plan)?;

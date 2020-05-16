@@ -2,7 +2,7 @@ use crate::error::{ballista_error, BallistaError};
 use crate::plan::Action;
 use crate::protobuf;
 
-use crate::logicalplan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator, ScalarValue};
+use datafusion::logicalplan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator, ScalarValue};
 
 use arrow::datatypes::{DataType, Field, Schema};
 

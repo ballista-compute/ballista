@@ -24,13 +24,13 @@ prost = "0.6"
 prost-types = "0.6"
 reqwest = "0.9.18"
 
-#arrow = { git = "https://github.com/apache/arrow" }
-#arrow-flight = { git = "https://github.com/apache/arrow" }
-#datafusion = { git = "https://github.com/apache/arrow" }
+arrow = { git = "https://github.com/apache/arrow" }
+arrow-flight = { git = "https://github.com/apache/arrow" }
+datafusion = { git = "https://github.com/apache/arrow" }
 
-arrow = "0.17"
-arrow-flight = "0.17"
-datafusion = "0.17"
+#arrow = "0.17"
+#arrow-flight = "0.17"
+#datafusion = "0.17"
 
 [[bin]]
 name = "executor"

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BALLISTA_VERSION=0.2.5
+BALLISTA_VERSION=0.2.6-SNAPSHOT
 
 set -e
 

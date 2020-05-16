@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "org.ballistacompute.spark"
-version = "0.2.5"
+version = "0.2.6-SNAPSHOT"
 description = "Ballista Spark Support"
 
 allprojects {
@@ -31,11 +31,11 @@ subprojects {
 
         // note that this project depends on the kotlin artifacts being published to a local maven repository
         // see ../jvm/README.md for instructions on publishing those artifacts
-        implementation("org.ballistacompute:datatypes:0.2.5")
-        implementation("org.ballistacompute:datasource:0.2.5")
-        implementation("org.ballistacompute:logical-plan:0.2.5")
-        implementation("org.ballistacompute:protobuf:0.2.5")
-        implementation("org.ballistacompute:executor:0.2.5")
+        implementation("org.ballistacompute:datatypes:0.2.6-SNAPSHOT")
+        implementation("org.ballistacompute:datasource:0.2.6-SNAPSHOT")
+        implementation("org.ballistacompute:logical-plan:0.2.6-SNAPSHOT")
+        implementation("org.ballistacompute:protobuf:0.2.6-SNAPSHOT")
+        implementation("org.ballistacompute:executor:0.2.6-SNAPSHOT")
 
         implementation("org.apache.arrow:flight-core:0.17.0")
         implementation("org.apache.arrow:flight-grpc:0.17.0")

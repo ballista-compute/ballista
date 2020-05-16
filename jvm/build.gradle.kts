@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "org.ballistacompute"
-version = "0.2.5"
+version = "0.2.6-SNAPSHOT"
 
 allprojects {
     repositories {

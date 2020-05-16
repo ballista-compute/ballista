@@ -19,13 +19,13 @@
 use std::fmt;
 use std::sync::Arc;
 
-use arrow::datatypes::{DataType, Field, Schema};
+use crate::arrow::datatypes::{DataType, Field, Schema};
 
-use arrow::record_batch::RecordBatch;
-use datafusion::datasource::MemTable;
-use datafusion::error::{ExecutionError, Result};
-use datafusion::execution::context::ExecutionContext;
-use datafusion::logicalplan::{
+use crate::arrow::record_batch::RecordBatch;
+use crate::datafusion::datasource::MemTable;
+use crate::datafusion::error::{ExecutionError, Result};
+use crate::datafusion::execution::context::ExecutionContext;
+use crate::datafusion::logicalplan::{
     Expr as DFExpr, LogicalPlan as DFLogicalPlan, Operator as DFOperator,
     ScalarValue as DFScalarValue,
 };
@@ -815,7 +815,7 @@ pub fn get_supertype(l: &DataType, r: &DataType) -> Result<DataType> {
 
 /// Given two datatypes, determine the supertype that both types can safely be cast to
 fn _get_supertype(l: &DataType, r: &DataType) -> Option<DataType> {
-    use arrow::datatypes::DataType::*;
+    use crate::arrow::datatypes::DataType::*;
     match (l, r) {
         (UInt8, Int8) => Some(Int8),
         (UInt8, Int16) => Some(Int16),
@@ -926,8 +926,8 @@ pub fn translate_plan(ctx: &mut ExecutionContext, plan: &LogicalPlan) -> Result<
             Ok(DFLogicalPlan::TableScan {
                 schema_name: "default".to_owned(),
                 table_name: table_name.to_owned(),
-                table_schema: Arc::new(schema.clone()),
-                projected_schema: Arc::new(schema.clone()),
+                table_schema: Box::new(schema.clone()),
+                projected_schema: Box::new(schema.clone()),
                 projection: None,
             })
         }
@@ -950,8 +950,8 @@ pub fn translate_plan(ctx: &mut ExecutionContext, plan: &LogicalPlan) -> Result<
             Ok(DFLogicalPlan::TableScan {
                 schema_name: "default".to_owned(),
                 table_name: table_name.clone(),
-                table_schema: Arc::new(schema.clone()),
-                projected_schema: Arc::new(projected_schema.clone()),
+                table_schema: Box::new(schema.clone()),
+                projected_schema: Box::new(projected_schema.clone()),
                 projection: projection.clone(),
             })
         }
@@ -964,12 +964,12 @@ pub fn translate_plan(ctx: &mut ExecutionContext, plan: &LogicalPlan) -> Result<
                 .iter()
                 .map(|e| translate_expr(e))
                 .collect::<Result<Vec<_>>>()?,
-            input: Arc::new(translate_plan(ctx, input)?),
-            schema: Arc::new(schema.clone()),
+            input: Box::new(translate_plan(ctx, input)?),
+            schema: Box::new(schema.clone()),
         }),
         LogicalPlan::Selection { expr, input } => Ok(DFLogicalPlan::Selection {
             expr: translate_expr(expr)?,
-            input: Arc::new(translate_plan(ctx, input)?),
+            input: Box::new(translate_plan(ctx, input)?),
         }),
         LogicalPlan::Aggregate {
             group_expr,
@@ -985,8 +985,8 @@ pub fn translate_plan(ctx: &mut ExecutionContext, plan: &LogicalPlan) -> Result<
                 .iter()
                 .map(|e| translate_expr(e))
                 .collect::<Result<Vec<_>>>()?,
-            input: Arc::new(translate_plan(ctx, input)?),
-            schema: Arc::new(schema.clone()),
+            input: Box::new(translate_plan(ctx, input)?),
+            schema: Box::new(schema.clone()),
         }),
         LogicalPlan::Limit {
             expr,
@@ -994,8 +994,8 @@ pub fn translate_plan(ctx: &mut ExecutionContext, plan: &LogicalPlan) -> Result<
             schema,
         } => Ok(DFLogicalPlan::Limit {
             expr: translate_expr(expr)?,
-            input: Arc::new(translate_plan(ctx, input)?),
-            schema: Arc::new(schema.clone()),
+            input: Box::new(translate_plan(ctx, input)?),
+            schema: Box::new(schema.clone()),
         }),
         other => Err(ExecutionError::General(format!(
             "Cannot translate operator to DataFusion: {:?}",
@@ -1008,7 +1008,7 @@ pub fn translate_plan(ctx: &mut ExecutionContext, plan: &LogicalPlan) -> Result<
 fn translate_expr(expr: &Expr) -> Result<DFExpr> {
     match expr {
         Expr::Alias(expr, alias) => Ok(DFExpr::Alias(
-            Arc::new(translate_expr(expr.as_ref())?),
+            Box::new(translate_expr(expr.as_ref())?),
             alias.clone(),
         )),
         Expr::Column(index) => Ok(DFExpr::Column(*index)),
@@ -1022,9 +1022,9 @@ fn translate_expr(expr: &Expr) -> Result<DFExpr> {
             let right = translate_expr(right)?;
             let op = translate_operator(op)?;
             Ok(DFExpr::BinaryExpr {
-                left: Arc::new(left),
+                left: Box::new(left),
                 op,
-                right: Arc::new(right),
+                right: Box::new(right),
             })
         }
         Expr::AggregateFunction {

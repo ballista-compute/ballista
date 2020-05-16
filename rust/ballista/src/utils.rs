@@ -1,6 +1,6 @@
-use arrow::array::*;
-use arrow::datatypes::DataType;
-use arrow::record_batch::RecordBatch;
+use crate::arrow::array::*;
+use crate::arrow::datatypes::DataType;
+use crate::arrow::record_batch::RecordBatch;
 
 /** Create formatted result set from record batches */
 pub fn result_str(results: &[RecordBatch]) -> Vec<String> {

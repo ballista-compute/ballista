@@ -1,11 +1,11 @@
+use std::collections::HashMap;
 use std::process;
 use std::time::Instant;
 
-use arrow::datatypes::{DataType, Field, Schema};
-use arrow::record_batch::RecordBatch;
-
 extern crate ballista;
-
+use ballista::arrow::datatypes::{DataType, Field, Schema};
+use ballista::arrow::record_batch::RecordBatch;
+use ballista::arrow::util::pretty;
 use ballista::cluster;
 use ballista::cluster::Executor;
 use ballista::dataframe::{max, Context};
@@ -13,9 +13,6 @@ use ballista::error::Result;
 use ballista::logicalplan::*;
 use ballista::BALLISTA_VERSION;
 
-use datafusion::utils;
-
-use std::collections::HashMap;
 use tokio::task;
 
 #[tokio::main]
@@ -108,7 +105,7 @@ async fn main() -> Result<()> {
         .await?;
 
     // print the results
-    utils::print_batches(&results)?;
+    pretty::print_batches(&results)?;
 
     println!("Parallel query took {} seconds", start.elapsed().as_secs());
 

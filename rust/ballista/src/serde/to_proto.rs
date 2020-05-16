@@ -4,7 +4,7 @@ use crate::protobuf;
 
 use crate::logicalplan::{Expr, LogicalPlan, ScalarValue};
 
-use arrow::datatypes::{DataType, Schema};
+use crate::arrow::datatypes::{DataType, Schema};
 
 use std::convert::TryInto;
 

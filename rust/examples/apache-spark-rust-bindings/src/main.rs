@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 
-use arrow::datatypes::{DataType, Field, Schema};
-
 extern crate ballista;
 
+use ballista::arrow::datatypes::{DataType, Field, Schema};
+use ballista::arrow::util::pretty;
 use ballista::dataframe::*;
 use ballista::error::Result;
 use ballista::logicalplan::col;
-use datafusion::utils;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -39,7 +38,7 @@ async fn main() -> Result<()> {
     let results = df.collect().await?;
 
     // display the results
-    utils::print_batches(&results)?;
+    pretty::print_batches(&results)?;
 
     Ok(())
 }

@@ -4,7 +4,7 @@ use ballista::logicalplan::translate_plan;
 use ballista::serde::decode_protobuf;
 use ballista::{plan, BALLISTA_VERSION};
 
-use datafusion::execution::context::ExecutionContext;
+use ballista::datafusion::execution::context::ExecutionContext;
 
 use flight::{
     flight_service_server::FlightService, flight_service_server::FlightServiceServer, Action,

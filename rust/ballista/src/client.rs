@@ -5,10 +5,10 @@ use crate::error::BallistaError;
 use crate::plan::Action;
 use crate::protobuf;
 
-use arrow::datatypes::Schema;
-use arrow::flight::flight_data_to_batch;
+use crate::arrow::datatypes::Schema;
+use crate::arrow::flight::flight_data_to_batch;
 
-use arrow::record_batch::RecordBatch;
+use crate::arrow::record_batch::RecordBatch;
 use flight::flight_service_client::FlightServiceClient;
 use flight::Ticket;
 use prost::Message;

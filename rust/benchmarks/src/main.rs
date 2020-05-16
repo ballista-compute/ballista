@@ -4,18 +4,16 @@ use std::io::prelude::*;
 use std::process;
 use std::time::Instant;
 
-use arrow::datatypes::{DataType, Field, Schema};
-use arrow::record_batch::RecordBatch;
-
 extern crate ballista;
 
+use ballista::arrow::datatypes::{DataType, Field, Schema};
+use ballista::arrow::record_batch::RecordBatch;
+use ballista::arrow::util::pretty;
 use ballista::cluster;
 use ballista::dataframe::{max, min, sum, Context, DataFrame, CSV_BATCH_SIZE};
 use ballista::error::{BallistaError, Result};
 use ballista::logicalplan::*;
 use ballista::BALLISTA_VERSION;
-
-use datafusion::utils;
 
 use std::collections::HashMap;
 use tokio::task;
@@ -51,7 +49,7 @@ async fn local_mode_benchmark(path: &str, results_filename: &str, format: &str) 
     df.explain();
 
     let response = df.collect().await?;
-    utils::print_batches(&response).map_err(|e| BallistaError::DataFusionError(e))?;
+    pretty::print_batches(&response).map_err(|e| BallistaError::ArrowError(e))?;
     let duration = start.elapsed().as_millis();
     println!("Local mode benchmark took {} ms", duration);
 
@@ -124,7 +122,7 @@ async fn k8s(path: &str, format: &str) -> Result<()> {
         process::exit(3);
     }
     println!("Received {} batches from executors", batches.len());
-    utils::print_batches(&batches)?;
+    pretty::print_batches(&batches)?;
 
     // perform secondary aggregate query on the results collected from the executors
     let mut settings = HashMap::new();
@@ -143,7 +141,7 @@ async fn k8s(path: &str, format: &str) -> Result<()> {
 
     // print the results
     println!("Benchmark took {} ms", start.elapsed().as_millis());
-    utils::print_batches(&results)?;
+    pretty::print_batches(&results)?;
 
     Ok(())
 }

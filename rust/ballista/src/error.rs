@@ -3,8 +3,8 @@
 use std::io;
 use std::result;
 
-use arrow::error::ArrowError;
-use datafusion::error::ExecutionError;
+use crate::arrow::error::ArrowError;
+use crate::datafusion::error::ExecutionError;
 
 pub type Result<T> = result::Result<T, BallistaError>;
 

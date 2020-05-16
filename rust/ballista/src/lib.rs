@@ -1,5 +1,8 @@
 //! Ballista is a proof-of-concept distributed compute platform based on Kubernetes and Apache Arrow.
 
+pub use arrow;
+pub use datafusion;
+
 // include the generated protobuf source as a submodule
 #[allow(clippy::all)]
 pub mod protobuf {

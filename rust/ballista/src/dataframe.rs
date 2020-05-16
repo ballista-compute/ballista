@@ -1,5 +1,5 @@
-use arrow::datatypes::{DataType, Schema};
-use arrow::record_batch::RecordBatch;
+use crate::arrow::datatypes::{DataType, Schema};
+use crate::arrow::record_batch::RecordBatch;
 
 use datafusion;
 
@@ -10,9 +10,9 @@ use crate::logicalplan::{exprlist_to_fields, translate_plan, Expr, LogicalPlan, 
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::datafusion::datasource::parquet::ParquetTable;
+use crate::datafusion::datasource::TableProvider;
 use crate::plan::Action;
-use datafusion::datasource::parquet::ParquetTable;
-use datafusion::datasource::TableProvider;
 
 pub const CSV_BATCH_SIZE: &'static str = "ballista.csv.batchSize";
 

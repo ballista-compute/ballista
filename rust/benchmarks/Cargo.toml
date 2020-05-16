@@ -6,7 +6,4 @@ edition = "2018"
 
 [dependencies]
 ballista = { path="../ballista" }
-arrow = "0.17"
-arrow-flight = "0.17"
-datafusion = "0.17"
 tokio = { version = "0.2", features = ["full"] }

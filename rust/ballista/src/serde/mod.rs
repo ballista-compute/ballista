@@ -19,11 +19,11 @@ pub fn decode_protobuf(bytes: &[u8]) -> Result<Action, BallistaError> {
 
 #[cfg(test)]
 mod tests {
+    use crate::arrow::datatypes::{DataType, Field, Schema};
     use crate::error::Result;
     use crate::logicalplan::{col, lit_str, Expr, LogicalPlanBuilder};
     use crate::plan::*;
     use crate::protobuf;
-    use arrow::datatypes::{DataType, Field, Schema};
     use std::convert::TryInto;
 
     #[test]

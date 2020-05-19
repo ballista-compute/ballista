@@ -11,8 +11,8 @@ use ballista::arrow::record_batch::RecordBatch;
 use ballista::arrow::util::pretty;
 use ballista::cluster;
 use ballista::dataframe::{max, min, sum, Context, DataFrame, CSV_BATCH_SIZE};
+use ballista::datafusion::logicalplan::*;
 use ballista::error::{BallistaError, Result};
-use ballista::logicalplan::*;
 use ballista::BALLISTA_VERSION;
 
 use std::collections::HashMap;

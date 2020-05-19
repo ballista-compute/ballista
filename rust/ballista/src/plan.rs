@@ -1,4 +1,4 @@
-use crate::logicalplan::LogicalPlan;
+use crate::datafusion::logicalplan::LogicalPlan;
 
 #[derive(Debug, Clone)]
 pub enum Action {

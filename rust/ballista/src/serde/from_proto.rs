@@ -2,7 +2,9 @@ use crate::error::{ballista_error, BallistaError};
 use crate::plan::Action;
 use crate::protobuf;
 
-use crate::logicalplan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator, ScalarValue};
+use crate::datafusion::logicalplan::{
+    Expr, LogicalPlan, LogicalPlanBuilder, Operator, ScalarValue,
+};
 
 use crate::arrow::datatypes::{DataType, Field, Schema};
 
@@ -59,7 +61,7 @@ impl TryInto<LogicalPlan> for protobuf::LogicalPlanNode {
 
             println!("projection: {:?}", projection);
 
-            LogicalPlanBuilder::scan_csv(&scan.path, &schema, None)? //TODO
+            LogicalPlanBuilder::scan_csv(&scan.path, true, &schema, None)? //TODO
                 .build()
                 .map_err(|e| e.into())
         } else {

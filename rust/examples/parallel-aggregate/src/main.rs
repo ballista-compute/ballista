@@ -9,8 +9,8 @@ use ballista::arrow::util::pretty;
 use ballista::cluster;
 use ballista::cluster::Executor;
 use ballista::dataframe::{max, Context};
+use ballista::datafusion::logicalplan::*;
 use ballista::error::Result;
-use ballista::logicalplan::*;
 use ballista::BALLISTA_VERSION;
 
 use tokio::task;

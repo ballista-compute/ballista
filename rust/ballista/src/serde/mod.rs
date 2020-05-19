@@ -20,8 +20,8 @@ pub fn decode_protobuf(bytes: &[u8]) -> Result<Action, BallistaError> {
 #[cfg(test)]
 mod tests {
     use crate::arrow::datatypes::{DataType, Field, Schema};
+    use crate::datafusion::logicalplan::{col, lit_str, Expr, LogicalPlanBuilder};
     use crate::error::Result;
-    use crate::logicalplan::{col, lit_str, Expr, LogicalPlanBuilder};
     use crate::plan::*;
     use crate::protobuf;
     use std::convert::TryInto;
@@ -36,7 +36,7 @@ mod tests {
             Field::new("salary", DataType::Int32, false),
         ]);
 
-        let plan = LogicalPlanBuilder::scan_csv("employee.csv", &schema, None)
+        let plan = LogicalPlanBuilder::scan_csv("employee.csv", true, &schema, None)
             .and_then(|plan| plan.filter(col("state").eq(&lit_str("CO"))))
             .and_then(|plan| plan.project(vec![col("id")]))
             .and_then(|plan| plan.build())
@@ -72,7 +72,7 @@ mod tests {
             Field::new("salary", DataType::Int32, false),
         ]);
 
-        let plan = LogicalPlanBuilder::scan_csv("employee.csv", &schema, None)
+        let plan = LogicalPlanBuilder::scan_csv("employee.csv", true, &schema, None)
             .and_then(|plan| plan.aggregate(vec![col("state")], vec![max(col("salary"))]))
             .and_then(|plan| plan.build())
             //.map_err(|e| Err(format!("{:?}", e)))

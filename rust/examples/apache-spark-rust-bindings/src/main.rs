@@ -5,8 +5,8 @@ extern crate ballista;
 use ballista::arrow::datatypes::{DataType, Field, Schema};
 use ballista::arrow::util::pretty;
 use ballista::dataframe::*;
+use ballista::datafusion::logicalplan::col;
 use ballista::error::Result;
-use ballista::logicalplan::col;
 
 #[tokio::main]
 async fn main() -> Result<()> {

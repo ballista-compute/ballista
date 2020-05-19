@@ -1,10 +1,9 @@
 use std::pin::Pin;
 
-use ballista::logicalplan::translate_plan;
-use ballista::serde::decode_protobuf;
-use ballista::{plan, BALLISTA_VERSION};
-
 use ballista::datafusion::execution::context::ExecutionContext;
+use ballista::serde::decode_protobuf;
+
+use ballista::{plan, BALLISTA_VERSION};
 
 use flight::{
     flight_service_server::FlightService, flight_service_server::FlightServiceServer, Action,
@@ -52,8 +51,7 @@ impl FlightService for FlightServiceImpl {
                         // create local execution context
                         let mut ctx = ExecutionContext::new();
 
-                        let datafusion_plan =
-                            translate_plan(&mut ctx, logical_plan).map_err(|e| to_tonic_err(&e))?;
+                        let datafusion_plan = logical_plan;
 
                         // create the query plan
                         let optimized_plan = ctx
@@ -94,7 +92,10 @@ impl FlightService for FlightServiceImpl {
 
                         Ok(Response::new(Box::pin(output) as Self::DoGetStream))
                     }
-                    other => Err(Status::invalid_argument(format!("Invalid Ballista action: {:?}", other))),
+                    other => Err(Status::invalid_argument(format!(
+                        "Invalid Ballista action: {:?}",
+                        other
+                    ))),
                 }
             }
             Err(e) => Err(Status::invalid_argument(format!("Invalid ticket: {:?}", e))),

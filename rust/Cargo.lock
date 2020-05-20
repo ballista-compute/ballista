@@ -75,7 +75,7 @@ checksum = "cff77d8686867eceff3105329d4698d96c2391c176d5d03adc90c7389162b5b8"
 [[package]]
 name = "arrow"
 version = "0.18.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow#8fc6f53e71135c03883e9d32957cae4f59aa6e34"
+source = "git+https://github.com/apache/arrow#11a20bf7f2e796277f11d7e995ee80613f646466"
 dependencies = [
  "arrow-flight",
  "chrono",
@@ -96,7 +96,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "0.18.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow#8fc6f53e71135c03883e9d32957cae4f59aa6e34"
+source = "git+https://github.com/apache/arrow#11a20bf7f2e796277f11d7e995ee80613f646466"
 dependencies = [
  "bytes 0.5.4",
  "futures 0.3.5",
@@ -324,9 +324,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.53"
+version = "1.0.54"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "404b1fe4f65288577753b17e3b36a04596ee784493ec249bf81c7f2d2acd751c"
+checksum = "7bbb73db36c1246e9034e307d0fba23f9a2e251faa47ade70c1bd252220c8311"
 dependencies = [
  "jobserver",
 ]
@@ -528,7 +528,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "0.18.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow#8fc6f53e71135c03883e9d32957cae4f59aa6e34"
+source = "git+https://github.com/apache/arrow#11a20bf7f2e796277f11d7e995ee80613f646466"
 dependencies = [
  "arrow",
  "clap",
@@ -1560,7 +1560,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "0.18.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow#8fc6f53e71135c03883e9d32957cae4f59aa6e34"
+source = "git+https://github.com/apache/arrow#11a20bf7f2e796277f11d7e995ee80613f646466"
 dependencies = [
  "arrow",
  "brotli",

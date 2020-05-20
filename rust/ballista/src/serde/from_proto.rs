@@ -61,9 +61,20 @@ impl TryInto<LogicalPlan> for protobuf::LogicalPlanNode {
 
             println!("projection: {:?}", projection);
 
-            LogicalPlanBuilder::scan_csv(&scan.path, true, &schema, None)? //TODO
-                .build()
-                .map_err(|e| e.into())
+            match scan.file_format.as_str() {
+                "csv" => {
+                    LogicalPlanBuilder::scan_csv(&scan.path, scan.has_header, Some(&schema), None, None)? //TODO projection
+                        .build()
+                        .map_err(|e| e.into())
+                }
+                "parquet" => LogicalPlanBuilder::scan_parquet(&scan.path, None)? //TODO projection
+                    .build()
+                    .map_err(|e| e.into()),
+                other => Err(ballista_error(&format!(
+                    "Unsupported file format '{}' for file scan",
+                    other
+                ))),
+            }
         } else {
             Err(ballista_error(&format!(
                 "Unsupported logical plan '{:?}'",

@@ -151,11 +151,12 @@ impl Context {
         path: &str,
         schema: Option<Schema>,
         projection: Option<Vec<usize>>,
-        _has_header: bool,
+        has_header: bool,
     ) -> Result<DataFrame> {
         Ok(DataFrame::scan_csv(
             self.state.clone(),
             path,
+            has_header,
             &schema.unwrap(), //TODO schema should be optional here
             projection,
         )?)
@@ -215,6 +216,7 @@ impl DataFrame {
     pub fn scan_csv(
         ctx: Arc<ContextState>,
         path: &str,
+        has_header: bool,
         schema: &Schema,
         projection: Option<Vec<usize>>,
     ) -> Result<Self> {
@@ -225,7 +227,8 @@ impl DataFrame {
             ctx,
             &LogicalPlan::CsvScan {
                 path: path.to_owned(),
-                has_header: true, //TODO
+                has_header,
+                delimiter: None,
                 schema: Box::new(schema.clone()),
                 projected_schema: Box::new(projected_schema.or(Some(schema.clone())).unwrap()),
                 projection,

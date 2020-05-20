@@ -1,5 +1,5 @@
 # Base image extends rust:nightly which extends debian:buster-slim
-FROM ballistacompute/rust-cached-deps:0.2.5 as build
+FROM ballistacompute/rust-cached-deps:0.3.0-SNAPSHOT as build
 
 # protobuf
 COPY proto/ballista.proto /tmp/ballista/proto/

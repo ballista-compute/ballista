@@ -1,16 +1,15 @@
 use std::time::Instant;
 
-use arrow::datatypes::{DataType, Field, Schema};
-
 extern crate ballista;
 
+use ballista::arrow::datatypes::{DataType, Field, Schema};
 use ballista::dataframe::{max, min, Context, CSV_BATCH_SIZE};
+use ballista::datafusion::logicalplan::*;
+use ballista::arrow::util::pretty;
 use ballista::error::Result;
-use ballista::logicalplan::*;
-use ballista::BALLISTA_VERSION;
 
+use ballista::BALLISTA_VERSION;
 use arrow::array::{Float64Array, Int32Array};
-use datafusion::utils::print_batches;
 use std::collections::HashMap;
 
 #[tokio::main]
@@ -52,7 +51,7 @@ async fn main() -> Result<()> {
             port,
             duration.as_millis()
         );
-        print_batches(&response)?;
+        pretty::print_batches(&response)?;
 
         // assertions
         assert_eq!(1, response.len());

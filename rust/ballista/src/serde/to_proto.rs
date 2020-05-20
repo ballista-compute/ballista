@@ -77,6 +77,7 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
                 path,
                 schema,
                 projection,
+                has_header,
                 ..
             } => {
                 let mut node = empty_plan_node();
@@ -92,6 +93,8 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
                     path: path.clone(),
                     projection: projected_field_names,
                     schema: Some(schema),
+                    has_header,
+                    file_format: "csv".to_owned(),
                 });
                 Ok(node)
             }
@@ -114,6 +117,8 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
                     path: path.clone(),
                     projection: projected_field_names,
                     schema: Some(schema),
+                    has_header: false,
+                    file_format: "parquet".to_owned(),
                 });
                 Ok(node)
             }

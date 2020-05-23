@@ -75,7 +75,7 @@ checksum = "cff77d8686867eceff3105329d4698d96c2391c176d5d03adc90c7389162b5b8"
 [[package]]
 name = "arrow"
 version = "0.18.0-SNAPSHOT"
-source = "git+https://github.com/andygrove/arrow?branch=ballista#b9fb4a00f8c9b28eb7eb0027c44d3532a7f281f7"
+source = "git+https://github.com/apache/arrow#6e84421933894cd8e448f0c74828e9e18b2167aa"
 dependencies = [
  "arrow-flight",
  "chrono",
@@ -96,7 +96,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "0.18.0-SNAPSHOT"
-source = "git+https://github.com/andygrove/arrow?branch=ballista#b9fb4a00f8c9b28eb7eb0027c44d3532a7f281f7"
+source = "git+https://github.com/apache/arrow#6e84421933894cd8e448f0c74828e9e18b2167aa"
 dependencies = [
  "bytes 0.5.4",
  "futures 0.3.5",
@@ -528,7 +528,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "0.18.0-SNAPSHOT"
-source = "git+https://github.com/andygrove/arrow?branch=ballista#b9fb4a00f8c9b28eb7eb0027c44d3532a7f281f7"
+source = "git+https://github.com/apache/arrow#6e84421933894cd8e448f0c74828e9e18b2167aa"
 dependencies = [
  "arrow",
  "clap",
@@ -1297,7 +1297,7 @@ checksum = "f5e374eff525ce1c5b7687c4cef63943e7686524a387933ad27ca7ec43779cb3"
 dependencies = [
  "log 0.4.8",
  "mio",
- "miow 0.3.3",
+ "miow 0.3.4",
  "winapi 0.3.8",
 ]
 
@@ -1326,9 +1326,9 @@ dependencies = [
 
 [[package]]
 name = "miow"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "396aa0f2003d7df8395cb93e09871561ccc3e785f0acb369170e8cc74ddf9226"
+checksum = "22dfdd1d51b2639a5abd17ed07005c3af05fb7a2a3b1a1d0d7af1000a520c1c7"
 dependencies = [
  "socket2",
  "winapi 0.3.8",
@@ -1560,7 +1560,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "0.18.0-SNAPSHOT"
-source = "git+https://github.com/andygrove/arrow?branch=ballista#b9fb4a00f8c9b28eb7eb0027c44d3532a7f281f7"
+source = "git+https://github.com/apache/arrow#6e84421933894cd8e448f0c74828e9e18b2167aa"
 dependencies = [
  "arrow",
  "brotli",
@@ -1624,9 +1624,9 @@ checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
 
 [[package]]
 name = "petgraph"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29c127eea4a29ec6c85d153c59dc1213f33ec74cead30fe4730aecc88cc1fd92"
+checksum = "467d164a6de56270bd7c4d070df81d07beace25012d5103ced4e9ff08d6afdb7"
 dependencies = [
  "fixedbitset",
  "indexmap",
@@ -1704,9 +1704,9 @@ checksum = "8e946095f9d3ed29ec38de908c22f95d9ac008e424c7bcae54c75a79c527c694"
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.13"
+version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53f5ffe53a6b28e37c9c1ce74893477864d64f74778a93a4beb43c8fa167f639"
+checksum = "70a50b9351bfa8d65a7d93ce712dc63d2fd15ddbf2c36990fc7cac344859c04f"
 dependencies = [
  "unicode-xid",
 ]
@@ -2344,9 +2344,9 @@ checksum = "8ea5119cdb4c55b55d432abb513a0429384878c15dde60cc77b1c99de1a95a6a"
 
 [[package]]
 name = "syn"
-version = "1.0.22"
+version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1425de3c33b0941002740a420b1a906a350b88d08b82b2c8a01035a3f9447bac"
+checksum = "95b5f192649e48a5302a13f2feb224df883b98933222369e4b3b0fe2a5447269"
 dependencies = [
  "proc-macro2",
  "quote",

@@ -8,6 +8,7 @@ use crate::datafusion::logicalplan::{
 
 use crate::arrow::datatypes::{DataType, Field, Schema};
 
+use datafusion::execution::physical_plan::csv::CsvReadOptions;
 use std::convert::TryInto;
 
 impl TryInto<LogicalPlan> for protobuf::LogicalPlanNode {
@@ -63,9 +64,13 @@ impl TryInto<LogicalPlan> for protobuf::LogicalPlanNode {
 
             match scan.file_format.as_str() {
                 "csv" => {
-                    LogicalPlanBuilder::scan_csv(&scan.path, scan.has_header, Some(&schema), None, None)? //TODO projection
-                        .build()
-                        .map_err(|e| e.into())
+                    LogicalPlanBuilder::scan_csv(
+                        &scan.path,
+                        CsvReadOptions::new().schema(&schema).has_header(true), //TODO
+                        None,                                                   //TODO projection
+                    )?
+                    .build()
+                    .map_err(|e| e.into())
                 }
                 "parquet" => LogicalPlanBuilder::scan_parquet(&scan.path, None)? //TODO projection
                     .build()

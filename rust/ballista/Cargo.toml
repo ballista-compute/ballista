@@ -24,13 +24,18 @@ prost = "0.6"
 prost-types = "0.6"
 reqwest = "0.9.18"
 
-arrow = { git = "https://github.com/apache/arrow" }
-arrow-flight = { git = "https://github.com/apache/arrow" }
-datafusion = { git = "https://github.com/apache/arrow" }
+# ballista will depend on this fork until pending PRs are merged
+arrow = { git = "https://github.com/andygrove/arrow", branch="ballista" }
+arrow-flight = { git = "https://github.com/andygrove/arrow", branch="ballista" }
+datafusion = { git = "https://github.com/andygrove/arrow", branch="ballista" }
 
-#arrow = "0.17"
-#arrow-flight = "0.17"
-#datafusion = "0.17"
+#arrow = { git = "https://github.com/apache/arrow" }
+#arrow-flight = { git = "https://github.com/apache/arrow" }
+#datafusion = { git = "https://github.com/apache/arrow" }
+
+#arrow = "1.0.0"
+#arrow-flight = "1.0.0"
+#datafusion = "1.0.0"
 
 [[bin]]
 name = "executor"

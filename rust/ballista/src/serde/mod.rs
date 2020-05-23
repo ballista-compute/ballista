@@ -24,6 +24,7 @@ mod tests {
     use crate::error::Result;
     use crate::plan::*;
     use crate::protobuf;
+    use datafusion::execution::physical_plan::csv::CsvReadOptions;
     use std::convert::TryInto;
 
     #[test]
@@ -36,12 +37,16 @@ mod tests {
             Field::new("salary", DataType::Int32, false),
         ]);
 
-        let plan = LogicalPlanBuilder::scan_csv("employee.csv", true, Some(&schema), None, None)
-            .and_then(|plan| plan.filter(col("state").eq(&lit_str("CO"))))
-            .and_then(|plan| plan.project(vec![col("id")]))
-            .and_then(|plan| plan.build())
-            //.map_err(|e| Err(format!("{:?}", e)))
-            .unwrap(); //TODO
+        let plan = LogicalPlanBuilder::scan_csv(
+            "employee.csv",
+            CsvReadOptions::new().schema(&schema).has_header(true),
+            None,
+        )
+        .and_then(|plan| plan.filter(col("state").eq(&lit_str("CO"))))
+        .and_then(|plan| plan.project(vec![col("id")]))
+        .and_then(|plan| plan.build())
+        //.map_err(|e| Err(format!("{:?}", e)))
+        .unwrap(); //TODO
 
         let action = Action::Collect {
             plan: plan.clone(),
@@ -72,11 +77,15 @@ mod tests {
             Field::new("salary", DataType::Int32, false),
         ]);
 
-        let plan = LogicalPlanBuilder::scan_csv("employee.csv", true, Some(&schema), None, None)
-            .and_then(|plan| plan.aggregate(vec![col("state")], vec![max(col("salary"))]))
-            .and_then(|plan| plan.build())
-            //.map_err(|e| Err(format!("{:?}", e)))
-            .unwrap(); //TODO
+        let plan = LogicalPlanBuilder::scan_csv(
+            "employee.csv",
+            CsvReadOptions::new().schema(&schema).has_header(true),
+            None,
+        )
+        .and_then(|plan| plan.aggregate(vec![col("state")], vec![max(col("salary"))]))
+        .and_then(|plan| plan.build())
+        //.map_err(|e| Err(format!("{:?}", e)))
+        .unwrap(); //TODO
 
         let action = Action::Collect {
             plan: plan.clone(),

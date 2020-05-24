@@ -25,14 +25,14 @@ prost-types = "0.6"
 reqwest = "0.9.18"
 
 # For local development and debugging
-arrow = { path = "../../../arrow/rust/arrow" }
-arrow-flight = { path = "../../../arrow/rust/arrow-flight" }
-datafusion = { path = "../../../arrow/rust/datafusion" }
+#arrow = { path = "../../../arrow/rust/arrow" }
+#arrow-flight = { path = "../../../arrow/rust/arrow-flight" }
+#datafusion = { path = "../../../arrow/rust/datafusion" }
 
 # Ballista sometimes depends on this fork when PRs are still pending against Arrow repo
-#arrow = { git = "https://github.com/andygrove/arrow", branch="ballista" }
-#arrow-flight = { git = "https://github.com/andygrove/arrow", branch="ballista" }
-#datafusion = { git = "https://github.com/andygrove/arrow", branch="ballista" }
+arrow = { git = "https://github.com/andygrove/arrow", branch="ballista" }
+arrow-flight = { git = "https://github.com/andygrove/arrow", branch="ballista" }
+datafusion = { git = "https://github.com/andygrove/arrow", branch="ballista" }
 
 # Ballista 0.3.0-SNAPSHOT depends on latest Arrow
 #arrow = { git = "https://github.com/apache/arrow" }

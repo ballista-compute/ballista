@@ -52,9 +52,8 @@ impl FlightService for FlightServiceImpl {
                         let mut ctx = ExecutionContext::new();
 
                         // create the query plan
-                        let optimized_plan = ctx
-                            .optimize(&logical_plan)
-                            .map_err(|e| to_tonic_err(&e))?;
+                        let optimized_plan =
+                            ctx.optimize(&logical_plan).map_err(|e| to_tonic_err(&e))?;
 
                         println!("Optimized Plan: {:?}", optimized_plan);
 
@@ -84,7 +83,6 @@ impl FlightService for FlightServiceImpl {
                         let mut batches: Vec<Result<FlightData, Status>> = results
                             .iter()
                             .map(|batch| {
-
                                 println!("batch schema: {:?}", batch.schema());
 
                                 Ok(FlightData::from(batch))

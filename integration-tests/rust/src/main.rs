@@ -6,8 +6,8 @@ extern crate ballista;
 use ballista::arrow::array::{Float64Array, Int32Array};
 use ballista::arrow::datatypes::{DataType, Field, Schema};
 use ballista::arrow::util::pretty;
-use ballista::datafusion::logicalplan::*;
 use ballista::dataframe::{max, min, Context, CSV_BATCH_SIZE};
+use ballista::datafusion::logicalplan::*;
 use ballista::error::Result;
 use ballista::BALLISTA_VERSION;
 
@@ -21,8 +21,8 @@ async fn main() -> Result<()> {
 
     let mut targets = HashMap::new();
     targets.insert("Rust", 50051);
-    // targets.insert("JVM", 50052);
-    // targets.insert("Spark", 50053);
+    targets.insert("JVM", 50052);
+    targets.insert("Spark", 50053);
 
     for (name, port) in &targets {
         println!(
@@ -31,7 +31,7 @@ async fn main() -> Result<()> {
         );
         match execute(filename, host, name, port).await {
             Ok(_) => println!("{}: OK", name),
-            Err(e) => println!("{}: FAIL: {:?}", name, e)
+            Err(e) => println!("{}: FAIL: {:?}", name, e),
         }
     }
 

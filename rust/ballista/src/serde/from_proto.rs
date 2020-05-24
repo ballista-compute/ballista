@@ -64,10 +64,11 @@ impl TryInto<LogicalPlan> for protobuf::LogicalPlanNode {
 
             match scan.file_format.as_str() {
                 "csv" => {
+                    let options = CsvReadOptions::new().schema(&schema).has_header(scan.has_header);
                     LogicalPlanBuilder::scan_csv(
                         &scan.path,
-                        CsvReadOptions::new().schema(&schema).has_header(true), //TODO
-                        None,                                                   //TODO projection
+                        options,
+                        None, //TODO projection
                     )?
                     .build()
                     .map_err(|e| e.into())

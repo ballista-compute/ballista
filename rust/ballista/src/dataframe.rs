@@ -1,18 +1,16 @@
-use crate::arrow::datatypes::{DataType, Schema};
-use crate::arrow::record_batch::RecordBatch;
-
-use datafusion;
-
-use crate::client;
-use crate::error::{BallistaError, Result};
-
 use std::collections::HashMap;
 use std::sync::Arc;
 
+
+use crate::arrow::datatypes::{DataType, Schema};
+use crate::arrow::record_batch::RecordBatch;
+use crate::datafusion;
 use crate::datafusion::datasource::parquet::ParquetTable;
 use crate::datafusion::datasource::TableProvider;
 use crate::datafusion::logicalplan::{Expr, LogicalPlan, ScalarValue};
 use crate::datafusion::optimizer::utils::exprlist_to_fields;
+use crate::client;
+use crate::error::{BallistaError, Result};
 use crate::plan::Action;
 
 pub const CSV_BATCH_SIZE: &'static str = "ballista.csv.batchSize";

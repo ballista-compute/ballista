@@ -19,13 +19,13 @@ pub fn decode_protobuf(bytes: &[u8]) -> Result<Action, BallistaError> {
 
 #[cfg(test)]
 mod tests {
+    use std::convert::TryInto;
     use crate::arrow::datatypes::{DataType, Field, Schema};
     use crate::datafusion::logicalplan::{col, lit_str, Expr, LogicalPlanBuilder};
+    use crate::datafusion::execution::physical_plan::csv::CsvReadOptions;
     use crate::error::Result;
     use crate::plan::*;
     use crate::protobuf;
-    use datafusion::execution::physical_plan::csv::CsvReadOptions;
-    use std::convert::TryInto;
 
     #[test]
     fn roundtrip() -> Result<()> {

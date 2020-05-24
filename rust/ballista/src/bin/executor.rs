@@ -51,17 +51,16 @@ impl FlightService for FlightServiceImpl {
                         // create local execution context
                         let mut ctx = ExecutionContext::new();
 
-                        let datafusion_plan = logical_plan;
-
                         // create the query plan
                         let optimized_plan = ctx
-                            .optimize(&datafusion_plan)
+                            .optimize(&logical_plan)
                             .map_err(|e| to_tonic_err(&e))?;
 
                         println!("Optimized Plan: {:?}", optimized_plan);
 
+                        let batch_size = 1024 * 1024;
                         let physical_plan = ctx
-                            .create_physical_plan(&optimized_plan, 1024 * 1024)
+                            .create_physical_plan(&optimized_plan, batch_size)
                             .map_err(|e| to_tonic_err(&e))?;
 
                         // execute the query
@@ -77,12 +76,19 @@ impl FlightService for FlightServiceImpl {
 
                         // add an initial FlightData message that sends schema
                         let schema = physical_plan.schema();
+                        println!("physical plan schema: {:?}", &schema);
+
                         let mut flights: Vec<Result<FlightData, Status>> =
                             vec![Ok(FlightData::from(schema.as_ref()))];
 
                         let mut batches: Vec<Result<FlightData, Status>> = results
                             .iter()
-                            .map(|batch| Ok(FlightData::from(batch)))
+                            .map(|batch| {
+
+                                println!("batch schema: {:?}", batch.schema());
+
+                                Ok(FlightData::from(batch))
+                            })
                             .collect();
 
                         // append batch vector to schema vector, so that the first message sent is the schema

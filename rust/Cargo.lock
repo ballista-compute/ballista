@@ -181,6 +181,7 @@ version = "0.3.0-SNAPSHOT"
 dependencies = [
  "arrow",
  "arrow-flight",
+ "crossbeam",
  "datafusion",
  "env_logger",
  "flatbuffers",
@@ -189,6 +190,7 @@ dependencies = [
  "k8s-openapi",
  "kube",
  "log 0.4.8",
+ "parquet",
  "prost",
  "prost-build",
  "prost-types",

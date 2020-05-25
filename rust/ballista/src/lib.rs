@@ -2,6 +2,7 @@
 
 pub use arrow;
 pub use datafusion;
+pub use parquet;
 
 // include the generated protobuf source as a submodule
 #[allow(clippy::all)]
@@ -15,6 +16,7 @@ pub mod client;
 pub mod cluster;
 pub mod dataframe;
 pub mod error;
+pub mod execution;
 pub mod plan;
 pub mod serde;
 pub mod utils;

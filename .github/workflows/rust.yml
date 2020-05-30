@@ -20,7 +20,7 @@ jobs:
     - name: Run tests
       run: cd rust && cargo test
 
-  Mac_OSX:
+  Mac:
     runs-on: macOS-latest
     steps:
     - uses: actions/checkout@v2

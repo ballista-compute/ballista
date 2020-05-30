@@ -37,10 +37,27 @@ jobs:
     runs-on: windows-2016
     steps:
     - uses: actions/checkout@v2
+    - name: Pre-requisite for Windows vcpkg
+      uses: actions/checkout@v2
+      with:
+        repository: Microsoft/vcpkg
+        path: vcpkg
+    - name: Install vcpkg
+      run: |
+        cd vcpkg && ./bootstrap-vcpkg.bat
+        vcpkg install openssl-windows:x64-windows
+        vcpkg install openssl:x64-windows-static
+        vcpkg integrate install
+        set VCPKGRS_DYNAMIC=1
     - name: Setup
-      run: rustup default nightly-2020-05-14 && rustup component add rustfmt
+      run: |
+        rustup default nightly-2020-05-14 && rustup component add rustfmt
     - name: Build
-      run: cd rust && cargo build
+      run: |
+        set VCPKGRS_DYNAMIC=1
+        cd rust && cargo build
     - name: Run tests
-      run: cd rust && cargo test
+      run: |
+        set VCPKGRS_DYNAMIC=1
+        cd rust && cargo test
     

@@ -10,7 +10,11 @@ use flight::{
     ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo, HandshakeRequest,
     HandshakeResponse, PutResult, SchemaResult, Ticket,
 };
+
+use etcd_client::*;
+use uuid::Uuid;
 use futures::Stream;
+use structopt::StructOpt;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status, Streaming};
 
@@ -192,19 +196,67 @@ fn to_tonic_err(e: &datafusion::error::ExecutionError) -> Status {
     Status::internal(format!("{:?}", e))
 }
 
+#[derive(StructOpt, Debug)]
+#[structopt(name = "basic")]
+struct Opt {
+    // List of urls for etcd servers
+    #[structopt(long)]
+    etcd: Option<String>
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "0.0.0.0:50051".parse()?;
+
+    let opt = Opt::from_args();
+
+    let bind_host_port = "0.0.0.0:50051";
+
+    //TODO need to publish a public host and port - either pass this in on command line or
+    // get it from k8s env vars?
+    let public_host_port = bind_host_port.clone();
+
+    let addr = bind_host_port.parse()?;
     let service = FlightServiceImpl {};
 
     let svc = FlightServiceServer::new(service);
 
     println!(
-        "Ballista v{} Rust Executor listening on {:?}",
-        BALLISTA_VERSION, addr
+        "Ballista v{} Rust Executor",
+        BALLISTA_VERSION
     );
 
+    match opt.etcd {
+        Some(urls) => {
+            println!("Running in cluster mode");
+            println!("Connecting to etcd at {}", urls);
+
+            let mut client = Client::connect([&urls], None).await?;
+
+            let uuid = Uuid::new_v4();
+
+            let cluster_name = "default";
+            let key = format!("/ballista/{}/{}", cluster_name, uuid);
+            let value = public_host_port;
+
+            let lease = client.lease_grant(500, None).await?;
+            println!("lease_grant: {:?}", lease);
+
+            let options = PutOptions::new().with_lease(lease.id());
+            let resp = client.put(key.clone(), value, Some(options)).await?;
+            println!("Registered with etcd as {}. Response: {:?}.", key, resp);
+
+        },
+        None => {
+            println!("Running in standalone mode");
+        }
+    };
+
+    println!(
+        "Flight service listening on {:?}",
+        addr
+    );
     Server::builder().add_service(svc).serve(addr).await?;
+
 
     Ok(())
 }

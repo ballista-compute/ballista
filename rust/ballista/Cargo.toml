@@ -23,6 +23,9 @@ flatbuffers = "0.6.0"
 prost = "0.6"
 prost-types = "0.6"
 reqwest = "0.9.18"
+structopt = "0.3"
+etcd-client = "0.4"
+uuid = { version = "0.8", features = ["serde", "v4"] }
 
 # For local development and debugging
 #arrow = { path = "../../../arrow/rust/arrow" }

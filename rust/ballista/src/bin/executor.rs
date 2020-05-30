@@ -5,17 +5,29 @@ use ballista::serde::decode_protobuf;
 
 use ballista::{plan, BALLISTA_VERSION};
 
+use arrow::record_batch::RecordBatch;
 use flight::{
     flight_service_server::FlightService, flight_service_server::FlightServiceServer, Action,
     ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo, HandshakeRequest,
     HandshakeResponse, PutResult, SchemaResult, Ticket,
 };
 use futures::Stream;
+use std::collections::HashMap;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status, Streaming};
 
 #[derive(Clone)]
-pub struct FlightServiceImpl {}
+pub struct FlightServiceImpl {
+    results: HashMap<String, Vec<RecordBatch>>,
+}
+
+impl FlightServiceImpl {
+    pub fn new() -> Self {
+        Self {
+            results: HashMap::new(),
+        }
+    }
+}
 
 #[tonic::async_trait]
 impl FlightService for FlightServiceImpl {
@@ -40,69 +52,67 @@ impl FlightService for FlightServiceImpl {
     ) -> Result<Response<Self::DoGetStream>, Status> {
         let ticket = request.into_inner();
 
-        match decode_protobuf(&ticket.ticket.to_vec()) {
-            Ok(action) => {
-                println!("do_get: {:?}", action);
+        let action =
+            decode_protobuf(&ticket.ticket.to_vec()).map_err(|e| to_tonic_err(&e.into()))?;
+        println!("do_get: {:?}", action);
 
-                match &action {
-                    plan::Action::Collect { plan: logical_plan } => {
-                        println!("Logical plan: {:?}", logical_plan);
+        match &action {
+            plan::Action::Collect { plan: logical_plan } => {
+                println!("Logical plan: {:?}", logical_plan);
 
-                        // create local execution context
-                        let mut ctx = ExecutionContext::new();
+                // create local execution context
+                let mut ctx = ExecutionContext::new();
 
-                        // create the query plan
-                        let optimized_plan =
-                            ctx.optimize(&logical_plan).map_err(|e| to_tonic_err(&e))?;
+                // create the query plan
+                let optimized_plan = ctx
+                    .optimize(&logical_plan)
+                    .map_err(|e| to_tonic_err(&e.into()))?;
 
-                        println!("Optimized Plan: {:?}", optimized_plan);
+                println!("Optimized Plan: {:?}", optimized_plan);
 
-                        let batch_size = 1024 * 1024;
-                        let physical_plan = ctx
-                            .create_physical_plan(&optimized_plan, batch_size)
-                            .map_err(|e| to_tonic_err(&e))?;
+                let batch_size = 1024 * 1024;
+                let physical_plan = ctx
+                    .create_physical_plan(&optimized_plan, batch_size)
+                    .map_err(|e| to_tonic_err(&e.into()))?;
 
-                        // execute the query
-                        let results = ctx
-                            .collect(physical_plan.as_ref())
-                            .map_err(|e| to_tonic_err(&e))?;
+                // execute the query
+                let results = ctx
+                    .collect(physical_plan.as_ref())
+                    .map_err(|e| to_tonic_err(&e.into()))?;
 
-                        println!("Executed query");
+                println!("Executed query");
 
-                        if results.is_empty() {
-                            return Err(Status::internal("There were no results from ticket"));
-                        }
-
-                        // add an initial FlightData message that sends schema
-                        let schema = physical_plan.schema();
-                        println!("physical plan schema: {:?}", &schema);
-
-                        let mut flights: Vec<Result<FlightData, Status>> =
-                            vec![Ok(FlightData::from(schema.as_ref()))];
-
-                        let mut batches: Vec<Result<FlightData, Status>> = results
-                            .iter()
-                            .map(|batch| {
-                                println!("batch schema: {:?}", batch.schema());
-
-                                Ok(FlightData::from(batch))
-                            })
-                            .collect();
-
-                        // append batch vector to schema vector, so that the first message sent is the schema
-                        flights.append(&mut batches);
-
-                        let output = futures::stream::iter(flights);
-
-                        Ok(Response::new(Box::pin(output) as Self::DoGetStream))
-                    }
-                    other => Err(Status::invalid_argument(format!(
-                        "Invalid Ballista action: {:?}",
-                        other
-                    ))),
+                if results.is_empty() {
+                    return Err(Status::internal("There were no results from ticket"));
                 }
+
+                // add an initial FlightData message that sends schema
+                let schema = physical_plan.schema();
+                println!("physical plan schema: {:?}", &schema);
+
+                let mut flights: Vec<Result<FlightData, Status>> =
+                    vec![Ok(FlightData::from(schema.as_ref()))];
+
+                let mut batches: Vec<Result<FlightData, Status>> = results
+                    .iter()
+                    .map(|batch| {
+                        println!("batch schema: {:?}", batch.schema());
+
+                        Ok(FlightData::from(batch))
+                    })
+                    .collect();
+
+                // append batch vector to schema vector, so that the first message sent is the schema
+                flights.append(&mut batches);
+
+                let output = futures::stream::iter(flights);
+
+                Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
-            Err(e) => Err(Status::invalid_argument(format!("Invalid ticket: {:?}", e))),
+            other => Err(Status::invalid_argument(format!(
+                "Invalid Ballista action: {:?}",
+                other
+            ))),
         }
     }
 
@@ -168,14 +178,18 @@ impl FlightService for FlightServiceImpl {
 
     async fn do_action(
         &self,
-        _request: Request<Action>,
+        request: Request<Action>,
     ) -> Result<Response<Self::DoActionStream>, Status> {
+        let action = request.into_inner();
+        println!("do_action() type={}", action.r#type);
+        let _proto = decode_protobuf(&action.body.to_vec()).map_err(|e| to_tonic_err(&e.into()))?;
+
         Err(Status::unimplemented("Not yet implemented"))
     }
 
     async fn list_actions(
         &self,
-        _request: Request<Empty>,
+        _equest: Request<Empty>,
     ) -> Result<Response<Self::ListActionsStream>, Status> {
         Err(Status::unimplemented("Not yet implemented"))
     }
@@ -188,14 +202,14 @@ impl FlightService for FlightServiceImpl {
     }
 }
 
-fn to_tonic_err(e: &datafusion::error::ExecutionError) -> Status {
+fn to_tonic_err(e: &ballista::error::BallistaError) -> Status {
     Status::internal(format!("{:?}", e))
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "0.0.0.0:50051".parse()?;
-    let service = FlightServiceImpl {};
+    let service = FlightServiceImpl::new();
 
     let svc = FlightServiceServer::new(service);
 

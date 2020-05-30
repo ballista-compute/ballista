@@ -1,4 +1,8 @@
+#![feature(async_closure)]
+
 use std::pin::Pin;
+use std::thread;
+use std::time;
 
 use ballista::datafusion::execution::context::ExecutionContext;
 use ballista::serde::decode_protobuf;
@@ -230,16 +234,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let uuid = Uuid::new_v4();
 
+            //TODO make configurable
             let cluster_name = "default";
+            let lease_time_seconds = 60;
+
             let key = format!("/ballista/{}/{}", cluster_name, uuid);
             let value = public_host_port;
 
-            let lease = client.lease_grant(500, None).await?;
+            let lease = client.lease_grant(lease_time_seconds, None).await?;
             println!("lease_grant: {:?}", lease);
 
             let options = PutOptions::new().with_lease(lease.id());
             let resp = client.put(key.clone(), value, Some(options)).await?;
             println!("Registered with etcd as {}. Response: {:?}.", key, resp);
+
+            // keep lease alive in background thread
+            //TODO not sure how to do this
+            // let lease_id = lease.id();
+            // let _ = tokio::spawn(async move || {
+            //     loop {
+            //         client.lease_keep_alive(lease_id).await?;
+            //         thread::sleep(time::Duration::from_secs(5));
+            //     }
+            // });
+
         }
         None => {
             println!("Running in standalone mode");

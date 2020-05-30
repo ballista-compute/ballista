@@ -8,6 +8,9 @@ on: [push]
 #  pull_request:
 #    branches: [ master ]
 
+env:
+  VCPKGRS_DYNAMIC: 1
+
 jobs:
   Ubuntu:
     runs-on: ubuntu-latest
@@ -45,19 +48,15 @@ jobs:
     - name: Install vcpkg
       run: |
         cd vcpkg && ./bootstrap-vcpkg.bat
-        vcpkg install openssl-windows:x64-windows
-        vcpkg install openssl:x64-windows-static
         vcpkg integrate install
-        set VCPKGRS_DYNAMIC=1
+        vcpkg install openssl:x64-windows
     - name: Setup
       run: |
         rustup default nightly-2020-05-14 && rustup component add rustfmt
     - name: Build
       run: |
-        set VCPKGRS_DYNAMIC=1
         cd rust && cargo build
     - name: Run tests
       run: |
-        set VCPKGRS_DYNAMIC=1
         cd rust && cargo test
     

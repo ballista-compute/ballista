@@ -7,10 +7,8 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
-
+  Ubuntu:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v2
     - name: Setup
@@ -19,3 +17,28 @@ jobs:
       run: cd rust && cargo build
     - name: Run tests
       run: cd rust && cargo test
+
+  Mac_OSX:
+    runs-on: macOS-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup
+      run: |
+        brew install rustup
+        rustup default nightly-2020-05-14 && rustup component add rustfmt
+    - name: Build
+      run: cd rust && cargo build
+    - name: Run tests
+      run: cd rust && cargo test
+
+  Windows:
+    runs-on: windows-2016
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup
+      run: rustup default nightly-2020-05-14 && rustup component add rustfmt
+    - name: Build
+      run: cd rust && cargo build
+    - name: Run tests
+      run: cd rust && cargo test
+    

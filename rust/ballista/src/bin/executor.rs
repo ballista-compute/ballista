@@ -12,11 +12,11 @@ use flight::{
 };
 
 use etcd_client::*;
-use uuid::Uuid;
 use futures::Stream;
 use structopt::StructOpt;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status, Streaming};
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct FlightServiceImpl {}
@@ -201,12 +201,11 @@ fn to_tonic_err(e: &datafusion::error::ExecutionError) -> Status {
 struct Opt {
     // List of urls for etcd servers
     #[structopt(long)]
-    etcd: Option<String>
+    etcd: Option<String>,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-
     let opt = Opt::from_args();
 
     let bind_host_port = "0.0.0.0:50051";
@@ -220,10 +219,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let svc = FlightServiceServer::new(service);
 
-    println!(
-        "Ballista v{} Rust Executor",
-        BALLISTA_VERSION
-    );
+    println!("Ballista v{} Rust Executor", BALLISTA_VERSION);
 
     match opt.etcd {
         Some(urls) => {
@@ -244,19 +240,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let options = PutOptions::new().with_lease(lease.id());
             let resp = client.put(key.clone(), value, Some(options)).await?;
             println!("Registered with etcd as {}. Response: {:?}.", key, resp);
-
-        },
+        }
         None => {
             println!("Running in standalone mode");
         }
     };
 
-    println!(
-        "Flight service listening on {:?}",
-        addr
-    );
+    println!("Flight service listening on {:?}", addr);
     Server::builder().add_service(svc).serve(addr).await?;
-
 
     Ok(())
 }

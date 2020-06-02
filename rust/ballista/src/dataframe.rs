@@ -5,9 +5,10 @@ use crate::arrow::datatypes::{DataType, Schema};
 use crate::arrow::record_batch::RecordBatch;
 use crate::client;
 use crate::datafusion;
+pub use crate::datafusion::datasource::csv::CsvReadOptions;
 use crate::datafusion::datasource::parquet::ParquetTable;
 use crate::datafusion::datasource::TableProvider;
-use crate::datafusion::logicalplan::{Expr, LogicalPlan, ScalarValue};
+use crate::datafusion::logicalplan::{Expr, LogicalPlan, LogicalPlanBuilder, ScalarValue};
 use crate::datafusion::optimizer::utils::exprlist_to_fields;
 use crate::error::{BallistaError, Result};
 use crate::plan::Action;
@@ -146,15 +147,13 @@ impl Context {
     pub fn read_csv(
         &self,
         path: &str,
-        schema: Option<Schema>,
+        options: CsvReadOptions,
         projection: Option<Vec<usize>>,
-        has_header: bool,
     ) -> Result<DataFrame> {
         Ok(DataFrame::scan_csv(
             self.state.clone(),
             path,
-            has_header,
-            &schema.unwrap(), //TODO schema should be optional here
+            options,
             projection,
         )?)
     }
@@ -213,23 +212,12 @@ impl DataFrame {
     pub fn scan_csv(
         ctx: Arc<ContextState>,
         path: &str,
-        has_header: bool,
-        schema: &Schema,
+        options: CsvReadOptions,
         projection: Option<Vec<usize>>,
     ) -> Result<Self> {
-        let projected_schema = projection
-            .clone()
-            .map(|p| Schema::new(p.iter().map(|i| schema.field(*i).clone()).collect()));
         Ok(Self::from(
             ctx,
-            &LogicalPlan::CsvScan {
-                path: path.to_owned(),
-                has_header,
-                delimiter: None,
-                schema: Box::new(schema.clone()),
-                projected_schema: Box::new(projected_schema.or(Some(schema.clone())).unwrap()),
-                projection,
-            },
+            &LogicalPlanBuilder::scan_csv(path, options, projection)?.build()?,
         ))
     }
 

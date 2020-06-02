@@ -10,7 +10,7 @@ use ballista::arrow::datatypes::{DataType, Field, Schema};
 use ballista::arrow::record_batch::RecordBatch;
 use ballista::arrow::util::pretty;
 use ballista::cluster;
-use ballista::dataframe::{max, min, sum, Context, DataFrame, CSV_BATCH_SIZE};
+use ballista::dataframe::{max, min, sum, Context, CsvReadOptions, DataFrame, CSV_BATCH_SIZE};
 use ballista::datafusion::logicalplan::*;
 use ballista::error::{BallistaError, Result};
 use ballista::BALLISTA_VERSION;
@@ -171,7 +171,7 @@ async fn execute_remote(
 
 fn create_query(ctx: &Context, path: &str, format: &str) -> Result<DataFrame> {
     let data = match format {
-        "csv" => ctx.read_csv(path, Some(nyctaxi_schema()), None, true),
+        "csv" => ctx.read_csv(path, CsvReadOptions::new().schema(&nyctaxi_schema()), None),
         "parquet" => ctx.read_parquet(path, None),
         _ => Err(BallistaError::General(format!(
             "Unsupported file format '{}'",

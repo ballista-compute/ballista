@@ -65,32 +65,10 @@ checksum = "cff77d8686867eceff3105329d4698d96c2391c176d5d03adc90c7389162b5b8"
 
 [[package]]
 name = "arrow"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77ce18c21476a4ba0b8f7f7f0cc7fd7a41e716f65ee68d2b288e7f72d892722a"
+version = "1.0.0-SNAPSHOT"
+source = "git+https://github.com/apache/arrow#2bff6138b5e97b5e94ebf6fe6a5a9f61ba2c80a0"
 dependencies = [
- "arrow-flight 0.17.0",
- "chrono",
- "csv",
- "flatbuffers",
- "hex",
- "indexmap",
- "lazy_static",
- "num",
- "packed_simd",
- "rand 0.7.3",
- "regex",
- "serde",
- "serde_derive",
- "serde_json",
-]
-
-[[package]]
-name = "arrow"
-version = "0.18.0-SNAPSHOT"
-source = "git+https://github.com/andygrove/arrow?branch=ballista#d6645756d7a8edc0ce916ede8181be317ac0744f"
-dependencies = [
- "arrow-flight 0.18.0-SNAPSHOT",
+ "arrow-flight",
  "chrono",
  "csv",
  "flatbuffers",
@@ -108,23 +86,8 @@ dependencies = [
 
 [[package]]
 name = "arrow-flight"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "944b9ac6ad1f9f770dce969764676fb01df21d7fbd8c31c4cc69e22e797c1ddc"
-dependencies = [
- "bytes 0.5.4",
- "futures 0.3.4",
- "prost",
- "prost-derive",
- "tokio 0.2.19",
- "tonic",
- "tonic-build",
-]
-
-[[package]]
-name = "arrow-flight"
-version = "0.18.0-SNAPSHOT"
-source = "git+https://github.com/andygrove/arrow?branch=ballista#d6645756d7a8edc0ce916ede8181be317ac0744f"
+version = "1.0.0-SNAPSHOT"
+source = "git+https://github.com/apache/arrow#2bff6138b5e97b5e94ebf6fe6a5a9f61ba2c80a0"
 dependencies = [
  "bytes 0.5.4",
  "futures 0.3.4",
@@ -216,9 +179,9 @@ dependencies = [
 name = "ballista"
 version = "0.3.0-SNAPSHOT"
 dependencies = [
- "arrow 0.18.0-SNAPSHOT",
- "arrow-flight 0.18.0-SNAPSHOT",
- "datafusion 0.18.0-SNAPSHOT",
+ "arrow",
+ "arrow-flight",
+ "datafusion",
  "env_logger",
  "flatbuffers",
  "futures 0.3.4",
@@ -238,10 +201,7 @@ dependencies = [
 name = "ballista-integration-tests"
 version = "0.3.0-SNAPSHOT"
 dependencies = [
- "arrow 0.17.0",
- "arrow-flight 0.17.0",
  "ballista",
- "datafusion 0.17.0",
  "tokio 0.2.19",
 ]
 
@@ -567,31 +527,14 @@ dependencies = [
 
 [[package]]
 name = "datafusion"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3779d9bbdb9309858aa76adbf46dfd2956f1f1ffff72171c4fdd1c391a379fe"
+version = "1.0.0-SNAPSHOT"
+source = "git+https://github.com/apache/arrow#2bff6138b5e97b5e94ebf6fe6a5a9f61ba2c80a0"
 dependencies = [
- "arrow 0.17.0",
+ "arrow",
  "clap",
  "crossbeam",
  "fnv",
- "parquet 0.17.0",
- "paste",
- "prettytable-rs",
- "rustyline",
- "sqlparser",
-]
-
-[[package]]
-name = "datafusion"
-version = "0.18.0-SNAPSHOT"
-source = "git+https://github.com/andygrove/arrow?branch=ballista#d6645756d7a8edc0ce916ede8181be317ac0744f"
-dependencies = [
- "arrow 0.18.0-SNAPSHOT",
- "clap",
- "crossbeam",
- "fnv",
- "parquet 0.18.0-SNAPSHOT",
+ "parquet",
  "paste",
  "prettytable-rs",
  "rustyline",
@@ -1559,15 +1502,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "packed_simd"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a85ea9fc0d4ac0deb6fe7911d38786b32fc11119afd9e9d38b84ff691ce64220"
-dependencies = [
- "cfg-if",
-]
-
-[[package]]
 name = "parking_lot"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1595,31 +1529,10 @@ dependencies = [
 
 [[package]]
 name = "parquet"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "769356535e2399e1e6dab29b8e8addee82739d22d713006a6940de03aa520676"
+version = "1.0.0-SNAPSHOT"
+source = "git+https://github.com/apache/arrow#2bff6138b5e97b5e94ebf6fe6a5a9f61ba2c80a0"
 dependencies = [
- "arrow 0.17.0",
- "brotli",
- "byteorder",
- "chrono",
- "flate2",
- "lz4",
- "num-bigint",
- "parquet-format",
- "quick-error",
- "serde_json",
- "snap",
- "thrift",
- "zstd",
-]
-
-[[package]]
-name = "parquet"
-version = "0.18.0-SNAPSHOT"
-source = "git+https://github.com/andygrove/arrow?branch=ballista#d6645756d7a8edc0ce916ede8181be317ac0744f"
-dependencies = [
- "arrow 0.18.0-SNAPSHOT",
+ "arrow",
  "brotli",
  "byteorder",
  "chrono",

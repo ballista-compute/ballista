@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Ballista distributed scheduler
+//! The Ballista distributed scheduler translates a logical plan into a physical plan consisting
+//! of tasks that can be scheduled across a number of executors (which could be multiple threads
+//! in a single process, or multiple processes in a cluster).
 
 use crate::datafusion::logicalplan::Expr;
 use crate::datafusion::logicalplan::LogicalPlan;
@@ -21,6 +23,7 @@ use crate::error::Result;
 
 use uuid::Uuid;
 
+/// A physical plan that can be assigned to an executor
 struct Task {
     id: String,
     plan: PhysicalPlan,

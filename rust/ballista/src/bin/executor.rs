@@ -9,12 +9,15 @@ use ballista::serde::decode_protobuf;
 use ballista::{plan, BALLISTA_VERSION};
 
 use arrow::record_batch::RecordBatch;
+use ballista::execution::compile_query;
 use flatbuffers::FlatBufferBuilder;
+use flight::flight_descriptor::DescriptorType;
 use flight::{
     flight_service_server::FlightService, flight_service_server::FlightServiceServer, Action,
     ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo, HandshakeRequest,
     HandshakeResponse, PutResult, SchemaResult, Ticket,
 };
+use futures::stream::BoxStream;
 use futures::{Stream, StreamExt};
 use std::collections::HashMap;
 use tonic::transport::Server;
@@ -104,21 +107,31 @@ impl FlightService for FlightServiceImpl {
         println!("get_flight_info");
 
         let request = request.into_inner();
-        let uuid = &request.path[0];
+        match request.r#type {
+            2 /*DescriptorType::Cmd*/ => {
+                let action =
+                    decode_protobuf(&request.cmd).map_err(|e| to_tonic_err(&e.into()))?;
 
-        match self.results.lock().unwrap().get(uuid) {
-            Some(results) => {
-                let schema_bytes = schema_to_bytes(&results.schema);
+                let result = execute_async(&action).await?;
 
-                Ok(Response::new(FlightInfo {
-                    schema: schema_bytes,
-                    endpoint: vec![],
-                    flight_descriptor: None,
-                    total_bytes: -1,
-                    total_records: -1,
-                }))
+                // match self.results.lock().unwrap().get(uuid) {
+                //     Some(results) => {
+                //         let schema_bytes = schema_to_bytes(&results.schema);
+                //
+                //         Ok(Response::new(FlightInfo {
+                //             schema: schema_bytes,
+                //             endpoint: vec![],
+                //             flight_descriptor: None,
+                //             total_bytes: -1,
+                //             total_records: -1,
+                //         }))
+                //     }
+                //     _ => Err(Status::not_found("Invalid uuid")),
+                // }
+
+                unimplemented!()
             }
-            _ => Err(Status::not_found("Invalid uuid")),
+            _ => Err(Status::invalid_argument("Unsupported descriptor type")),
         }
     }
 
@@ -209,6 +222,22 @@ fn schema_to_bytes(schema: &Schema) -> Vec<u8> {
 
     let data = fbb.finished_data();
     data.to_vec()
+}
+
+async fn execute_async(
+    action: &plan::Action,
+) -> Result<Vec<BoxStream<'static, RecordBatch>>, Status> {
+    match &action {
+        plan::Action::Collect { plan: logical_plan } => {
+            println!("Logical plan: {:?}", logical_plan);
+
+            compile_query(logical_plan).map_err(|e| to_tonic_err(&e.into()))
+        }
+        other => Err(Status::invalid_argument(format!(
+            "Invalid Ballista action: {:?}",
+            other
+        ))),
+    }
 }
 
 fn execute_action(action: &plan::Action) -> Result<Results, Status> {

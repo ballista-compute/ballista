@@ -8,7 +8,7 @@ use ballista::arrow::record_batch::RecordBatch;
 use ballista::arrow::util::pretty;
 use ballista::cluster;
 use ballista::cluster::Executor;
-use ballista::dataframe::{max, Context};
+use ballista::dataframe::{max, Context, CsvReadOptions};
 use ballista::datafusion::logicalplan::*;
 use ballista::error::Result;
 use ballista::BALLISTA_VERSION;
@@ -120,7 +120,11 @@ async fn execute_remote(host: &str, port: usize, filename: &str) -> Result<Vec<R
     let ctx = Context::remote(host, port, HashMap::new());
 
     let response = ctx
-        .read_csv(filename, Some(nyctaxi_schema()), None, true)?
+        .read_csv(
+            filename,
+            CsvReadOptions::new().schema(&nyctaxi_schema()),
+            None,
+        )?
         .aggregate(vec![col("passenger_count")], vec![max(col("fare_amount"))])?
         .collect()
         .await?;

@@ -74,8 +74,8 @@ checksum = "cff77d8686867eceff3105329d4698d96c2391c176d5d03adc90c7389162b5b8"
 
 [[package]]
 name = "arrow"
-version = "0.18.0-SNAPSHOT"
-source = "git+https://github.com/andygrove/arrow?branch=ballista#d6645756d7a8edc0ce916ede8181be317ac0744f"
+version = "1.0.0-SNAPSHOT"
+source = "git+https://github.com/apache/arrow#2bff6138b5e97b5e94ebf6fe6a5a9f61ba2c80a0"
 dependencies = [
  "arrow-flight",
  "chrono",
@@ -95,8 +95,8 @@ dependencies = [
 
 [[package]]
 name = "arrow-flight"
-version = "0.18.0-SNAPSHOT"
-source = "git+https://github.com/andygrove/arrow?branch=ballista#d6645756d7a8edc0ce916ede8181be317ac0744f"
+version = "1.0.0-SNAPSHOT"
+source = "git+https://github.com/apache/arrow#2bff6138b5e97b5e94ebf6fe6a5a9f61ba2c80a0"
 dependencies = [
  "bytes 0.5.4",
  "futures 0.3.5",
@@ -529,8 +529,8 @@ dependencies = [
 
 [[package]]
 name = "datafusion"
-version = "0.18.0-SNAPSHOT"
-source = "git+https://github.com/andygrove/arrow?branch=ballista#d6645756d7a8edc0ce916ede8181be317ac0744f"
+version = "1.0.0-SNAPSHOT"
+source = "git+https://github.com/apache/arrow#2bff6138b5e97b5e94ebf6fe6a5a9f61ba2c80a0"
 dependencies = [
  "arrow",
  "clap",
@@ -1561,8 +1561,8 @@ dependencies = [
 
 [[package]]
 name = "parquet"
-version = "0.18.0-SNAPSHOT"
-source = "git+https://github.com/andygrove/arrow?branch=ballista#d6645756d7a8edc0ce916ede8181be317ac0744f"
+version = "1.0.0-SNAPSHOT"
+source = "git+https://github.com/apache/arrow#2bff6138b5e97b5e94ebf6fe6a5a9f61ba2c80a0"
 dependencies = [
  "arrow",
  "brotli",

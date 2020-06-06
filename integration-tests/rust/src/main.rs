@@ -7,6 +7,7 @@ use ballista::arrow::array::{Float64Array, Int32Array};
 use ballista::arrow::datatypes::{DataType, Field, Schema};
 use ballista::arrow::util::pretty;
 use ballista::dataframe::{max, min, Context, CSV_BATCH_SIZE};
+pub use ballista::datafusion::datasource::csv::CsvReadOptions;
 use ballista::datafusion::logicalplan::*;
 use ballista::error::Result;
 use ballista::BALLISTA_VERSION;
@@ -38,13 +39,13 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn execute(filename: &str, host: &str, name: &&str, port: &usize) -> Result<()> {
+async fn execute(path: &str, host: &str, name: &&str, port: &usize) -> Result<()> {
     let start = Instant::now();
     let mut settings = HashMap::new();
     settings.insert(CSV_BATCH_SIZE, "1024");
     let ctx = Context::remote(host, *port, settings);
     let response = ctx
-        .read_csv(filename, Some(nyctaxi_schema()), None, true)?
+        .read_csv(path, CsvReadOptions::new().schema(&nyctaxi_schema()), None)?
         .aggregate(
             vec![col("passenger_count")],
             vec![min(col("fare_amount")), max(col("fare_amount"))],

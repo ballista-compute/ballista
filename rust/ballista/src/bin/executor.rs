@@ -1,38 +1,54 @@
 use std::pin::Pin;
+use std::sync::{Arc, Mutex};
 
+use ballista::arrow::datatypes::Schema;
+use ballista::arrow::ipc;
 use ballista::datafusion::execution::context::ExecutionContext;
 use ballista::serde::decode_protobuf;
 
 use ballista::{plan, BALLISTA_VERSION};
 
+use arrow::record_batch::RecordBatch;
+use flatbuffers::FlatBufferBuilder;
 use flight::{
     flight_service_server::FlightService, flight_service_server::FlightServiceServer, Action,
     ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo, HandshakeRequest,
     HandshakeResponse, PutResult, SchemaResult, Ticket,
 };
-use futures::Stream;
+use futures::{Stream, StreamExt};
+use std::collections::HashMap;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status, Streaming};
 
+struct Results {
+    schema: Schema,
+    data: Vec<RecordBatch>,
+}
+
 #[derive(Clone)]
-pub struct FlightServiceImpl {}
+pub struct FlightServiceImpl {
+    results: Arc<Mutex<HashMap<String, Results>>>,
+}
+
+impl FlightServiceImpl {
+    pub fn new() -> Self {
+        Self {
+            results: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+}
+
+type BoxedFlightStream<T> = Pin<Box<dyn Stream<Item = Result<T, Status>> + Send + Sync + 'static>>;
 
 #[tonic::async_trait]
 impl FlightService for FlightServiceImpl {
-    type HandshakeStream =
-        Pin<Box<dyn Stream<Item = Result<HandshakeResponse, Status>> + Send + Sync + 'static>>;
-    type ListFlightsStream =
-        Pin<Box<dyn Stream<Item = Result<FlightInfo, Status>> + Send + Sync + 'static>>;
-    type DoGetStream =
-        Pin<Box<dyn Stream<Item = Result<FlightData, Status>> + Send + Sync + 'static>>;
-    type DoPutStream =
-        Pin<Box<dyn Stream<Item = Result<PutResult, Status>> + Send + Sync + 'static>>;
-    type DoActionStream =
-        Pin<Box<dyn Stream<Item = Result<flight::Result, Status>> + Send + Sync + 'static>>;
-    type ListActionsStream =
-        Pin<Box<dyn Stream<Item = Result<ActionType, Status>> + Send + Sync + 'static>>;
-    type DoExchangeStream =
-        Pin<Box<dyn Stream<Item = Result<FlightData, Status>> + Send + Sync + 'static>>;
+    type HandshakeStream = BoxedFlightStream<HandshakeResponse>;
+    type ListFlightsStream = BoxedFlightStream<FlightInfo>;
+    type DoGetStream = BoxedFlightStream<FlightData>;
+    type DoPutStream = BoxedFlightStream<PutResult>;
+    type DoActionStream = BoxedFlightStream<flight::Result>;
+    type ListActionsStream = BoxedFlightStream<ActionType>;
+    type DoExchangeStream = BoxedFlightStream<FlightData>;
 
     async fn do_get(
         &self,
@@ -40,109 +56,70 @@ impl FlightService for FlightServiceImpl {
     ) -> Result<Response<Self::DoGetStream>, Status> {
         let ticket = request.into_inner();
 
-        match decode_protobuf(&ticket.ticket.to_vec()) {
-            Ok(action) => {
-                println!("do_get: {:?}", action);
+        let action =
+            decode_protobuf(&ticket.ticket.to_vec()).map_err(|e| to_tonic_err(&e.into()))?;
 
-                match &action {
-                    plan::Action::Collect { plan: logical_plan } => {
-                        println!("Logical plan: {:?}", logical_plan);
+        println!("do_get: {:?}", action);
 
-                        // create local execution context
-                        let mut ctx = ExecutionContext::new();
+        let results = execute_action(&action)?;
 
-                        // create the query plan
-                        let optimized_plan =
-                            ctx.optimize(&logical_plan).map_err(|e| to_tonic_err(&e))?;
+        let mut flights: Vec<Result<FlightData, Status>> =
+            vec![Ok(FlightData::from(&results.schema))];
 
-                        println!("Optimized Plan: {:?}", optimized_plan);
+        let mut batches: Vec<Result<FlightData, Status>> = results
+            .data
+            .iter()
+            .map(|batch| {
+                println!("batch schema: {:?}", batch.schema());
 
-                        let batch_size = 1024 * 1024;
-                        let physical_plan = ctx
-                            .create_physical_plan(&optimized_plan, batch_size)
-                            .map_err(|e| to_tonic_err(&e))?;
+                Ok(FlightData::from(batch))
+            })
+            .collect();
 
-                        // execute the query
-                        let results = ctx
-                            .collect(physical_plan.as_ref())
-                            .map_err(|e| to_tonic_err(&e))?;
+        flights.append(&mut batches);
 
-                        println!("Executed query");
-
-                        if results.is_empty() {
-                            return Err(Status::internal("There were no results from ticket"));
-                        }
-
-                        // add an initial FlightData message that sends schema
-                        let schema = physical_plan.schema();
-                        println!("physical plan schema: {:?}", &schema);
-
-                        let mut flights: Vec<Result<FlightData, Status>> =
-                            vec![Ok(FlightData::from(schema.as_ref()))];
-
-                        let mut batches: Vec<Result<FlightData, Status>> = results
-                            .iter()
-                            .map(|batch| {
-                                println!("batch schema: {:?}", batch.schema());
-
-                                Ok(FlightData::from(batch))
-                            })
-                            .collect();
-
-                        // append batch vector to schema vector, so that the first message sent is the schema
-                        flights.append(&mut batches);
-
-                        let output = futures::stream::iter(flights);
-
-                        Ok(Response::new(Box::pin(output) as Self::DoGetStream))
-                    }
-                    other => Err(Status::invalid_argument(format!(
-                        "Invalid Ballista action: {:?}",
-                        other
-                    ))),
-                }
-            }
-            Err(e) => Err(Status::invalid_argument(format!("Invalid ticket: {:?}", e))),
-        }
+        let output = futures::stream::iter(flights);
+        Ok(Response::new(Box::pin(output) as Self::DoGetStream))
     }
 
     async fn get_schema(
         &self,
-        _request: Request<FlightDescriptor>,
+        request: Request<FlightDescriptor>,
     ) -> Result<Response<SchemaResult>, Status> {
         println!("get_schema()");
 
-        // let request = request.into_inner();
-        //
-        // let table = ParquetTable::try_new(&request.path[0]).unwrap();
-        //
-        // Ok(Response::new(SchemaResult::from(table.schema().as_ref())))
+        let request = request.into_inner();
+        let uuid = &request.path[0];
 
-        Err(Status::unimplemented("Not yet implemented"))
+        match self.results.lock().unwrap().get(uuid) {
+            Some(results) => Ok(Response::new(SchemaResult::from(&results.schema))),
+            _ => Err(Status::not_found("Invalid uuid")),
+        }
     }
 
     async fn get_flight_info(
         &self,
-        _request: Request<FlightDescriptor>,
+        request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         println!("get_flight_info");
 
-        // let request = request.into_inner();
-        //
-        // let table = ParquetTable::try_new(&request.path[0]).unwrap();
-        //
-        // let schema_bytes = schema_to_bytes(table.schema().as_ref());
-        //
-        // Ok(Response::new(FlightInfo {
-        //     schema: schema_bytes,
-        //     endpoint: vec![],
-        //     flight_descriptor: None,
-        //     total_bytes: -1,
-        //     total_records: -1,
-        //
-        // }))
+        let request = request.into_inner();
+        let uuid = &request.path[0];
 
-        Err(Status::unimplemented("Not yet implemented"))
+        match self.results.lock().unwrap().get(uuid) {
+            Some(results) => {
+                let schema_bytes = schema_to_bytes(&results.schema);
+
+                Ok(Response::new(FlightInfo {
+                    schema: schema_bytes,
+                    endpoint: vec![],
+                    flight_descriptor: None,
+                    total_bytes: -1,
+                    total_records: -1,
+                }))
+            }
+            _ => Err(Status::not_found("Invalid uuid")),
+        }
     }
 
     async fn handshake(
@@ -161,16 +138,41 @@ impl FlightService for FlightServiceImpl {
 
     async fn do_put(
         &self,
-        _request: Request<Streaming<FlightData>>,
+        request: Request<Streaming<FlightData>>,
     ) -> Result<Response<Self::DoPutStream>, Status> {
+        println!("do_put()");
+
+        let mut request = request.into_inner();
+
+        while let Some(data) = request.next().await {
+            let data = data?;
+            println!("do_put() received data: {:?}", data);
+        }
+
         Err(Status::unimplemented("Not yet implemented"))
     }
 
     async fn do_action(
         &self,
-        _request: Request<Action>,
+        request: Request<Action>,
     ) -> Result<Response<Self::DoActionStream>, Status> {
-        Err(Status::unimplemented("Not yet implemented"))
+        let action = request.into_inner();
+        println!("do_action() type={}", action.r#type);
+
+        let action = decode_protobuf(&action.body.to_vec()).map_err(|e| to_tonic_err(&e.into()))?;
+
+        let results = execute_action(&action)?;
+
+        let key = "tbd"; // generate uuid here
+
+        self.results.lock().unwrap().insert(key.to_owned(), results);
+
+        let result = vec![Ok(flight::Result {
+            body: key.as_bytes().to_vec(),
+        })];
+
+        let output = futures::stream::iter(result);
+        Ok(Response::new(Box::pin(output) as Self::DoActionStream))
     }
 
     async fn list_actions(
@@ -188,14 +190,82 @@ impl FlightService for FlightServiceImpl {
     }
 }
 
-fn to_tonic_err(e: &datafusion::error::ExecutionError) -> Status {
+//TODO this is private in arrow so copied here
+fn schema_to_bytes(schema: &Schema) -> Vec<u8> {
+    let mut fbb = FlatBufferBuilder::new();
+    let schema = {
+        let fb = ipc::convert::schema_to_fb_offset(&mut fbb, schema);
+        fb.as_union_value()
+    };
+
+    let mut message = ipc::MessageBuilder::new(&mut fbb);
+    message.add_version(ipc::MetadataVersion::V4);
+    message.add_header_type(ipc::MessageHeader::Schema);
+    message.add_bodyLength(0);
+    message.add_header(schema);
+    // TODO: custom metadata
+    let data = message.finish();
+    fbb.finish(data, None);
+
+    let data = fbb.finished_data();
+    data.to_vec()
+}
+
+fn execute_action(action: &plan::Action) -> Result<Results, Status> {
+    match &action {
+        plan::Action::Collect { plan: logical_plan } => {
+            println!("Logical plan: {:?}", logical_plan);
+
+            // create local execution context
+            let mut ctx = ExecutionContext::new();
+
+            // create the query plan
+            let optimized_plan = ctx
+                .optimize(&logical_plan)
+                .map_err(|e| to_tonic_err(&e.into()))?;
+
+            println!("Optimized Plan: {:?}", optimized_plan);
+
+            let batch_size = 1024 * 1024;
+            let physical_plan = ctx
+                .create_physical_plan(&optimized_plan, batch_size)
+                .map_err(|e| to_tonic_err(&e.into()))?;
+
+            // execute the query
+            let results = ctx
+                .collect(physical_plan.as_ref())
+                .map_err(|e| to_tonic_err(&e.into()))?;
+
+            println!("Executed query");
+
+            if results.is_empty() {
+                return Err(Status::internal("There were no results from ticket"));
+            }
+
+            // add an initial FlightData message that sends schema
+            let schema = physical_plan.schema();
+            println!("physical plan schema: {:?}", &schema);
+
+            Ok(Results {
+                schema: schema.as_ref().clone(),
+                data: results,
+            })
+        }
+        other => Err(Status::invalid_argument(format!(
+            "Invalid Ballista action: {:?}",
+            other
+        ))),
+    }
+}
+
+fn to_tonic_err(e: &ballista::error::BallistaError) -> Status {
     Status::internal(format!("{:?}", e))
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "0.0.0.0:50051".parse()?;
-    let service = FlightServiceImpl {};
+    let service = FlightServiceImpl::new();
 
     let svc = FlightServiceServer::new(service);
 

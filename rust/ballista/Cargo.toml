@@ -29,22 +29,25 @@ crossbeam = "0.7"
 #arrow = { path = "../../../arrow/rust/arrow" }
 #arrow-flight = { path = "../../../arrow/rust/arrow-flight" }
 #datafusion = { path = "../../../arrow/rust/datafusion" }
+#parquet = { path = "../../../arrow/rust/parquet" }
 
 # Ballista sometimes depends on this fork when PRs are still pending against Arrow repo
-arrow = { git = "https://github.com/andygrove/arrow", branch="ballista" }
-arrow-flight = { git = "https://github.com/andygrove/arrow", branch="ballista" }
-parquet = { git = "https://github.com/andygrove/arrow", branch="ballista" }
-datafusion = { git = "https://github.com/andygrove/arrow", branch="ballista" }
+#arrow = { git = "https://github.com/andygrove/arrow", branch="ballista" }
+#arrow-flight = { git = "https://github.com/andygrove/arrow", branch="ballista" }
+#datafusion = { git = "https://github.com/andygrove/arrow", branch="ballista" }
+#parquet = { git = "https://github.com/andygrove/arrow", branch="ballista" }
 
 # Ballista 0.3.0-SNAPSHOT depends on latest Arrow
-#arrow = { git = "https://github.com/apache/arrow" }
-#arrow-flight = { git = "https://github.com/apache/arrow" }
-#datafusion = { git = "https://github.com/apache/arrow" }
+arrow = { git = "https://github.com/apache/arrow" }
+arrow-flight = { git = "https://github.com/apache/arrow" }
+datafusion = { git = "https://github.com/apache/arrow" }
+parquet = { git = "https://github.com/apache/arrow" }
 
 # Ballista 0.3.x releases will depend on Arrow 1.0.0
 #arrow = "1.0.0"
 #arrow-flight = "1.0.0"
 #datafusion = "1.0.0"
+#parquet = "1.0.0"
 
 [[bin]]
 name = "executor"

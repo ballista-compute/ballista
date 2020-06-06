@@ -18,6 +18,10 @@ jobs:
       run: rustup default nightly-2020-05-14 && rustup component add rustfmt
     - name: Build
       run: cd rust && cargo build
+    - name: Build IT
+      run: cd integration-tests/rust && cargo build
+    - name: Build Benchmarks
+      run: cd benchmarks/rust && cargo build
     - name: Run tests
       run: cd rust && cargo test
 
@@ -31,6 +35,10 @@ jobs:
         rustup default nightly-2020-05-14 && rustup component add rustfmt
     - name: Build
       run: cd rust && cargo build
+    - name: Build IT
+      run: cd integration-tests/rust && cargo build
+    - name: Build Benchmarks
+      run: cd benchmarks/rust && cargo build
     - name: Run tests
       run: cd rust && cargo test
 
@@ -54,6 +62,12 @@ jobs:
     - name: Build
       run: |
         cd rust && cargo build
+    - name: Build IT
+      run: |
+        cd integration-tests/rust && cargo build
+    - name: Build Becnhmarks
+      run: |
+        cd benchmarks && cargo build
     - name: Run tests
       run: |
         cd rust && cargo test

@@ -30,5 +30,6 @@ pub mod cluster;
 pub mod dataframe;
 pub mod error;
 pub mod plan;
+pub mod scheduler;
 pub mod serde;
 pub mod utils;

@@ -21,6 +21,7 @@ use crate::datafusion::logicalplan::LogicalPlan;
 
 use crate::error::Result;
 
+use crate::scheduler::PhysicalPlan::HashAggregate;
 use uuid::Uuid;
 
 struct DistributedPlan {
@@ -29,7 +30,7 @@ struct DistributedPlan {
 
 struct Stage {
     /// Physical plan with same number of input and output partitions
-    plan: PhysicalPlan,
+    partitions: Vec<PhysicalPlan>,
 }
 
 #[derive(Debug, Clone)]
@@ -66,12 +67,22 @@ impl PhysicalPlan {
     }
 }
 
+fn foo(logical_plan: &LogicalPlan) -> Result<DistributedPlan> {
+    let mut distributed_plan = DistributedPlan { stages: vec![] };
+
+    let plan = create_scheduler_plan(&mut distributed_plan, logical_plan)?;
+
+    distributed_plan.stages.push(Stage { partitions: plan });
+
+    Ok(distributed_plan)
+}
+
 fn create_scheduler_plan(
     distributed_plan: &mut DistributedPlan,
     logical_plan: &LogicalPlan,
 ) -> Result<Vec<PhysicalPlan>> {
     match logical_plan {
-        LogicalPlan::ParquetScan { path, .. } => {
+        LogicalPlan::ParquetScan { .. } => {
             // how many partitions? what is the partitioning?
 
             let mut partitions = vec![];
@@ -101,7 +112,7 @@ fn create_scheduler_plan(
 
         LogicalPlan::Selection { input, .. } => {
             // no change in partitioning
-            let input = create_scheduler_plan(distributed_plan, input)?;
+            let _input = create_scheduler_plan(distributed_plan, input)?;
 
             unimplemented!()
         }
@@ -110,18 +121,18 @@ fn create_scheduler_plan(
             let input = create_scheduler_plan(distributed_plan, input)?;
 
             let stage = Stage {
-                plan: PhysicalPlan::HashAggregate { partitions: input },
+                partitions: input
+                    .iter()
+                    .map(|p| HashAggregate {
+                        partitions: vec![p.clone()],
+                    })
+                    .collect(),
             };
             distributed_plan.stages.push(stage);
 
-            let stage = Stage {
-                plan: PhysicalPlan::HashAggregate {
-                    partitions: vec![PhysicalPlan::Exchange { task_ids: vec![] }],
-                },
-            };
-            distributed_plan.stages.push(stage);
-
-            unimplemented!()
+            Ok(vec![PhysicalPlan::HashAggregate {
+                partitions: vec![PhysicalPlan::Exchange { task_ids: vec![] }],
+            }])
         }
 
         _ => unimplemented!(),

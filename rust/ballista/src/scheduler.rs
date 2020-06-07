@@ -25,7 +25,11 @@ use uuid::Uuid;
 
 /// A physical plan that can be assigned to an executor
 struct Task {
+    /// Task ID
     id: String,
+    /// The partition of the plan to execute
+    partition_index: usize,
+    /// Physical plan with same number of input and output partitions
     plan: PhysicalPlan,
 }
 
@@ -35,10 +39,10 @@ struct SortOrder {}
 
 #[derive(Debug, Clone)]
 enum PhysicalPlan {
-    ParquetScan {
+    ParquetPartitionScan {
         projection: Vec<usize>,
-        /// Each output partition can contain multiple files
-        partitions: Vec<Vec<String>>,
+        /// Each partition can process multiple files
+        files: Vec<String>,
     },
     Projection {
         expr: Vec<Expr>,
@@ -53,16 +57,19 @@ enum PhysicalPlan {
     FinalHashAggregate {
         partitions: Vec<PhysicalPlan>,
     },
-    /// Retrieve a data stream from a Flight service
-    FlightGet {
+    Task {
         id: String,
+        plan: Box<PhysicalPlan>
+    },
+    Exchange {
+        task_ids: Vec<String>
     },
 }
 
 impl PhysicalPlan {
     fn partition_count(&self) -> usize {
         match self {
-            PhysicalPlan::ParquetScan { partitions, .. } => partitions.len(),
+            PhysicalPlan::ParquetPartitionScan { .. } => 1,
             PhysicalPlan::Projection { partitions, .. } => partitions.len(),
             PhysicalPlan::Selection { partitions } => partitions.len(),
             PhysicalPlan::PartialHashAggregate { partitions } => partitions.len(),
@@ -114,6 +121,10 @@ fn create_scheduler_plan(plan: &LogicalPlan) -> Result<Vec<PhysicalPlan>> {
 
             //TODO Create multiple of these
             PhysicalPlan::PartialHashAggregate { partitions: vec![] };
+
+            PhysicalPlan::Exchange {
+
+            };
 
             PhysicalPlan::FinalHashAggregate { partitions: vec![] };
 

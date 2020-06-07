@@ -24,10 +24,12 @@ use crate::error::Result;
 use crate::scheduler::PhysicalPlan::HashAggregate;
 use uuid::Uuid;
 
+#[derive(Debug, Clone)]
 struct DistributedPlan {
     stages: Vec<Stage>,
 }
 
+#[derive(Debug, Clone)]
 struct Stage {
     /// Physical plan with same number of input and output partitions
     partitions: Vec<PhysicalPlan>,
@@ -67,7 +69,7 @@ impl PhysicalPlan {
     }
 }
 
-fn foo(logical_plan: &LogicalPlan) -> Result<DistributedPlan> {
+fn create_distributed_plan(logical_plan: &LogicalPlan) -> Result<DistributedPlan> {
     let mut distributed_plan = DistributedPlan { stages: vec![] };
 
     let plan = create_scheduler_plan(&mut distributed_plan, logical_plan)?;
@@ -136,5 +138,25 @@ fn create_scheduler_plan(
         }
 
         _ => unimplemented!(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dataframe::{max, DataFrame};
+    use datafusion::logicalplan::{col, LogicalPlanBuilder};
+
+    #[test]
+    fn create_plan() -> Result<()> {
+        let plan = LogicalPlanBuilder::scan_parquet("/mnt/nyctaxi/parquet", None)?
+            .aggregate(vec![col("passenger_count")], vec![max(col("fare_amt"))])?
+            .build()?;
+
+        let distributed_plan = create_distributed_plan(&plan)?;
+
+        println!("{:?}", distributed_plan);
+
+        Ok(())
     }
 }

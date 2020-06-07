@@ -23,6 +23,7 @@ use crate::error::Result;
 
 use crate::scheduler::PhysicalPlan::HashAggregate;
 use uuid::Uuid;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 struct DistributedPlan {
@@ -31,8 +32,23 @@ struct DistributedPlan {
 
 #[derive(Debug, Clone)]
 struct Stage {
+    /// Stage ID
+    id: String,
     /// Physical plan with same number of input and output partitions
     partitions: Vec<PhysicalPlan>,
+}
+
+impl Stage {
+    fn new(partitions: Vec<PhysicalPlan>) -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
+            partitions
+        }
+    }
+
+    fn id(&self) -> &str {
+        &self.id
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -53,28 +69,28 @@ enum PhysicalPlan {
         partitions: Vec<PhysicalPlan>,
     },
     Exchange {
-        task_ids: Vec<String>,
+        stage_id: String,
     },
 }
 
-impl PhysicalPlan {
-    fn partition_count(&self) -> usize {
-        match self {
-            PhysicalPlan::ParquetScan { files, .. } => files.len(),
-            PhysicalPlan::Projection { partitions, .. } => partitions.len(),
-            PhysicalPlan::Selection { partitions } => partitions.len(),
-            PhysicalPlan::HashAggregate { partitions } => partitions.len(),
-            _ => unimplemented!(),
-        }
-    }
-}
+// impl PhysicalPlan {
+//     fn partition_count(&self) -> usize {
+//         match self {
+//             PhysicalPlan::ParquetScan { files, .. } => files.len(),
+//             PhysicalPlan::Projection { partitions, .. } => partitions.len(),
+//             PhysicalPlan::Selection { partitions } => partitions.len(),
+//             PhysicalPlan::HashAggregate { partitions } => partitions.len(),
+//             _ => unimplemented!(),
+//         }
+//     }
+// }
 
 fn create_distributed_plan(logical_plan: &LogicalPlan) -> Result<DistributedPlan> {
     let mut distributed_plan = DistributedPlan { stages: vec![] };
 
-    let plan = create_scheduler_plan(&mut distributed_plan, logical_plan)?;
+    let partitions = create_scheduler_plan(&mut distributed_plan, logical_plan)?;
 
-    distributed_plan.stages.push(Stage { partitions: plan });
+    distributed_plan.stages.push(Stage::new(partitions));
 
     Ok(distributed_plan)
 }
@@ -122,23 +138,73 @@ fn create_scheduler_plan(
         LogicalPlan::Aggregate { input, .. } => {
             let input = create_scheduler_plan(distributed_plan, input)?;
 
-            let stage = Stage {
-                partitions: input
+            let stage = Stage::new(input
                     .iter()
                     .map(|p| HashAggregate {
                         partitions: vec![p.clone()],
                     })
-                    .collect(),
-            };
+                    .collect());
+
+            let stage_id = stage.id().to_owned();
+
             distributed_plan.stages.push(stage);
 
             Ok(vec![PhysicalPlan::HashAggregate {
-                partitions: vec![PhysicalPlan::Exchange { task_ids: vec![] }],
+                partitions: vec![PhysicalPlan::Exchange { stage_id: stage_id }],
             }])
         }
 
         _ => unimplemented!(),
     }
+}
+
+fn sanitize(s: &str) -> String {
+    s.replace("-", "_")
+}
+
+fn create_dot_plan(stage_id: &str, plan: &PhysicalPlan, map: &mut HashMap<String, String>) -> Uuid {
+    let uuid = Uuid::new_v4();
+    let uuid_str = sanitize(&uuid.to_string());
+    let dot_id = format!("node{}", map.len());
+    map.insert(uuid_str.clone(), dot_id.clone());
+
+    match plan {
+        PhysicalPlan::HashAggregate { partitions } => {
+            println!("\t\t{} [label=\"HashAggregate\"];", dot_id);
+            let child = create_dot_plan(stage_id, &partitions[0], map);
+            //println!("\t\t{} -> {};", dot_id, sanitize(&child.to_string()));
+        }
+        PhysicalPlan::ParquetScan { .. } => {
+            println!("\t\t{} [label=\"ParquetScan\"];", dot_id);
+        }
+        PhysicalPlan::Exchange { .. } => {
+            println!("\t\t{} [label=\"Exchange\"];", dot_id);
+        }
+        _ => {
+            println!("other;");
+        }
+    }
+    uuid
+}
+
+fn create_dot_file(plan: &DistributedPlan) {
+    println!("digraph distributed_plan {{");
+
+    let mut map = HashMap::new();
+
+    let mut cluster = 0;
+
+    for stage in &plan.stages {
+        let stage_id = sanitize(stage.id());
+        println!("\tsubgraph cluster{} {{", cluster);
+        println!("\t\tnode [style=filled];");
+        println!("\t\tlabel = \"Stage {}\";", stage_id);
+        create_dot_plan(&stage_id, &stage.partitions[0], &mut map);
+        println!("\t}}");
+        cluster += 1;
+    }
+
+    println!("}}");
 }
 
 #[cfg(test)]
@@ -156,6 +222,8 @@ mod tests {
         let distributed_plan = create_distributed_plan(&plan)?;
 
         println!("{:?}", distributed_plan);
+
+        create_dot_file(&distributed_plan);
 
         Ok(())
     }

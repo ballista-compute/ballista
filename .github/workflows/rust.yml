@@ -56,7 +56,8 @@ jobs:
         vcpkg install openssl:x64-windows
     - name: Setup
       run: |
-        rustup default ${RUSTUP_VERSION} && rustup component add rustfmt
+        rustup default ${RUSTUP_VERSION}
+        rustup component add rustfmt --toolchain ${RUSTUP_VERSION}-x86_64-pc-windows-msvc
     - name: Build
       run: |
         cd rust && cargo build

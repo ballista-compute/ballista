@@ -1,13 +1,16 @@
 name: Rust
 
-on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+#on:
+#  push:
+#    branches: [ master ]
+#  pull_request:
+#    branches: [ master ]
+
+on: [push]
 
 env:
   VCPKGRS_DYNAMIC: 1
+  RUSTUP_VERSION: nightly-2020-05-14
 
 jobs:
   Ubuntu:
@@ -15,7 +18,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Setup
-      run: rustup default nightly-2020-05-14 && rustup component add rustfmt
+      run: rustup default ${RUSTUP_VERSION} && rustup component add rustfmt
     - name: Build
       run: cd rust && cargo build
     - name: Build IT
@@ -32,7 +35,7 @@ jobs:
     - name: Setup
       run: |
         brew install rustup
-        rustup default nightly-2020-05-14 && rustup component add rustfmt
+        rustup default ${RUSTUP_VERSION} && rustup component add rustfmt
     - name: Build
       run: cd rust && cargo build
     - name: Build IT
@@ -54,11 +57,12 @@ jobs:
     - name: Install vcpkg
       run: |
         cd vcpkg && ./bootstrap-vcpkg.bat
+        vcpkg update
         vcpkg integrate install
         vcpkg install openssl:x64-windows
     - name: Setup
       run: |
-        rustup default nightly-2020-05-14 && rustup component add rustfmt
+        rustup default ${RUSTUP_VERSION} && rustup component add rustfmt
     - name: Build
       run: |
         cd rust && cargo build

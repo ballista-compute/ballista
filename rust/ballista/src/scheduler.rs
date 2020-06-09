@@ -22,8 +22,8 @@ use crate::datafusion::logicalplan::LogicalPlan;
 use crate::error::Result;
 
 use crate::scheduler::PhysicalPlan::HashAggregate;
-use uuid::Uuid;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 struct DistributedPlan {
@@ -33,7 +33,7 @@ struct DistributedPlan {
 #[derive(Debug, Clone)]
 struct Stage {
     /// Stage ID
-    id: String,
+    id: Uuid,
     /// Physical plan with same number of input and output partitions
     partitions: Vec<PhysicalPlan>,
 }
@@ -41,12 +41,12 @@ struct Stage {
 impl Stage {
     fn new(partitions: Vec<PhysicalPlan>) -> Self {
         Self {
-            id: Uuid::new_v4().to_string(),
-            partitions
+            id: Uuid::new_v4(),
+            partitions,
         }
     }
 
-    fn id(&self) -> &str {
+    fn id(&self) -> &Uuid {
         &self.id
     }
 }
@@ -69,7 +69,7 @@ enum PhysicalPlan {
         partitions: Vec<PhysicalPlan>,
     },
     Exchange {
-        stage_id: String,
+        stage_id: Uuid,
     },
 }
 
@@ -138,12 +138,14 @@ fn create_scheduler_plan(
         LogicalPlan::Aggregate { input, .. } => {
             let input = create_scheduler_plan(distributed_plan, input)?;
 
-            let stage = Stage::new(input
+            let stage = Stage::new(
+                input
                     .iter()
                     .map(|p| HashAggregate {
                         partitions: vec![p.clone()],
                     })
-                    .collect());
+                    .collect(),
+            );
 
             let stage_id = stage.id().to_owned();
 
@@ -158,27 +160,45 @@ fn create_scheduler_plan(
     }
 }
 
-fn sanitize(s: &str) -> String {
-    s.replace("-", "_")
+fn sanitize(s: &Uuid) -> String {
+    s.to_string().replace("-", "_")
 }
 
-fn create_dot_plan(stage_id: &str, plan: &PhysicalPlan, map: &mut HashMap<String, String>) -> Uuid {
+fn create_dot_plan(
+    dist_plan: &DistributedPlan,
+    stage_id: &str,
+    plan: &PhysicalPlan,
+    map: &mut HashMap<Uuid, String>,
+    stage_output_map: &HashMap<Uuid, String>,
+) -> Uuid {
+    // uuid for plan step
     let uuid = Uuid::new_v4();
-    let uuid_str = sanitize(&uuid.to_string());
     let dot_id = format!("node{}", map.len());
-    map.insert(uuid_str.clone(), dot_id.clone());
+    map.insert(uuid, dot_id.clone());
 
     match plan {
         PhysicalPlan::HashAggregate { partitions } => {
             println!("\t\t{} [label=\"HashAggregate\"];", dot_id);
-            let child = create_dot_plan(stage_id, &partitions[0], map);
-            //println!("\t\t{} -> {};", dot_id, sanitize(&child.to_string()));
+            let child_uuid =
+                create_dot_plan(dist_plan, stage_id, &partitions[0], map, stage_output_map);
+            let child_dot_id = &map[&child_uuid].as_str();
+            println!("\t\t{} -> {};", child_dot_id, dot_id);
         }
         PhysicalPlan::ParquetScan { .. } => {
             println!("\t\t{} [label=\"ParquetScan\"];", dot_id);
         }
-        PhysicalPlan::Exchange { .. } => {
+        PhysicalPlan::Exchange { stage_id, .. } => {
             println!("\t\t{} [label=\"Exchange\"];", dot_id);
+
+            //stage_output_map
+            let other_stage = dist_plan
+                .stages
+                .iter()
+                .find(|stage| stage.id.to_owned() == stage_id.to_owned())
+                .unwrap();
+
+            let x = &stage_output_map[other_stage.id()];
+            println!("\t\t{} -> {};", x, dot_id);
         }
         _ => {
             println!("other;");
@@ -191,15 +211,26 @@ fn create_dot_file(plan: &DistributedPlan) {
     println!("digraph distributed_plan {{");
 
     let mut map = HashMap::new();
+    let mut stage_output_uuid = HashMap::new();
 
     let mut cluster = 0;
 
     for stage in &plan.stages {
         let stage_id = sanitize(stage.id());
+
         println!("\tsubgraph cluster{} {{", cluster);
         println!("\t\tnode [style=filled];");
-        println!("\t\tlabel = \"Stage {}\";", stage_id);
-        create_dot_plan(&stage_id, &stage.partitions[0], &mut map);
+        println!("\t\tlabel = \"Stage {}\";", cluster);
+        let uuid = create_dot_plan(
+            &plan,
+            &stage_id,
+            &stage.partitions[0],
+            &mut map,
+            &stage_output_uuid,
+        );
+        let x: String = map[&uuid].to_owned();
+        stage_output_uuid.insert(stage.id().to_owned(), x);
+
         println!("\t}}");
         cluster += 1;
     }

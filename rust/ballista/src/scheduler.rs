@@ -215,24 +215,24 @@ fn create_dot_file(plan: &Job) {
     println!("}}");
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::dataframe::max;
-    use datafusion::logicalplan::{col, LogicalPlanBuilder};
-
-    #[test]
-    fn create_plan() -> Result<()> {
-        let plan = LogicalPlanBuilder::scan_parquet("/mnt/nyctaxi/parquet", None)?
-            .aggregate(vec![col("passenger_count")], vec![max(col("fare_amt"))])?
-            .build()?;
-
-        let job = create_job(&plan)?;
-
-        println!("{:?}", job);
-
-        create_dot_file(&job);
-
-        Ok(())
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use crate::dataframe::max;
+//     use datafusion::logicalplan::{col, LogicalPlanBuilder};
+//
+//     #[test]
+//     fn create_plan() -> Result<()> {
+//         let plan = LogicalPlanBuilder::scan_parquet("/mnt/nyctaxi/parquet", None)?
+//             .aggregate(vec![col("passenger_count")], vec![max(col("fare_amt"))])?
+//             .build()?;
+//
+//         let job = create_job(&plan)?;
+//
+//         println!("{:?}", job);
+//
+//         create_dot_file(&job);
+//
+//         Ok(())
+//     }
+// }

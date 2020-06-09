@@ -58,9 +58,9 @@ jobs:
         vcpkg install openssl:x64-windows
     - name: Setup Rust Nightly
       run: |
-        rustup default ${RUSTUP_VERSION}
-        rustup toolchain install ${RUSTUP_VERSION}
-        rustup component add rustfmt --toolchain ${TOOLCHAIN_VERSION}
+        rustup default $RUSTUP_VERSION
+        rustup toolchain install $RUSTUP_VERSION
+        rustup component add rustfmt --toolchain $TOOLCHAIN_VERSION
     - name: Build Ballista
       run: |
         cd rust && cargo build

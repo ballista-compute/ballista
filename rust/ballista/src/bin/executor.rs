@@ -23,6 +23,7 @@ use ballista::serde::decode_protobuf;
 use ballista::{plan, BALLISTA_VERSION};
 
 use arrow::record_batch::RecordBatch;
+use ballista::scheduler::create_job;
 use flatbuffers::FlatBufferBuilder;
 use flight::{
     flight_service_server::FlightService, flight_service_server::FlightServiceServer, Action,
@@ -118,21 +119,36 @@ impl FlightService for FlightServiceImpl {
         println!("get_flight_info");
 
         let request = request.into_inner();
-        let uuid = &request.path[0];
 
-        match self.results.lock().unwrap().get(uuid) {
-            Some(results) => {
-                let schema_bytes = schema_to_bytes(&results.schema);
+        let action = decode_protobuf(&request.cmd.to_vec()).map_err(|e| to_tonic_err(&e.into()))?;
 
-                Ok(Response::new(FlightInfo {
-                    schema: schema_bytes,
-                    endpoint: vec![],
-                    flight_descriptor: None,
-                    total_bytes: -1,
-                    total_records: -1,
-                }))
+        match &action {
+            plan::Action::Collect { plan: logical_plan } => {
+                println!("Logical plan: {:?}", logical_plan);
+
+                let job = create_job(logical_plan).map_err(|e| to_tonic_err(&e.into()))?;
+                println!("Job: {:?}", job);
+
+                //TODO execute stages
+
+                let uuid = "tbd";
+
+                match self.results.lock().unwrap().get(uuid) {
+                    Some(results) => {
+                        let schema_bytes = schema_to_bytes(&results.schema);
+
+                        Ok(Response::new(FlightInfo {
+                            schema: schema_bytes,
+                            endpoint: vec![],
+                            flight_descriptor: None,
+                            total_bytes: -1,
+                            total_records: -1,
+                        }))
+                    }
+                    _ => Err(Status::not_found("Invalid uuid")),
+                }
             }
-            _ => Err(Status::not_found("Invalid uuid")),
+            _ => Err(Status::invalid_argument("Invalid action")),
         }
     }
 

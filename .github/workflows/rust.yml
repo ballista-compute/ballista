@@ -57,6 +57,7 @@ jobs:
     - name: Setup
       run: |
         rustup default ${RUSTUP_VERSION}
+        rustup toolchain install nightly-2020-05-14
         rustup component add rustfmt --toolchain nightly-2020-05-14-x86_64-pc-windows-msvc
     - name: Build
       run: |

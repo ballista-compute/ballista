@@ -51,19 +51,9 @@ jobs:
     - uses: actions/checkout@v2
     - name: Set up the Windows environment
       run: |
+        vcpkg update
         vcpkg integrate install
         vcpkg install openssl:x64-windows
-#    - name: Pre-requisite for Windows vcpkg
-#      uses: actions/checkout@v2
-#      with:
-#        repository: Microsoft/vcpkg
-#        path: vcpkg
-#    - name: Install vcpkg
-#      run: |
-#        cd vcpkg && ./bootstrap-vcpkg.bat
-#        vcpkg update
-#        vcpkg integrate install
-#        vcpkg install openssl:x64-windows
     - name: Setup
       run: |
         rustup default ${RUSTUP_VERSION} && rustup component add rustfmt

@@ -247,7 +247,7 @@ fn execute_action(action: &plan::Action) -> Result<Results, Status> {
             println!("Logical plan: {:?}", logical_plan);
 
             // create local execution context
-            let mut ctx = ExecutionContext::new();
+            let ctx = ExecutionContext::new();
 
             // create the query plan
             let optimized_plan = ctx

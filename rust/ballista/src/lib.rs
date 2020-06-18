@@ -16,6 +16,7 @@
 
 pub use arrow;
 pub use datafusion;
+pub use sqlparser;
 
 // include the generated protobuf source as a submodule
 #[allow(clippy::all)]

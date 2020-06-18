@@ -21,6 +21,7 @@ use std::result;
 
 use crate::arrow::error::ArrowError;
 use crate::datafusion::error::ExecutionError;
+use crate::sqlparser::sqlparser;
 
 pub type Result<T> = result::Result<T, BallistaError>;
 
@@ -31,6 +32,7 @@ pub enum BallistaError {
     General(String),
     ArrowError(ArrowError),
     DataFusionError(ExecutionError),
+    SqlError(sqlparser::ParserError),
     IoError(io::Error),
     ReqwestError(reqwest::Error),
     HttpError(http::Error),
@@ -53,6 +55,12 @@ impl From<String> for BallistaError {
 impl From<ArrowError> for BallistaError {
     fn from(e: ArrowError) -> Self {
         BallistaError::ArrowError(e)
+    }
+}
+
+impl From<sqlparser::ParserError> for BallistaError {
+    fn from(e: sqlparser::ParserError) -> Self {
+        BallistaError::SqlError(e)
     }
 }
 
@@ -111,6 +119,7 @@ impl Display for BallistaError {
             BallistaError::General(ref desc) => write!(f, "General error: {}", desc),
             BallistaError::ArrowError(ref desc) => write!(f, "Arrow error: {}", desc),
             BallistaError::DataFusionError(ref desc) => write!(f, "DataFusion error: {:?}", desc),
+            BallistaError::SqlError(ref desc) => write!(f, "SQL error: {:?}", desc),
             BallistaError::IoError(ref desc) => write!(f, "IO error: {}", desc),
             BallistaError::ReqwestError(ref desc) => write!(f, "Reqwest error: {}", desc),
             BallistaError::HttpError(ref desc) => write!(f, "HTTP error: {}", desc),

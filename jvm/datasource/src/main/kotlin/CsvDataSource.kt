@@ -14,22 +14,27 @@
 
 package org.ballistacompute.datasource
 
+import com.univocity.parsers.common.IterableResult
+import com.univocity.parsers.common.ParsingContext
+import com.univocity.parsers.common.ResultIterator
 import org.apache.arrow.memory.RootAllocator
 import org.apache.arrow.vector.*
 import org.ballistacompute.datatypes.*
-import java.io.BufferedReader
-import java.io.File
-import java.io.FileNotFoundException
-import java.io.FileReader
 import java.lang.IllegalStateException
 import java.util.logging.Logger
+
+import com.univocity.parsers.csv.*
+import java.io.*
 
 /**
  * Simple CSV data source. If no schema is provided then it assumes that the first line contains field names and that all values are strings.
  */
-class CsvDataSource(val filename: String, val schema: Schema?, private val batchSize: Int) : DataSource {
+class CsvDataSource(val filename: String, val schema: Schema?, private val hasHeaders: Boolean, private val batchSize: Int) : DataSource {
 
     private val logger = Logger.getLogger(CsvDataSource::class.simpleName)
+
+    private val settings: CsvParserSettings = CsvParserSettings()
+    private val parser: CsvParser = CsvParser(settings)
 
     private val finalSchema = schema ?: inferSchema()
 
@@ -44,89 +49,95 @@ class CsvDataSource(val filename: String, val schema: Schema?, private val batch
         if (!file.exists()) {
             throw FileNotFoundException(file.absolutePath)
         }
-        val b = BufferedReader(FileReader(file), 16*1024*1024) //TODO configurable buffer size
-        b.readLine() // skip header
+
+        // parser will close once the end of the reader is reached
+        parser.beginParsing(file.inputStream().reader())
+
+        if (hasHeaders) {
+            // skip first row
+            parser.parseNext()
+        }
 
         val projectionIndices = projection.map { name -> finalSchema.fields.indexOfFirst { it.name == name } }
-        val readSchema = finalSchema.select(projection)
-        return ReaderAsSequence(readSchema, projectionIndices, b, batchSize)
+        val readSchema = finalSchema // TODO add this back in .select(projection)
+        return ReaderAsSequence(readSchema, projectionIndices, parser, batchSize)
     }
 
     private fun inferSchema(): Schema {
         logger.fine("inferSchema()")
+
         val file = File(filename)
         if (!file.exists()) {
             throw FileNotFoundException(file.absolutePath)
         }
-        val b = BufferedReader(FileReader(file))
-        val header = b.readLine().split(",")
-        return Schema(header.map { Field(it, ArrowTypes.StringType) })
+
+        return file.inputStream().use {
+            parser.beginParsing(it.reader())
+
+            parser.parseNext()
+            val headers = parser.context.parsedHeaders()
+
+            val schema = if(hasHeaders) {
+                Schema(headers.map { colName -> Field(colName, ArrowTypes.StringType) })
+            } else {
+                Schema(headers.mapIndexed { i, _ -> Field("field_$i", ArrowTypes.StringType) } )
+            }
+
+            parser.stopParsing()
+            schema
+        }
     }
 
 }
 
 class ReaderAsSequence(private val schema: Schema,
                        private val projectionIndices: List<Int>,
-                       private val r: BufferedReader,
+                       private val parser: CsvParser,
                        private val batchSize: Int) : Sequence<RecordBatch> {
     override fun iterator(): Iterator<RecordBatch> {
-        return ReaderIterator(schema, projectionIndices, r, batchSize)
+        return ReaderIterator(schema, projectionIndices, parser, batchSize)
     }
 }
 
 class ReaderIterator(private val schema: Schema,
                      private val projectionIndices: List<Int>,
-                     private val r: BufferedReader,
+                     private val parser: CsvParser,
                      private val batchSize: Int) : Iterator<RecordBatch> {
 
     private val logger = Logger.getLogger(CsvDataSource::class.simpleName)
 
-    private var rows: List<List<String>> = listOf()
+    private var next: RecordBatch? = null
 
     override fun hasNext(): Boolean {
-        var list = ArrayList<List<String>>(batchSize)
-        var line = r.readLine()
-        while (line != null) {
-            list.add(parseLine(line, projectionIndices))
-            if (list.size == batchSize) {
-                break
-            }
-            line = r.readLine()
-        }
-        rows = list.toList()
-        return rows.size > 0
+        next = nextBatch()
+
+        return next != null
     }
 
     override fun next(): RecordBatch {
-        return createBatch(rows)
+        val out = next
+
+        next = nextBatch()
+
+        return out!!
     }
 
-    private val fieldSeparators = mutableListOf<Int>()
+    private fun nextBatch(): RecordBatch? {
+        val rows = ArrayList<List<String>>(batchSize)
+        var line = parser.parseNext()
 
-    private fun parseLine(line: String, projection: List<Int>) : List<String> {
-        if (projection.isEmpty()) {
-            return line.split(",")
-        } else {
-            // find field delimiters
-            var i=0
-            fieldSeparators.clear()
-            fieldSeparators.add(0) // first field starts at zero offset
-            while (i<line.length) {
-                //TODO handle strings, escaped quotes, etc
-                if (line[i] == ',') {
-                    fieldSeparators.add(i)
-                }
-                i++
-            }
-            return projection.map {
-                val startIndex = fieldSeparators[it] + 1
-                if (it == fieldSeparators.size) {
-                    line.substring(startIndex)
-                } else {
-                    line.substring(startIndex, fieldSeparators[it+1])
-                }
-            }.toList()
+
+        while(line != null) {
+            rows.add(line.asList())
+
+            line = parser.parseNext()
         }
+
+        if(rows.isEmpty()) {
+            return null
+        }
+
+        return createBatch(rows)
     }
 
     private fun createBatch(rows: List<List<String>>) : RecordBatch {

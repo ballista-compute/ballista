@@ -25,11 +25,12 @@ class CsvDataSourceTest {
 
     @Test
     fun `read csv`() {
-        val csv = CsvDataSource(File(dir, "employee.csv").absolutePath, null,1024)
+        val csv = CsvDataSource(File(dir, "employee.csv").absolutePath, null, true,1024)
         val result = csv.scan(listOf())
         result.asSequence().forEach {
             val field = it.field(0)
             println(field.size())
+            assert(field.size() == 3)
         }
     }
 

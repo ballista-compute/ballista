@@ -160,7 +160,6 @@ class ReaderIterator(private val schema: Schema,
         do {
             val line = parser.parseNextRecord()
             if (line != null) rows.add(line)
-            if (line != null) rows.add(line)
         } while(line != null && rows.size < batchSize)
 
         if (rows.isEmpty()) {

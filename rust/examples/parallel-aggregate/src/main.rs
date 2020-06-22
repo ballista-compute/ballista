@@ -49,7 +49,7 @@ async fn main() -> Result<()> {
     // get a list of ballista executors from kubernetes
     let executors = match mode {
         "local" => vec![Executor::new("localhost", 50051)],
-        "k8s" => cluster::get_executors(cluster_name, namespace)?,
+        "k8s" => cluster::get_executors(cluster_name, namespace).await?,
         _ => panic!("Invalid mode"),
     };
 

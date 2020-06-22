@@ -34,6 +34,7 @@ pub enum BallistaError {
     IoError(io::Error),
     ReqwestError(reqwest::Error),
     HttpError(http::Error),
+    KubeAPIError(kube::error::Error),
     KubeAPIRequestError(k8s_openapi::RequestError),
     KubeAPIResponseError(k8s_openapi::ResponseError),
     // TonicError(tonic::status::Status)
@@ -79,6 +80,12 @@ impl From<http::Error> for BallistaError {
     }
 }
 
+impl From<kube::error::Error> for BallistaError {
+    fn from(e: kube::error::Error) -> Self {
+        BallistaError::KubeAPIError(e)
+    }
+}
+
 impl From<k8s_openapi::RequestError> for BallistaError {
     fn from(e: k8s_openapi::RequestError) -> Self {
         BallistaError::KubeAPIRequestError(e)
@@ -107,6 +114,7 @@ impl Display for BallistaError {
             BallistaError::IoError(ref desc) => write!(f, "IO error: {}", desc),
             BallistaError::ReqwestError(ref desc) => write!(f, "Reqwest error: {}", desc),
             BallistaError::HttpError(ref desc) => write!(f, "HTTP error: {}", desc),
+            BallistaError::KubeAPIError(ref desc) => write!(f, "Kube API error: {}", desc),
             BallistaError::KubeAPIRequestError(ref desc) => {
                 write!(f, "KubeAPI request error: {}", desc)
             }

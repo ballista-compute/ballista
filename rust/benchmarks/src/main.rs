@@ -81,7 +81,7 @@ async fn k8s(path: &str, format: &str) -> Result<()> {
     let num_months: usize = 12;
 
     // get a list of ballista executors from kubernetes
-    let executors = cluster::get_executors(cluster_name, namespace)?;
+    let executors = cluster::get_executors(cluster_name, namespace).await?;
 
     if executors.is_empty() {
         println!("No executors found");

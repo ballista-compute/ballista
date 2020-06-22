@@ -58,18 +58,18 @@ class CsvDataSource(val filename: String, val schema: Schema?, private val hasHe
             throw FileNotFoundException(file.absolutePath)
         }
 
-        val readSchema = if(projection.isNotEmpty()) {
+        val readSchema = if (projection.isNotEmpty()) {
             finalSchema.select(projection)
         } else {
             finalSchema
         }
 
         val settings = defaultSettings()
-        if(projection.isNotEmpty()) {
+        if (projection.isNotEmpty()) {
             settings.selectFields(*projection.toTypedArray())
         }
         settings.isHeaderExtractionEnabled = hasHeaders
-        if(!hasHeaders) {
+        if (!hasHeaders) {
             settings.setHeaders(*readSchema.fields.map{ it.name }.toTypedArray())
         }
 
@@ -98,7 +98,7 @@ class CsvDataSource(val filename: String, val schema: Schema?, private val hasHe
             // some delimiters cause sparse arrays, so remove null columns in the parsed header
             val headers = parser.context.parsedHeaders().filterNotNull()
 
-            val schema = if(hasHeaders) {
+            val schema = if (hasHeaders) {
                 Schema(headers.map { colName -> Field(colName, ArrowTypes.StringType) })
             } else {
                 Schema(headers.mapIndexed { i, _ -> Field("field_${i + 1}", ArrowTypes.StringType) } )
@@ -129,7 +129,7 @@ class ReaderIterator(private val schema: Schema,
     private var started: Boolean = false
 
     override fun hasNext(): Boolean {
-        if(!started) {
+        if (!started) {
             started = true
 
             next = nextBatch()
@@ -139,7 +139,7 @@ class ReaderIterator(private val schema: Schema,
     }
 
     override fun next(): RecordBatch {
-        if(!started) {
+        if (!started) {
             hasNext()
         }
 
@@ -147,7 +147,7 @@ class ReaderIterator(private val schema: Schema,
 
         next = nextBatch()
 
-        if(out == null) {
+        if (out == null) {
             throw NoSuchElementException("Cannot read past the end of ${ReaderIterator::class.simpleName}")
         }
 
@@ -159,10 +159,11 @@ class ReaderIterator(private val schema: Schema,
 
         do {
             val line = parser.parseNextRecord()
-            if(line != null) rows.add(line)
+            if (line != null) rows.add(line)
+            if (line != null) rows.add(line)
         } while(line != null && rows.size < batchSize)
 
-        if(rows.isEmpty()) {
+        if (rows.isEmpty()) {
             return null
         }
 

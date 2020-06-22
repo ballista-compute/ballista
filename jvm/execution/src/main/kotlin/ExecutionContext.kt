@@ -43,7 +43,7 @@ class ExecutionContext(val settings: Map<String,String>) {
 
     /** Get a DataFrame representing the specified CSV file */
     fun csv(filename: String): DataFrame {
-        return DataFrameImpl(Scan(filename, CsvDataSource(filename, null, batchSize), listOf()))
+        return DataFrameImpl(Scan(filename, CsvDataSource(filename, null, true, batchSize), listOf()))
     }
 
     /** Register a DataFrame with the context */

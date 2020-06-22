@@ -14,9 +14,7 @@
 
 package org.ballistacompute.datasource
 
-import com.univocity.parsers.common.IterableResult
-import com.univocity.parsers.common.ParsingContext
-import com.univocity.parsers.common.ResultIterator
+import com.univocity.parsers.common.record.Record
 import org.apache.arrow.memory.RootAllocator
 import org.apache.arrow.vector.*
 import org.ballistacompute.datatypes.*
@@ -33,10 +31,21 @@ class CsvDataSource(val filename: String, val schema: Schema?, private val hasHe
 
     private val logger = Logger.getLogger(CsvDataSource::class.simpleName)
 
-    private val settings: CsvParserSettings = CsvParserSettings()
-    private val parser: CsvParser = CsvParser(settings)
+    private val finalSchema: Schema by lazy { schema ?: inferSchema() }
 
-    private val finalSchema = schema ?: inferSchema()
+    private fun buildParser(settings: CsvParserSettings): CsvParser {
+        return CsvParser(settings)
+    }
+
+    private fun defaultSettings(): CsvParserSettings {
+        val s = CsvParserSettings()
+        s.isDelimiterDetectionEnabled = true
+        s.isLineSeparatorDetectionEnabled = true
+        s.skipEmptyLines = true
+        s.isAutoClosingEnabled = true
+
+        return s
+    }
 
     override fun schema(): Schema {
         return finalSchema
@@ -50,16 +59,30 @@ class CsvDataSource(val filename: String, val schema: Schema?, private val hasHe
             throw FileNotFoundException(file.absolutePath)
         }
 
-        // parser will close once the end of the reader is reached
-        parser.beginParsing(file.inputStream().reader())
-
-        if (hasHeaders) {
-            // skip first row
-            parser.parseNext()
+        val readSchema = if(projection.isNotEmpty()) {
+            finalSchema.select(projection)
+        } else {
+            finalSchema
         }
 
+        val settings = defaultSettings()
+        if(projection.isNotEmpty()) {
+            settings.selectFields(*projection.toTypedArray())
+        }
+        settings.isHeaderExtractionEnabled = hasHeaders
+        if(!hasHeaders) {
+            settings.setHeaders(*readSchema.fields.map{ it.name }.toTypedArray())
+        }
+
+
+        val parser = buildParser(settings)
+        // parser will close once the end of the reader is reached
+        parser.beginParsing(file.inputStream().reader())
+        parser.detectedFormat
+
         val projectionIndices = projection.map { name -> finalSchema.fields.indexOfFirst { it.name == name } }
-        val readSchema = finalSchema // TODO add this back in .select(projection)
+
+
         return ReaderAsSequence(readSchema, projectionIndices, parser, batchSize)
     }
 
@@ -71,16 +94,19 @@ class CsvDataSource(val filename: String, val schema: Schema?, private val hasHe
             throw FileNotFoundException(file.absolutePath)
         }
 
+        val parser = buildParser(defaultSettings())
         return file.inputStream().use {
             parser.beginParsing(it.reader())
+            parser.detectedFormat
 
             parser.parseNext()
-            val headers = parser.context.parsedHeaders()
+            // some delimiters cause sparse arrays, so remove null columns in the parsed header
+            val headers = parser.context.parsedHeaders().filterNotNull()
 
             val schema = if(hasHeaders) {
                 Schema(headers.map { colName -> Field(colName, ArrowTypes.StringType) })
             } else {
-                Schema(headers.mapIndexed { i, _ -> Field("field_$i", ArrowTypes.StringType) } )
+                Schema(headers.mapIndexed { i, _ -> Field("field_${i + 1}", ArrowTypes.StringType) } )
             }
 
             parser.stopParsing()
@@ -107,31 +133,41 @@ class ReaderIterator(private val schema: Schema,
     private val logger = Logger.getLogger(CsvDataSource::class.simpleName)
 
     private var next: RecordBatch? = null
+    private var started: Boolean = false
 
     override fun hasNext(): Boolean {
-        next = nextBatch()
+        if(!started) {
+            started = true
+
+            next = nextBatch()
+        }
 
         return next != null
     }
 
     override fun next(): RecordBatch {
+        if(!started) {
+            hasNext()
+        }
+
         val out = next
 
         next = nextBatch()
 
-        return out!!
+        if(out == null) {
+            throw NoSuchElementException("Cannot read past the end of ${ReaderIterator::class.simpleName}")
+        }
+
+        return out
     }
 
     private fun nextBatch(): RecordBatch? {
-        val rows = ArrayList<List<String>>(batchSize)
-        var line = parser.parseNext()
+        val rows = ArrayList<Record>(batchSize)
 
-
-        while(line != null) {
-            rows.add(line.asList())
-
-            line = parser.parseNext()
-        }
+        do {
+            val line = parser.parseNextRecord()
+            if(line != null) rows.add(line)
+        } while(line != null && rows.size < batchSize)
 
         if(rows.isEmpty()) {
             return null
@@ -140,7 +176,7 @@ class ReaderIterator(private val schema: Schema,
         return createBatch(rows)
     }
 
-    private fun createBatch(rows: List<List<String>>) : RecordBatch {
+    private fun createBatch(rows: ArrayList<Record>) : RecordBatch {
         val root = VectorSchemaRoot.create(schema.toArrow(), RootAllocator(Long.MAX_VALUE))
         root.fieldVectors.forEach {
             it.setInitialCapacity(rows.size)
@@ -151,11 +187,11 @@ class ReaderIterator(private val schema: Schema,
             val vector = field.value
             when (vector) {
                 is VarCharVector -> rows.withIndex().forEach { row ->
-                    val valueStr = row.value[field.index].trim()
-                    vector.set(row.index, valueStr.toByteArray())
+                    val valueStr = row.value.getValue(field.value.name, "").trim()
+                    vector.setSafe(row.index, valueStr.toByteArray())
                 }
                 is TinyIntVector -> rows.withIndex().forEach { row ->
-                    val valueStr = row.value[field.index].trim()
+                    val valueStr = row.value.getValue(field.value.name, "").trim()
                     if (valueStr.isEmpty()) {
                         vector.setNull(row.index)
                     } else {
@@ -163,7 +199,7 @@ class ReaderIterator(private val schema: Schema,
                     }
                 }
                 is SmallIntVector -> rows.withIndex().forEach { row ->
-                    val valueStr = row.value[field.index].trim()
+                    val valueStr = row.value.getValue(field.value.name, "").trim()
                     if (valueStr.isEmpty()) {
                         vector.setNull(row.index)
                     } else {
@@ -171,7 +207,7 @@ class ReaderIterator(private val schema: Schema,
                     }
                 }
                 is IntVector -> rows.withIndex().forEach { row ->
-                    val valueStr = row.value[field.index].trim()
+                    val valueStr = row.value.getValue(field.value.name, "").trim()
                     if (valueStr.isEmpty()) {
                         vector.setNull(row.index)
                     } else {
@@ -179,7 +215,7 @@ class ReaderIterator(private val schema: Schema,
                     }
                 }
                 is BigIntVector -> rows.withIndex().forEach { row ->
-                    val valueStr = row.value[field.index].trim()
+                    val valueStr = row.value.getValue(field.value.name, "").trim()
                     if (valueStr.isEmpty()) {
                         vector.setNull(row.index)
                     } else {
@@ -187,7 +223,7 @@ class ReaderIterator(private val schema: Schema,
                     }
                 }
                 is Float4Vector -> rows.withIndex().forEach { row ->
-                    val valueStr = row.value[field.index].trim()
+                    val valueStr = row.value.getValue(field.value.name, "").trim()
                     if (valueStr.isEmpty()) {
                         vector.setNull(row.index)
                     } else {
@@ -195,7 +231,7 @@ class ReaderIterator(private val schema: Schema,
                     }
                 }
                 is Float8Vector -> rows.withIndex().forEach { row ->
-                    val valueStr = row.value[field.index].trim()
+                    val valueStr = row.value.getValue(field.value.name, "")
                     if (valueStr.isEmpty()) {
                         vector.setNull(row.index)
                     } else {

@@ -38,13 +38,12 @@ class CsvDataSource(val filename: String, val schema: Schema?, private val hasHe
     }
 
     private fun defaultSettings(): CsvParserSettings {
-        val s = CsvParserSettings()
-        s.isDelimiterDetectionEnabled = true
-        s.isLineSeparatorDetectionEnabled = true
-        s.skipEmptyLines = true
-        s.isAutoClosingEnabled = true
-
-        return s
+        return CsvParserSettings().apply {
+            isDelimiterDetectionEnabled = true
+            isLineSeparatorDetectionEnabled = true
+            skipEmptyLines = true
+            isAutoClosingEnabled = true
+        }
     }
 
     override fun schema(): Schema {
@@ -74,16 +73,12 @@ class CsvDataSource(val filename: String, val schema: Schema?, private val hasHe
             settings.setHeaders(*readSchema.fields.map{ it.name }.toTypedArray())
         }
 
-
         val parser = buildParser(settings)
         // parser will close once the end of the reader is reached
         parser.beginParsing(file.inputStream().reader())
         parser.detectedFormat
 
-        val projectionIndices = projection.map { name -> finalSchema.fields.indexOfFirst { it.name == name } }
-
-
-        return ReaderAsSequence(readSchema, projectionIndices, parser, batchSize)
+        return ReaderAsSequence(readSchema, parser, batchSize)
     }
 
     private fun inferSchema(): Schema {
@@ -117,16 +112,14 @@ class CsvDataSource(val filename: String, val schema: Schema?, private val hasHe
 }
 
 class ReaderAsSequence(private val schema: Schema,
-                       private val projectionIndices: List<Int>,
                        private val parser: CsvParser,
                        private val batchSize: Int) : Sequence<RecordBatch> {
     override fun iterator(): Iterator<RecordBatch> {
-        return ReaderIterator(schema, projectionIndices, parser, batchSize)
+        return ReaderIterator(schema, parser, batchSize)
     }
 }
 
 class ReaderIterator(private val schema: Schema,
-                     private val projectionIndices: List<Int>,
                      private val parser: CsvParser,
                      private val batchSize: Int) : Iterator<RecordBatch> {
 

@@ -22,6 +22,9 @@ class Executor {
     companion object {
         @JvmStatic
         fun main(args: Array<String>) {
+            val name = Executor::class.java.`package`.implementationTitle
+            val version = Executor::class.java.`package`.implementationVersion
+            println("Starting $name $version")
 
             // https://issues.apache.org/jira/browse/ARROW-5412
             System.setProperty( "io.netty.tryReflectionSetAccessible","true")

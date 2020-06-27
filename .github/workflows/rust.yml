@@ -20,13 +20,13 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Setup
-      run: rustup default ${RUSTUP_VERSION} && rustup component add rustfmt
+      run: rustup default ${RUSTUP_VERSION} && rustup component add rustfmt clippy
     - name: Build Ballista
-      run: cd rust && cargo build
+      run: cd rust && cargo clippy -- -Dwarnings && cargo build
     - name: Build Integration Tests
-      run: cd integration-tests/rust && cargo build
+      run: cd integration-tests/rust && cargo clippy -- -Dwarnings && cargo build
     - name: Build Benchmarks
-      run: cd benchmarks && cargo build
+      run: cd benchmarks && cargo clippy -- -Dwarnings && cargo build
     - name: Run tests
       run: cd rust && cargo test
 
@@ -37,13 +37,13 @@ jobs:
     - name: Setup
       run: |
         brew install rustup
-        rustup default ${RUSTUP_VERSION} && rustup component add rustfmt
+        rustup default ${RUSTUP_VERSION} && rustup component add rustfmt clippy
     - name: Build Ballista
-      run: cd rust && cargo build
+      run: cd rust && cargo clippy -- -Dwarnings && cargo build
     - name: Build Integration Tests
-      run: cd integration-tests/rust && cargo build
+      run: cd integration-tests/rust && cargo clippy -- -Dwarnings && cargo build
     - name: Build Benchmarks
-      run: cd benchmarks && cargo build
+      run: cd benchmarks && cargo clippy -- -Dwarnings && cargo build
     - name: Run tests
       run: cd rust && cargo test
 
@@ -60,17 +60,16 @@ jobs:
       run: |
         rustup default nightly-2020-05-14
         rustup toolchain install nightly-2020-05-14
-        rustup component add rustfmt --toolchain nightly-2020-05-14-x86_64-pc-windows-msvc
+        rustup component add rustfmt clippy --toolchain nightly-2020-05-14-x86_64-pc-windows-msvc
     - name: Build Ballista
       run: |
-        cd rust && cargo build
+        cd rust && cargo clippy -- -Dwarnings && cargo build
     - name: Build Integration Tests
       run: |
-        cd integration-tests/rust && cargo build
+        cd integration-tests/rust && cargo clippy -- -Dwarnings && cargo build
     - name: Build Becnhmarks
       run: |
-        cd benchmarks && cargo build
+        cd benchmarks && cargo clippy -- -Dwarnings && cargo build
     - name: Run tests
       run: |
         cd rust && cargo test
-    

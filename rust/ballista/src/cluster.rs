@@ -15,7 +15,6 @@
 //! Ballista cluster management utilities
 
 use k8s_openapi::api;
-use kube;
 
 use crate::error::BallistaError;
 

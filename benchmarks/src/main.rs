@@ -29,38 +29,49 @@ struct BenchmarkConfig {
 
 impl BenchmarkConfig {
     fn result_file(&self) -> String {
-        format!("/results/{}-{}-{}cpu.csv", self.name, self.format, self.cpus)
+        format!(
+            "/results/{}-{}-{}cpu.csv",
+            self.name, self.format, self.cpus
+        )
     }
 }
 
 fn main() {
     let matches = App::new("Ballista Benchmarking Tool")
         //.version(BALLISTA_VERSION)
-        .arg(Arg::with_name("bench")
-            .required(true)
-            .short("b")
-            .long("bench")
-            .help("Benchmark")
-            .takes_value(true))
-        .arg(Arg::with_name("path")
-            .required(true)
-            .short("p")
-            .long("path")
-            .value_name("FILE")
-            .help("Path to NYC Taxi data files")
-            .takes_value(true))
-        .arg(Arg::with_name("format")
-            .required(true)
-            .short("f")
-            .long("format")
-            .help("File format (csv or parquet)")
-            .takes_value(true))
-        .arg(Arg::with_name("cpus")
-            .required(true)
-            .short("c")
-            .long("cpus")
-            .help("CPUs to use")
-            .takes_value(true))
+        .arg(
+            Arg::with_name("bench")
+                .required(true)
+                .short("b")
+                .long("bench")
+                .help("Benchmark")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("path")
+                .required(true)
+                .short("p")
+                .long("path")
+                .value_name("FILE")
+                .help("Path to NYC Taxi data files")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("format")
+                .required(true)
+                .short("f")
+                .long("format")
+                .help("File format (csv or parquet)")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("cpus")
+                .required(true)
+                .short("c")
+                .long("cpus")
+                .help("CPUs to use")
+                .takes_value(true),
+        )
         .get_matches();
 
     let bench = matches.value_of("bench").unwrap();
@@ -129,7 +140,7 @@ fn ballista_jvm_localmode_benchmarks(image: &str, host_path: &str, config: &Benc
     let mut env = HashMap::new();
     env.insert("BENCH_MODE", "local".to_owned());
     env.insert("BENCH_FORMAT", config.format.to_owned());
-    env.insert("BENCH_PATH", container_path.to_owned());
+    env.insert("BENCH_PATH", container_path);
     env.insert("BENCH_RESULT_FILE", config.result_file());
     env.insert("BENCH_ITERATIONS", format!("{}", config.iterations));
 
@@ -152,7 +163,7 @@ fn ballista_rust_localmode_benchmarks(image: &str, host_path: &str, config: &Ben
     let mut env = HashMap::new();
     env.insert("BENCH_MODE", "local".to_owned());
     env.insert("BENCH_FORMAT", config.format.to_owned());
-    env.insert("BENCH_PATH", container_path.to_owned());
+    env.insert("BENCH_PATH", container_path);
     env.insert("BENCH_RESULT_FILE", config.result_file());
     env.insert("BENCH_ITERATIONS", format!("{}", config.iterations));
 
@@ -174,7 +185,7 @@ fn spark_localmode_benchmarks(image: &str, host_path: &str, sql: &str, config: &
 
     let mut env = HashMap::new();
     env.insert("BENCH_FORMAT", config.format.to_owned());
-    env.insert("BENCH_PATH", container_path.to_owned());
+    env.insert("BENCH_PATH", container_path);
     env.insert("BENCH_SQL", sql.to_owned());
     env.insert("BENCH_RESULT_FILE", config.result_file());
     env.insert("BENCH_ITERATIONS", format!("{}", config.iterations));
@@ -186,11 +197,22 @@ fn spark_localmode_benchmarks(image: &str, host_path: &str, sql: &str, config: &
     //TODO assert result file exists
 }
 
-fn docker_run(image: &str, env: &HashMap<&str, String>, volumes: &HashMap<&str, String>, config: &BenchmarkConfig) {
+fn docker_run(
+    image: &str,
+    env: &HashMap<&str, String>,
+    volumes: &HashMap<&str, String>,
+    config: &BenchmarkConfig,
+) {
     let mut cmd = "docker run ".to_owned();
 
-    let env_args: Vec<String> = env.iter().map(|(k, v)| format!("-e {}=\"{}\"", k, v)).collect();
-    let volume_args: Vec<String> = volumes.iter().map(|(k, v)| format!("-v {}:{}", k, v)).collect();
+    let env_args: Vec<String> = env
+        .iter()
+        .map(|(k, v)| format!("-e {}=\"{}\"", k, v))
+        .collect();
+    let volume_args: Vec<String> = volumes
+        .iter()
+        .map(|(k, v)| format!("-v {}:{}", k, v))
+        .collect();
 
     cmd += &format!("--cpus={} ", config.cpus);
 

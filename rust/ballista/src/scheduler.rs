@@ -147,6 +147,7 @@ fn create_scheduler_plan(job: &mut Job, logical_plan: &LogicalPlan) -> Result<Ve
     }
 }
 
+#[allow(dead_code)]
 fn create_dot_plan(
     job: &Job,
     plan: &PhysicalPlan,
@@ -179,7 +180,7 @@ fn create_dot_plan(
             let other_stage = job
                 .stages
                 .iter()
-                .find(|stage| stage.id.to_owned() == stage_id.to_owned())
+                .find(|stage| &stage.id == stage_id)
                 .unwrap();
 
             let stage_dot_id = &stage_to_dot_id_map[other_stage.id()];
@@ -192,15 +193,14 @@ fn create_dot_plan(
     uuid
 }
 
+#[allow(dead_code)]
 fn create_dot_file(plan: &Job) {
     println!("digraph distributed_plan {{");
 
     let mut map = HashMap::new();
     let mut stage_output_uuid = HashMap::new();
 
-    let mut cluster = 0;
-
-    for stage in &plan.stages {
+    for (cluster, stage) in plan.stages.iter().enumerate() {
         println!("\tsubgraph cluster{} {{", cluster);
         println!("\t\tnode [style=filled];");
         println!("\t\tlabel = \"Stage {}\";", cluster);
@@ -209,7 +209,6 @@ fn create_dot_file(plan: &Job) {
         stage_output_uuid.insert(stage.id().to_owned(), stage_dot_id);
 
         println!("\t}}");
-        cluster += 1;
     }
 
     println!("}}");

@@ -32,7 +32,7 @@ use crate::datafusion::sql::planner::{SchemaProvider, SqlToRel};
 use crate::error::{BallistaError, Result};
 use crate::plan::Action;
 
-pub const CSV_BATCH_SIZE: &'static str = "ballista.csv.batchSize";
+pub const CSV_BATCH_SIZE: &str = "ballista.csv.batchSize";
 
 /// Configuration setting
 struct ConfigSetting {
@@ -111,7 +111,7 @@ impl ContextSchemaProvider {
 
 impl ContextSchemaProvider {
     pub fn register_temp_table(&mut self, name: &str, df: DataFrame) -> Result<()> {
-        self.temp_tables.insert(name.to_string(), df.clone());
+        self.temp_tables.insert(name.to_string(), df);
         Ok(())
     }
 }
@@ -326,7 +326,7 @@ impl DataFrame {
                 path: path.to_owned(),
                 schema: Box::new(schema.clone()),
                 projection,
-                projected_schema: Box::new(projected_schema.or(Some(schema.clone())).unwrap()),
+                projected_schema: Box::new(projected_schema.or(Some(schema)).unwrap()),
             },
         ))
     }
@@ -338,14 +338,13 @@ impl DataFrame {
             let mut expr_vec = vec![];
             (0..expr.len()).for_each(|i| match &expr[i] {
                 Expr::Wildcard => {
-                    (0..input_schema.fields().len())
-                        .for_each(|i| expr_vec.push(Expr::Column(i).clone()));
+                    (0..input_schema.fields().len()).for_each(|i| expr_vec.push(Expr::Column(i)));
                 }
                 _ => expr_vec.push(expr[i].clone()),
             });
             expr_vec
         } else {
-            expr.clone()
+            expr
         };
 
         let schema = Schema::new(exprlist_to_fields(&projected_expr, input_schema)?);
@@ -355,7 +354,7 @@ impl DataFrame {
             LogicalPlan::Projection {
                 expr: projected_expr,
                 input: Box::new(self.plan.clone()),
-                schema: Box::new(schema.clone()),
+                schema: Box::new(schema),
             },
         );
 
@@ -445,7 +444,7 @@ impl DataFrame {
 
         // execute the query
         ctx.collect(physical_plan.as_ref())
-            .map_err(|e| BallistaError::DataFusionError(e))
+            .map_err(BallistaError::DataFusionError)
     }
 
     pub async fn collect(&self) -> Result<Vec<RecordBatch>> {
@@ -481,6 +480,7 @@ impl DataFrame {
         }
     }
 
+    #[allow(clippy::match_single_binding)]
     pub fn write_csv(&self, _path: &str) -> Result<()> {
         match &self.ctx_state.backend {
             other => Err(BallistaError::NotImplemented(format!(
@@ -490,6 +490,7 @@ impl DataFrame {
         }
     }
 
+    #[allow(clippy::match_single_binding)]
     pub fn write_parquet(&self, _path: &str) -> Result<()> {
         match &self.ctx_state.backend {
             other => Err(BallistaError::NotImplemented(format!(

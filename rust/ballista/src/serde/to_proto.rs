@@ -104,7 +104,7 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
                 let schema: protobuf::Schema = schema.as_ref().to_owned().try_into()?;
 
                 node.scan = Some(protobuf::ScanNode {
-                    path: path.clone(),
+                    path,
                     projection: projected_field_names,
                     schema: Some(schema),
                     has_header,
@@ -128,7 +128,7 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
                 let schema: protobuf::Schema = schema.as_ref().to_owned().try_into()?;
 
                 node.scan = Some(protobuf::ScanNode {
-                    path: path.clone(),
+                    path,
                     projection: projected_field_names,
                     schema: Some(schema),
                     has_header: false,
@@ -197,13 +197,13 @@ impl TryInto<protobuf::LogicalExprNode> for Expr {
             Expr::UnresolvedColumn(name) => {
                 let mut expr = empty_expr_node();
                 expr.has_column_name = true;
-                expr.column_name = name.clone();
+                expr.column_name = name;
                 Ok(expr)
             }
-            Expr::Literal(ScalarValue::Utf8(str)) => {
+            Expr::Literal(ScalarValue::Utf8(s)) => {
                 let mut expr = empty_expr_node();
                 expr.has_literal_string = true;
-                expr.literal_string = str.clone();
+                expr.literal_string = s;
                 Ok(expr)
             }
             Expr::BinaryExpr { left, op, right } => {

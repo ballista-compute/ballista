@@ -121,11 +121,9 @@ impl TryInto<Expr> for protobuf::LogicalExprNode {
                 self.literal_string.clone(),
             )))
         } else if self.has_literal_double {
-            Ok(Expr::Literal(ScalarValue::Float64(
-                self.literal_double.clone(),
-            )))
+            Ok(Expr::Literal(ScalarValue::Float64(self.literal_double)))
         } else if self.has_literal_long {
-            Ok(Expr::Literal(ScalarValue::Int64(self.literal_long.clone())))
+            Ok(Expr::Literal(ScalarValue::Int64(self.literal_long)))
         } else if let Some(aggregate_expr) = self.aggregate_expr {
             let name = match aggregate_expr.aggr_function {
                 0 => Ok("MIN"),

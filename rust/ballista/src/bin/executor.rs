@@ -40,7 +40,7 @@ struct Results {
     data: Vec<RecordBatch>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct FlightServiceImpl {
     results: Arc<Mutex<HashMap<String, Results>>>,
 }
@@ -71,8 +71,7 @@ impl FlightService for FlightServiceImpl {
     ) -> Result<Response<Self::DoGetStream>, Status> {
         let ticket = request.into_inner();
 
-        let action =
-            decode_protobuf(&ticket.ticket.to_vec()).map_err(|e| to_tonic_err(&e.into()))?;
+        let action = decode_protobuf(&ticket.ticket.to_vec()).map_err(|e| to_tonic_err(&e))?;
 
         println!("do_get: {:?}", action);
 
@@ -120,13 +119,13 @@ impl FlightService for FlightServiceImpl {
 
         let request = request.into_inner();
 
-        let action = decode_protobuf(&request.cmd.to_vec()).map_err(|e| to_tonic_err(&e.into()))?;
+        let action = decode_protobuf(&request.cmd.to_vec()).map_err(|e| to_tonic_err(&e))?;
 
         match &action {
             plan::Action::Collect { plan: logical_plan } => {
                 println!("Logical plan: {:?}", logical_plan);
 
-                let job = create_job(logical_plan).map_err(|e| to_tonic_err(&e.into()))?;
+                let job = create_job(logical_plan).map_err(|e| to_tonic_err(&e))?;
                 println!("Job: {:?}", job);
 
                 //TODO execute stages
@@ -189,7 +188,7 @@ impl FlightService for FlightServiceImpl {
         let action = request.into_inner();
         println!("do_action() type={}", action.r#type);
 
-        let action = decode_protobuf(&action.body.to_vec()).map_err(|e| to_tonic_err(&e.into()))?;
+        let action = decode_protobuf(&action.body.to_vec()).map_err(|e| to_tonic_err(&e))?;
 
         let results = execute_action(&action)?;
 

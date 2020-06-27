@@ -63,7 +63,7 @@ async fn local_mode_benchmark(path: &str, results_filename: &str, format: &str) 
     df.explain();
 
     let response = df.collect().await?;
-    pretty::print_batches(&response).map_err(|e| BallistaError::ArrowError(e))?;
+    pretty::print_batches(&response).map_err(BallistaError::ArrowError)?;
     let duration = start.elapsed().as_millis();
     println!("Local mode benchmark took {} ms", duration);
 

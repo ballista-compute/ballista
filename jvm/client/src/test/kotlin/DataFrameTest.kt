@@ -25,7 +25,7 @@ class DataFrameTest {
     @Test
     fun test() {
 
-        val df = DataFrameImpl(Scan("", CsvDataSource("", null, 0), listOf()))
+        val df = DataFrameImpl(Scan("", CsvDataSource("", null, true,0), listOf()))
 
         val df2 = df
             .filter(col("a") eq lit(123))

@@ -49,7 +49,7 @@ class SerdeTest {
 
     private fun csv(): DataFrame {
         val employeeCsv = "src/test/resources/employee.csv"
-        val csv = CsvDataSource(employeeCsv, null, 1024)
+        val csv = CsvDataSource(employeeCsv, null, true, 1024)
         println(csv.schema())
         return DataFrameImpl(Scan(employeeCsv, csv, listOf()))
     }

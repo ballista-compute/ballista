@@ -1,3 +1,5 @@
+import java.time.Instant
+
 plugins {
     java
     `java-library`
@@ -17,8 +19,8 @@ allprojects {
         mavenCentral()
         jcenter()
     }
-
 }
+
 subprojects {
     apply {
         plugin("org.jetbrains.kotlin.jvm")
@@ -60,6 +62,16 @@ subprojects {
     tasks.dokka {
         outputFormat = "html"
         outputDirectory = "$buildDir/javadoc"
+    }
+
+    tasks.jar {
+        manifest {
+            attributes(
+                "Implementation-Title" to "${rootProject.name}-${archiveBaseName.get()}",
+                "Implementation-Version" to rootProject.version,
+                "Build-Timestamp" to Instant.now()
+            )
+        }
     }
 
     val sourcesJar = tasks.create<Jar>("sourcesJar") {

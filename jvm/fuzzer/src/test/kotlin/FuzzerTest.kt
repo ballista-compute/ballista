@@ -29,7 +29,7 @@ class FuzzerTest {
 
     @Test
     fun `fuzzer example`() {
-        val csv = CsvDataSource(employeeCsv, null, 10)
+        val csv = CsvDataSource(employeeCsv, null, true,10)
         val input = DataFrameImpl(Scan("employee.csv", csv, listOf()))
         val fuzzer = Fuzzer()
 

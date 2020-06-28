@@ -1,3 +1,5 @@
+import java.time.Instant
+
 plugins {
     scala
     kotlin("jvm") version "1.3.50" apply false
@@ -45,6 +47,16 @@ subprojects {
 
         testImplementation("junit:junit:4.12")
 
+    }
+
+    tasks.jar {
+        manifest {
+            attributes(
+                "Implementation-Title" to "${rootProject.name}-${archiveBaseName.get()}",
+                "Implementation-Version" to rootProject.version,
+                "Build-Timestamp" to Instant.now()
+            )
+        }
     }
 }
 

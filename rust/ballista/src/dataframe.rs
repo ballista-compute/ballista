@@ -384,6 +384,18 @@ impl DataFrame {
         ))
     }
 
+    /// Apply a sort
+    pub fn sort(&self, expr: Vec<Expr>) -> Result<DataFrame> {
+        Ok(Self::from(
+            self.ctx_state.clone(),
+            LogicalPlan::Sort {
+                expr,
+                input: Box::new(self.plan.clone()),
+                schema: self.plan.schema().clone(),
+            },
+        ))
+    }
+
     /// Apply a limit
     pub fn limit(&self, n: usize) -> Result<DataFrame> {
         Ok(Self::from(

@@ -21,6 +21,9 @@ import org.apache.spark.sql.SparkSession
 object SparkExecutor {
 
   def main(arg: Array[String]): Unit = {
+    val name = SparkExecutor.getClass.getPackage.getImplementationTitle
+    val version = SparkExecutor.getClass.getPackage.getImplementationVersion
+    println(s"Starting $name $version")
 
     //TODO command-line params
     val master = "local[1]" // single-threaded for benchmarks against Rust/JVM executors

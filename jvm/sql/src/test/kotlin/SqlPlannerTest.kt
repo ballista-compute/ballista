@@ -118,7 +118,7 @@ class SqlPlannerTest {
         val parsedQuery = SqlParser(tokens).parse()
         println(parsedQuery)
 
-       val tables = mapOf("employee" to DataFrameImpl(Scan("", CsvDataSource(employeeCsv, null, 1024), listOf())))
+       val tables = mapOf("employee" to DataFrameImpl(Scan("", CsvDataSource(employeeCsv, null, true, 1024), listOf())))
 
         val df = SqlPlanner().createDataFrame(parsedQuery as SqlSelect, tables)
 

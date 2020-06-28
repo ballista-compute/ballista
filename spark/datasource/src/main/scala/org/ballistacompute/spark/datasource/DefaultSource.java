@@ -22,14 +22,17 @@ import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableProvider;
+import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.ArrowUtils;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
+import java.util.Map;
+
 public class DefaultSource implements TableProvider {
 
   @Override
-  public Table getTable(CaseInsensitiveStringMap options) {
+  public Table getTable(StructType schema, Transform[] partitioning, Map<String, String> options) {
 
     options.forEach( (k,v) -> System.out.println(k + "=" + v));
 
@@ -57,4 +60,8 @@ public class DefaultSource implements TableProvider {
     return new BallistaTable(new TableMeta(host, port, tableName, sparkSchema));
   }
 
+  @Override
+  public StructType inferSchema(CaseInsensitiveStringMap options) {
+    throw new UnsupportedOperationException("not implemented yet");
+  }
 }

@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  SONATYPE_USERNAME: not_needed
+  SONATYPE_PASSWORD: not_needed
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -20,4 +24,4 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x jvm/gradlew
       - name: Build and run Tests with Gradle
-        run: cd jvm && ./gradlew build
+        run: cd jvm && ./gradlew assemble

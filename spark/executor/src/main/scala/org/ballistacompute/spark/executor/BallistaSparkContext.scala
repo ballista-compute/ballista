@@ -15,7 +15,7 @@
 package org.ballistacompute.spark.executor
 
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.util.ArrowUtils
+import org.apache.spark.sql.util.{ArrowUtils, ArrowUtilsAccessor}
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import org.ballistacompute.{logical => ballista}
 
@@ -31,7 +31,7 @@ class BallistaSparkContext(spark: SparkSession) {
       case s: ballista.Scan =>
         assert(input.isEmpty)
 
-        val sparkSchema = ArrowUtils.fromArrowSchema(s.schema().toArrow())
+        val sparkSchema = ArrowUtilsAccessor.fromArrowSchema(s.schema().toArrow)
 
         val df = spark.read
           .format("csv")

@@ -86,7 +86,8 @@ class ExecutionTest {
         val batch = batches.first()
         val expected =
                 "CO,11500\n" +
-                "CA,12000\n"
+                "CA,12000\n" +
+                ",11500\n"
         assertEquals(expected
                 , batch.toCSV())
     }

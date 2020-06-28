@@ -5,7 +5,7 @@ plugins {
     `java-library`
     kotlin("jvm") version "1.3.50" apply false
     `maven-publish`
-    id("org.hibernate.build.maven-repo-auth") version "3.0.0"
+//    id("org.hibernate.build.maven-repo-auth") version "3.0.0"
     id("org.jetbrains.dokka") version "0.10.1"
     signing
 }

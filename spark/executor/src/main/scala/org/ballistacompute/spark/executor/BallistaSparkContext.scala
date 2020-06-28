@@ -24,7 +24,10 @@ import scala.collection.JavaConverters._
 class BallistaSparkContext(spark: SparkSession) {
 
   /** Translate Ballista logical plan step into a DataFrame transformation */
-  def createDataFrame(plan: ballista.LogicalPlan, input: Option[DataFrame]): DataFrame = {
+  def createDataFrame(
+      plan: ballista.LogicalPlan,
+      input: Option[DataFrame]
+  ): DataFrame = {
 
     plan match {
 
@@ -86,7 +89,9 @@ class BallistaSparkContext(spark: SparkSession) {
         }
 
       case other =>
-        throw new UnsupportedOperationException(s"Ballista logical plan step can not be converted to Spark: $other")
+        throw new UnsupportedOperationException(
+          s"Ballista logical plan step can not be converted to Spark: $other"
+        )
     }
 
   }
@@ -96,7 +101,7 @@ class BallistaSparkContext(spark: SparkSession) {
     expr match {
 
       case c: ballista.LiteralDouble => lit(c.getN)
-      case c: ballista.LiteralLong => lit(c.getN)
+      case c: ballista.LiteralLong   => lit(c.getN)
       case c: ballista.LiteralString => lit(c.getStr)
 
       case c: ballista.Column =>
@@ -107,28 +112,32 @@ class BallistaSparkContext(spark: SparkSession) {
         val r = createExpression(b.getR, input)
         b match {
 
-          case _: ballista.Add => l.plus(r)
+          case _: ballista.Add      => l.plus(r)
           case _: ballista.Subtract => l.minus(r)
           case _: ballista.Multiply => l.multiply(r)
-          case _: ballista.Divide => l.divide(r)
+          case _: ballista.Divide   => l.divide(r)
 
-          case _: ballista.Eq => l.equalTo(r)
-          case _: ballista.Neq => l.notEqual(r)
-          case _: ballista.Gt => l > r
+          case _: ballista.Eq   => l.equalTo(r)
+          case _: ballista.Neq  => l.notEqual(r)
+          case _: ballista.Gt   => l > r
           case _: ballista.GtEq => l >= r
-          case _: ballista.Lt => l < r
+          case _: ballista.Lt   => l < r
           case _: ballista.LtEq => l <= r
 
           case _: ballista.And => l.and(r)
-          case _: ballista.Or => l.or(r)
+          case _: ballista.Or  => l.or(r)
 
           case other =>
-            throw new UnsupportedOperationException(s"Ballista logical binary expression can not be converted to Spark: $other")
+            throw new UnsupportedOperationException(
+              s"Ballista logical binary expression can not be converted to Spark: $other"
+            )
         }
 
       case other =>
-          throw new UnsupportedOperationException(s"Ballista logical expression can not be converted to Spark: $other")
-      }
+        throw new UnsupportedOperationException(
+          s"Ballista logical expression can not be converted to Spark: $other"
+        )
+    }
   }
 
 }

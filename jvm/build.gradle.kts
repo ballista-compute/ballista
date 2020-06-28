@@ -12,6 +12,7 @@ plugins {
 
     id("org.jetbrains.dokka") version "0.10.1"
     signing
+    id("com.diffplug.gradle.spotless") version "4.4.0"
 }
 
 group = "org.ballistacompute"
@@ -31,6 +32,13 @@ subprojects {
         plugin("maven-publish")
         plugin("signing")
         plugin("org.jetbrains.dokka")
+        plugin("com.diffplug.gradle.spotless")
+    }
+
+    spotless {
+        kotlin {
+            ktfmt()
+        }
     }
 
     extra["isReleaseVersion"]  = !version.toString().endsWith("SNAPSHOT")
@@ -147,4 +155,5 @@ subprojects {
     }
 
 }
+
 

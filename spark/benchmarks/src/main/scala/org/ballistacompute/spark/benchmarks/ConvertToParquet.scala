@@ -27,8 +27,10 @@ object ConvertToParquet {
     for (year <- 2019 to 2019) {
       for (month <- 1 to 12) {
         val monthStr = "%02d".format(month)
-        val csvPath = s"/mnt/nyctaxi/csv/year=$year/yellow_tripdata_$year-$monthStr.csv"
-        val parquetPath = s"/mnt/nyctaxi/parquet/year=$year/month=$monthStr/yellow_tripdata_$year-$monthStr.parquet"
+        val csvPath =
+          s"/mnt/nyctaxi/csv/year=$year/yellow_tripdata_$year-$monthStr.csv"
+        val parquetPath =
+          s"/mnt/nyctaxi/parquet/year=$year/month=$monthStr/yellow_tripdata_$year-$monthStr.parquet"
         if (File(parquetPath).exists) {
           println(s"$parquetPath exists")
         } else {

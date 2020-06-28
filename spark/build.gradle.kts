@@ -3,6 +3,7 @@ import java.time.Instant
 plugins {
     scala
     kotlin("jvm") version "1.3.50" apply false
+    id("com.diffplug.gradle.spotless") version "4.4.0"
 }
 
 group = "org.ballistacompute.spark"
@@ -21,6 +22,13 @@ subprojects {
 
     apply {
         plugin("org.jetbrains.kotlin.jvm")
+        plugin("com.diffplug.gradle.spotless")
+    }
+
+    spotless {
+        scala {
+            scalafmt()
+        }
     }
 
     dependencies {

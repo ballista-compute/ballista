@@ -14,36 +14,37 @@
 
 package org.ballistacompute.executor
 
-import org.apache.arrow.memory.RootAllocator
 import org.apache.arrow.flight.FlightServer
 import org.apache.arrow.flight.Location
+import org.apache.arrow.memory.RootAllocator
 
 class Executor {
-    companion object {
-        @JvmStatic
-        fun main(args: Array<String>) {
-            val name = Executor::class.java.`package`.implementationTitle
-            val version = Executor::class.java.`package`.implementationVersion
-            println("Starting $name $version")
+  companion object {
+    @JvmStatic
+    fun main(args: Array<String>) {
+      val name = Executor::class.java.`package`.implementationTitle
+      val version = Executor::class.java.`package`.implementationVersion
+      println("Starting $name $version")
 
-            // https://issues.apache.org/jira/browse/ARROW-5412
-            System.setProperty( "io.netty.tryReflectionSetAccessible","true")
+      // https://issues.apache.org/jira/browse/ARROW-5412
+      System.setProperty("io.netty.tryReflectionSetAccessible", "true")
 
-            val bindHost = "0.0.0.0"
-            val port = 50051
+      val bindHost = "0.0.0.0"
+      val port = 50051
 
-            val server = FlightServer.builder(
-                    RootAllocator(Long.MAX_VALUE),
-                    Location.forGrpcInsecure(bindHost, port),
-                    BallistaFlightProducer())
-                    .build()
-            server.start()
+      val server =
+          FlightServer.builder(
+              RootAllocator(Long.MAX_VALUE),
+              Location.forGrpcInsecure(bindHost, port),
+              BallistaFlightProducer())
+              .build()
+      server.start()
 
-            println("Listening on $bindHost:$port")
+      println("Listening on $bindHost:$port")
 
-            while (true) {
-                Thread.sleep(1000)
-            }
-        }
+      while (true) {
+        Thread.sleep(1000)
+      }
     }
+  }
 }

@@ -31,19 +31,22 @@ object SparkExecutor {
     val port = 50051
 
     // https://issues.apache.org/jira/browse/ARROW-5412
-    System.setProperty( "io.netty.tryReflectionSetAccessible","true")
+    System.setProperty("io.netty.tryReflectionSetAccessible", "true")
 
-    val spark = SparkSession.builder()
+    val spark = SparkSession
+      .builder()
       .master(master)
       .getOrCreate()
 
     val flightProducer = new SparkFlightProducer(spark)
 
     // start Flight server
-    val server = FlightServer.builder(
-      new RootAllocator(Long.MaxValue),
-      Location.forGrpcInsecure(bindHost, port),
-      flightProducer)
+    val server = FlightServer
+      .builder(
+        new RootAllocator(Long.MaxValue),
+        Location.forGrpcInsecure(bindHost, port),
+        flightProducer
+      )
       .build()
 
     server.start()

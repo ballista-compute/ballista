@@ -14,37 +14,32 @@
 
 package org.ballistacompute.client
 
-import org.ballistacompute.logical.LogicalPlan
+import java.util.concurrent.TimeUnit
 import org.apache.arrow.flight.CallOptions
 import org.apache.arrow.flight.FlightClient
 import org.apache.arrow.flight.Location
 import org.apache.arrow.flight.Ticket
 import org.apache.arrow.memory.RootAllocator
+import org.ballistacompute.logical.LogicalPlan
 import org.ballistacompute.protobuf.ProtobufSerializer
 
-import java.util.concurrent.TimeUnit
-
-/**
- * Connection to a Ballista executor.
- */
+/** Connection to a Ballista executor. */
 class Client(val host: String, val port: Int) {
 
-    var client = FlightClient.builder()
-            .allocator(RootAllocator(Long.MAX_VALUE))
-            .location(Location.forGrpcInsecure(host, port))
-            .build()
+  var client =
+      FlightClient.builder()
+          .allocator(RootAllocator(Long.MAX_VALUE))
+          .location(Location.forGrpcInsecure(host, port))
+          .build()
 
-    var callOptions = CallOptions.timeout(600, TimeUnit.SECONDS)
+  var callOptions = CallOptions.timeout(600, TimeUnit.SECONDS)
 
-    fun execute(plan: LogicalPlan) {
+  fun execute(plan: LogicalPlan) {
 
-        val protoBuf = ProtobufSerializer().toProto(plan)
+    val protoBuf = ProtobufSerializer().toProto(plan)
 
-        var ticket = Ticket(protoBuf.toByteArray())
+    var ticket = Ticket(protoBuf.toByteArray())
 
-        var stream = client.getStream(ticket, callOptions)
-
-    }
-
-
+    var stream = client.getStream(ticket, callOptions)
+  }
 }

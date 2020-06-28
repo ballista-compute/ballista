@@ -15,8 +15,8 @@
 package org.ballistacompute.spark.benchmarks
 
 /**
- * This benchmark is designed to be called as a Docker container.
- */
+  * This benchmark is designed to be called as a Docker container.
+  */
 object Main {
 
   def main(args: Array[String]): Unit = {
@@ -27,13 +27,8 @@ object Main {
     val resultFile = sys.env("BENCH_RESULT_FILE")
     val iterations = sys.env("BENCH_ITERATIONS").toInt
 
-    Benchmarks.run(format,
-      path,
-      sql,
-      iterations,
-      resultFile)
+    Benchmarks.run(format, path, sql, iterations, resultFile)
 
   }
 
 }
-

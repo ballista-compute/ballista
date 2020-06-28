@@ -22,16 +22,14 @@ import org.junit.jupiter.api.TestInstance
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DataFrameTest {
 
-    @Test
-    fun test() {
+  @Test
+  fun test() {
 
-        val df = DataFrameImpl(Scan("", CsvDataSource("", null, true,0), listOf()))
+    val df = DataFrameImpl(Scan("", CsvDataSource("", null, true, 0), listOf()))
 
-        val df2 = df
-            .filter(col("a") eq lit(123))
-            .project(listOf(col("a"), col("b"), col("c")))
+    val df2 = df.filter(col("a") eq lit(123)).project(listOf(col("a"), col("b"), col("c")))
 
-        val client = Client("localhost", 50001)
-        client.execute(df2.logicalPlan())
-    }
+    val client = Client("localhost", 50001)
+    client.execute(df2.logicalPlan())
+  }
 }

@@ -14,149 +14,117 @@
 
 package org.ballistacompute.physical
 
+import kotlin.test.assertEquals
 import org.ballistacompute.datatypes.*
 import org.ballistacompute.fuzzer.Fuzzer
-
 import org.ballistacompute.physical.expressions.*
 import org.junit.Test
 import org.junit.jupiter.api.TestInstance
-import kotlin.test.assertEquals
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class BooleanExpressionTest {
-    
-    @Test
-    fun `gteq bytes`() {
 
-        val schema = Schema(listOf(
-                Field("a", ArrowTypes.Int8Type),
-                Field("b", ArrowTypes.Int8Type)
-        ))
+  @Test
+  fun `gteq bytes`() {
 
-        val a: List<Byte> = listOf(10, 20, 30, Byte.MIN_VALUE, Byte.MAX_VALUE)
-        val b: List<Byte> = listOf(10, 30, 20, Byte.MAX_VALUE, Byte.MIN_VALUE)
+    val schema = Schema(listOf(Field("a", ArrowTypes.Int8Type), Field("b", ArrowTypes.Int8Type)))
 
-        val batch = Fuzzer().createRecordBatch(schema, listOf(a,b))
+    val a: List<Byte> = listOf(10, 20, 30, Byte.MIN_VALUE, Byte.MAX_VALUE)
+    val b: List<Byte> = listOf(10, 30, 20, Byte.MAX_VALUE, Byte.MIN_VALUE)
 
-        val expr = GtEqExpression(ColumnExpression(0), ColumnExpression(1))
-        val result = expr.evaluate(batch)
+    val batch = Fuzzer().createRecordBatch(schema, listOf(a, b))
 
-        assertEquals(a.size, result.size())
-        (0 until result.size()).forEach {
-            assertEquals(a[it] >= b[it], result.getValue(it))
-        }
-    }
+    val expr = GtEqExpression(ColumnExpression(0), ColumnExpression(1))
+    val result = expr.evaluate(batch)
 
-    @Test
-    fun `gteq shorts`() {
+    assertEquals(a.size, result.size())
+    (0 until result.size()).forEach { assertEquals(a[it] >= b[it], result.getValue(it)) }
+  }
 
-        val schema = Schema(listOf(
-                Field("a", ArrowTypes.Int16Type),
-                Field("b", ArrowTypes.Int16Type)
-        ))
+  @Test
+  fun `gteq shorts`() {
 
-        val a: List<Short> = listOf(111, 222, 333, Short.MIN_VALUE, Short.MAX_VALUE)
-        val b: List<Short> = listOf(111, 333, 222, Short.MAX_VALUE, Short.MIN_VALUE)
+    val schema = Schema(listOf(Field("a", ArrowTypes.Int16Type), Field("b", ArrowTypes.Int16Type)))
 
-        val batch = Fuzzer().createRecordBatch(schema, listOf(a,b))
+    val a: List<Short> = listOf(111, 222, 333, Short.MIN_VALUE, Short.MAX_VALUE)
+    val b: List<Short> = listOf(111, 333, 222, Short.MAX_VALUE, Short.MIN_VALUE)
 
-        val expr = GtEqExpression(ColumnExpression(0), ColumnExpression(1))
-        val result = expr.evaluate(batch)
+    val batch = Fuzzer().createRecordBatch(schema, listOf(a, b))
 
-        assertEquals(a.size, result.size())
-        (0 until result.size()).forEach {
-            assertEquals(a[it] >= b[it], result.getValue(it))
-        }
-    }
+    val expr = GtEqExpression(ColumnExpression(0), ColumnExpression(1))
+    val result = expr.evaluate(batch)
 
-    @Test
-    fun `gteq ints`() {
+    assertEquals(a.size, result.size())
+    (0 until result.size()).forEach { assertEquals(a[it] >= b[it], result.getValue(it)) }
+  }
 
-        val schema = Schema(listOf(
-                Field("a", ArrowTypes.Int32Type),
-                Field("b", ArrowTypes.Int32Type)
-        ))
+  @Test
+  fun `gteq ints`() {
 
-        val a: List<Int> = listOf(111, 222, 333, Int.MIN_VALUE, Int.MAX_VALUE)
-        val b: List<Int> = listOf(111, 333, 222, Int.MAX_VALUE, Int.MIN_VALUE)
+    val schema = Schema(listOf(Field("a", ArrowTypes.Int32Type), Field("b", ArrowTypes.Int32Type)))
 
-        val batch = Fuzzer().createRecordBatch(schema, listOf(a,b))
+    val a: List<Int> = listOf(111, 222, 333, Int.MIN_VALUE, Int.MAX_VALUE)
+    val b: List<Int> = listOf(111, 333, 222, Int.MAX_VALUE, Int.MIN_VALUE)
 
-        val expr = GtEqExpression(ColumnExpression(0), ColumnExpression(1))
-        val result = expr.evaluate(batch)
+    val batch = Fuzzer().createRecordBatch(schema, listOf(a, b))
 
-        assertEquals(a.size, result.size())
-        (0 until result.size()).forEach {
-            assertEquals(a[it] >= b[it], result.getValue(it))
-        }
-    }
+    val expr = GtEqExpression(ColumnExpression(0), ColumnExpression(1))
+    val result = expr.evaluate(batch)
 
-    @Test
-    fun `gteq longs`() {
+    assertEquals(a.size, result.size())
+    (0 until result.size()).forEach { assertEquals(a[it] >= b[it], result.getValue(it)) }
+  }
 
-        val schema = Schema(listOf(
-                Field("a", ArrowTypes.Int64Type),
-                Field("b", ArrowTypes.Int64Type)
-        ))
+  @Test
+  fun `gteq longs`() {
 
-        val a: List<Long> = listOf(111, 222, 333, Long.MIN_VALUE, Long.MAX_VALUE)
-        val b: List<Long> = listOf(111, 333, 222, Long.MAX_VALUE, Long.MIN_VALUE)
+    val schema = Schema(listOf(Field("a", ArrowTypes.Int64Type), Field("b", ArrowTypes.Int64Type)))
 
-        val batch = Fuzzer().createRecordBatch(schema, listOf(a,b))
+    val a: List<Long> = listOf(111, 222, 333, Long.MIN_VALUE, Long.MAX_VALUE)
+    val b: List<Long> = listOf(111, 333, 222, Long.MAX_VALUE, Long.MIN_VALUE)
 
-        val expr = GtEqExpression(ColumnExpression(0), ColumnExpression(1))
-        val result = expr.evaluate(batch)
+    val batch = Fuzzer().createRecordBatch(schema, listOf(a, b))
 
-        assertEquals(a.size, result.size())
-        (0 until result.size()).forEach {
-            assertEquals(a[it] >= b[it], result.getValue(it))
-        }
-    }
+    val expr = GtEqExpression(ColumnExpression(0), ColumnExpression(1))
+    val result = expr.evaluate(batch)
 
-    @Test
-    fun `gteq doubles`() {
+    assertEquals(a.size, result.size())
+    (0 until result.size()).forEach { assertEquals(a[it] >= b[it], result.getValue(it)) }
+  }
 
-        val schema = Schema(listOf(
-                Field("a", ArrowTypes.DoubleType),
-                Field("b", ArrowTypes.DoubleType)
-        ))
+  @Test
+  fun `gteq doubles`() {
 
-        val a: List<Double> = listOf(0.0, 1.0, Double.MIN_VALUE, Double.MAX_VALUE, Double.NaN)
-        val b = a.reversed()
+    val schema =
+        Schema(listOf(Field("a", ArrowTypes.DoubleType), Field("b", ArrowTypes.DoubleType)))
 
-        val batch = Fuzzer().createRecordBatch(schema, listOf(a,b))
+    val a: List<Double> = listOf(0.0, 1.0, Double.MIN_VALUE, Double.MAX_VALUE, Double.NaN)
+    val b = a.reversed()
 
-        val expr = GtEqExpression(ColumnExpression(0), ColumnExpression(1))
-        val result = expr.evaluate(batch)
+    val batch = Fuzzer().createRecordBatch(schema, listOf(a, b))
 
-        assertEquals(a.size, result.size())
-        (0 until result.size()).forEach {
-            assertEquals(a[it] >= b[it], result.getValue(it))
-        }
-    }
+    val expr = GtEqExpression(ColumnExpression(0), ColumnExpression(1))
+    val result = expr.evaluate(batch)
 
-    @Test
-    fun `gteq strings`() {
+    assertEquals(a.size, result.size())
+    (0 until result.size()).forEach { assertEquals(a[it] >= b[it], result.getValue(it)) }
+  }
 
-        val schema = Schema(listOf(
-                Field("a", ArrowTypes.StringType),
-                Field("b", ArrowTypes.StringType)
-        ))
+  @Test
+  fun `gteq strings`() {
 
-        val a: List<String> = listOf("aaa", "bbb", "ccc")
-        val b: List<String> = listOf("aaa", "ccc", "bbb")
+    val schema =
+        Schema(listOf(Field("a", ArrowTypes.StringType), Field("b", ArrowTypes.StringType)))
 
-        val batch = Fuzzer().createRecordBatch(schema, listOf(a,b))
+    val a: List<String> = listOf("aaa", "bbb", "ccc")
+    val b: List<String> = listOf("aaa", "ccc", "bbb")
 
-        val expr = GtEqExpression(ColumnExpression(0), ColumnExpression(1))
-        val result = expr.evaluate(batch)
+    val batch = Fuzzer().createRecordBatch(schema, listOf(a, b))
 
-        assertEquals(a.size, result.size())
-        (0 until result.size()).forEach {
-            assertEquals(a[it] >= b[it], result.getValue(it))
-        }
-    }
+    val expr = GtEqExpression(ColumnExpression(0), ColumnExpression(1))
+    val result = expr.evaluate(batch)
 
-
-
+    assertEquals(a.size, result.size())
+    (0 until result.size()).forEach { assertEquals(a[it] >= b[it], result.getValue(it)) }
+  }
 }

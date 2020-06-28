@@ -26,6 +26,6 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x jvm/gradlew
       - name: Build and run JVM tests with Gradle
-        run: cd jvm && ./gradlew assemble
+        run: cd jvm && ./gradlew clean assemble publishToMavenLocal
       - name: Build and run Spark tests with Gradle
-        run: cd spark && ./gradlew assemble
+        run: cd spark && ./gradlew clean assemble

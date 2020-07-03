@@ -29,6 +29,7 @@ use crate::datafusion::logicalplan::ScalarValue;
 use crate::error::Result;
 use crate::execution::hash_aggregate::HashAggregateExec;
 
+use crate::execution::shuffle_exchange::ShuffleExchangeExec;
 use futures::stream::BoxStream;
 
 /// Stream of columnar batches using futures
@@ -91,8 +92,8 @@ pub enum PhysicalPlanNode {
     HashAggregate(Rc<HashAggregateExec>),
     // /// Performs a hash join of two child relations by first shuffling the data using the join keys.
     // ShuffledHashJoin(ShuffledHashJoinPlan),
-    // /// Performs a shuffle that will result in the desired partitioning.
-    // ShuffleExchange(ShuffleExchangePlan),
+    /// Performs a shuffle that will result in the desired partitioning.
+    ShuffleExchange(Rc<ShuffleExchangeExec>),
     // /// Scans a partitioned data source
     // FileScan(FileScanPlan),
 }

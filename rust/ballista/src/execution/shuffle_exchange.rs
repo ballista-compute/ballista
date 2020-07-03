@@ -17,11 +17,11 @@ use std::rc::Rc;
 use crate::error::Result;
 use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan};
 
-struct ShuffleExchange {
+pub struct ShuffleExchangeExec {
     child: Rc<dyn ExecutionPlan>,
 }
 
-impl ExecutionPlan for ShuffleExchange {
+impl ExecutionPlan for ShuffleExchangeExec {
     fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
         let _input = self.child.execute(partition_index)?;
 

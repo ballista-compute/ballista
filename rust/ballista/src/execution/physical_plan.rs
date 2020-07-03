@@ -52,8 +52,7 @@ pub trait ExecutionPlan {
     }
 
     /// Runs this query against one partition returning a stream of columnar batches
-    fn execute(&self) -> Result<ColumnarBatchStream>;
-
+    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream>;
 }
 
 pub trait Expression {
@@ -64,7 +63,7 @@ pub trait Expression {
 /// Batch of columnar data.
 #[allow(dead_code)]
 pub struct ColumnarBatch {
-    columns: Vec<ColumnarValue>
+    columns: Vec<ColumnarValue>,
 }
 
 /// A columnar value can either be a scalar value or an Arrow array.
@@ -188,6 +187,3 @@ pub enum Partitioning {
 //     sort_order: Vec<SortOrder>,
 //     child: Box<PhysicalPlanNode>,
 // }
-
-
-

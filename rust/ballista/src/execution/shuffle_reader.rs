@@ -12,7 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod hash_aggregate;
-pub mod physical_plan;
-pub mod shuffle_exchange;
-pub mod shuffle_reader;
+use crate::error::Result;
+use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan};
+use uuid::Uuid;
+
+struct ShuffleReader {
+    partitions: Vec<ShufflePartition>,
+}
+
+#[allow(dead_code)]
+struct ShufflePartition {
+    executor_uuid: Uuid,
+    partition_uuid: Vec<Uuid>,
+}
+
+impl ExecutionPlan for ShuffleReader {
+    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+        let _part = &self.partitions[partition_index];
+
+        // TODO send Flight request to the executor asking for the partition(s)
+
+        unimplemented!()
+    }
+}

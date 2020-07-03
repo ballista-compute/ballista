@@ -20,6 +20,7 @@
 use crate::arrow::datatypes::Schema;
 use crate::arrow::record_batch::RecordBatch;
 use crate::datafusion::logicalplan::LogicalPlan;
+use crate::error::Result;
 use crate::physical_plan::{Partitioning, SortOrder};
 
 /// Base trait for all operators
@@ -33,11 +34,11 @@ pub trait ExecutionPlan {
     /// Runs this query returning a stream of colymnar batches
     fn execute(&self); //TODO decide on return type to represent stream of record batches
     /// Runs this query returning the full results
-    fn execute_collect(&self) -> Vec<ColumnarBatch>;
+    fn execute_collect(&self) -> Result<Vec<ColumnarBatch>>;
     /// Runs this query returning the first `n` rows
-    fn execute_take(&self, n: usize) -> Vec<ColumnarBatch>;
+    fn execute_take(&self, n: usize) -> Result<Vec<ColumnarBatch>>;
     /// Runs this query returning the last `n` rows
-    fn execute_tail(&self, n: usize) -> Vec<ColumnarBatch>;
+    fn execute_tail(&self, n: usize) -> Result<Vec<ColumnarBatch>>;
     /// Returns the children of this operator
     fn children(&self) -> Vec<Box<dyn ExecutionPlan>>;
 }

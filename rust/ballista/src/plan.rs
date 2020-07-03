@@ -15,6 +15,7 @@
 //! Ballista Physical Plan (Experimental)
 
 use crate::arrow::datatypes::Schema;
+use crate::arrow::record_batch::RecordBatch;
 use crate::datafusion::logicalplan::LogicalPlan;
 
 #[derive(Debug, Clone)]
@@ -27,23 +28,23 @@ pub enum Action {
 #[derive(Debug, Clone)]
 pub enum PhysicalPlan {
     /// Projection.
-    Project(ProjectExec),
+    Project(ProjectPlan),
     /// Filter a.k.a predicate.
-    Filter(FilterExec),
+    Filter(FilterPlan),
     /// Take the first `limit` elements of the child's single output partition.
-    GlobalLimit(GlobalLimitExec),
+    GlobalLimit(GlobalLimitPlan),
     /// Limit to be applied to each partition.
-    LocalLimit(LocalLimitExec),
+    LocalLimit(LocalLimitPlan),
     /// Sort on one or more sorting expressions.
-    Sort(SortExec),
+    Sort(SortPlan),
     /// Hash aggregate
-    HashAggregate(HashAggregateExec),
+    HashAggregate(HashAggregatePlan),
     /// Performs a hash join of two child relations by first shuffling the data using the join keys.
-    ShuffledHashJoin(ShuffledHashJoinExec),
+    ShuffledHashJoin(ShuffledHashJoinPlan),
     /// Performs a shuffle that will result in the desired partitioning.
-    ShuffleExchange(ShuffleExchangeExec),
+    ShuffleExchange(ShuffleExchangePlan),
     /// Scans a partitioned data source
-    FileScan(FileScanExec),
+    FileScan(FileScanPlan),
 }
 
 #[derive(Debug, Clone)]
@@ -76,31 +77,31 @@ pub enum Partitioning {
 }
 
 #[derive(Debug, Clone)]
-pub struct ProjectExec {
+pub struct ProjectPlan {
     child: Box<PhysicalPlan>,
     projection: Vec<Expression>,
 }
 
 #[derive(Debug, Clone)]
-pub struct FilterExec {
+pub struct FilterPlan {
     child: Box<PhysicalPlan>,
     filter: Box<Expression>,
 }
 
 #[derive(Debug, Clone)]
-pub struct GlobalLimitExec {
+pub struct GlobalLimitPlan {
     child: Box<PhysicalPlan>,
     limit: usize,
 }
 
 #[derive(Debug, Clone)]
-pub struct LocalLimitExec {
+pub struct LocalLimitPlan {
     child: Box<PhysicalPlan>,
     limit: usize,
 }
 
 #[derive(Debug, Clone)]
-pub struct FileScanExec {
+pub struct FileScanPlan {
     projection: Option<Vec<usize>>,
     partition_filters: Option<Vec<Expression>>,
     data_filters: Option<Vec<Expression>>,
@@ -108,13 +109,13 @@ pub struct FileScanExec {
 }
 
 #[derive(Debug, Clone)]
-pub struct ShuffleExchangeExec {
+pub struct ShuffleExchangePlan {
     child: Box<PhysicalPlan>,
     output_partitioning: Partitioning,
 }
 
 #[derive(Debug, Clone)]
-pub struct ShuffledHashJoinExec {
+pub struct ShuffledHashJoinPlan {
     left_keys: Vec<Expression>,
     right_keys: Vec<Expression>,
     build_side: BuildSide,
@@ -131,13 +132,13 @@ pub struct SortOrder {
 }
 
 #[derive(Debug, Clone)]
-pub struct SortExec {
+pub struct SortPlan {
     sort_order: Vec<SortOrder>,
     child: Box<PhysicalPlan>,
 }
 
 #[derive(Debug, Clone)]
-pub struct HashAggregateExec {
+pub struct HashAggregatePlan {
     group_expr: Vec<Expression>,
     aggr_expr: Vec<Expression>,
     child: Box<PhysicalPlan>,
@@ -147,4 +148,50 @@ pub struct HashAggregateExec {
 #[derive(Debug, Clone)]
 pub enum Expression {
     Column(usize),
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Execution (interpreted) below this point
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct ColumnarBatch {
+    /// we just wrap Arrow RecordBatch for now, but this may change later so that we can
+    /// support scalar values as well as columnar results
+    record_batch: RecordBatch,
+}
+
+pub trait ExecutionPlan {
+    /// Specifies how data is partitioned across different nodes in the cluster
+    fn output_partitioning(&self) -> Partitioning;
+    /// Specifies how data is ordered in each partition
+    fn output_ordering(&self) -> Vec<SortOrder>;
+    /// Specifies the data distribution requirements of all the children for this operator
+    fn required_child_ordering(&self) -> Vec<Vec<SortOrder>>;
+    /// Runs this query returning a stream of colymnar batches
+    fn execute(&self); //TODO decide on return type to represent stream of record batches
+    /// Runs this query returning the full results
+    fn execute_collect(&self) -> Vec<ColumnarBatch>;
+    /// Runs this query returning the first `n` rows
+    fn execute_take(&self, n: usize) -> Vec<ColumnarBatch>;
+    /// Runs this query returning the last `n` rows
+    fn execute_tail(&self, n: usize) -> Vec<ColumnarBatch>;
+    /// Returns the children of this operator
+    fn children(&self) -> Vec<Box<dyn ExecutionPlan>>;
+}
+
+pub trait UnaryExec: ExecutionPlan {
+    fn child(&self) -> Box<dyn ExecutionPlan>;
+
+    fn children(&self) -> Vec<Box<dyn ExecutionPlan>> {
+        vec![self.child()]
+    }
+}
+
+pub trait BinaryExec: ExecutionPlan {
+    fn left(&self) -> Box<dyn ExecutionPlan>;
+    fn right(&self) -> Box<dyn ExecutionPlan>;
+
+    fn children(&self) -> Vec<Box<dyn ExecutionPlan>> {
+        vec![self.left(), self.right()]
+    }
 }

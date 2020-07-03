@@ -25,7 +25,7 @@
 use crate::arrow::datatypes::Schema;
 
 #[derive(Debug, Clone)]
-pub enum PhysicalPlan {
+pub enum PhysicalPlanNode {
     /// Projection.
     Project(ProjectPlan),
     /// Filter a.k.a predicate.
@@ -77,25 +77,25 @@ pub enum Partitioning {
 
 #[derive(Debug, Clone)]
 pub struct ProjectPlan {
-    child: Box<PhysicalPlan>,
+    child: Box<PhysicalPlanNode>,
     projection: Vec<Expression>,
 }
 
 #[derive(Debug, Clone)]
 pub struct FilterPlan {
-    child: Box<PhysicalPlan>,
+    child: Box<PhysicalPlanNode>,
     filter: Box<Expression>,
 }
 
 #[derive(Debug, Clone)]
 pub struct GlobalLimitPlan {
-    child: Box<PhysicalPlan>,
+    child: Box<PhysicalPlanNode>,
     limit: usize,
 }
 
 #[derive(Debug, Clone)]
 pub struct LocalLimitPlan {
-    child: Box<PhysicalPlan>,
+    child: Box<PhysicalPlanNode>,
     limit: usize,
 }
 
@@ -109,7 +109,7 @@ pub struct FileScanPlan {
 
 #[derive(Debug, Clone)]
 pub struct ShuffleExchangePlan {
-    child: Box<PhysicalPlan>,
+    child: Box<PhysicalPlanNode>,
     output_partitioning: Partitioning,
 }
 
@@ -119,8 +119,8 @@ pub struct ShuffledHashJoinPlan {
     right_keys: Vec<Expression>,
     build_side: BuildSide,
     join_type: JoinType,
-    left: Box<PhysicalPlan>,
-    right: Box<PhysicalPlan>,
+    left: Box<PhysicalPlanNode>,
+    right: Box<PhysicalPlanNode>,
 }
 
 #[derive(Debug, Clone)]
@@ -133,14 +133,14 @@ pub struct SortOrder {
 #[derive(Debug, Clone)]
 pub struct SortPlan {
     sort_order: Vec<SortOrder>,
-    child: Box<PhysicalPlan>,
+    child: Box<PhysicalPlanNode>,
 }
 
 #[derive(Debug, Clone)]
 pub struct HashAggregatePlan {
     group_expr: Vec<Expression>,
     aggr_expr: Vec<Expression>,
-    child: Box<PhysicalPlan>,
+    child: Box<PhysicalPlanNode>,
 }
 
 /// Physical expression

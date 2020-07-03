@@ -12,26 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Ballista is a proof-of-concept distributed compute platform based on Kubernetes and Apache Arrow.
+//! Ballista Logical Plan
 
-pub use arrow;
-pub use datafusion;
-pub use sqlparser;
+use crate::datafusion::logicalplan::LogicalPlan;
 
-// include the generated protobuf source as a submodule
-#[allow(clippy::all)]
-pub mod protobuf {
-    include!(concat!(env!("OUT_DIR"), "/ballista.protobuf.rs"));
+/// Action that can be sent to an executor
+#[derive(Debug, Clone)]
+pub enum Action {
+    /// Execute the query and return the results
+    Collect { plan: LogicalPlan },
+    /// Execute the query and write the results to CSV
+    WriteCsv { plan: LogicalPlan, path: String },
+    /// Execute the query and write the results to Parquet
+    WriteParquet { plan: LogicalPlan, path: String },
 }
-
-pub const BALLISTA_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-pub mod client;
-pub mod cluster;
-pub mod dataframe;
-pub mod error;
-pub mod logical_plan;
-pub mod physical_plan;
-pub mod scheduler;
-pub mod serde;
-pub mod utils;

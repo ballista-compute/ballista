@@ -20,7 +20,7 @@ use ballista::arrow::ipc;
 use ballista::datafusion::execution::context::ExecutionContext;
 use ballista::serde::decode_protobuf;
 
-use ballista::{plan, BALLISTA_VERSION};
+use ballista::{physical_plan, BALLISTA_VERSION};
 
 use arrow::record_batch::RecordBatch;
 use ballista::scheduler::create_job;
@@ -122,7 +122,7 @@ impl FlightService for FlightServiceImpl {
         let action = decode_protobuf(&request.cmd.to_vec()).map_err(|e| to_tonic_err(&e))?;
 
         match &action {
-            plan::Action::Collect { plan: logical_plan } => {
+            physical_plan::Action::Collect { plan: logical_plan } => {
                 println!("Logical plan: {:?}", logical_plan);
 
                 let job = create_job(logical_plan).map_err(|e| to_tonic_err(&e))?;
@@ -240,9 +240,9 @@ fn schema_to_bytes(schema: &Schema) -> Vec<u8> {
     data.to_vec()
 }
 
-fn execute_action(action: &plan::Action) -> Result<Results, Status> {
+fn execute_action(action: &physical_plan::Action) -> Result<Results, Status> {
     match &action {
-        plan::Action::Collect { plan: logical_plan } => {
+        physical_plan::Action::Collect { plan: logical_plan } => {
             println!("Logical plan: {:?}", logical_plan);
 
             // create local execution context

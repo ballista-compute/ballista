@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::error::BallistaError;
-use crate::plan::Action;
+use crate::physical_plan::Action;
 use crate::protobuf;
 
 use prost::Message;
@@ -37,7 +37,7 @@ mod tests {
     use crate::datafusion::execution::physical_plan::csv::CsvReadOptions;
     use crate::datafusion::logicalplan::{col, lit_str, Expr, LogicalPlanBuilder};
     use crate::error::Result;
-    use crate::plan::*;
+    use crate::physical_plan::*;
     use crate::protobuf;
     use std::convert::TryInto;
 

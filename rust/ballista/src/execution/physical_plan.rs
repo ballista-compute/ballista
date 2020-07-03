@@ -22,130 +22,172 @@
 //!
 //! The physical plan also accounts for partitioning and ordering of data between operators.
 
-use crate::arrow::datatypes::Schema;
+use std::rc::Rc;
 
-#[derive(Debug, Clone)]
-pub enum PhysicalPlanNode {
-    /// Projection.
-    Project(ProjectPlan),
-    /// Filter a.k.a predicate.
-    Filter(FilterPlan),
-    /// Take the first `limit` elements of the child's single output partition.
-    GlobalLimit(GlobalLimitPlan),
-    /// Limit to be applied to each partition.
-    LocalLimit(LocalLimitPlan),
-    /// Sort on one or more sorting expressions.
-    Sort(SortPlan),
-    /// Hash aggregate
-    HashAggregate(HashAggregatePlan),
-    /// Performs a hash join of two child relations by first shuffling the data using the join keys.
-    ShuffledHashJoin(ShuffledHashJoinPlan),
-    /// Performs a shuffle that will result in the desired partitioning.
-    ShuffleExchange(ShuffleExchangePlan),
-    /// Scans a partitioned data source
-    FileScan(FileScanPlan),
+use crate::arrow::array::ArrayRef;
+use crate::datafusion::logicalplan::ScalarValue;
+use crate::error::Result;
+use crate::execution::hash_aggregate::HashAggregateExec;
+
+use futures::stream::BoxStream;
+
+/// Stream of columnar batches using futures
+pub type ColumnarBatchStream = BoxStream<'static, ColumnarBatch>;
+
+/// Base trait for all operators
+pub trait ExecutionPlan {
+    /// Specifies how data is partitioned across different nodes in the cluster
+    fn output_partitioning(&self) -> Partitioning {
+        Partitioning::UnknownPartitioning(0)
+    }
+
+    /// Specifies how data is ordered in each partition
+    fn output_ordering(&self) -> Option<Vec<SortOrder>> {
+        None
+    }
+
+    /// Specifies the data distribution requirements of all the children for this operator
+    fn required_child_ordering(&self) -> Option<Vec<Vec<SortOrder>>> {
+        None
+    }
+
+    /// Runs this query against one partition returning a stream of columnar batches
+    fn execute(&self) -> Result<ColumnarBatchStream>;
+
 }
 
-#[derive(Debug, Clone)]
+pub trait Expression {
+    /// Evaluate an expression against a ColumnarBatch to produce a scalar or columnar result.
+    fn evaluate(&self, input: &ColumnarBatch);
+}
+
+/// Batch of columnar data.
+#[allow(dead_code)]
+pub struct ColumnarBatch {
+    columns: Vec<ColumnarValue>
+}
+
+/// A columnar value can either be a scalar value or an Arrow array.
+#[allow(dead_code)]
+pub enum ColumnarValue {
+    Scalar(ScalarValue),
+    Columnar(ArrayRef),
+}
+
+/// Enumeration wrapping physical plan structs so that they can be represented in a tree easily
+/// and processed using pattern matching
+#[derive(Clone)]
+pub enum PhysicalPlanNode {
+    // /// Projection.
+    // Project(ProjectPlan),
+    // /// Filter a.k.a predicate.
+    // Filter(FilterPlan),
+    // /// Take the first `limit` elements of the child's single output partition.
+    // GlobalLimit(GlobalLimitPlan),
+    // /// Limit to be applied to each partition.
+    // LocalLimit(LocalLimitPlan),
+    // /// Sort on one or more sorting expressions.
+    // Sort(SortPlan),
+    /// Hash aggregate
+    HashAggregate(Rc<HashAggregateExec>),
+    // /// Performs a hash join of two child relations by first shuffling the data using the join keys.
+    // ShuffledHashJoin(ShuffledHashJoinPlan),
+    // /// Performs a shuffle that will result in the desired partitioning.
+    // ShuffleExchange(ShuffleExchangePlan),
+    // /// Scans a partitioned data source
+    // FileScan(FileScanPlan),
+}
+
+#[derive(Clone)]
 pub enum JoinType {
     Inner,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum BuildSide {
     BuildLeft,
     BuildRight,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum SortDirection {
     Ascending,
     Descending,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
+pub struct SortOrder {
+    child: Rc<dyn Expression>,
+    direction: SortDirection,
+    null_ordering: NullOrdering,
+}
+
+#[derive(Clone)]
 pub enum NullOrdering {
     NullsFirst,
     NullsLast,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Partitioning {
     UnknownPartitioning(usize),
-    HashPartitioning(usize, Vec<Expression>),
+    HashPartitioning(usize, Vec<Rc<dyn Expression>>),
 }
 
-#[derive(Debug, Clone)]
-pub struct ProjectPlan {
-    child: Box<PhysicalPlanNode>,
-    projection: Vec<Expression>,
-}
+// #[derive(Clone)]
+// pub struct ProjectPlan {
+//     child: Box<PhysicalPlanNode>,
+//     projection: Vec<Expression>,
+// }
+//
+// #[derive(Clone)]
+// pub struct FilterPlan {
+//     child: Box<PhysicalPlanNode>,
+//     filter: Box<Expression>,
+// }
+//
+// #[derive(Clone)]
+// pub struct GlobalLimitPlan {
+//     child: Box<PhysicalPlanNode>,
+//     limit: usize,
+// }
+//
+// #[derive(Clone)]
+// pub struct LocalLimitPlan {
+//     child: Box<PhysicalPlanNode>,
+//     limit: usize,
+// }
+//
+// #[derive(Clone)]
+// pub struct FileScanPlan {
+//     projection: Option<Vec<usize>>,
+//     partition_filters: Option<Vec<Expression>>,
+//     data_filters: Option<Vec<Expression>>,
+//     output_schema: Box<Schema>,
+// }
+//
+// #[derive(Clone)]
+// pub struct ShuffleExchangePlan {
+//     child: Box<PhysicalPlanNode>,
+//     output_partitioning: Partitioning,
+// }
+//
+// #[derive(Clone)]
+// pub struct ShuffledHashJoinPlan {
+//     left_keys: Vec<Expression>,
+//     right_keys: Vec<Expression>,
+//     build_side: BuildSide,
+//     join_type: JoinType,
+//     left: Box<PhysicalPlanNode>,
+//     right: Box<PhysicalPlanNode>,
+// // }
 
-#[derive(Debug, Clone)]
-pub struct FilterPlan {
-    child: Box<PhysicalPlanNode>,
-    filter: Box<Expression>,
-}
+//
+// #[derive(Clone)]
+// pub struct SortPlan {
+//     sort_order: Vec<SortOrder>,
+//     child: Box<PhysicalPlanNode>,
+// }
 
-#[derive(Debug, Clone)]
-pub struct GlobalLimitPlan {
-    child: Box<PhysicalPlanNode>,
-    limit: usize,
-}
 
-#[derive(Debug, Clone)]
-pub struct LocalLimitPlan {
-    child: Box<PhysicalPlanNode>,
-    limit: usize,
-}
 
-#[derive(Debug, Clone)]
-pub struct FileScanPlan {
-    projection: Option<Vec<usize>>,
-    partition_filters: Option<Vec<Expression>>,
-    data_filters: Option<Vec<Expression>>,
-    output_schema: Box<Schema>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ShuffleExchangePlan {
-    child: Box<PhysicalPlanNode>,
-    output_partitioning: Partitioning,
-}
-
-#[derive(Debug, Clone)]
-pub struct ShuffledHashJoinPlan {
-    left_keys: Vec<Expression>,
-    right_keys: Vec<Expression>,
-    build_side: BuildSide,
-    join_type: JoinType,
-    left: Box<PhysicalPlanNode>,
-    right: Box<PhysicalPlanNode>,
-}
-
-#[derive(Debug, Clone)]
-pub struct SortOrder {
-    child: Box<Expression>,
-    direction: SortDirection,
-    null_ordering: NullOrdering,
-}
-
-#[derive(Debug, Clone)]
-pub struct SortPlan {
-    sort_order: Vec<SortOrder>,
-    child: Box<PhysicalPlanNode>,
-}
-
-#[derive(Debug, Clone)]
-pub struct HashAggregatePlan {
-    group_expr: Vec<Expression>,
-    aggr_expr: Vec<Expression>,
-    child: Box<PhysicalPlanNode>,
-}
-
-/// Physical expression
-#[derive(Debug, Clone)]
-pub enum Expression {
-    Column(usize),
-    //TODO: add all the expressions here or possibly re-use the expressions from the logical plan
-}

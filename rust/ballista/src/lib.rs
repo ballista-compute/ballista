@@ -30,6 +30,7 @@ pub mod client;
 pub mod cluster;
 pub mod dataframe;
 pub mod error;
+pub mod execution_plan;
 pub mod logical_plan;
 pub mod physical_plan;
 pub mod scheduler;

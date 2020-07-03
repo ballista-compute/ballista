@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::error::BallistaError;
-use crate::physical_plan::Action;
+use crate::logical_plan::Action;
 use crate::protobuf;
 
 use crate::datafusion::logicalplan::{Expr, LogicalPlan, ScalarValue};

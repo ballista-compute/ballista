@@ -30,7 +30,7 @@ use crate::datafusion::optimizer::utils::exprlist_to_fields;
 use crate::datafusion::sql::parser::{DFASTNode, DFParser};
 use crate::datafusion::sql::planner::{SchemaProvider, SqlToRel};
 use crate::error::{BallistaError, Result};
-use crate::physical_plan::Action;
+use crate::logical_plan::Action;
 
 pub const CSV_BATCH_SIZE: &str = "ballista.csv.batchSize";
 

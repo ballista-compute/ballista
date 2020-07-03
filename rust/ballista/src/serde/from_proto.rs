@@ -21,7 +21,7 @@ use crate::datafusion::logicalplan::{
 };
 
 use crate::error::{ballista_error, BallistaError};
-use crate::physical_plan::Action;
+use crate::logical_plan::Action;
 use crate::protobuf;
 
 impl TryInto<LogicalPlan> for protobuf::LogicalPlanNode {

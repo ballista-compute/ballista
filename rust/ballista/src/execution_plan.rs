@@ -17,9 +17,7 @@
 //! The execution plan is (will be) generated from the physical plan and there may be multiple
 //! implementations for these traits e.g. interpreted versus code-generated and CPU vs GPU.
 
-use crate::arrow::datatypes::Schema;
 use crate::arrow::record_batch::RecordBatch;
-use crate::datafusion::logicalplan::LogicalPlan;
 use crate::error::Result;
 use crate::physical_plan::{Partitioning, SortOrder};
 
@@ -60,7 +58,8 @@ pub trait BinaryExec: ExecutionPlan {
     }
 }
 
-/// Batch of columnar data
+/// Batch of columnar data. Just a wrapper around Arrow's RecordBatch for now but may change later.
+#[allow(dead_code)]
 pub struct ColumnarBatch {
     record_batch: RecordBatch,
 }

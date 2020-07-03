@@ -38,7 +38,6 @@ mod tests {
     use crate::datafusion::logicalplan::{col, lit_str, Expr, LogicalPlanBuilder};
     use crate::error::Result;
     use crate::logical_plan::Action;
-    use crate::physical_plan::*;
     use crate::protobuf;
     use std::convert::TryInto;
 

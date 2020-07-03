@@ -23,8 +23,6 @@
 //! The physical plan also accounts for partitioning and ordering of data between operators.
 
 use crate::arrow::datatypes::Schema;
-use crate::arrow::record_batch::RecordBatch;
-use crate::datafusion::logicalplan::LogicalPlan;
 
 #[derive(Debug, Clone)]
 pub enum PhysicalPlan {

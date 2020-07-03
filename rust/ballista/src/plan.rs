@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Ballista Physical Plan (Experimental)
+
 use crate::arrow::datatypes::Schema;
 use crate::datafusion::logicalplan::LogicalPlan;
 
@@ -25,13 +27,13 @@ pub enum Action {
 #[derive(Debug, Clone)]
 pub enum PhysicalPlan {
     /// Projection.
-    Project,
+    Project(ProjectExec),
     /// Filter a.k.a predicate.
-    Filter(Expression),
+    Filter(FilterExec),
     /// Take the first `limit` elements of the child's single output partition.
-    GlobalLimit,
+    GlobalLimit(GlobalLimitExec),
     /// Limit to be applied to each partition.
-    LocalLimit,
+    LocalLimit(LocalLimitExec),
     /// Sort on one or more sorting expressions.
     Sort(SortExec),
     /// Hash aggregate
@@ -71,6 +73,30 @@ pub enum NullOrdering {
 pub enum Partitioning {
     UnknownPartitioning(usize),
     HashPartitioning(usize, Vec<Expression>),
+}
+
+#[derive(Debug, Clone)]
+pub struct ProjectExec {
+    child: Box<PhysicalPlan>,
+    projection: Vec<Expression>,
+}
+
+#[derive(Debug, Clone)]
+pub struct FilterExec {
+    child: Box<PhysicalPlan>,
+    filter: Box<Expression>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GlobalLimitExec {
+    child: Box<PhysicalPlan>,
+    limit: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct LocalLimitExec {
+    child: Box<PhysicalPlan>,
+    limit: usize,
 }
 
 #[derive(Debug, Clone)]

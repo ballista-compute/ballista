@@ -6,6 +6,10 @@ option java_multiple_files = true;
 option java_package = "org.ballistacompute.protobuf";
 option java_outer_classname = "BallistaProto";
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Ballista Actions
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 message Action {
 
   // interactive query
@@ -14,6 +18,10 @@ message Action {
   //TODO: write_csv, write_parquet, repartition, etc
 
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Ballista Logical Plan
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // logical expressions
 message LogicalExprNode {
@@ -99,6 +107,62 @@ message AggregateNode {
 message LimitNode {
   uint32 limit = 1;
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Ballista Physical Plan
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+// PhysicalPlanNode is a nested type
+message PhysicalPlanNode {
+
+  PhysicalPlanNode input = 1;
+
+  ScanExecNode scan = 10;
+  ProjectionExecNode projection = 20;
+  SelectionExecNode selection = 21;
+  GlobalLimitExecNode global_limit = 22;
+  LocalLimitExecNode local_limit = 23;
+  HashAggregateExecNode hash_aggregate = 30;
+  ShuffleExecNode shuffle = 40;
+}
+
+message ScanExecNode {
+  string path = 1;
+  repeated string projection = 2;
+  Schema schema = 3;
+  string file_format = 4; // parquet or csv
+  bool has_header = 5; // csv specific
+}
+
+message ProjectionExecNode {
+  repeated LogicalExprNode expr = 1;
+}
+
+message SelectionExecNode {
+  LogicalExprNode expr = 2;
+}
+
+message HashAggregateExecNode {
+  repeated LogicalExprNode group_expr = 1;
+  repeated LogicalExprNode aggr_expr = 2;
+}
+
+message ShuffleExecNode {
+
+}
+
+message GlobalLimitExecNode {
+  uint32 limit = 1;
+}
+
+message LocalLimitExecNode {
+  uint32 limit = 1;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Arrow Data Types
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 message Schema {
   repeated Field columns = 1;

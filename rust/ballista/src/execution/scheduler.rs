@@ -14,32 +14,41 @@
 
 use crate::datafusion::logicalplan::LogicalPlan;
 use crate::error::{BallistaError, Result};
-use crate::execution::physical_plan::{PhysicalPlan, AggregateMode, Partitioning, Distribution};
+use crate::execution::physical_plan::{AggregateMode, Distribution, Partitioning, PhysicalPlan};
 use crate::execution::projection::ProjectionExec;
 
-use std::rc::Rc;
 use crate::execution::hash_aggregate::HashAggregateExec;
 use crate::execution::shuffle_exchange::ShuffleExchangeExec;
+use std::rc::Rc;
 
 pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Rc<PhysicalPlan>> {
     match plan {
-        LogicalPlan::Projection { input, expr, .. } => {
+        LogicalPlan::Projection { input, .. } => {
             let exec = ProjectionExec::new(create_physical_plan(input)?);
             Ok(Rc::new(PhysicalPlan::Projection(exec)))
-        },
+        }
         LogicalPlan::Aggregate { input, .. } => {
             let input = create_physical_plan(input)?;
-            if input.as_execution_plan().output_partitioning().partition_count() == 1 {
-
-                Ok(Rc::new(PhysicalPlan::HashAggregate(Rc::new(HashAggregateExec::new(AggregateMode::Final, input)))))
+            if input
+                .as_execution_plan()
+                .output_partitioning()
+                .partition_count()
+                == 1
+            {
+                Ok(Rc::new(PhysicalPlan::HashAggregate(Rc::new(
+                    HashAggregateExec::new(AggregateMode::Final, input),
+                ))))
             } else {
-                let partial = Rc::new(PhysicalPlan::HashAggregate(Rc::new(HashAggregateExec::new(AggregateMode::Partial, input))));
-                Ok(Rc::new(PhysicalPlan::HashAggregate(Rc::new(HashAggregateExec::new(AggregateMode::Final, partial)))))
+                let partial = Rc::new(PhysicalPlan::HashAggregate(Rc::new(
+                    HashAggregateExec::new(AggregateMode::Partial, input),
+                )));
+                Ok(Rc::new(PhysicalPlan::HashAggregate(Rc::new(
+                    HashAggregateExec::new(AggregateMode::Final, partial),
+                ))))
             }
         }
-        _ => Err(BallistaError::General("unsupported".to_string()))
+        _ => Err(BallistaError::General("unsupported".to_string())),
     }
-
 }
 
 /// Optimizer rule to insert shuffles as needed
@@ -47,30 +56,39 @@ pub fn ensure_requirements(plan: Rc<PhysicalPlan>) -> Result<Rc<PhysicalPlan>> {
     let execution_plan = plan.as_execution_plan();
 
     // recurse down and replace children
-    if (execution_plan.children().is_empty()) {
-        return Ok(plan)
+    if execution_plan.children().is_empty() {
+        return Ok(plan);
     }
-    let children: Vec<Rc<PhysicalPlan>> = execution_plan.children().iter()
+    let children: Vec<Rc<PhysicalPlan>> = execution_plan
+        .children()
+        .iter()
         .map(|c| ensure_requirements(c.clone()))
         .collect::<Result<Vec<_>>>()?;
 
     match execution_plan.required_child_distribution() {
         Distribution::SinglePartition => {
-            let new_children: Vec<Rc<PhysicalPlan>> = children.iter().map(|c| {
-                if c.as_execution_plan().output_partitioning().partition_count() > 1 {
-                    Rc::new(PhysicalPlan::ShuffleExchange(Rc::new(ShuffleExchangeExec::new(
-                        c.clone(), Partitioning::UnknownPartitioning(1)
-                    ))))
-                } else {
-                    plan.clone()
-                }
-            }).collect();
+            let new_children: Vec<Rc<PhysicalPlan>> = children
+                .iter()
+                .map(|c| {
+                    if c.as_execution_plan()
+                        .output_partitioning()
+                        .partition_count()
+                        > 1
+                    {
+                        Rc::new(PhysicalPlan::ShuffleExchange(Rc::new(
+                            ShuffleExchangeExec::new(
+                                c.clone(),
+                                Partitioning::UnknownPartitioning(1),
+                            ),
+                        )))
+                    } else {
+                        plan.clone()
+                    }
+                })
+                .collect();
 
-            //TODO replace
-            Ok(plan.clone())
+            Ok(Rc::new(plan.with_new_children(new_children)))
         }
-        other => Ok(plan.clone())
+        _ => Ok(plan.clone()),
     }
-
-
 }

@@ -15,37 +15,35 @@
 use std::fs::File;
 use std::pin::Pin;
 use std::rc::Rc;
-use std::sync::Arc;
 use std::thread;
 
 use crate::error::{BallistaError, Result};
-use crate::execution::physical_plan::{ColumnarBatch, ExecutionPlan, Partitioning, ColumnarBatchStream};
+use crate::execution::physical_plan::{
+    ColumnarBatch, ColumnarBatchStream, ExecutionPlan, Partitioning,
+};
 
 use crate::arrow::datatypes::Schema;
 use crate::arrow::record_batch::RecordBatchReader;
-use crate::datafusion::error::ExecutionError;
 use crate::parquet::arrow::arrow_reader::ArrowReader;
 use crate::parquet::arrow::ParquetFileArrowReader;
 use crate::parquet::file::reader::SerializedFileReader;
 
 use crossbeam::channel::{unbounded, Receiver, Sender};
-use futures::stream::BoxStream;
 use futures::task::{Context, Poll};
-use tokio::stream::{Stream, StreamExt};
+use tokio::stream::Stream;
 
 #[derive(Debug, Clone)]
 pub struct ParquetScanExec {
     paths: Vec<String>,
-    projection: Option<Vec<usize>>
+    projection: Option<Vec<usize>>,
 }
 
 impl ExecutionPlan for ParquetScanExec {
-
     fn output_partitioning(&self) -> Partitioning {
         Partitioning::UnknownPartitioning(self.paths.len())
     }
 
-    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+    fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
         unimplemented!()
     }
 }
@@ -56,6 +54,7 @@ struct ParquetStream {
     response_rx: Receiver<Result<Option<ColumnarBatch>>>,
 }
 
+#[allow(dead_code)]
 impl ParquetStream {
     pub fn try_new(filename: &str, projection: Option<Vec<usize>>) -> Result<Self> {
         let file = File::open(filename)?;

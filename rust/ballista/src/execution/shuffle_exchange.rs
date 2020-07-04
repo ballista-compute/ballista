@@ -14,9 +14,10 @@
 
 use std::rc::Rc;
 
-use crate::datafusion::logicalplan::Expr;
 use crate::error::Result;
-use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan, Expression, PhysicalPlan, Partitioning};
+use crate::execution::physical_plan::{
+    ColumnarBatchStream, ExecutionPlan, Partitioning, PhysicalPlan,
+};
 
 #[derive(Debug, Clone)]
 pub struct ShuffleExchangeExec {
@@ -28,13 +29,13 @@ impl ShuffleExchangeExec {
     pub fn new(child: Rc<PhysicalPlan>, output_partitioning: Partitioning) -> Self {
         Self {
             child,
-            output_partitioning
+            output_partitioning,
         }
     }
 }
 
 impl ExecutionPlan for ShuffleExchangeExec {
-    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+    fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
         //let stream = self.child.execute(partition_index)?;
         // Ok(Box::pin(stream.map(move |batch| {
         //     //TODO perform shuffle here

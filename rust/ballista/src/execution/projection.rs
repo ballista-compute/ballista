@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::error::{BallistaError, Result};
-use crate::execution::physical_plan::{ColumnarBatch, ExecutionPlan, Partitioning, ColumnarBatchStream, PhysicalPlan};
+use crate::error::Result;
+use crate::execution::physical_plan::{
+    ColumnarBatchStream, ExecutionPlan, Partitioning, PhysicalPlan,
+};
 use std::rc::Rc;
 
 #[derive(Debug, Clone)]
@@ -28,7 +30,6 @@ impl ProjectionExec {
 }
 
 impl ExecutionPlan for ProjectionExec {
-
     fn children(&self) -> Vec<Rc<PhysicalPlan>> {
         vec![self.child.clone()]
     }
@@ -37,7 +38,7 @@ impl ExecutionPlan for ProjectionExec {
         self.child.as_execution_plan().output_partitioning()
     }
 
-    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+    fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
         unimplemented!()
     }
 }

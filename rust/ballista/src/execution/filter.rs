@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::error::{BallistaError, Result};
-use crate::execution::physical_plan::{ColumnarBatch, ExecutionPlan, Partitioning, ColumnarBatchStream, PhysicalPlan};
+use crate::error::Result;
+use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan, PhysicalPlan};
 use std::rc::Rc;
 
 #[derive(Debug, Clone)]
@@ -22,12 +22,11 @@ pub struct FilterExec {
 }
 
 impl ExecutionPlan for FilterExec {
-
     fn children(&self) -> Vec<Rc<PhysicalPlan>> {
         vec![self.child.clone()]
     }
 
-    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+    fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
         unimplemented!()
     }
 }

@@ -22,6 +22,7 @@ use ballista::serde::decode_protobuf;
 use ballista::{logical_plan, BALLISTA_VERSION};
 
 use arrow::record_batch::RecordBatch;
+use ballista::execution::scheduler::{create_physical_plan, ensure_requirements};
 use flight::{
     flight_service_server::FlightService, flight_service_server::FlightServiceServer, Action,
     ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo, HandshakeRequest,
@@ -31,7 +32,6 @@ use futures::{Stream, StreamExt};
 use std::collections::HashMap;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status, Streaming};
-use ballista::execution::scheduler::create_physical_plan;
 
 struct Results {
     schema: Schema,
@@ -124,32 +124,34 @@ impl FlightService for FlightServiceImpl {
                 println!("Logical plan: {:?}", logical_plan);
 
                 let plan = create_physical_plan(&logical_plan).map_err(|e| to_tonic_err(&e))?;
+                println!("Physical plan: {:?}", plan);
 
-
+                let plan = ensure_requirements(plan.clone()).map_err(|e| to_tonic_err(&e))?;
+                println!("Optimized physical plan: {:?}", plan);
 
                 Err(Status::invalid_argument("not implemented yet"))
 
-            //     let job = create_job(logical_plan).map_err(|e| to_tonic_err(&e))?;
-            //     println!("Job: {:?}", job);
-            //
-            //     //TODO execute stages
-            //
-            //     let uuid = "tbd";
-            //
-            //     match self.results.lock().unwrap().get(uuid) {
-            //         Some(results) => {
-            //             let schema_bytes = schema_to_bytes(&results.schema);
-            //
-            //             Ok(Response::new(FlightInfo {
-            //                 schema: schema_bytes,
-            //                 endpoint: vec![],
-            //                 flight_descriptor: None,
-            //                 total_bytes: -1,
-            //                 total_records: -1,
-            //             }))
-            //         }
-            //         _ => Err(Status::not_found("Invalid uuid")),
-            //     }
+                //     let job = create_job(logical_plan).map_err(|e| to_tonic_err(&e))?;
+                //     println!("Job: {:?}", job);
+                //
+                //     //TODO execute stages
+                //
+                //     let uuid = "tbd";
+                //
+                //     match self.results.lock().unwrap().get(uuid) {
+                //         Some(results) => {
+                //             let schema_bytes = schema_to_bytes(&results.schema);
+                //
+                //             Ok(Response::new(FlightInfo {
+                //                 schema: schema_bytes,
+                //                 endpoint: vec![],
+                //                 flight_descriptor: None,
+                //                 total_bytes: -1,
+                //                 total_records: -1,
+                //             }))
+                //         }
+                //         _ => Err(Status::not_found("Invalid uuid")),
+                //     }
             }
             _ => Err(Status::invalid_argument("Invalid action")),
         }

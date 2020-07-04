@@ -32,12 +32,12 @@ use crate::error::Result;
 use crate::execution::hash_aggregate::HashAggregateExec;
 use crate::execution::shuffle_exchange::ShuffleExchangeExec;
 
-use futures::stream::BoxStream;
-use crate::execution::projection::ProjectionExec;
-use crate::execution::filter::FilterExec;
-use crate::execution::shuffled_hash_join::ShuffledHashJoinExec;
-use crate::execution::parquet_scan::ParquetScanExec;
 use crate::datafusion::logicalplan::Expr;
+use crate::execution::filter::FilterExec;
+use crate::execution::parquet_scan::ParquetScanExec;
+use crate::execution::projection::ProjectionExec;
+use crate::execution::shuffled_hash_join::ShuffledHashJoinExec;
+use futures::stream::BoxStream;
 
 /// Stream of columnar batches using futures
 pub type ColumnarBatchStream = BoxStream<'static, ColumnarBatch>;
@@ -71,7 +71,7 @@ pub trait ExecutionPlan {
     }
 
     /// Runs this query against one partition returning a stream of columnar batches
-    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream>;
+    fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream>;
 }
 
 pub trait Expression {
@@ -87,7 +87,7 @@ pub struct ColumnarBatch {
 }
 
 impl ColumnarBatch {
-    pub fn from_arrow(batch: &RecordBatch) -> Self {
+    pub fn from_arrow(_batch: &RecordBatch) -> Self {
         //TODO implement
         Self { columns: vec![] }
     }
@@ -123,9 +123,17 @@ impl PhysicalPlan {
     pub fn as_execution_plan(&self) -> Rc<dyn ExecutionPlan> {
         match self {
             Self::Projection(exec) => Rc::new(exec.clone()),
-            _ => unimplemented!()
+            _ => unimplemented!(),
         }
+    }
 
+    pub fn with_new_children(&self, new_children: Vec<Rc<PhysicalPlan>>) -> PhysicalPlan {
+        match self {
+            Self::HashAggregate(exec) => {
+                Self::HashAggregate(Rc::new(exec.with_new_children(new_children)))
+            }
+            _ => unimplemented!(),
+        }
     }
 }
 
@@ -136,13 +144,13 @@ pub enum Distribution {
     BroadcastDistribution,
     ClusteredDistribution {
         required_num_partitions: usize,
-        clustering: Vec<Expr>
+        clustering: Vec<Expr>,
     },
     HashClusteredDistribution {
         required_num_partitions: usize,
-        clustering: Vec<Expr>
+        clustering: Vec<Expr>,
     },
-    OrderedDistribution(Vec<SortOrder>)
+    OrderedDistribution(Vec<SortOrder>),
 }
 
 #[derive(Debug, Clone)]
@@ -192,7 +200,7 @@ impl Partitioning {
         use Partitioning::*;
         match self {
             UnknownPartitioning(n) => *n,
-            HashPartitioning(n, _) => *n
+            HashPartitioning(n, _) => *n,
         }
     }
 }

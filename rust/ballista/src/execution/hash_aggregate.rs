@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::error::Result;
 use crate::datafusion::logicalplan::Expr;
-use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan, Expression, PhysicalPlan, AggregateMode, Partitioning, SortOrder, Distribution};
+use crate::error::Result;
+use crate::execution::physical_plan::{
+    AggregateMode, ColumnarBatchStream, Distribution, ExecutionPlan, Partitioning, PhysicalPlan,
+};
 use std::rc::Rc;
 
 #[allow(dead_code)]
@@ -32,24 +34,33 @@ impl HashAggregateExec {
             mode,
             group_expr: vec![],
             aggr_expr: vec![],
-            child
+            child,
+        }
+    }
+
+    pub fn with_new_children(&self, new_children: Vec<Rc<PhysicalPlan>>) -> HashAggregateExec {
+        assert!(new_children.len() == 1);
+        HashAggregateExec {
+            mode: self.mode.clone(),
+            group_expr: self.group_expr.clone(),
+            aggr_expr: self.aggr_expr.clone(),
+            child: new_children[0].clone(),
         }
     }
 }
 
 impl ExecutionPlan for HashAggregateExec {
-
     fn output_partitioning(&self) -> Partitioning {
         match self.mode {
             AggregateMode::Partial => self.child.as_execution_plan().output_partitioning(),
-            AggregateMode::Final => Partitioning::UnknownPartitioning(1)
+            AggregateMode::Final => Partitioning::UnknownPartitioning(1),
         }
     }
 
     fn required_child_distribution(&self) -> Distribution {
         match self.mode {
             AggregateMode::Partial => Distribution::UnspecifiedDistribution,
-            AggregateMode::Final => Distribution::SinglePartition
+            AggregateMode::Final => Distribution::SinglePartition,
         }
     }
 
@@ -57,7 +68,7 @@ impl ExecutionPlan for HashAggregateExec {
         vec![self.child.clone()]
     }
 
-    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+    fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
         //let _input = self.child.execute(partition_index)?;
 
         unimplemented!()

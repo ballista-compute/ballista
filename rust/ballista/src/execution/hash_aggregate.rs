@@ -13,19 +13,21 @@
 // limitations under the License.
 
 use crate::error::Result;
-use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan, Expression};
+use crate::datafusion::logicalplan::Expr;
+use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan, Expression, PhysicalPlan};
 use std::rc::Rc;
 
 #[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub struct HashAggregateExec {
-    group_expr: Vec<Rc<dyn Expression>>,
-    aggr_expr: Vec<Rc<dyn Expression>>,
-    child: Box<Rc<dyn ExecutionPlan>>,
+    group_expr: Vec<Expr>,
+    aggr_expr: Vec<Expr>,
+    child: Box<Rc<PhysicalPlan>>,
 }
 
 impl ExecutionPlan for HashAggregateExec {
     fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
-        let _input = self.child.execute(partition_index)?;
+        //let _input = self.child.execute(partition_index)?;
 
         unimplemented!()
     }

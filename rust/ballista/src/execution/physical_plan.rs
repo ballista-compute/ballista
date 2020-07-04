@@ -87,8 +87,8 @@ pub enum ColumnarValue {
 
 /// Enumeration wrapping physical plan structs so that they can be represented in a tree easily
 /// and processed using pattern matching
-#[derive(Clone)]
-pub enum PhysicalPlanNode {
+#[derive(Debug, Clone)]
+pub enum PhysicalPlan {
     // /// Projection.
     // Project(ProjectPlan),
     // /// Filter a.k.a predicate.

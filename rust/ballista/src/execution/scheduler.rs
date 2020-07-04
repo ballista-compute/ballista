@@ -121,9 +121,9 @@ pub fn ensure_requirements(plan: &PhysicalPlan) -> Result<Rc<PhysicalPlan>> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::dataframe::{col, sum, Context};
-    use std::collections::HashMap;
+    // use super::*;
+    // use crate::dataframe::{col, sum, Context};
+    // use std::collections::HashMap;
     //use crate::arrow::datatypes::{Schema, Field, DataType};
 
     // #[test]

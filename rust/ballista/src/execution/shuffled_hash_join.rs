@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod hash_aggregate;
-pub mod parquet_scan;
-pub mod projection;
-pub mod filter;
-pub mod physical_plan;
-pub mod shuffle_exchange;
-pub mod shuffle_reader;
-pub mod shuffled_hash_join;
+
+use std::rc::Rc;
+
+use crate::error::{BallistaError, Result};
+use crate::execution::physical_plan::{ColumnarBatch, ExecutionPlan, Partitioning, ColumnarBatchStream, PhysicalPlan};
+
+#[derive(Debug, Clone)]
+pub struct ShuffledHashJoinExec {
+    left: Rc<PhysicalPlan>,
+    right: Rc<PhysicalPlan>,
+}

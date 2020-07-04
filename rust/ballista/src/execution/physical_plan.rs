@@ -29,10 +29,15 @@ use crate::arrow::array::ArrayRef;
 use crate::arrow::record_batch::RecordBatch;
 use crate::datafusion::logicalplan::ScalarValue;
 use crate::error::Result;
-
 use crate::execution::hash_aggregate::HashAggregateExec;
 use crate::execution::shuffle_exchange::ShuffleExchangeExec;
+
 use futures::stream::BoxStream;
+use crate::execution::projection::ProjectionExec;
+use crate::execution::filter::FilterExec;
+use crate::execution::shuffled_hash_join::ShuffledHashJoinExec;
+use crate::execution::parquet_scan::ParquetScanExec;
+use crate::datafusion::logicalplan::Expr;
 
 /// Stream of columnar batches using futures
 pub type ColumnarBatchStream = BoxStream<'static, ColumnarBatch>;
@@ -89,60 +94,54 @@ pub enum ColumnarValue {
 /// and processed using pattern matching
 #[derive(Debug, Clone)]
 pub enum PhysicalPlan {
-    // /// Projection.
-    // Project(ProjectPlan),
-    // /// Filter a.k.a predicate.
-    // Filter(FilterPlan),
-    // /// Take the first `limit` elements of the child's single output partition.
-    // GlobalLimit(GlobalLimitPlan),
-    // /// Limit to be applied to each partition.
-    // LocalLimit(LocalLimitPlan),
-    // /// Sort on one or more sorting expressions.
-    // Sort(SortPlan),
+    /// Projection.
+    Projection(ProjectionExec),
+    /// Filter a.k.a predicate.
+    Filter(FilterExec),
     /// Hash aggregate
     HashAggregate(Rc<HashAggregateExec>),
-    // /// Performs a hash join of two child relations by first shuffling the data using the join keys.
-    // ShuffledHashJoin(ShuffledHashJoinPlan),
+    /// Performs a hash join of two child relations by first shuffling the data using the join keys.
+    ShuffledHashJoin(ShuffledHashJoinExec),
     /// Performs a shuffle that will result in the desired partitioning.
     ShuffleExchange(Rc<ShuffleExchangeExec>),
-    // /// Scans a partitioned data source
-    // FileScan(FileScanPlan),
+    /// Scans a partitioned data source
+    ParquetScan(ParquetScanExec),
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum JoinType {
     Inner,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum BuildSide {
     BuildLeft,
     BuildRight,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum SortDirection {
     Ascending,
     Descending,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SortOrder {
-    child: Rc<dyn Expression>,
+    child: Rc<Expr>,
     direction: SortDirection,
     null_ordering: NullOrdering,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum NullOrdering {
     NullsFirst,
     NullsLast,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum Partitioning {
     UnknownPartitioning(usize),
-    HashPartitioning(usize, Vec<Rc<dyn Expression>>),
+    HashPartitioning(usize, Vec<Rc<Expr>>),
 }
 
 // #[derive(Clone)]

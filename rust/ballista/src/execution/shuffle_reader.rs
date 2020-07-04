@@ -16,17 +16,19 @@ use crate::error::Result;
 use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan};
 use uuid::Uuid;
 
-struct ShuffleReader {
+#[derive(Debug, Clone)]
+struct ShuffleReaderExec {
     partitions: Vec<ShufflePartition>,
 }
 
 #[allow(dead_code)]
+#[derive(Debug, Clone)]
 struct ShufflePartition {
     executor_uuid: Uuid,
     partition_uuid: Vec<Uuid>,
 }
 
-impl ExecutionPlan for ShuffleReader {
+impl ExecutionPlan for ShuffleReaderExec {
     fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
         let _part = &self.partitions[partition_index];
 

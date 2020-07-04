@@ -19,7 +19,7 @@ use std::sync::Arc;
 use std::thread;
 
 use crate::error::{BallistaError, Result};
-use crate::execution::physical_plan::ColumnarBatch;
+use crate::execution::physical_plan::{ColumnarBatch, ExecutionPlan, Partitioning, ColumnarBatchStream};
 
 use crate::arrow::datatypes::Schema;
 use crate::arrow::record_batch::RecordBatchReader;
@@ -32,6 +32,23 @@ use crossbeam::channel::{unbounded, Receiver, Sender};
 use futures::stream::BoxStream;
 use futures::task::{Context, Poll};
 use tokio::stream::{Stream, StreamExt};
+
+#[derive(Debug, Clone)]
+pub struct ParquetScanExec {
+    paths: Vec<String>,
+    projection: Option<Vec<usize>>
+}
+
+impl ExecutionPlan for ParquetScanExec {
+
+    fn output_partitioning(&self) -> Partitioning {
+        Partitioning::UnknownPartitioning(self.paths.len())
+    }
+
+    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+        unimplemented!()
+    }
+}
 
 struct ParquetStream {
     // schema: Arc<Schema>,

@@ -12,26 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Ballista is a proof-of-concept distributed compute platform based on Kubernetes and Apache Arrow.
+pub trait Context {
+    fn submit_job(&self);
 
-pub use arrow;
-pub use datafusion;
-pub use parquet;
-pub use sqlparser;
-
-// include the generated protobuf source as a submodule
-#[allow(clippy::all)]
-pub mod protobuf {
-    include!(concat!(env!("OUT_DIR"), "/ballista.protobuf.rs"));
+    fn submit_map_stage(&self);
 }
-
-pub const BALLISTA_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-pub mod client;
-pub mod cluster;
-pub mod dataframe;
-pub mod error;
-pub mod execution;
-pub mod logical_plan;
-pub mod serde;
-pub mod utils;

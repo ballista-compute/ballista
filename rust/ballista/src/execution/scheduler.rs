@@ -21,7 +21,7 @@ use crate::datafusion::logicalplan::LogicalPlan;
 
 use crate::error::Result;
 
-use crate::scheduler::PhysicalPlan::HashAggregate;
+use crate::execution::scheduler::PhysicalPlan::HashAggregate;
 use std::collections::HashMap;
 use uuid::Uuid;
 

@@ -23,7 +23,7 @@ use ballista::serde::decode_protobuf;
 use ballista::{logical_plan, BALLISTA_VERSION};
 
 use arrow::record_batch::RecordBatch;
-use ballista::scheduler::create_job;
+use ballista::execution::scheduler::create_job;
 use flatbuffers::FlatBufferBuilder;
 use flight::{
     flight_service_server::FlightService, flight_service_server::FlightServiceServer, Action,

@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub mod context;
 pub mod hash_aggregate;
+pub mod parquet_scan;
 pub mod physical_plan;
+pub mod scheduler;
 pub mod shuffle_exchange;
 pub mod shuffle_reader;

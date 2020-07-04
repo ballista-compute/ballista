@@ -23,12 +23,14 @@
 //! The physical plan also accounts for partitioning and ordering of data between operators.
 
 use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::arrow::array::ArrayRef;
+use crate::arrow::record_batch::RecordBatch;
 use crate::datafusion::logicalplan::ScalarValue;
 use crate::error::Result;
-use crate::execution::hash_aggregate::HashAggregateExec;
 
+use crate::execution::hash_aggregate::HashAggregateExec;
 use crate::execution::shuffle_exchange::ShuffleExchangeExec;
 use futures::stream::BoxStream;
 
@@ -63,12 +65,21 @@ pub trait Expression {
 
 /// Batch of columnar data.
 #[allow(dead_code)]
+#[derive(Clone)]
 pub struct ColumnarBatch {
-    columns: Vec<ColumnarValue>,
+    columns: Vec<Arc<ColumnarValue>>,
+}
+
+impl ColumnarBatch {
+    pub fn from_arrow(batch: &RecordBatch) -> Self {
+        //TODO implement
+        Self { columns: vec![] }
+    }
 }
 
 /// A columnar value can either be a scalar value or an Arrow array.
 #[allow(dead_code)]
+#[derive(Clone)]
 pub enum ColumnarValue {
     Scalar(ScalarValue),
     Columnar(ArrayRef),

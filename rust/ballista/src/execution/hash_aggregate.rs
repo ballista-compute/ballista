@@ -22,18 +22,23 @@ use std::rc::Rc;
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct HashAggregateExec {
-    mode: AggregateMode,
-    group_expr: Vec<Expr>,
-    aggr_expr: Vec<Expr>,
-    child: Rc<PhysicalPlan>,
+    pub(crate) mode: AggregateMode,
+    pub(crate) group_expr: Vec<Expr>,
+    pub(crate) aggr_expr: Vec<Expr>,
+    pub(crate) child: Rc<PhysicalPlan>,
 }
 
 impl HashAggregateExec {
-    pub fn new(mode: AggregateMode, child: Rc<PhysicalPlan>) -> Self {
+    pub fn new(
+        mode: AggregateMode,
+        group_expr: Vec<Expr>,
+        aggr_expr: Vec<Expr>,
+        child: Rc<PhysicalPlan>,
+    ) -> Self {
         Self {
             mode,
-            group_expr: vec![],
-            aggr_expr: vec![],
+            group_expr,
+            aggr_expr,
             child,
         }
     }

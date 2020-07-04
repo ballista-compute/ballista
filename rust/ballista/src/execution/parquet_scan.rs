@@ -24,6 +24,7 @@ use crate::execution::physical_plan::{
 
 use crate::arrow::datatypes::Schema;
 use crate::arrow::record_batch::RecordBatchReader;
+use crate::datafusion::execution::physical_plan::common;
 use crate::parquet::arrow::arrow_reader::ArrowReader;
 use crate::parquet::arrow::ParquetFileArrowReader;
 use crate::parquet::file::reader::SerializedFileReader;
@@ -36,13 +37,28 @@ type MaybeColumnarBatch = Result<Option<ColumnarBatch>>;
 
 #[derive(Debug, Clone)]
 pub struct ParquetScanExec {
-    paths: Vec<String>,
+    pub(crate) path: String,
+    filenames: Vec<String>,
     projection: Option<Vec<usize>>,
+}
+
+impl ParquetScanExec {
+    pub fn try_new(path: &str, projection: Option<Vec<usize>>) -> Result<Self> {
+        let mut filenames: Vec<String> = vec![];
+        common::build_file_list(path, &mut filenames, ".parquet")?;
+        Ok(Self {
+            path: path.to_owned(),
+            filenames,
+            projection,
+        })
+    }
 }
 
 impl ExecutionPlan for ParquetScanExec {
     fn output_partitioning(&self) -> Partitioning {
-        Partitioning::UnknownPartitioning(self.paths.len())
+        // note that this one partition per file which is crude and later we should support
+        // splitting files into partitions as well
+        Partitioning::UnknownPartitioning(self.filenames.len())
     }
 
     fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {

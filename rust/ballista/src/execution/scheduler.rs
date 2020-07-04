@@ -18,6 +18,7 @@ use crate::execution::physical_plan::{AggregateMode, Distribution, Partitioning,
 use crate::execution::projection::ProjectionExec;
 
 use crate::execution::hash_aggregate::HashAggregateExec;
+use crate::execution::parquet_scan::ParquetScanExec;
 use crate::execution::shuffle_exchange::ShuffleExchangeExec;
 use std::rc::Rc;
 
@@ -27,7 +28,12 @@ pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Rc<PhysicalPlan>> {
             let exec = ProjectionExec::new(create_physical_plan(input)?);
             Ok(Rc::new(PhysicalPlan::Projection(exec)))
         }
-        LogicalPlan::Aggregate { input, .. } => {
+        LogicalPlan::Aggregate {
+            input,
+            group_expr,
+            aggr_expr,
+            ..
+        } => {
             let input = create_physical_plan(input)?;
             if input
                 .as_execution_plan()
@@ -36,18 +42,38 @@ pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Rc<PhysicalPlan>> {
                 == 1
             {
                 Ok(Rc::new(PhysicalPlan::HashAggregate(Rc::new(
-                    HashAggregateExec::new(AggregateMode::Final, input),
+                    HashAggregateExec::new(
+                        AggregateMode::Final,
+                        group_expr.clone(),
+                        aggr_expr.clone(),
+                        input,
+                    ),
                 ))))
             } else {
                 let partial = Rc::new(PhysicalPlan::HashAggregate(Rc::new(
-                    HashAggregateExec::new(AggregateMode::Partial, input),
+                    HashAggregateExec::new(
+                        AggregateMode::Partial,
+                        group_expr.clone(),
+                        aggr_expr.clone(),
+                        input,
+                    ),
                 )));
+                // TODO these are not the correct expressions being passed in here for the final agg
                 Ok(Rc::new(PhysicalPlan::HashAggregate(Rc::new(
-                    HashAggregateExec::new(AggregateMode::Final, partial),
+                    HashAggregateExec::new(
+                        AggregateMode::Final,
+                        group_expr.clone(),
+                        aggr_expr.clone(),
+                        partial,
+                    ),
                 ))))
             }
         }
-        _ => Err(BallistaError::General("unsupported".to_string())),
+        LogicalPlan::ParquetScan { path, .. } => {
+            let exec = ParquetScanExec::try_new(&path, None)?;
+            Ok(Rc::new(PhysicalPlan::ParquetScan(exec)))
+        }
+        other => Err(BallistaError::General(format!("unsupported {:?}", other))),
     }
 }
 
@@ -91,4 +117,29 @@ pub fn ensure_requirements(plan: &PhysicalPlan) -> Result<Rc<PhysicalPlan>> {
         }
         _ => Ok(Rc::new(plan.clone())),
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dataframe::{col, sum, Context};
+    use std::collections::HashMap;
+    //use crate::arrow::datatypes::{Schema, Field, DataType};
+
+    // #[test]
+    // fn create_plan() -> Result<()> {
+    //     let ctx = Context::local(HashMap::new());
+    //
+    //     let df = ctx
+    //         .read_parquet("/mnt/nyctaxi/parquet/year=2019", None)?
+    //         .aggregate(vec![col("passenger_count")], vec![sum(col("fare_amount"))])?;
+    //
+    //     let plan = df.logical_plan();
+    //
+    //     let plan = create_physical_plan(&plan)?;
+    //     let plan = ensure_requirements(&plan)?;
+    //     println!("{:?}", plan);
+    //
+    //     Ok(())
+    // }
 }

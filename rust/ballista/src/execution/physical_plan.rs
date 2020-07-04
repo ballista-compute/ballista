@@ -22,6 +22,7 @@
 //!
 //! The physical plan also accounts for partitioning and ordering of data between operators.
 
+use std::fmt;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -103,7 +104,7 @@ pub enum ColumnarValue {
 
 /// Enumeration wrapping physical plan structs so that they can be represented in a tree easily
 /// and processed using pattern matching
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum PhysicalPlan {
     /// Projection.
     Projection(ProjectionExec),
@@ -123,6 +124,10 @@ impl PhysicalPlan {
     pub fn as_execution_plan(&self) -> Rc<dyn ExecutionPlan> {
         match self {
             Self::Projection(exec) => Rc::new(exec.clone()),
+            Self::Filter(exec) => Rc::new(exec.clone()),
+            Self::HashAggregate(exec) => Rc::new(exec.as_ref().clone()),
+            Self::ParquetScan(exec) => Rc::new(exec.clone()),
+            Self::ShuffleExchange(exec) => Rc::new(exec.as_ref().clone()),
             _ => unimplemented!(),
         }
     }
@@ -134,6 +139,39 @@ impl PhysicalPlan {
             }
             _ => unimplemented!(),
         }
+    }
+
+    fn fmt_with_indent(&self, f: &mut fmt::Formatter, indent: usize) -> fmt::Result {
+        if indent > 0 {
+            writeln!(f)?;
+            for _ in 0..indent {
+                write!(f, "  ")?;
+            }
+        }
+        match self {
+            PhysicalPlan::ParquetScan(exec) => write!(f, "ParquetScan: {:?}", exec.path),
+            PhysicalPlan::HashAggregate(exec) => {
+                write!(
+                    f,
+                    "HashAggregate: mode={:?}, groupExpr={:?}, aggrExpr={:?}",
+                    exec.mode, exec.group_expr, exec.aggr_expr
+                )?;
+                exec.child.fmt_with_indent(f, indent + 1)
+            }
+            PhysicalPlan::ShuffleExchange(exec) => {
+                write!(f, "Shuffle: {:?}", exec.as_ref().output_partitioning())?;
+                exec.as_ref().child.fmt_with_indent(f, indent + 1)
+            }
+            PhysicalPlan::Projection(_exec) => write!(f, "Projection:"),
+            PhysicalPlan::Filter(_exec) => write!(f, "Filter:"),
+            _ => write!(f, "???"),
+        }
+    }
+}
+
+impl fmt::Debug for PhysicalPlan {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.fmt_with_indent(f, 0)
     }
 }
 
@@ -204,58 +242,3 @@ impl Partitioning {
         }
     }
 }
-
-// #[derive(Clone)]
-// pub struct ProjectPlan {
-//     child: Box<PhysicalPlanNode>,
-//     projection: Vec<Expression>,
-// }
-//
-// #[derive(Clone)]
-// pub struct FilterPlan {
-//     child: Box<PhysicalPlanNode>,
-//     filter: Box<Expression>,
-// }
-//
-// #[derive(Clone)]
-// pub struct GlobalLimitPlan {
-//     child: Box<PhysicalPlanNode>,
-//     limit: usize,
-// }
-//
-// #[derive(Clone)]
-// pub struct LocalLimitPlan {
-//     child: Box<PhysicalPlanNode>,
-//     limit: usize,
-// }
-//
-// #[derive(Clone)]
-// pub struct FileScanPlan {
-//     projection: Option<Vec<usize>>,
-//     partition_filters: Option<Vec<Expression>>,
-//     data_filters: Option<Vec<Expression>>,
-//     output_schema: Box<Schema>,
-// }
-//
-// #[derive(Clone)]
-// pub struct ShuffleExchangePlan {
-//     child: Box<PhysicalPlanNode>,
-//     output_partitioning: Partitioning,
-// }
-//
-// #[derive(Clone)]
-// pub struct ShuffledHashJoinPlan {
-//     left_keys: Vec<Expression>,
-//     right_keys: Vec<Expression>,
-//     build_side: BuildSide,
-//     join_type: JoinType,
-//     left: Box<PhysicalPlanNode>,
-//     right: Box<PhysicalPlanNode>,
-// // }
-
-//
-// #[derive(Clone)]
-// pub struct SortPlan {
-//     sort_order: Vec<SortOrder>,
-//     child: Box<PhysicalPlanNode>,
-// }

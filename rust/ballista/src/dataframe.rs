@@ -503,6 +503,10 @@ impl DataFrame {
     pub fn schema(&self) -> &Schema {
         self.plan.schema()
     }
+
+    pub fn logical_plan(&self) -> &LogicalPlan {
+        &self.plan
+    }
 }
 
 pub fn min(expr: Expr) -> Expr {
@@ -515,6 +519,11 @@ pub fn max(expr: Expr) -> Expr {
 
 pub fn sum(expr: Expr) -> Expr {
     aggregate_expr("SUM", &expr)
+}
+
+/// Create a column expression based on a column name
+pub fn col(name: &str) -> Expr {
+    Expr::UnresolvedColumn(name.to_owned())
 }
 
 /// Create an expression to represent a named aggregate function

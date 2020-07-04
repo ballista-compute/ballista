@@ -126,7 +126,7 @@ impl FlightService for FlightServiceImpl {
                 let plan = create_physical_plan(&logical_plan).map_err(|e| to_tonic_err(&e))?;
                 println!("Physical plan: {:?}", plan);
 
-                let plan = ensure_requirements(plan.clone()).map_err(|e| to_tonic_err(&e))?;
+                let plan = ensure_requirements(&plan).map_err(|e| to_tonic_err(&e))?;
                 println!("Optimized physical plan: {:?}", plan);
 
                 Err(Status::invalid_argument("not implemented yet"))

@@ -52,17 +52,17 @@ pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Rc<PhysicalPlan>> {
 }
 
 /// Optimizer rule to insert shuffles as needed
-pub fn ensure_requirements(plan: Rc<PhysicalPlan>) -> Result<Rc<PhysicalPlan>> {
+pub fn ensure_requirements(plan: &PhysicalPlan) -> Result<Rc<PhysicalPlan>> {
     let execution_plan = plan.as_execution_plan();
 
     // recurse down and replace children
     if execution_plan.children().is_empty() {
-        return Ok(plan);
+        return Ok(Rc::new(plan.clone()));
     }
     let children: Vec<Rc<PhysicalPlan>> = execution_plan
         .children()
         .iter()
-        .map(|c| ensure_requirements(c.clone()))
+        .map(|c| ensure_requirements(c.as_ref()))
         .collect::<Result<Vec<_>>>()?;
 
     match execution_plan.required_child_distribution() {
@@ -82,13 +82,13 @@ pub fn ensure_requirements(plan: Rc<PhysicalPlan>) -> Result<Rc<PhysicalPlan>> {
                             ),
                         )))
                     } else {
-                        plan.clone()
+                        Rc::new(plan.clone())
                     }
                 })
                 .collect();
 
             Ok(Rc::new(plan.with_new_children(new_children)))
         }
-        _ => Ok(plan.clone()),
+        _ => Ok(Rc::new(plan.clone())),
     }
 }

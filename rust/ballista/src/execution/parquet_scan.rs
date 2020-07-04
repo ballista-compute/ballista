@@ -32,6 +32,8 @@ use crossbeam::channel::{unbounded, Receiver, Sender};
 use futures::task::{Context, Poll};
 use tokio::stream::Stream;
 
+type MaybeColumnarBatch = Result<Option<ColumnarBatch>>;
+
 #[derive(Debug, Clone)]
 pub struct ParquetScanExec {
     paths: Vec<String>,
@@ -77,10 +79,8 @@ impl ParquetStream {
         // because the parquet implementation is not thread-safe, it is necessary to execute
         // on a thread and communicate with channels
         let (request_tx, request_rx): (Sender<()>, Receiver<()>) = unbounded();
-        let (response_tx, response_rx): (
-            Sender<Result<Option<ColumnarBatch>>>,
-            Receiver<Result<Option<ColumnarBatch>>>,
-        ) = unbounded();
+        let (response_tx, response_rx): (Sender<MaybeColumnarBatch>, Receiver<MaybeColumnarBatch>) =
+            unbounded();
 
         let filename = filename.to_string();
 
@@ -99,7 +99,7 @@ impl ParquetStream {
 
                     match arrow_reader.get_record_reader_by_columns(projection, batch_size) {
                         Ok(mut batch_reader) => {
-                            while let Ok(_) = request_rx.recv() {
+                            while request_rx.recv().is_ok() {
                                 match batch_reader.next_batch() {
                                     Ok(Some(batch)) => {
                                         response_tx

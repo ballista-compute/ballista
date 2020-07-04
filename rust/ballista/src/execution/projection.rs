@@ -20,3 +20,24 @@ use std::rc::Rc;
 pub struct ProjectionExec {
     child: Rc<PhysicalPlan>,
 }
+
+impl ProjectionExec {
+    pub fn new(child: Rc<PhysicalPlan>) -> Self {
+        Self { child }
+    }
+}
+
+impl ExecutionPlan for ProjectionExec {
+
+    fn children(&self) -> Vec<Rc<PhysicalPlan>> {
+        vec![self.child.clone()]
+    }
+
+    fn output_partitioning(&self) -> Partitioning {
+        self.child.as_execution_plan().output_partitioning()
+    }
+
+    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+        unimplemented!()
+    }
+}

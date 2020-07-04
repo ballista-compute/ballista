@@ -15,8 +15,7 @@
 
 use std::rc::Rc;
 
-use crate::error::{BallistaError, Result};
-use crate::execution::physical_plan::{ColumnarBatch, ExecutionPlan, Partitioning, ColumnarBatchStream, PhysicalPlan};
+use crate::execution::physical_plan::PhysicalPlan;
 
 #[derive(Debug, Clone)]
 pub struct ShuffledHashJoinExec {

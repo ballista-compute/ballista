@@ -17,6 +17,7 @@ pub mod parquet_scan;
 pub mod projection;
 pub mod filter;
 pub mod physical_plan;
+pub mod scheduler;
 pub mod shuffle_exchange;
 pub mod shuffle_reader;
 pub mod shuffled_hash_join;

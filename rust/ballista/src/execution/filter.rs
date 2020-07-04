@@ -20,3 +20,14 @@ use std::rc::Rc;
 pub struct FilterExec {
     child: Rc<PhysicalPlan>,
 }
+
+impl ExecutionPlan for FilterExec {
+
+    fn children(&self) -> Vec<Rc<PhysicalPlan>> {
+        vec![self.child.clone()]
+    }
+
+    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+        unimplemented!()
+    }
+}

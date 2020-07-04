@@ -49,6 +49,11 @@ pub trait ExecutionPlan {
         Partitioning::UnknownPartitioning(0)
     }
 
+    /// Specifies the data distribution requirements of all the children for this operator
+    fn required_child_distribution(&self) -> Distribution {
+        Distribution::UnspecifiedDistribution
+    }
+
     /// Specifies how data is ordered in each partition
     fn output_ordering(&self) -> Option<Vec<SortOrder>> {
         None
@@ -57,6 +62,12 @@ pub trait ExecutionPlan {
     /// Specifies the data distribution requirements of all the children for this operator
     fn required_child_ordering(&self) -> Option<Vec<Vec<SortOrder>>> {
         None
+    }
+
+    /// Get the children of this plan. Leaf nodes have no children. Unary nodes have a single
+    /// child. Binary nodes have two children.
+    fn children(&self) -> Vec<Rc<PhysicalPlan>> {
+        vec![]
     }
 
     /// Runs this query against one partition returning a stream of columnar batches
@@ -108,6 +119,32 @@ pub enum PhysicalPlan {
     ParquetScan(ParquetScanExec),
 }
 
+impl PhysicalPlan {
+    pub fn as_execution_plan(&self) -> Rc<dyn ExecutionPlan> {
+        match self {
+            Self::Projection(exec) => Rc::new(exec.clone()),
+            _ => unimplemented!()
+        }
+
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Distribution {
+    UnspecifiedDistribution,
+    SinglePartition,
+    BroadcastDistribution,
+    ClusteredDistribution {
+        required_num_partitions: usize,
+        clustering: Vec<Expr>
+    },
+    HashClusteredDistribution {
+        required_num_partitions: usize,
+        clustering: Vec<Expr>
+    },
+    OrderedDistribution(Vec<SortOrder>)
+}
+
 #[derive(Debug, Clone)]
 pub enum JoinType {
     Inner,
@@ -123,6 +160,12 @@ pub enum BuildSide {
 pub enum SortDirection {
     Ascending,
     Descending,
+}
+
+#[derive(Debug, Clone)]
+pub enum AggregateMode {
+    Partial,
+    Final,
 }
 
 #[derive(Debug, Clone)]
@@ -142,6 +185,16 @@ pub enum NullOrdering {
 pub enum Partitioning {
     UnknownPartitioning(usize),
     HashPartitioning(usize, Vec<Rc<Expr>>),
+}
+
+impl Partitioning {
+    pub fn partition_count(&self) -> usize {
+        use Partitioning::*;
+        match self {
+            UnknownPartitioning(n) => *n,
+            HashPartitioning(n, _) => *n
+        }
+    }
 }
 
 // #[derive(Clone)]

@@ -16,14 +16,21 @@ use std::rc::Rc;
 
 use crate::datafusion::logicalplan::Expr;
 use crate::error::Result;
-use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan, Expression, PhysicalPlan};
-
-use futures::StreamExt;
+use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan, Expression, PhysicalPlan, Partitioning};
 
 #[derive(Debug, Clone)]
 pub struct ShuffleExchangeExec {
     child: Rc<PhysicalPlan>,
-    partition_expr: Vec<Expr>,
+    output_partitioning: Partitioning,
+}
+
+impl ShuffleExchangeExec {
+    pub fn new(child: Rc<PhysicalPlan>, output_partitioning: Partitioning) -> Self {
+        Self {
+            child,
+            output_partitioning
+        }
+    }
 }
 
 impl ExecutionPlan for ShuffleExchangeExec {

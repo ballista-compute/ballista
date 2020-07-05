@@ -34,7 +34,7 @@ pub struct Job {
     pub id: Uuid,
     /// A list of stages within this job. There can be dependencies between stages to form
     /// a directed acyclic graph (DAG).
-    pub stages: Vec<Rc<Stage>>,
+    pub stages: Vec<Rc<RefCell<Stage>>>,
 }
 
 /// A query stage consists of tasks. Typically, tasks map to partitions.
@@ -53,7 +53,7 @@ impl Stage {
         Self {
             id,
             prior_stages: vec![],
-            tasks: vec![]
+            tasks: vec![],
         }
     }
 }
@@ -73,21 +73,32 @@ pub struct Task {
 
 impl Task {
     pub fn new(id: usize, partition_id: usize, split_id: usize, plan: Rc<PhysicalPlan>) -> Self {
-        Self { id, partition_id, split_id, plan }
+        Self {
+            id,
+            partition_id,
+            split_id,
+            plan,
+        }
     }
 }
 
 pub struct Scheduler {
-    current_stage: Option<Rc<RefCell<Stage>>>,
+    job: Job,
+    current_stage: Rc<RefCell<Stage>>,
     next_stage_id: usize,
     next_task_id: usize,
 }
 
 impl Scheduler {
-
     fn new() -> Self {
+        let initial_stage = Rc::new(RefCell::new(Stage::new(0)));
+        let job = Job {
+            id: Uuid::new_v4(),
+            stages: vec![initial_stage.clone()],
+        };
         Self {
-            current_stage: Some(Rc::new(RefCell::new(Stage::new(0)))),
+            job,
+            current_stage: initial_stage,
             next_stage_id: 1,
             next_task_id: 0,
         }
@@ -99,25 +110,29 @@ impl Scheduler {
                 self.create_dag(exec.child.clone());
             }
             PhysicalPlan::ShuffleExchange(exec) => {
+                // shuffle indicates that we need a new stage
+                self.current_stage = Rc::new(RefCell::new(Stage::new(self.next_stage_id)));
+                self.next_stage_id += 1;
+                self.next_task_id = 0;
+
+                //TODO update prior stages
+
                 self.create_dag(exec.child.clone());
             }
             PhysicalPlan::ParquetScan(exec) => {
-                let mut current_stage = self.current_stage.as_ref()
-                    .expect("stage must exist when creating ParquetScan tasks")
-                    .borrow_mut();
+                let mut current_stage = self.current_stage.as_ref().borrow_mut();
 
                 // create one task per file for now but later we may want finer granularity of one
                 // task per chunk or split.
                 for (i, _) in exec.filenames.iter().enumerate() {
-                    current_stage.tasks.push(Task::new(self.next_task_id, i, 0, plan.clone()));
+                    current_stage
+                        .tasks
+                        .push(Task::new(self.next_task_id, i, 0, plan.clone()));
                     self.next_task_id += 1;
-
                 }
-                    //.for_each(|(i, filename)| current_stage.add_task(i, plan.clone()));
+                //.for_each(|(i, filename)| current_stage.add_task(i, plan.clone()));
             }
-            _ => {
-                unimplemented!()
-            }
+            _ => unimplemented!(),
         }
     }
 }

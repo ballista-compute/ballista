@@ -5,4 +5,5 @@ members = [
     "benchmarks",
     "examples/apache-spark-rust-bindings",
     "examples/parallel-aggregate",
+    "examples/distributed-query",
 ]

@@ -26,6 +26,7 @@ use crate::execution::parquet_scan::ParquetScanExec;
 use crate::execution::physical_plan::{AggregateMode, Distribution, Partitioning, PhysicalPlan};
 use crate::execution::projection::ProjectionExec;
 use crate::execution::shuffle_exchange::ShuffleExchangeExec;
+use crate::execution::shuffle_reader::ShuffleReaderExec;
 
 /// A Job typically represents a single query and the query is executed in stages. Stages are
 /// separated by map operations (shuffles) to re-partition data before the next stage starts.
@@ -38,6 +39,31 @@ pub struct Job {
     pub stages: Vec<Rc<RefCell<Stage>>>,
 }
 
+impl Job {
+    pub fn explain(&self) {
+        println!("Job {} has {} stages:\n", self.id, self.stages.len());
+        self.stages.iter().for_each(|stage| {
+            let stage = stage.as_ref().borrow();
+            println!("Stage {}:\n", stage.id);
+            if stage.prior_stages.is_empty() {
+                println!("Stage {} has no dependencies.", stage.id);
+            } else {
+                println!(
+                    "Stage {} depends on stages {:?}.",
+                    stage.id, stage.prior_stages
+                );
+            }
+            println!(
+                "\n{:?}\n",
+                stage
+                    .plan
+                    .as_ref()
+                    .expect("Stages should always have a plan")
+            );
+        })
+    }
+}
+
 /// A query stage consists of tasks. Typically, tasks map to partitions.
 #[derive(Debug)]
 pub struct Stage {
@@ -45,8 +71,8 @@ pub struct Stage {
     pub id: usize,
     /// A list of stages that must complete before this stage can execute.
     pub prior_stages: Vec<usize>,
-    /// A list of tasks in this stage. One task per partition currently.
-    pub tasks: Vec<Task>,
+    /// The physical plan to execute for this stage
+    pub plan: Option<Rc<PhysicalPlan>>,
 }
 
 impl Stage {
@@ -55,40 +81,37 @@ impl Stage {
         Self {
             id,
             prior_stages: vec![],
-            tasks: vec![],
+            plan: None,
         }
     }
 }
 
-/// A Task represents a physical query plan to be executed against a partition (and later, possibly
-/// against partition splits).
-#[derive(Debug)]
-pub struct Task {
-    /// Task id which is unique within a stage.
-    pub id: usize,
-    /// The partition that this task will execute against
-    pub partition_id: usize,
-    /// The split or chunk of the partition. Currently unused.
-    pub split_id: usize,
-    /// The physical plan to execute
-    pub plan: Rc<PhysicalPlan>,
-}
-
-impl Task {
-    pub fn new(id: usize, partition_id: usize, split_id: usize, plan: Rc<PhysicalPlan>) -> Self {
-        Self {
-            id,
-            partition_id,
-            split_id,
-            plan,
-        }
-    }
-}
+// /// A Task represents a physical query plan to be executed against a partition (and later, possibly
+// /// against partition splits).
+// #[derive(Debug)]
+// pub struct Task {
+//     /// Task id which is unique within a stage.
+//     pub id: usize,
+//     /// The partition that this task will execute against
+//     pub partition_id: usize,
+//     /// The split or chunk of the partition. Currently unused.
+//     pub split_id: usize,
+// }
+//
+// impl Task {
+//     pub fn new(id: usize, partition_id: usize, split_id: usize, plan: Rc<PhysicalPlan>) -> Self {
+//         Self {
+//             id,
+//             partition_id,
+//             split_id,
+//             plan,
+//         }
+//     }
+// }
 
 pub struct Scheduler {
     job: Job,
     next_stage_id: usize,
-    next_task_id: usize,
 }
 
 impl Scheduler {
@@ -100,23 +123,25 @@ impl Scheduler {
         Self {
             job,
             next_stage_id: 0,
-            next_task_id: 0,
         }
     }
 
-    fn create_job(&mut self, plan: Rc<PhysicalPlan>) {
-        let initial_stage = Rc::new(RefCell::new(Stage::new(0)));
+    fn create_job(&mut self, plan: Rc<PhysicalPlan>) -> Result<()> {
+        let new_stage_id = self.next_stage_id;
         self.next_stage_id += 1;
-        self.job.stages.push(initial_stage.clone());
-        self.visit_plan(plan, initial_stage);
+        let new_stage = Rc::new(RefCell::new(Stage::new(new_stage_id)));
+        self.job.stages.push(new_stage.clone());
+        let plan = self.visit_plan(plan, new_stage.clone())?;
+        new_stage.as_ref().borrow_mut().plan = Some(plan);
+        Ok(())
     }
 
-    fn visit_plan(&mut self, plan: Rc<PhysicalPlan>, current_stage: Rc<RefCell<Stage>>) {
-        println!(
-            "visit_plan(stage={}) {:?}",
-            current_stage.as_ref().borrow().id,
-            plan
-        );
+    fn visit_plan(
+        &mut self,
+        plan: Rc<PhysicalPlan>,
+        current_stage: Rc<RefCell<Stage>>,
+    ) -> Result<Rc<PhysicalPlan>> {
+        //
         match plan.as_ref() {
             PhysicalPlan::ShuffleExchange(exec) => {
                 // shuffle indicates that we need a new stage
@@ -125,6 +150,11 @@ impl Scheduler {
                 let new_stage = Rc::new(RefCell::new(Stage::new(new_stage_id)));
                 self.job.stages.push(new_stage.clone());
 
+                // the children need to be part of this new stage
+                let shuffle_input = self.visit_plan(exec.child.clone(), new_stage.clone())?;
+
+                new_stage.as_ref().borrow_mut().plan = Some(shuffle_input);
+
                 // the current stage depends on this new stage
                 current_stage
                     .as_ref()
@@ -132,18 +162,34 @@ impl Scheduler {
                     .prior_stages
                     .push(new_stage_id);
 
-                //TODO add stage to job
-
-                //TODO update prior stages
-
-                self.visit_plan(exec.child.clone(), new_stage);
+                // return a shuffle reader to read the results from the stage
+                Ok(Rc::new(PhysicalPlan::ShuffleReader(Rc::new(
+                    ShuffleReaderExec {
+                        stage_id: new_stage_id,
+                    },
+                ))))
+            }
+            PhysicalPlan::Projection(exec) => {
+                //TODO
+                //PhysicalPlan::Projection(exec.with_new_child())
+                self.visit_plan(exec.child.clone(), current_stage)
+            }
+            PhysicalPlan::Filter(exec) => {
+                //TODO with_new_child
+                self.visit_plan(exec.child.clone(), current_stage)
             }
             PhysicalPlan::HashAggregate(exec) => {
-                self.visit_plan(exec.child.clone(), current_stage);
+                let child = self.visit_plan(exec.child.clone(), current_stage)?;
+                Ok(Rc::new(PhysicalPlan::HashAggregate(Rc::new(
+                    exec.with_new_children(vec![child]),
+                ))))
             }
-            PhysicalPlan::ParquetScan(_) => {
-                // leaf node
+            PhysicalPlan::ShuffledHashJoin(exec) => {
+                //TODO with_new_child
+                self.visit_plan(exec.left.clone(), current_stage.clone())?;
+                self.visit_plan(exec.right.clone(), current_stage)
             }
+            PhysicalPlan::ParquetScan(_) => Ok(plan.clone()),
             _ => unimplemented!(),
         }
     }
@@ -246,30 +292,30 @@ pub fn ensure_requirements(plan: &PhysicalPlan) -> Result<Rc<PhysicalPlan>> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::dataframe::{col, sum, Context};
-    use std::collections::HashMap;
-
-    #[test]
-    fn create_plan() -> Result<()> {
-        let ctx = Context::local(HashMap::new());
-
-        let df = ctx
-            .read_parquet("/mnt/nyctaxi/parquet/year=2019", None)?
-            .aggregate(vec![col("passenger_count")], vec![sum(col("fare_amount"))])?;
-
-        let plan = df.logical_plan();
-
-        let plan = create_physical_plan(&plan)?;
-        let plan = ensure_requirements(&plan)?;
-        println!("Optimized physical plan:\n{:?}", plan);
-
-        let mut scheduler = Scheduler::new();
-        scheduler.create_job(plan);
-
-        println!("Job:\n{:?}", scheduler.job);
-        Ok(())
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use crate::dataframe::{col, sum, Context};
+//     use std::collections::HashMap;
+//
+//     #[test]
+//     fn create_plan() -> Result<()> {
+//         let ctx = Context::local(HashMap::new());
+//
+//         let df = ctx
+//             .read_parquet("/mnt/nyctaxi/parquet/year=2019", None)?
+//             .aggregate(vec![col("passenger_count")], vec![sum(col("fare_amount"))])?;
+//
+//         let plan = df.logical_plan();
+//
+//         let plan = create_physical_plan(&plan)?;
+//         let plan = ensure_requirements(&plan)?;
+//         println!("Optimized physical plan:\n{:?}", plan);
+//
+//         let mut scheduler = Scheduler::new();
+//         scheduler.create_job(plan)?;
+//
+//         scheduler.job.explain();
+//         Ok(())
+//     }
+// }

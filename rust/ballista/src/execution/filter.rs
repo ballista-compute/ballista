@@ -18,7 +18,7 @@ use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub struct FilterExec {
-    child: Rc<PhysicalPlan>,
+    pub(crate) child: Rc<PhysicalPlan>,
 }
 
 impl ExecutionPlan for FilterExec {

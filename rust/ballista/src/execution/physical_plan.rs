@@ -39,6 +39,7 @@ use crate::datafusion::logicalplan::Expr;
 use crate::execution::filter::FilterExec;
 use crate::execution::parquet_scan::ParquetScanExec;
 use crate::execution::projection::ProjectionExec;
+use crate::execution::shuffle_reader::ShuffleReaderExec;
 use crate::execution::shuffled_hash_join::ShuffledHashJoinExec;
 
 /// Stream of columnar batches using futures
@@ -117,6 +118,8 @@ pub enum PhysicalPlan {
     ShuffledHashJoin(ShuffledHashJoinExec),
     /// Performs a shuffle that will result in the desired partitioning.
     ShuffleExchange(Rc<ShuffleExchangeExec>),
+    /// Reads results from a ShuffleExchange
+    ShuffleReader(Rc<ShuffleReaderExec>),
     /// Scans a partitioned data source
     ParquetScan(Rc<ParquetScanExec>),
 }
@@ -129,6 +132,7 @@ impl PhysicalPlan {
             Self::HashAggregate(exec) => exec.clone(),
             Self::ParquetScan(exec) => exec.clone(),
             Self::ShuffleExchange(exec) => exec.clone(),
+            Self::ShuffleReader(exec) => exec.clone(),
             _ => unimplemented!(),
         }
     }
@@ -150,7 +154,12 @@ impl PhysicalPlan {
             }
         }
         match self {
-            PhysicalPlan::ParquetScan(exec) => write!(f, "ParquetScan: {:?}", exec.path),
+            PhysicalPlan::ParquetScan(exec) => write!(
+                f,
+                "ParquetScan: {:?}, partitions={}",
+                exec.path,
+                exec.filenames.len()
+            ),
             PhysicalPlan::HashAggregate(exec) => {
                 write!(
                     f,
@@ -162,6 +171,9 @@ impl PhysicalPlan {
             PhysicalPlan::ShuffleExchange(exec) => {
                 write!(f, "Shuffle: {:?}", exec.as_ref().output_partitioning())?;
                 exec.as_ref().child.fmt_with_indent(f, indent + 1)
+            }
+            PhysicalPlan::ShuffleReader(exec) => {
+                write!(f, "ShuffleReader: stage_id={}", exec.stage_id)
             }
             PhysicalPlan::Projection(_exec) => write!(f, "Projection:"),
             PhysicalPlan::Filter(_exec) => write!(f, "Filter:"),

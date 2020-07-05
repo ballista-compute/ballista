@@ -14,26 +14,16 @@
 
 use crate::error::Result;
 use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan};
-use uuid::Uuid;
 
 #[derive(Debug, Clone)]
-struct ShuffleReaderExec {
-    partitions: Vec<ShufflePartition>,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone)]
-struct ShufflePartition {
-    executor_uuid: Uuid,
-    job_uuid: Vec<Uuid>,
+pub struct ShuffleReaderExec {
+    // query stage that produced the shuffle output that this reader needs to read
+    pub stage_id: usize,
 }
 
 impl ExecutionPlan for ShuffleReaderExec {
-    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
-        let _part = &self.partitions[partition_index];
-
+    fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
         // TODO send Flight request to the executor asking for the partition(s)
-
         unimplemented!()
     }
 }

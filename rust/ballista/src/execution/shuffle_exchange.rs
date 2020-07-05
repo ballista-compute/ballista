@@ -21,7 +21,7 @@ use crate::execution::physical_plan::{
 
 #[derive(Debug, Clone)]
 pub struct ShuffleExchangeExec {
-    pub child: Rc<PhysicalPlan>,
+    pub(crate) child: Rc<PhysicalPlan>,
     output_partitioning: Partitioning,
 }
 

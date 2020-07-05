@@ -18,6 +18,6 @@ use crate::execution::physical_plan::PhysicalPlan;
 
 #[derive(Debug, Clone)]
 pub struct ShuffledHashJoinExec {
-    left: Rc<PhysicalPlan>,
-    right: Rc<PhysicalPlan>,
+    pub(crate) left: Rc<PhysicalPlan>,
+    pub(crate) right: Rc<PhysicalPlan>,
 }

@@ -20,7 +20,7 @@ use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub struct ProjectionExec {
-    child: Rc<PhysicalPlan>,
+    pub(crate) child: Rc<PhysicalPlan>,
 }
 
 impl ProjectionExec {

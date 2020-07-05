@@ -25,7 +25,7 @@ struct ShuffleReaderExec {
 #[derive(Debug, Clone)]
 struct ShufflePartition {
     executor_uuid: Uuid,
-    partition_uuid: Vec<Uuid>,
+    job_uuid: Vec<Uuid>,
 }
 
 impl ExecutionPlan for ShuffleReaderExec {

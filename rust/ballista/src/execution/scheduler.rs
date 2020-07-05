@@ -12,15 +12,49 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! The scheduler is responsible for breaking a physical query plan down into stages and tasks
+//! and co-ordinating execution of these stages and tasks across the cluster.
+
+use std::rc::Rc;
+use uuid::Uuid;
+
 use crate::datafusion::logicalplan::LogicalPlan;
 use crate::error::{BallistaError, Result};
-use crate::execution::physical_plan::{AggregateMode, Distribution, Partitioning, PhysicalPlan};
-use crate::execution::projection::ProjectionExec;
-
 use crate::execution::hash_aggregate::HashAggregateExec;
 use crate::execution::parquet_scan::ParquetScanExec;
+use crate::execution::physical_plan::{AggregateMode, Distribution, Partitioning, PhysicalPlan};
+use crate::execution::projection::ProjectionExec;
 use crate::execution::shuffle_exchange::ShuffleExchangeExec;
-use std::rc::Rc;
+
+/// A Job typically represents a single query and the query is executed in stages. Stages are
+/// separated by map operations (shuffles) to re-partition data before the next stage starts.
+pub struct Job {
+    /// Job UUID
+    pub id: Uuid,
+    /// A list of stages within this job. There can be dependencies between stages to form
+    /// a directed acyclic graph (DAG).
+    pub stages: Vec<Box<Stage>>,
+}
+
+/// A query stage consists of tasks. Typically, tasks map to partitions.
+pub struct Stage {
+    /// Stage id which is unique within a job.
+    pub id: usize,
+    /// A list of stages that must complete before this stage can execute.
+    pub prior_stages: Vec<usize>,
+    /// A list of tasks in this stage. One task per partition currently.
+    pub tasks: Vec<Box<Task>>,
+}
+
+/// A Task represents a physical query plan to be executed against a partition.
+pub struct Task {
+    /// Stage id which is unique within a stage.
+    pub id: usize,
+    /// The partition that this task will execute against
+    pub partition_id: usize,
+    /// The physical plan to execute
+    pub plan: Box<PhysicalPlan>,
+}
 
 pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Rc<PhysicalPlan>> {
     match plan {

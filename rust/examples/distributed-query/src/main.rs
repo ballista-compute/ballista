@@ -24,10 +24,7 @@ use ballista::BALLISTA_VERSION;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    println!(
-        "Ballista v{} Parallel Aggregate Query Example",
-        BALLISTA_VERSION
-    );
+    println!("Ballista v{} Distributed Query Example", BALLISTA_VERSION);
 
     //TODO use command-line args
     let nyc_taxi_path = "/mnt/nyctaxi";

@@ -26,6 +26,8 @@ use std::fmt;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use futures::stream::BoxStream;
+
 use crate::arrow::array::ArrayRef;
 use crate::arrow::record_batch::RecordBatch;
 use crate::datafusion::logicalplan::ScalarValue;
@@ -38,7 +40,6 @@ use crate::execution::filter::FilterExec;
 use crate::execution::parquet_scan::ParquetScanExec;
 use crate::execution::projection::ProjectionExec;
 use crate::execution::shuffled_hash_join::ShuffledHashJoinExec;
-use futures::stream::BoxStream;
 
 /// Stream of columnar batches using futures
 pub type ColumnarBatchStream = BoxStream<'static, ColumnarBatch>;

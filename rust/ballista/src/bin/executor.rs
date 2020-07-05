@@ -22,7 +22,7 @@ use ballista::serde::decode_protobuf;
 use ballista::{logical_plan, BALLISTA_VERSION};
 
 use arrow::record_batch::RecordBatch;
-use ballista::execution::scheduler::{create_physical_plan, ensure_requirements};
+use ballista::execution::scheduler::{create_job, create_physical_plan, ensure_requirements};
 use flight::{
     flight_service_server::FlightService, flight_service_server::FlightServiceServer, Action,
     ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo, HandshakeRequest,
@@ -128,6 +128,12 @@ impl FlightService for FlightServiceImpl {
 
                 let plan = ensure_requirements(&plan).map_err(|e| to_tonic_err(&e))?;
                 println!("Optimized physical plan: {:?}", plan);
+
+                let job = create_job(plan).map_err(|e| to_tonic_err(&e))?;
+                job.explain();
+
+                // TODO execute the DAG by serializing stages to protobuf and allocating
+                // tasks (partitions) to executors in the cluster
 
                 Err(Status::invalid_argument("not implemented yet"))
 

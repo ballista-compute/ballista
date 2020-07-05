@@ -86,28 +86,12 @@ impl Stage {
     }
 }
 
-// /// A Task represents a physical query plan to be executed against a partition (and later, possibly
-// /// against partition splits).
-// #[derive(Debug)]
-// pub struct Task {
-//     /// Task id which is unique within a stage.
-//     pub id: usize,
-//     /// The partition that this task will execute against
-//     pub partition_id: usize,
-//     /// The split or chunk of the partition. Currently unused.
-//     pub split_id: usize,
-// }
-//
-// impl Task {
-//     pub fn new(id: usize, partition_id: usize, split_id: usize, plan: Rc<PhysicalPlan>) -> Self {
-//         Self {
-//             id,
-//             partition_id,
-//             split_id,
-//             plan,
-//         }
-//     }
-// }
+/// Create a Job (DAG of stages) from a physical execution plan.
+pub fn create_job(plan: Rc<PhysicalPlan>) -> Result<Job> {
+    let mut scheduler = Scheduler::new();
+    scheduler.create_job(plan)?;
+    Ok(scheduler.job)
+}
 
 pub struct Scheduler {
     job: Job,
@@ -169,25 +153,11 @@ impl Scheduler {
                     },
                 ))))
             }
-            PhysicalPlan::Projection(exec) => {
-                //TODO
-                //PhysicalPlan::Projection(exec.with_new_child())
-                self.visit_plan(exec.child.clone(), current_stage)
-            }
-            PhysicalPlan::Filter(exec) => {
-                //TODO with_new_child
-                self.visit_plan(exec.child.clone(), current_stage)
-            }
             PhysicalPlan::HashAggregate(exec) => {
                 let child = self.visit_plan(exec.child.clone(), current_stage)?;
                 Ok(Rc::new(PhysicalPlan::HashAggregate(Rc::new(
                     exec.with_new_children(vec![child]),
                 ))))
-            }
-            PhysicalPlan::ShuffledHashJoin(exec) => {
-                //TODO with_new_child
-                self.visit_plan(exec.left.clone(), current_stage.clone())?;
-                self.visit_plan(exec.right.clone(), current_stage)
             }
             PhysicalPlan::ParquetScan(_) => Ok(plan.clone()),
             _ => unimplemented!(),
@@ -195,6 +165,7 @@ impl Scheduler {
     }
 }
 
+/// Convert a logical plan into a physical plan
 pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Rc<PhysicalPlan>> {
     match plan {
         LogicalPlan::Projection { input, .. } => {

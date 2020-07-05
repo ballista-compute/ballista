@@ -142,9 +142,15 @@ message SelectionExecNode {
   LogicalExprNode expr = 2;
 }
 
+enum AggregateMode {
+  PARTIAL = 0;
+  FINAL = 1;
+}
+
 message HashAggregateExecNode {
   repeated LogicalExprNode group_expr = 1;
   repeated LogicalExprNode aggr_expr = 2;
+  AggregateMode mode = 3;
 }
 
 message ShuffleExecNode {
@@ -159,6 +165,16 @@ message LocalLimitExecNode {
   uint32 limit = 1;
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Ballista Scheduling
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+message Task {
+  string job_uuid = 1;
+  uint32 stage_id = 2;
+  uint32 task_id = 3;
+  PhysicalPlanNode plan = 4;
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Arrow Data Types

@@ -38,7 +38,7 @@ type MaybeColumnarBatch = Result<Option<ColumnarBatch>>;
 #[derive(Debug, Clone)]
 pub struct ParquetScanExec {
     pub(crate) path: String,
-    filenames: Vec<String>,
+    pub(crate) filenames: Vec<String>,
     projection: Option<Vec<usize>>,
 }
 

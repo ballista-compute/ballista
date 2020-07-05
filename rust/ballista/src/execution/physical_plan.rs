@@ -108,9 +108,9 @@ pub enum ColumnarValue {
 #[derive(Clone)]
 pub enum PhysicalPlan {
     /// Projection.
-    Projection(ProjectionExec),
+    Projection(Rc<ProjectionExec>),
     /// Filter a.k.a predicate.
-    Filter(FilterExec),
+    Filter(Rc<FilterExec>),
     /// Hash aggregate
     HashAggregate(Rc<HashAggregateExec>),
     /// Performs a hash join of two child relations by first shuffling the data using the join keys.
@@ -118,17 +118,17 @@ pub enum PhysicalPlan {
     /// Performs a shuffle that will result in the desired partitioning.
     ShuffleExchange(Rc<ShuffleExchangeExec>),
     /// Scans a partitioned data source
-    ParquetScan(ParquetScanExec),
+    ParquetScan(Rc<ParquetScanExec>),
 }
 
 impl PhysicalPlan {
     pub fn as_execution_plan(&self) -> Rc<dyn ExecutionPlan> {
         match self {
-            Self::Projection(exec) => Rc::new(exec.clone()),
-            Self::Filter(exec) => Rc::new(exec.clone()),
-            Self::HashAggregate(exec) => Rc::new(exec.as_ref().clone()),
-            Self::ParquetScan(exec) => Rc::new(exec.clone()),
-            Self::ShuffleExchange(exec) => Rc::new(exec.as_ref().clone()),
+            Self::Projection(exec) => exec.clone(),
+            Self::Filter(exec) => exec.clone(),
+            Self::HashAggregate(exec) => exec.clone(),
+            Self::ParquetScan(exec) => exec.clone(),
+            Self::ShuffleExchange(exec) => exec.clone(),
             _ => unimplemented!(),
         }
     }

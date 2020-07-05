@@ -29,6 +29,7 @@ use crate::execution::shuffle_exchange::ShuffleExchangeExec;
 
 /// A Job typically represents a single query and the query is executed in stages. Stages are
 /// separated by map operations (shuffles) to re-partition data before the next stage starts.
+#[derive(Debug)]
 pub struct Job {
     /// Job UUID
     pub id: Uuid,
@@ -38,6 +39,7 @@ pub struct Job {
 }
 
 /// A query stage consists of tasks. Typically, tasks map to partitions.
+#[derive(Debug)]
 pub struct Stage {
     /// Stage id which is unique within a job.
     pub id: usize,
@@ -60,6 +62,7 @@ impl Stage {
 
 /// A Task represents a physical query plan to be executed against a partition (and later, possibly
 /// against partition splits).
+#[derive(Debug)]
 pub struct Task {
     /// Task id which is unique within a stage.
     pub id: usize,
@@ -84,53 +87,62 @@ impl Task {
 
 pub struct Scheduler {
     job: Job,
-    current_stage: Rc<RefCell<Stage>>,
     next_stage_id: usize,
     next_task_id: usize,
 }
 
 impl Scheduler {
     fn new() -> Self {
-        let initial_stage = Rc::new(RefCell::new(Stage::new(0)));
         let job = Job {
             id: Uuid::new_v4(),
-            stages: vec![initial_stage.clone()],
+            stages: vec![],
         };
         Self {
             job,
-            current_stage: initial_stage,
-            next_stage_id: 1,
+            next_stage_id: 0,
             next_task_id: 0,
         }
     }
 
-    fn create_dag(&mut self, plan: Rc<PhysicalPlan>) {
+    fn create_job(&mut self, plan: Rc<PhysicalPlan>) {
+        let initial_stage = Rc::new(RefCell::new(Stage::new(0)));
+        self.next_stage_id += 1;
+        self.job.stages.push(initial_stage.clone());
+        self.visit_plan(plan, initial_stage);
+    }
+
+    fn visit_plan(&mut self, plan: Rc<PhysicalPlan>, current_stage: Rc<RefCell<Stage>>) {
+        println!(
+            "visit_plan(stage={}) {:?}",
+            current_stage.as_ref().borrow().id,
+            plan
+        );
         match plan.as_ref() {
-            PhysicalPlan::HashAggregate(exec) => {
-                self.create_dag(exec.child.clone());
-            }
             PhysicalPlan::ShuffleExchange(exec) => {
                 // shuffle indicates that we need a new stage
-                self.current_stage = Rc::new(RefCell::new(Stage::new(self.next_stage_id)));
+                let new_stage_id = self.next_stage_id;
                 self.next_stage_id += 1;
-                self.next_task_id = 0;
+                let new_stage = Rc::new(RefCell::new(Stage::new(new_stage_id)));
+                self.job.stages.push(new_stage.clone());
+
+                // the current stage depends on this new stage
+                current_stage
+                    .as_ref()
+                    .borrow_mut()
+                    .prior_stages
+                    .push(new_stage_id);
+
+                //TODO add stage to job
 
                 //TODO update prior stages
 
-                self.create_dag(exec.child.clone());
+                self.visit_plan(exec.child.clone(), new_stage);
             }
-            PhysicalPlan::ParquetScan(exec) => {
-                let mut current_stage = self.current_stage.as_ref().borrow_mut();
-
-                // create one task per file for now but later we may want finer granularity of one
-                // task per chunk or split.
-                for (i, _) in exec.filenames.iter().enumerate() {
-                    current_stage
-                        .tasks
-                        .push(Task::new(self.next_task_id, i, 0, plan.clone()));
-                    self.next_task_id += 1;
-                }
-                //.for_each(|(i, filename)| current_stage.add_task(i, plan.clone()));
+            PhysicalPlan::HashAggregate(exec) => {
+                self.visit_plan(exec.child.clone(), current_stage);
+            }
+            PhysicalPlan::ParquetScan(_) => {
+                // leaf node
             }
             _ => unimplemented!(),
         }
@@ -252,11 +264,12 @@ mod tests {
 
         let plan = create_physical_plan(&plan)?;
         let plan = ensure_requirements(&plan)?;
-        println!("{:?}", plan);
+        println!("Optimized physical plan:\n{:?}", plan);
 
         let mut scheduler = Scheduler::new();
-        scheduler.create_dag(plan);
+        scheduler.create_job(plan);
 
+        println!("Job:\n{:?}", scheduler.job);
         Ok(())
     }
 }

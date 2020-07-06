@@ -66,7 +66,7 @@ impl ExecutionPlan for ParquetScanExec {
     }
 }
 
-struct ParquetStream {
+pub struct ParquetStream {
     // schema: Arc<Schema>,
     request_tx: Sender<()>,
     response_rx: Receiver<Result<Option<ColumnarBatch>>>,
@@ -100,7 +100,10 @@ impl ParquetStream {
 
         let filename = filename.to_string();
 
+        println!("spawn thread");
         thread::spawn(move || {
+            println!("in thread");
+
             //TODO error handling, remove unwraps
 
             let batch_size = 64 * 1024; //TODO
@@ -115,25 +118,43 @@ impl ParquetStream {
 
                     match arrow_reader.get_record_reader_by_columns(projection, batch_size) {
                         Ok(mut batch_reader) => {
-                            while request_rx.recv().is_ok() {
-                                match batch_reader.next_batch() {
-                                    Ok(Some(batch)) => {
-                                        response_tx
-                                            .send(Ok(Some(ColumnarBatch::from_arrow(&batch))))
-                                            .unwrap();
-                                    }
-                                    Ok(None) => {
-                                        response_tx.send(Ok(None)).unwrap();
-                                        break;
+                            loop {
+                                println!("waiting for request");
+                                match request_rx.recv() {
+                                    Ok(_) => {
+                                        println!("got request");
+
+                                        match batch_reader.next_batch() {
+                                            Ok(Some(batch)) => {
+                                                response_tx
+                                                    .send(Ok(Some(ColumnarBatch::from_arrow(
+                                                        &batch,
+                                                    ))))
+                                                    .unwrap();
+                                            }
+                                            Ok(None) => {
+                                                println!("EOF");
+                                                response_tx.send(Ok(None)).unwrap();
+                                                break;
+                                            }
+                                            Err(e) => {
+                                                response_tx
+                                                    .send(Err(BallistaError::General(format!(
+                                                        "{:?}",
+                                                        e
+                                                    ))))
+                                                    .unwrap();
+                                                break;
+                                            }
+                                        }
                                     }
                                     Err(e) => {
-                                        response_tx
-                                            .send(Err(BallistaError::General(format!("{:?}", e))))
-                                            .unwrap();
+                                        println!("error receiving request: {}", e.to_string());
                                         break;
                                     }
                                 }
                             }
+                            println!("stopped")
                         }
 
                         Err(e) => {
@@ -152,8 +173,6 @@ impl ParquetStream {
             }
         });
 
-        println!("try_new ok");
-
         Ok(Self {
             // schema: projected_schema,
             request_tx,
@@ -166,19 +185,11 @@ impl Stream for ParquetStream {
     type Item = ColumnarBatch;
 
     fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        println!("poll_next()");
-
         self.request_tx.send(()).unwrap();
-
         match self.response_rx.recv().unwrap().unwrap() {
-            Some(batch) => {
-                println!("ready");
-                Poll::Ready(Some(batch))
-            }
-            _ => {
-                println!("pending");
-                Poll::Pending
-            }
+            Some(batch) => Poll::Ready(Some(batch)),
+            None => Poll::Ready(None),
+            //_ => Poll::Pending,
         }
     }
 }

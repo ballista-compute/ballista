@@ -15,6 +15,7 @@
 use std::fs::File;
 use std::pin::Pin;
 use std::rc::Rc;
+use std::thread;
 
 use crate::error::{BallistaError, Result};
 use crate::execution::physical_plan::{
@@ -28,11 +29,11 @@ use crate::parquet::arrow::arrow_reader::ArrowReader;
 use crate::parquet::arrow::ParquetFileArrowReader;
 use crate::parquet::file::reader::SerializedFileReader;
 
+use crossbeam::channel::{unbounded, Receiver, Sender};
 use futures::task::{Context, Poll};
 use tokio::stream::Stream;
-use tokio::sync::mpsc::{self, Receiver};
 
-type MaybeColumnarBatch = Option<Result<ColumnarBatch>>;
+type MaybeColumnarBatch = Result<Option<ColumnarBatch>>;
 
 #[derive(Debug, Clone)]
 pub struct ParquetScanExec {
@@ -67,35 +68,40 @@ impl ExecutionPlan for ParquetScanExec {
 
 pub struct ParquetStream {
     // schema: Arc<Schema>,
-    rx: Receiver<MaybeColumnarBatch>,
+    response_rx: Receiver<MaybeColumnarBatch>,
 }
 
 #[allow(dead_code)]
 impl ParquetStream {
     pub fn try_new(filename: &str, projection: Option<Vec<usize>>) -> Result<Self> {
-        let (mut tx, rx) = mpsc::channel(1);
+        let file = File::open(filename)?;
+        let file_reader = Rc::new(SerializedFileReader::new(file).unwrap()); //TODO error handling
+        let mut arrow_reader = ParquetFileArrowReader::new(file_reader);
+        let schema = arrow_reader.get_schema().unwrap(); //TODO error handling
+
+        let projection = match projection {
+            Some(p) => p,
+            None => (0..schema.fields().len()).collect(),
+        };
+
+        let _projected_schema = Schema::new(
+            projection
+                .iter()
+                .map(|i| schema.field(*i).clone())
+                .collect(),
+        );
+
+        // because the parquet implementation is not thread-safe, it is necessary to execute
+        // on a thread and communicate with channels
+        let (response_tx, response_rx): (Sender<MaybeColumnarBatch>, Receiver<MaybeColumnarBatch>) =
+            unbounded();
+
         let filename = filename.to_string();
-        tokio::spawn(async move || {
 
-            let file = File::open(filename).unwrap();
-            let file_reader = Rc::new(SerializedFileReader::new(file).unwrap()); //TODO error handling
-            let mut arrow_reader = ParquetFileArrowReader::new(file_reader);
-            let schema = arrow_reader.get_schema().unwrap(); //TODO error handling
-
-            let projection = match projection {
-                Some(p) => p,
-                None => (0..schema.fields().len()).collect(),
-            };
-
-            let _projected_schema = Schema::new(
-                projection
-                    .iter()
-                    .map(|i| schema.field(*i).clone())
-                    .collect(),
-            );
-
+        thread::spawn(move || {
             //TODO error handling, remove unwraps
             let batch_size = 64 * 1024; //TODO
+            let file = File::open(&filename).unwrap();
             match SerializedFileReader::new(file) {
                 Ok(file_reader) => {
                     let file_reader = Rc::new(file_reader);
@@ -106,48 +112,59 @@ impl ParquetStream {
                             match batch_reader.next_batch() {
                                 Ok(Some(batch)) => {
                                     println!("sending batch");
-                                    tx.send(Some(Ok(ColumnarBatch::from_arrow(&batch)))).await;
+                                    response_tx
+                                        .send(Ok(Some(ColumnarBatch::from_arrow(&batch))))
+                                        .unwrap();
                                 }
                                 Ok(None) => {
                                     println!("sending eof");
-                                    tx.send(None);
+                                    response_tx.send(Ok(None)).unwrap();
                                     break;
                                 }
                                 Err(e) => {
                                     println!("sending error");
-                                    tx.send(Some(Err(BallistaError::General(format!("{:?}", e)))))
-                                        .await;
+                                    response_tx
+                                        .send(Err(BallistaError::General(format!("{:?}", e))))
+                                        .unwrap();
                                     break;
                                 }
                             }
                         },
 
                         Err(e) => {
-                            tx.send(Some(Err(BallistaError::General(format!("{:?}", e)))))
-                                .await;
+                            response_tx
+                                .send(Err(BallistaError::General(format!("{:?}", e))))
+                                .unwrap();
                         }
                     }
                 }
 
                 Err(e) => {
-                    tx.send(Some(Err(BallistaError::General(format!("{:?}", e)))))
-                        .await;
+                    response_tx
+                        .send(Err(BallistaError::General(format!("{:?}", e))))
+                        .unwrap();
                 }
             }
         });
 
-        Ok(Self { rx })
+        Ok(Self { response_rx })
     }
 }
 
 impl Stream for ParquetStream {
     type Item = Result<ColumnarBatch>;
 
-    fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        println!("poll_next()");
-        match self.rx.try_recv() {
-            Ok(item) => Poll::Ready(item),
-            Err(_) => Poll::Pending,
+    fn poll_next(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // println!("poll_next()");
+        match self.response_rx.try_recv() {
+            Ok(Ok(Some(item))) => Poll::Ready(Some(Ok(item))),
+            Ok(Ok(None)) => Poll::Ready(None),
+            Ok(Err(e)) => Poll::Ready(Some(Err(e))),
+            Err(_) => {
+                // this isn't efficient but it works
+                ctx.waker().wake_by_ref();
+                Poll::Pending
+            }
         }
     }
 }

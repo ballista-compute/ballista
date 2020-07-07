@@ -25,6 +25,7 @@ prost-types = "0.6"
 reqwest = "0.9.18"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 sqlparser = "0.2.6"
+crossbeam = "0.7"
 
 # For local development and debugging
 #arrow = { path = "../../../arrow/rust/arrow" }

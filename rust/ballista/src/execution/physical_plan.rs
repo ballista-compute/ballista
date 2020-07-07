@@ -40,9 +40,15 @@ use crate::execution::parquet_scan::ParquetScanExec;
 use crate::execution::projection::ProjectionExec;
 use crate::execution::shuffle_reader::ShuffleReaderExec;
 use crate::execution::shuffled_hash_join::ShuffledHashJoinExec;
+use std::sync::Mutex;
+use tonic::codegen::Arc;
 
 /// Stream of columnar batches using futures
-pub type ColumnarBatchStream = BoxStream<'static, Result<ColumnarBatch>>;
+pub type ColumnarBatchStream = Arc<dyn ColumnarBatchIterator>;
+
+pub trait ColumnarBatchIterator {
+    fn next(&self) -> Result<Option<ColumnarBatch>>;
+}
 
 /// Base trait for all operators
 pub trait ExecutionPlan {

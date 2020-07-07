@@ -15,11 +15,12 @@
 use std::fs::File;
 use std::pin::Pin;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::thread;
 
 use crate::error::{BallistaError, Result};
 use crate::execution::physical_plan::{
-    ColumnarBatch, ColumnarBatchStream, ExecutionPlan, Partitioning,
+    ColumnarBatch, ColumnarBatchIterator, ColumnarBatchStream, ExecutionPlan, Partitioning,
 };
 
 use crate::arrow::datatypes::Schema;
@@ -33,7 +34,7 @@ use crossbeam::channel::{unbounded, Receiver, Sender};
 use futures::task::{Context, Poll};
 use tokio::stream::Stream;
 
-type MaybeColumnarBatch = Option<Result<ColumnarBatch>>;
+type MaybeColumnarBatch = Result<Option<ColumnarBatch>>;
 
 #[derive(Debug, Clone)]
 pub struct ParquetScanExec {
@@ -62,9 +63,10 @@ impl ExecutionPlan for ParquetScanExec {
     }
 
     fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
-        let stream =
-            ParquetStream::try_new(&self.filenames[partition_index], self.projection.clone())?;
-        Ok(Box::pin(stream))
+        Ok(Arc::new(ParquetStream::try_new(
+            &self.filenames[partition_index],
+            self.projection.clone(),
+        )?))
     }
 }
 
@@ -115,18 +117,18 @@ impl ParquetStream {
                                 Ok(Some(batch)) => {
                                     println!("sending batch");
                                     response_tx
-                                        .send(Some(Ok(ColumnarBatch::from_arrow(&batch))))
+                                        .send(Ok(Some(ColumnarBatch::from_arrow(&batch))))
                                         .unwrap();
                                 }
                                 Ok(None) => {
                                     println!("sending eof");
-                                    response_tx.send(None).unwrap();
+                                    response_tx.send(Ok(None)).unwrap();
                                     break;
                                 }
                                 Err(e) => {
                                     println!("sending error");
                                     response_tx
-                                        .send(Some(Err(BallistaError::General(format!("{:?}", e)))))
+                                        .send(Err(BallistaError::General(format!("{:?}", e))))
                                         .unwrap();
                                     break;
                                 }
@@ -135,7 +137,7 @@ impl ParquetStream {
 
                         Err(e) => {
                             response_tx
-                                .send(Some(Err(BallistaError::General(format!("{:?}", e)))))
+                                .send(Err(BallistaError::General(format!("{:?}", e))))
                                 .unwrap();
                         }
                     }
@@ -143,7 +145,7 @@ impl ParquetStream {
 
                 Err(e) => {
                     response_tx
-                        .send(Some(Err(BallistaError::General(format!("{:?}", e)))))
+                        .send(Err(BallistaError::General(format!("{:?}", e))))
                         .unwrap();
                 }
             }
@@ -153,17 +155,8 @@ impl ParquetStream {
     }
 }
 
-impl Stream for ParquetStream {
-    type Item = Result<ColumnarBatch>;
-
-    fn poll_next(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match self.response_rx.try_recv() {
-            Ok(item) => Poll::Ready(item),
-            Err(_) => {
-                // this isn't efficient but it works
-                ctx.waker().wake_by_ref();
-                Poll::Pending
-            }
-        }
+impl ColumnarBatchIterator for ParquetStream {
+    fn next(&self) -> Result<Option<ColumnarBatch>> {
+        self.response_rx.recv().unwrap()
     }
 }

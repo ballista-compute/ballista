@@ -19,7 +19,7 @@ use std::thread;
 
 use crate::error::{BallistaError, Result};
 use crate::execution::physical_plan::{
-    ColumnarBatch, ColumnarBatchIterator, ColumnarBatchStream, ExecutionPlan, Partitioning,
+    ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ExecutionPlan, Partitioning,
 };
 
 use crate::arrow::datatypes::Schema;
@@ -29,7 +29,9 @@ use crate::parquet::arrow::arrow_reader::ArrowReader;
 use crate::parquet::arrow::ParquetFileArrowReader;
 use crate::parquet::file::reader::SerializedFileReader;
 
+use async_trait::async_trait;
 use crossbeam::channel::{unbounded, Receiver, Sender};
+use smol::Task;
 
 type MaybeColumnarBatch = Result<Option<ColumnarBatch>>;
 
@@ -60,20 +62,20 @@ impl ExecutionPlan for ParquetScanExec {
     }
 
     fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
-        Ok(Arc::new(ParquetStream::try_new(
+        Ok(Arc::new(ParquetBatchIter::try_new(
             &self.filenames[partition_index],
             self.projection.clone(),
         )?))
     }
 }
 
-pub struct ParquetStream {
+pub struct ParquetBatchIter {
     // schema: Arc<Schema>,
-    response_rx: Receiver<MaybeColumnarBatch>,
+    pub response_rx: Receiver<MaybeColumnarBatch>,
 }
 
 #[allow(dead_code)]
-impl ParquetStream {
+impl ParquetBatchIter {
     pub fn try_new(filename: &str, projection: Option<Vec<usize>>) -> Result<Self> {
         let file = File::open(filename)?;
         let file_reader = Rc::new(SerializedFileReader::new(file).unwrap()); //TODO error handling
@@ -152,8 +154,10 @@ impl ParquetStream {
     }
 }
 
-impl ColumnarBatchIterator for ParquetStream {
-    fn next(&self) -> Result<Option<ColumnarBatch>> {
-        self.response_rx.recv().unwrap()
+#[async_trait]
+impl ColumnarBatchIter for ParquetBatchIter {
+    async fn next(&self) -> Result<Option<ColumnarBatch>> {
+        let channel = self.response_rx.clone();
+        Task::blocking(async move { channel.recv().unwrap() }).await
     }
 }

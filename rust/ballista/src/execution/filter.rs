@@ -12,13 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::error::Result;
-use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan, PhysicalPlan};
 use std::rc::Rc;
+
+use async_trait::async_trait;
+
+use crate::error::Result;
+use crate::execution::physical_plan::{
+    ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ExecutionPlan, PhysicalPlan,
+};
+use datafusion::logicalplan::Expr;
+use tonic::codegen::Arc;
 
 #[derive(Debug, Clone)]
 pub struct FilterExec {
     pub(crate) child: Rc<PhysicalPlan>,
+    filter_expr: Rc<Expr>,
 }
 
 impl ExecutionPlan for FilterExec {
@@ -26,7 +34,26 @@ impl ExecutionPlan for FilterExec {
         vec![self.child.clone()]
     }
 
-    fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
-        unimplemented!()
+    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+        //TODO compile filter expr
+        Ok(Arc::new(FilterIter {
+            input: self.child.as_execution_plan().execute(partition_index)?,
+            //filter_expr
+        }))
+    }
+}
+
+struct FilterIter {
+    input: ColumnarBatchStream,
+    //filter_expr: Arc<dyn Expression>
+}
+
+#[async_trait]
+impl ColumnarBatchIter for FilterIter {
+    async fn next(&self) -> Result<Option<ColumnarBatch>> {
+        Ok(self.input.next().await?.map(|batch| {
+            //TODO apply filter expresion
+            batch.clone()
+        }))
     }
 }

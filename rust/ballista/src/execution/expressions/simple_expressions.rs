@@ -12,15 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Experimental distributed query execution support.
+use crate::execution::physical_plan::{ColumnarBatch, ColumnarValue, Expression};
 
-pub mod expressions;
-pub mod filter;
-pub mod hash_aggregate;
-pub mod parquet_scan;
-pub mod physical_plan;
-pub mod projection;
-pub mod scheduler;
-pub mod shuffle_exchange;
-pub mod shuffle_reader;
-pub mod shuffled_hash_join;
+/// Reference to a column by index
+pub struct ColumnReference {
+    index: usize,
+}
+
+impl ColumnReference {
+    pub fn new(index: usize) -> Self {
+        Self { index }
+    }
+}
+
+impl Expression for ColumnReference {
+    fn evaluate(&self, input: &ColumnarBatch) -> ColumnarValue {
+        input.column(self.index).clone()
+    }
+}

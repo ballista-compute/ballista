@@ -14,9 +14,12 @@
 
 use crate::error::Result;
 use crate::execution::physical_plan::{
-    ColumnarBatchStream, ExecutionPlan, Partitioning, PhysicalPlan,
+    ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ColumnarValue, ExecutionPlan,
+    Expression, Partitioning, PhysicalPlan,
 };
+use async_trait::async_trait;
 use std::rc::Rc;
+use tonic::codegen::Arc;
 
 #[derive(Debug, Clone)]
 pub struct ProjectionExec {
@@ -38,7 +41,28 @@ impl ExecutionPlan for ProjectionExec {
         self.child.as_execution_plan().output_partitioning()
     }
 
-    fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
-        unimplemented!()
+    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+        // TODO compile expressions
+        Ok(Arc::new(ProjectionIter {
+            input: self.child.as_execution_plan().execute(partition_index)?,
+            projection: vec![], // TODO
+        }))
+    }
+}
+
+/// Iterator that applies a projection to the batches
+struct ProjectionIter {
+    input: ColumnarBatchStream,
+    projection: Vec<Arc<dyn Expression>>,
+}
+
+#[async_trait]
+impl ColumnarBatchIter for ProjectionIter {
+    async fn next(&self) -> Result<Option<ColumnarBatch>> {
+        Ok(self.input.next().await?.map(|batch| {
+            let projected_values: Vec<ColumnarValue> =
+                self.projection.iter().map(|e| e.evaluate(&batch)).collect();
+            ColumnarBatch::from_values(&projected_values)
+        }))
     }
 }

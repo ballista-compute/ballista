@@ -40,11 +40,17 @@ use crate::execution::projection::ProjectionExec;
 use crate::execution::shuffle_reader::ShuffleReaderExec;
 use crate::execution::shuffled_hash_join::ShuffledHashJoinExec;
 
-/// Stream of columnar batches using futures
-pub type ColumnarBatchStream = Arc<dyn ColumnarBatchIterator>;
+use crate::execution::expressions::simple_expressions::ColumnReference;
+use async_trait::async_trait;
 
-pub trait ColumnarBatchIterator {
-    fn next(&self) -> Result<Option<ColumnarBatch>>;
+/// Stream of columnar batches using futures
+pub type ColumnarBatchStream = Arc<dyn ColumnarBatchIter>;
+
+/// Async iterator over a stream of columnar batches
+#[async_trait]
+pub trait ColumnarBatchIter: Sync + Send {
+    /// Get the next batch from the stream, or None if the stream has ended
+    async fn next(&self) -> Result<Option<ColumnarBatch>>;
 }
 
 /// Base trait for all operators
@@ -79,9 +85,9 @@ pub trait ExecutionPlan {
     fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream>;
 }
 
-pub trait Expression {
+pub trait Expression: Sync + Send {
     /// Evaluate an expression against a ColumnarBatch to produce a scalar or columnar result.
-    fn evaluate(&self, input: &ColumnarBatch);
+    fn evaluate(&self, input: &ColumnarBatch) -> ColumnarValue;
 }
 
 /// Batch of columnar data.
@@ -101,12 +107,22 @@ impl ColumnarBatch {
         Self { columns }
     }
 
+    pub fn from_values(values: &[ColumnarValue]) -> Self {
+        Self {
+            columns: values.to_vec(),
+        }
+    }
+
     pub fn num_columns(&self) -> usize {
         self.columns.len()
     }
 
     pub fn num_rows(&self) -> usize {
         self.columns[0].len()
+    }
+
+    pub fn column(&self, index: usize) -> &ColumnarValue {
+        &self.columns[index]
     }
 }
 
@@ -279,5 +295,13 @@ impl Partitioning {
             UnknownPartitioning(n) => *n,
             HashPartitioning(n, _) => *n,
         }
+    }
+}
+
+/// Create a physical expression from a logical expression
+pub fn compile_expression(expr: &Expr, _input: &PhysicalPlan) -> Arc<dyn Expression> {
+    match expr {
+        Expr::Column(n) => Arc::new(ColumnReference::new(*n)),
+        _ => unimplemented!(),
     }
 }

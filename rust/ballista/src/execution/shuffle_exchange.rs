@@ -36,10 +36,6 @@ impl ShuffleExchangeExec {
 
 impl ExecutionPlan for ShuffleExchangeExec {
     fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
-        //let stream = self.child.execute(partition_index)?;
-        // Ok(Box::pin(stream.map(move |batch| {
-        //     //TODO perform shuffle here
-        // })))
         unimplemented!()
     }
 }

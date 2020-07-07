@@ -33,7 +33,7 @@ use crossbeam::channel::{unbounded, Receiver, Sender};
 use futures::task::{Context, Poll};
 use tokio::stream::Stream;
 
-type MaybeColumnarBatch = Result<Option<ColumnarBatch>>;
+type MaybeColumnarBatch = Option<Result<ColumnarBatch>>;
 
 #[derive(Debug, Clone)]
 pub struct ParquetScanExec {
@@ -113,18 +113,18 @@ impl ParquetStream {
                                 Ok(Some(batch)) => {
                                     println!("sending batch");
                                     response_tx
-                                        .send(Ok(Some(ColumnarBatch::from_arrow(&batch))))
+                                        .send(Some(Ok(ColumnarBatch::from_arrow(&batch))))
                                         .unwrap();
                                 }
                                 Ok(None) => {
                                     println!("sending eof");
-                                    response_tx.send(Ok(None)).unwrap();
+                                    response_tx.send(None).unwrap();
                                     break;
                                 }
                                 Err(e) => {
                                     println!("sending error");
                                     response_tx
-                                        .send(Err(BallistaError::General(format!("{:?}", e))))
+                                        .send(Some(Err(BallistaError::General(format!("{:?}", e)))))
                                         .unwrap();
                                     break;
                                 }
@@ -133,7 +133,7 @@ impl ParquetStream {
 
                         Err(e) => {
                             response_tx
-                                .send(Err(BallistaError::General(format!("{:?}", e))))
+                                .send(Some(Err(BallistaError::General(format!("{:?}", e)))))
                                 .unwrap();
                         }
                     }
@@ -141,7 +141,7 @@ impl ParquetStream {
 
                 Err(e) => {
                     response_tx
-                        .send(Err(BallistaError::General(format!("{:?}", e))))
+                        .send(Some(Err(BallistaError::General(format!("{:?}", e)))))
                         .unwrap();
                 }
             }
@@ -155,11 +155,8 @@ impl Stream for ParquetStream {
     type Item = Result<ColumnarBatch>;
 
     fn poll_next(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        // println!("poll_next()");
         match self.response_rx.try_recv() {
-            Ok(Ok(Some(item))) => Poll::Ready(Some(Ok(item))),
-            Ok(Ok(None)) => Poll::Ready(None),
-            Ok(Err(e)) => Poll::Ready(Some(Err(e))),
+            Ok(item) => Poll::Ready(item),
             Err(_) => {
                 // this isn't efficient but it works
                 ctx.waker().wake_by_ref();

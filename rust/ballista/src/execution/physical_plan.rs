@@ -24,8 +24,7 @@
 
 use std::fmt;
 use std::rc::Rc;
-
-use futures::stream::BoxStream;
+use std::sync::Arc;
 
 use crate::arrow::array::ArrayRef;
 use crate::arrow::record_batch::RecordBatch;
@@ -40,8 +39,6 @@ use crate::execution::parquet_scan::ParquetScanExec;
 use crate::execution::projection::ProjectionExec;
 use crate::execution::shuffle_reader::ShuffleReaderExec;
 use crate::execution::shuffled_hash_join::ShuffledHashJoinExec;
-use std::sync::Mutex;
-use tonic::codegen::Arc;
 
 /// Stream of columnar batches using futures
 pub type ColumnarBatchStream = Arc<dyn ColumnarBatchIterator>;

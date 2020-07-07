@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use std::fs::File;
-use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::thread;
@@ -31,8 +30,6 @@ use crate::parquet::arrow::ParquetFileArrowReader;
 use crate::parquet::file::reader::SerializedFileReader;
 
 use crossbeam::channel::{unbounded, Receiver, Sender};
-use futures::task::{Context, Poll};
-use tokio::stream::Stream;
 
 type MaybeColumnarBatch = Result<Option<ColumnarBatch>>;
 

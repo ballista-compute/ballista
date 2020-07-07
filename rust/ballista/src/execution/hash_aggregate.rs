@@ -15,9 +15,12 @@
 use crate::datafusion::logicalplan::Expr;
 use crate::error::Result;
 use crate::execution::physical_plan::{
-    AggregateMode, ColumnarBatchStream, Distribution, ExecutionPlan, Partitioning, PhysicalPlan,
+    AggregateMode, ColumnarBatch, ColumnarBatchIterator, ColumnarBatchStream, Distribution,
+    ExecutionPlan, Partitioning, PhysicalPlan,
 };
+
 use std::rc::Rc;
+use std::sync::Arc;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -73,9 +76,23 @@ impl ExecutionPlan for HashAggregateExec {
         vec![self.child.clone()]
     }
 
-    fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
-        //let _input = self.child.execute(partition_index)?;
+    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+        let input = self.child.as_execution_plan().execute(partition_index)?;
+        Ok(Arc::new(HashAggregateStream { input }))
+    }
+}
 
-        unimplemented!()
+struct HashAggregateStream {
+    input: ColumnarBatchStream,
+}
+
+impl ColumnarBatchIterator for HashAggregateStream {
+    fn next(&self) -> Result<Option<ColumnarBatch>> {
+        while let Some(_batch) = self.input.next()? {
+            //TODO aggregate
+            println!("aggregating batch!")
+        }
+        // TODO return aggregate result
+        Ok(None)
     }
 }

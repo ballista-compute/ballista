@@ -14,6 +14,8 @@
 
 //! Ballista is a proof-of-concept distributed compute platform based on Kubernetes and Apache Arrow.
 
+#![feature(async_closure)]
+
 pub use arrow;
 pub use datafusion;
 pub use parquet;

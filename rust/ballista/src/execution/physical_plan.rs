@@ -122,6 +122,9 @@ impl ColumnarValue {
             ColumnarValue::Columnar(array) => array.len(),
         }
     }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 /// Enumeration wrapping physical plan structs so that they can be represented in a tree easily

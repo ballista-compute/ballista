@@ -61,8 +61,10 @@ impl ExecutionPlan for ParquetScanExec {
         Partitioning::UnknownPartitioning(self.filenames.len())
     }
 
-    fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
-        unimplemented!()
+    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+        let stream =
+            ParquetStream::try_new(&self.filenames[partition_index], self.projection.clone())?;
+        Ok(Box::pin(stream))
     }
 }
 

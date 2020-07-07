@@ -42,7 +42,7 @@ use crate::execution::shuffle_reader::ShuffleReaderExec;
 use crate::execution::shuffled_hash_join::ShuffledHashJoinExec;
 
 /// Stream of columnar batches using futures
-pub type ColumnarBatchStream = BoxStream<'static, ColumnarBatch>;
+pub type ColumnarBatchStream = BoxStream<'static, Result<ColumnarBatch>>;
 
 /// Base trait for all operators
 pub trait ExecutionPlan {

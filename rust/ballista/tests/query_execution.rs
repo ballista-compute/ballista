@@ -10,24 +10,14 @@ async fn async_query() -> Result<()> {
     let path = nyc_path();
     let exec = ParquetStream::try_new(&path, None)?;
     let mut stream: ColumnarBatchStream = Box::pin(exec);
-
-    loop {
-        println!("waiting for next");
-        match stream.next().await {
-            Some(batch) => {
-                println!(
-                    "batch with {} rows and {} columns",
-                    batch.num_rows(),
-                    batch.num_columns()
-                );
-            }
-            None => {
-                println!("Finished");
-                break;
-            }
-        }
+    while let Some(batch) = stream.next().await {
+        let batch = batch?;
+        println!(
+            "batch with {} rows and {} columns",
+            batch.num_rows(),
+            batch.num_columns()
+        );
     }
-
     Ok(())
 }
 

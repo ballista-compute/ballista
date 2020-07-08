@@ -55,6 +55,10 @@ impl ParquetScanExec {
 }
 
 impl ExecutionPlan for ParquetScanExec {
+    fn schema(&self) -> Arc<Schema> {
+        unimplemented!()
+    }
+
     fn output_partitioning(&self) -> Partitioning {
         // note that this one partition per file which is crude and later we should support
         // splitting files into partitions as well

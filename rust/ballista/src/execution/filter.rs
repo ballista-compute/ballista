@@ -21,6 +21,7 @@ use crate::execution::physical_plan::{
     compile_expression, ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ColumnarValue,
     ExecutionPlan, Expression, PhysicalPlan,
 };
+use arrow::datatypes::Schema;
 use datafusion::logicalplan::Expr;
 use tonic::codegen::Arc;
 
@@ -31,6 +32,10 @@ pub struct FilterExec {
 }
 
 impl ExecutionPlan for FilterExec {
+    fn schema(&self) -> Arc<Schema> {
+        unimplemented!()
+    }
+
     fn children(&self) -> Vec<Rc<PhysicalPlan>> {
         vec![self.child.clone()]
     }

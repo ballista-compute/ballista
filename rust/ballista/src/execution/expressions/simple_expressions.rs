@@ -14,19 +14,37 @@
 
 use crate::error::Result;
 use crate::execution::physical_plan::{ColumnarBatch, ColumnarValue, Expression};
+use arrow::datatypes::{DataType, Schema};
 
 /// Reference to a column by index
+#[derive(Debug)]
 pub struct ColumnReference {
     index: usize,
+    name: String,
 }
 
 impl ColumnReference {
     pub fn new(index: usize) -> Self {
-        Self { index }
+        Self {
+            index,
+            name: format!("c{}", index),
+        }
     }
 }
 
 impl Expression for ColumnReference {
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn data_type(&self, input_schema: &Schema) -> Result<DataType> {
+        Ok(input_schema.field(self.index).data_type().clone())
+    }
+
+    fn nullable(&self, input_schema: &Schema) -> Result<bool> {
+        Ok(input_schema.field(self.index).is_nullable())
+    }
+
     fn evaluate(&self, input: &ColumnarBatch) -> Result<ColumnarValue> {
         Ok(input.column(self.index).clone())
     }

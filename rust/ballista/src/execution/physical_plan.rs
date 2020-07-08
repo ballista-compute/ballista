@@ -41,7 +41,10 @@ use crate::execution::shuffle_reader::ShuffleReaderExec;
 use crate::execution::shuffled_hash_join::ShuffledHashJoinExec;
 
 use crate::execution::expressions::simple_expressions::ColumnReference;
+use arrow::datatypes::{DataType, Field, Schema};
 use async_trait::async_trait;
+use std::cell::RefCell;
+use std::fmt::Debug;
 
 /// Stream of columnar batches using futures
 pub type ColumnarBatchStream = Arc<dyn ColumnarBatchIter>;
@@ -55,6 +58,9 @@ pub trait ColumnarBatchIter: Sync + Send {
 
 /// Base trait for all operators
 pub trait ExecutionPlan {
+    /// Specified the output schema of this operator.
+    fn schema(&self) -> Arc<Schema>;
+
     /// Specifies how data is partitioned across different nodes in the cluster
     fn output_partitioning(&self) -> Partitioning {
         Partitioning::UnknownPartitioning(0)
@@ -85,9 +91,47 @@ pub trait ExecutionPlan {
     fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream>;
 }
 
-pub trait Expression: Sync + Send {
+pub trait Expression: Send + Sync + Debug {
+    /// Get the name to use in a schema to represent the result of this expression
+    fn name(&self) -> String;
+    /// Get the data type of this expression, given the schema of the input
+    fn data_type(&self, input_schema: &Schema) -> Result<DataType>;
+    /// Decide whether this expression is nullable, given the schema of the input
+    fn nullable(&self, input_schema: &Schema) -> Result<bool>;
     /// Evaluate an expression against a ColumnarBatch to produce a scalar or columnar result.
     fn evaluate(&self, input: &ColumnarBatch) -> Result<ColumnarValue>;
+    /// Generate schema Field type for this expression
+    fn to_schema_field(&self, input_schema: &Schema) -> Result<Field> {
+        Ok(Field::new(
+            &self.name(),
+            self.data_type(input_schema)?,
+            self.nullable(input_schema)?,
+        ))
+    }
+}
+
+/// Aggregate expression that can be evaluated against a RecordBatch
+pub trait AggregateExpr: Send + Sync {
+    /// Get the name to use in a schema to represent the result of this expression
+    fn name(&self) -> String;
+    /// Get the data type of this expression, given the schema of the input
+    fn data_type(&self, input_schema: &Schema) -> Result<DataType>;
+    /// Evaluate the expression being aggregated
+    fn evaluate_input(&self, batch: &ColumnarBatch) -> Result<ColumnarValue>;
+    /// Create an accumulator for this aggregate expression
+    fn create_accumulator(&self) -> Rc<RefCell<dyn Accumulator>>;
+    /// Create an aggregate expression for combining the results of accumulators from partitions.
+    /// For example, to combine the results of a parallel SUM we just need to do another SUM, but
+    /// to combine the results of parallel COUNT we would also use SUM.
+    fn create_reducer(&self, column_index: usize) -> Arc<dyn AggregateExpr>;
+}
+
+/// Aggregate accumulator
+pub trait Accumulator {
+    /// Update the accumulator based on a columnar value
+    fn accumulate(&mut self, value: &ColumnarValue) -> Result<()>;
+    /// Get the final value for the accumulator
+    fn get_value(&self) -> Result<ColumnarValue>;
 }
 
 /// Batch of columnar data.
@@ -304,4 +348,11 @@ pub fn compile_expression(expr: &Expr, _input: &PhysicalPlan) -> Result<Arc<dyn 
         Expr::Column(n) => Ok(Arc::new(ColumnReference::new(*n))),
         _ => unimplemented!(),
     }
+}
+
+pub fn compile_expressions(
+    expr: &[Expr],
+    input: &PhysicalPlan,
+) -> Result<Vec<Arc<dyn Expression>>> {
+    expr.iter().map(|e| compile_expression(e, input)).collect()
 }

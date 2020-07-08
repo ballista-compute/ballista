@@ -168,8 +168,8 @@ impl Scheduler {
 /// Convert a logical plan into a physical plan
 pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Rc<PhysicalPlan>> {
     match plan {
-        LogicalPlan::Projection { input, .. } => {
-            let exec = ProjectionExec::new(create_physical_plan(input)?);
+        LogicalPlan::Projection { input, expr, .. } => {
+            let exec = ProjectionExec::try_new(expr, create_physical_plan(input)?)?;
             Ok(Rc::new(PhysicalPlan::Projection(Rc::new(exec))))
         }
         LogicalPlan::Aggregate {

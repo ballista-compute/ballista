@@ -15,12 +15,13 @@
 use crate::datafusion::logicalplan::Expr;
 use crate::error::Result;
 use crate::execution::physical_plan::{
-    AggregateMode, ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, Distribution,
-    ExecutionPlan, Partitioning, PhysicalPlan,
+    compile_expressions, AggregateMode, ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream,
+    Distribution, ExecutionPlan, Expression, Partitioning, PhysicalPlan,
 };
 
 use async_trait::async_trait;
 
+use arrow::datatypes::Schema;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -60,6 +61,10 @@ impl HashAggregateExec {
 }
 
 impl ExecutionPlan for HashAggregateExec {
+    fn schema(&self) -> Arc<Schema> {
+        unimplemented!()
+    }
+
     fn output_partitioning(&self) -> Partitioning {
         match self.mode {
             AggregateMode::Partial => self.child.as_execution_plan().output_partitioning(),
@@ -80,21 +85,29 @@ impl ExecutionPlan for HashAggregateExec {
 
     fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
         let input = self.child.as_execution_plan().execute(partition_index)?;
-        Ok(Arc::new(HashAggregateIter { input }))
+        let group_expr = compile_expressions(&self.group_expr, &self.child)?;
+        Ok(Arc::new(HashAggregateIter { input, group_expr }))
     }
 }
 
 struct HashAggregateIter {
     input: ColumnarBatchStream,
+    group_expr: Vec<Arc<dyn Expression>>,
+    // aggr_expr: Vec<Arc<dyn AggregateExpr>>,
 }
 
 #[async_trait]
 impl ColumnarBatchIter for HashAggregateIter {
     async fn next(&self) -> Result<Option<ColumnarBatch>> {
-        while let Some(_batch) = self.input.next().await? {
-            //TODO aggregate
-            println!("aggregating batch!")
+        while let Some(batch) = self.input.next().await? {
+            // evaluate the grouping expressions against this batch
+            let _group_keys = self
+                .group_expr
+                .iter()
+                .map(|e| e.evaluate(&batch))
+                .collect::<Result<Vec<_>>>()?;
         }
+
         // TODO return aggregate result
         Ok(None)
     }

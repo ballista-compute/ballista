@@ -14,10 +14,13 @@
 
 use std::rc::Rc;
 
+use crate::arrow::datatypes::Schema;
 use crate::error::Result;
 use crate::execution::physical_plan::{
     ColumnarBatchStream, ExecutionPlan, Partitioning, PhysicalPlan,
 };
+
+use tonic::codegen::Arc;
 
 #[derive(Debug, Clone)]
 pub struct ShuffleExchangeExec {
@@ -35,6 +38,10 @@ impl ShuffleExchangeExec {
 }
 
 impl ExecutionPlan for ShuffleExchangeExec {
+    fn schema(&self) -> Arc<Schema> {
+        unimplemented!()
+    }
+
     fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
         unimplemented!()
     }

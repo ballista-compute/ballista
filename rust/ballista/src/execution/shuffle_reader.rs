@@ -14,6 +14,8 @@
 
 use crate::error::Result;
 use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan};
+use arrow::datatypes::Schema;
+use tonic::codegen::Arc;
 
 #[derive(Debug, Clone)]
 pub struct ShuffleReaderExec {
@@ -22,6 +24,10 @@ pub struct ShuffleReaderExec {
 }
 
 impl ExecutionPlan for ShuffleReaderExec {
+    fn schema(&self) -> Arc<Schema> {
+        unimplemented!()
+    }
+
     fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
         // TODO send Flight request to the executor asking for the partition(s)
         unimplemented!()

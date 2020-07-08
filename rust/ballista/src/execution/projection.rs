@@ -14,25 +14,52 @@
 
 use crate::error::Result;
 use crate::execution::physical_plan::{
-    ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ColumnarValue, ExecutionPlan,
-    Expression, Partitioning, PhysicalPlan,
+    compile_expressions, ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ColumnarValue,
+    ExecutionPlan, Expression, Partitioning, PhysicalPlan,
 };
+use arrow::datatypes::Schema;
 use async_trait::async_trait;
+use datafusion::logicalplan::Expr;
 use std::rc::Rc;
 use tonic::codegen::Arc;
 
+/// Projection operator.
 #[derive(Debug, Clone)]
 pub struct ProjectionExec {
+    /// Logical expressions for the projection.
+    exprs: Vec<Arc<dyn Expression>>,
+    /// The input operator to apply the projection to.
     pub(crate) child: Rc<PhysicalPlan>,
+    /// The resulting schema of the projection.
+    schema: Arc<Schema>,
 }
 
 impl ProjectionExec {
-    pub fn new(child: Rc<PhysicalPlan>) -> Self {
-        Self { child }
+    pub fn try_new(expr: &[Expr], child: Rc<PhysicalPlan>) -> Result<Self> {
+        let exprs = compile_expressions(&expr, child.as_ref())?;
+
+        let input_schema = child.as_execution_plan().schema();
+
+        let fields: Result<Vec<_>> = exprs
+            .iter()
+            .map(|e| e.to_schema_field(&input_schema))
+            .collect();
+
+        let schema = Arc::new(Schema::new(fields?));
+
+        Ok(Self {
+            exprs,
+            child,
+            schema,
+        })
     }
 }
 
 impl ExecutionPlan for ProjectionExec {
+    fn schema(&self) -> Arc<Schema> {
+        self.schema.clone()
+    }
+
     fn children(&self) -> Vec<Rc<PhysicalPlan>> {
         vec![self.child.clone()]
     }
@@ -42,10 +69,9 @@ impl ExecutionPlan for ProjectionExec {
     }
 
     fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
-        // TODO compile expressions
         Ok(Arc::new(ProjectionIter {
             input: self.child.as_execution_plan().execute(partition_index)?,
-            projection: vec![], // TODO
+            projection: self.exprs.clone(),
         }))
     }
 }

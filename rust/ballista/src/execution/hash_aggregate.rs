@@ -21,6 +21,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
+//use async_mutex::Mutex;
 
 use crate::arrow::datatypes::Schema;
 use crate::datafusion::logicalplan::Expr;
@@ -123,7 +124,7 @@ impl HashAggregateIter {
 /// internal mutable state used during execution of a hash aggregate
 struct HashAggregateState {
     /// Map of grouping values to accumulator sets
-    accum_map: FnvHashMap<Vec<GroupByScalar>, Arc<AccumulatorSet>>
+    accum_map: FnvHashMap<Vec<GroupByScalar>, AccumulatorSet>
 }
 
 impl HashAggregateState {
@@ -141,10 +142,10 @@ impl ColumnarBatchIter for HashAggregateIter {
 
         while let Some(batch) = self.input.next().await? {
 
-            let state = self.state.lock().unwrap();
+            let mut state = self.state.lock().unwrap();
 
             // evaluate the grouping expressions against this batch
-            let _group_keys = self
+            let group_keys = self
                 .group_expr
                 .iter()
                 .map(|e| e.evaluate(&batch))
@@ -157,15 +158,39 @@ impl ColumnarBatchIter for HashAggregateIter {
                 .map(|expr| expr.evaluate_input(&batch))
                 .collect::<Result<Vec<_>>>()?;
 
+            //TODO try doing loops of map lookups, then loops of accumulation as per the talk
+            // from spark ai summit, to better leverage SIMD
 
-            let _accumulators: Vec<Arc<Mutex<dyn Accumulator>>> = self
-                .aggr_expr
-                .iter()
-                .map(|expr| expr.create_accumulator())
-                .collect();
+            for i in 0..group_keys.len() {
+
+                // create keys
+                let keys: Vec<GroupByScalar> = vec![];
+
+                // do map lookup
+                let updated = match state.accum_map.get(&keys) {
+                    Some(accum_set) => {
+                        //TODO update accumulators
+                        true
+                    }
+                    None => false
+                };
+
+                if !updated {
+                    // create accumulators
+                    let accumulators: Vec<Arc<Mutex<dyn Accumulator>>> = self
+                        .aggr_expr
+                        .iter()
+                        .map(|expr| expr.create_accumulator())
+                        .collect();
+
+                    //TODO update accumulators
+
+                    state.accum_map.insert(keys, accumulators);
+                }
+            }
         }
 
-        // TODO return aggregate result
+        //TODO return aggregate result
         Ok(None)
     }
 }

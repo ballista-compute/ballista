@@ -216,6 +216,7 @@ dependencies = [
  "datafusion",
  "env_logger",
  "flatbuffers",
+ "fnv",
  "futures 0.3.5",
  "http 0.1.21",
  "k8s-openapi",

@@ -24,7 +24,7 @@
 
 use std::fmt;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::arrow::array::ArrayRef;
 use crate::arrow::record_batch::RecordBatch;
@@ -43,7 +43,6 @@ use crate::execution::shuffled_hash_join::ShuffledHashJoinExec;
 use crate::execution::expressions::simple_expressions::ColumnReference;
 use arrow::datatypes::{DataType, Field, Schema};
 use async_trait::async_trait;
-use std::cell::RefCell;
 use std::fmt::Debug;
 
 /// Stream of columnar batches using futures
@@ -54,6 +53,11 @@ pub type ColumnarBatchStream = Arc<dyn ColumnarBatchIter>;
 pub trait ColumnarBatchIter: Sync + Send {
     /// Get the next batch from the stream, or None if the stream has ended
     async fn next(&self) -> Result<Option<ColumnarBatch>>;
+
+    /// Notify the iterator that no more results will be fetched, so that resources
+    /// can be freed immediately.
+    async fn close(&self) {
+    }
 }
 
 /// Base trait for all operators
@@ -111,7 +115,7 @@ pub trait Expression: Send + Sync + Debug {
 }
 
 /// Aggregate expression that can be evaluated against a RecordBatch
-pub trait AggregateExpr: Send + Sync {
+pub trait AggregateExpr: Send + Sync + Debug {
     /// Get the name to use in a schema to represent the result of this expression
     fn name(&self) -> String;
     /// Get the data type of this expression, given the schema of the input
@@ -119,7 +123,7 @@ pub trait AggregateExpr: Send + Sync {
     /// Evaluate the expression being aggregated
     fn evaluate_input(&self, batch: &ColumnarBatch) -> Result<ColumnarValue>;
     /// Create an accumulator for this aggregate expression
-    fn create_accumulator(&self) -> Rc<RefCell<dyn Accumulator>>;
+    fn create_accumulator(&self) -> Arc<Mutex<dyn Accumulator>>;
     /// Create an aggregate expression for combining the results of accumulators from partitions.
     /// For example, to combine the results of a parallel SUM we just need to do another SUM, but
     /// to combine the results of parallel COUNT we would also use SUM.
@@ -127,7 +131,7 @@ pub trait AggregateExpr: Send + Sync {
 }
 
 /// Aggregate accumulator
-pub trait Accumulator {
+pub trait Accumulator : Send + Sync {
     /// Update the accumulator based on a columnar value
     fn accumulate(&mut self, value: &ColumnarValue) -> Result<()>;
     /// Get the final value for the accumulator
@@ -355,4 +359,15 @@ pub fn compile_expressions(
     input: &PhysicalPlan,
 ) -> Result<Vec<Arc<dyn Expression>>> {
     expr.iter().map(|e| compile_expression(e, input)).collect()
+}
+
+pub fn compile_aggregate_expression(expr: &Expr, _input: &PhysicalPlan) -> Result<Arc<dyn AggregateExpr>> {
+    unimplemented!()
+}
+
+pub fn compile_aggregate_expressions(
+    expr: &[Expr],
+    input: &PhysicalPlan,
+) -> Result<Vec<Arc<dyn AggregateExpr>>> {
+    expr.iter().map(|e| compile_aggregate_expression(e, input)).collect()
 }

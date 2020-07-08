@@ -19,6 +19,7 @@ kube = "0.35"
 log = "0.4"
 tokio = { version = "0.2", features = ["full"] }
 tonic = "0.1.1"
+fnv = "1.0.7"
 flatbuffers = "0.6.0"
 prost = "0.6"
 prost-types = "0.6"

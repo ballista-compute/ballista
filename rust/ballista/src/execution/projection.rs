@@ -59,10 +59,16 @@ struct ProjectionIter {
 #[async_trait]
 impl ColumnarBatchIter for ProjectionIter {
     async fn next(&self) -> Result<Option<ColumnarBatch>> {
-        Ok(self.input.next().await?.map(|batch| {
-            let projected_values: Vec<ColumnarValue> =
-                self.projection.iter().map(|e| e.evaluate(&batch)).collect();
-            ColumnarBatch::from_values(&projected_values)
-        }))
+        match self.input.next().await? {
+            Some(batch) => {
+                let projected_values: Vec<ColumnarValue> = self
+                    .projection
+                    .iter()
+                    .map(|e| e.evaluate(&batch))
+                    .collect::<Result<Vec<_>>>()?;
+                Ok(Some(ColumnarBatch::from_values(&projected_values)))
+            }
+            None => Ok(None),
+        }
     }
 }

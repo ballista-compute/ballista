@@ -87,7 +87,7 @@ pub trait ExecutionPlan {
 
 pub trait Expression: Sync + Send {
     /// Evaluate an expression against a ColumnarBatch to produce a scalar or columnar result.
-    fn evaluate(&self, input: &ColumnarBatch) -> ColumnarValue;
+    fn evaluate(&self, input: &ColumnarBatch) -> Result<ColumnarValue>;
 }
 
 /// Batch of columnar data.
@@ -299,9 +299,9 @@ impl Partitioning {
 }
 
 /// Create a physical expression from a logical expression
-pub fn compile_expression(expr: &Expr, _input: &PhysicalPlan) -> Arc<dyn Expression> {
+pub fn compile_expression(expr: &Expr, _input: &PhysicalPlan) -> Result<Arc<dyn Expression>> {
     match expr {
-        Expr::Column(n) => Arc::new(ColumnReference::new(*n)),
+        Expr::Column(n) => Ok(Arc::new(ColumnReference::new(*n))),
         _ => unimplemented!(),
     }
 }

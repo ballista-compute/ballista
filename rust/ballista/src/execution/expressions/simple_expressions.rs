@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::error::Result;
 use crate::execution::physical_plan::{ColumnarBatch, ColumnarValue, Expression};
 
 /// Reference to a column by index
@@ -26,7 +27,7 @@ impl ColumnReference {
 }
 
 impl Expression for ColumnReference {
-    fn evaluate(&self, input: &ColumnarBatch) -> ColumnarValue {
-        input.column(self.index).clone()
+    fn evaluate(&self, input: &ColumnarBatch) -> Result<ColumnarValue> {
+        Ok(input.column(self.index).clone())
     }
 }

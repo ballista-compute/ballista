@@ -18,8 +18,9 @@
 //! Ballista Hash Aggregate operator. This is based on the implementation from DataFusion in the
 //! Apache Arrow project.
 
+use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use crossbeam::channel::{unbounded, Receiver, Sender};
@@ -155,7 +156,7 @@ macro_rules! extract_aggr_value {
         let mut builder = array::$BUILDER::new($MAP.len());
         let mut err = false;
         for v in $MAP.values() {
-            match v[$COL_INDEX].as_ref().lock().unwrap().get_value()? {
+            match v[$COL_INDEX].as_ref().borrow().get_value()? {
                 Some(ScalarValue::$TY(n)) => builder.append_value(n as $TY2).unwrap(),
                 None => builder.append_null().unwrap(),
                 _ => err = true,
@@ -198,7 +199,7 @@ macro_rules! update_accumulators {
         for row in 0..$ARRAY.len() {
             if $ARRAY.is_valid(row) {
                 let value = $SCALAR_TY(primitive_array.value(row));
-                let mut accum = $ACCUM[row][$COL].lock().unwrap();
+                let mut accum = $ACCUM[row][$COL].borrow_mut();
                 accum.accumulate(&ColumnarValue::Scalar(Some(value), 1))?;
             }
         }
@@ -206,7 +207,7 @@ macro_rules! update_accumulators {
 }
 
 /// AccumularSet is the value in the hash map
-type AccumulatorSet = Vec<Arc<Mutex<dyn Accumulator>>>;
+type AccumulatorSet = Vec<Rc<RefCell<dyn Accumulator>>>;
 
 #[allow(dead_code)]
 struct HashAggregateIter {
@@ -232,7 +233,7 @@ fn create_task(
     aggr_expr: Vec<Arc<dyn AggregateExpr>>,
     tx: Sender<MaybeColumnarBatch>,
 ) -> Task<Result<()>> {
-    Task::spawn(async move {
+    Task::local(async move {
         let start = Instant::now();
         let mut batch_count = 0;
         let mut row_count = 0;

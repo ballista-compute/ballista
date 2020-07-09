@@ -15,7 +15,6 @@
 use std::fs::File;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::thread;
 
 use crate::error::{BallistaError, Result};
 use crate::execution::physical_plan::{
@@ -33,6 +32,7 @@ use crate::parquet::file::reader::SerializedFileReader;
 use async_trait::async_trait;
 use crossbeam::channel::{unbounded, Receiver, Sender};
 use smol::Task;
+use std::time::Instant;
 
 #[derive(Debug, Clone)]
 pub struct ParquetScanExec {
@@ -48,6 +48,8 @@ impl ParquetScanExec {
         common::build_file_list(path, &mut filenames, ".parquet")?;
 
         let filename = &filenames[0];
+        println!("Scanning {}", filename);
+
         let file = File::open(filename)?;
         let file_reader = Rc::new(SerializedFileReader::new(file).unwrap()); //TODO error handling
         let mut arrow_reader = ParquetFileArrowReader::new(file_reader);
@@ -125,7 +127,11 @@ impl ParquetBatchIter {
 
         let filename = filename.to_string();
 
-        thread::spawn(move || {
+        let task = Task::local(async move {
+            let start = Instant::now();
+            let mut output_batches = 0;
+            let mut output_rows = 0;
+
             //TODO error handling, remove unwraps
             let batch_size = 64 * 1024; //TODO
             let file = File::open(&filename).unwrap();
@@ -137,6 +143,9 @@ impl ParquetBatchIter {
                         Ok(mut batch_reader) => loop {
                             match batch_reader.next_batch() {
                                 Ok(Some(batch)) => {
+                                    output_batches += 1;
+                                    output_rows += batch.num_rows();
+
                                     response_tx
                                         .send(Ok(Some(ColumnarBatch::from_arrow(&batch))))
                                         .unwrap();
@@ -168,7 +177,16 @@ impl ParquetBatchIter {
                         .unwrap();
                 }
             }
+
+            println!(
+                "ParquetScan scanned {} batches and {} rows in {} ms",
+                output_batches,
+                output_rows,
+                start.elapsed().as_millis()
+            );
         });
+
+        task.detach();
 
         Ok(Self {
             schema: Arc::new(projected_schema),

@@ -22,9 +22,10 @@
 //!
 //! The physical plan also accounts for partitioning and ordering of data between operators.
 
+use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::arrow::array::ArrayRef;
 use crate::arrow::datatypes::{DataType, Field, Schema};
@@ -127,7 +128,7 @@ pub trait AggregateExpr: Send + Sync + Debug {
     /// Evaluate the expression being aggregated
     fn evaluate_input(&self, batch: &ColumnarBatch) -> Result<ColumnarValue>;
     /// Create an accumulator for this aggregate expression
-    fn create_accumulator(&self) -> Arc<Mutex<dyn Accumulator>>;
+    fn create_accumulator(&self) -> Rc<RefCell<dyn Accumulator>>;
     /// Create an aggregate expression for combining the results of accumulators from partitions.
     /// For example, to combine the results of a parallel SUM we just need to do another SUM, but
     /// to combine the results of parallel COUNT we would also use SUM.

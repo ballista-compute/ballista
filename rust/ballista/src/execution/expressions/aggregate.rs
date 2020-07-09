@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::{Arc, Mutex};
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::arrow::array;
 use crate::arrow::compute;
@@ -64,8 +66,8 @@ impl AggregateExpr for Max {
         self.expr.evaluate(batch)
     }
 
-    fn create_accumulator(&self) -> Arc<Mutex<dyn Accumulator>> {
-        Arc::new(Mutex::new(MaxAccumulator { max: None }))
+    fn create_accumulator(&self) -> Rc<RefCell<dyn Accumulator>> {
+        Rc::new(RefCell::new(MaxAccumulator { max: None }))
     }
 
     fn create_reducer(&self, column_index: usize) -> Arc<dyn AggregateExpr> {

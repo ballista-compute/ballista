@@ -128,11 +128,7 @@ pub trait AggregateExpr: Send + Sync + Debug {
     /// Evaluate the expression being aggregated
     fn evaluate_input(&self, batch: &ColumnarBatch) -> Result<ColumnarValue>;
     /// Create an accumulator for this aggregate expression
-    fn create_accumulator(&self) -> Rc<RefCell<dyn Accumulator>>;
-    /// Create an aggregate expression for combining the results of accumulators from partitions.
-    /// For example, to combine the results of a parallel SUM we just need to do another SUM, but
-    /// to combine the results of parallel COUNT we would also use SUM.
-    fn create_reducer(&self, column_index: usize) -> Arc<dyn AggregateExpr>;
+    fn create_accumulator(&self, mode: &AggregateMode) -> Rc<RefCell<dyn Accumulator>>;
     /// Generate schema Field type for this expression
     fn to_schema_field(&self, input_schema: &Schema) -> Result<Field> {
         Ok(Field::new(
@@ -328,8 +324,14 @@ pub enum SortDirection {
 
 #[derive(Debug, Clone)]
 pub enum AggregateMode {
+    /// Partial aggregation that can run in parallel per partition
     Partial,
+    /// Perform final aggregation on results of partial aggregation. For example, this would
+    /// produce the SUM of SUMs, or the SUMs of COUNTs.
     Final,
+    /// Perform complete aggregation in one pass. This is used when there is only a single
+    /// partition to operate on.
+    Complete,
 }
 
 #[derive(Debug, Clone)]

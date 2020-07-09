@@ -1,13 +1,13 @@
 extern crate ballista;
 
-use ballista::execution::hash_aggregate::HashAggregateExec;
-use ballista::execution::parquet_scan::ParquetScanExec;
-use ballista::execution::physical_plan::{AggregateMode, ColumnarBatchStream, PhysicalPlan};
-
-use ballista::dataframe::max;
-use datafusion::logicalplan::col_index;
-use std::rc::Rc;
-
+// use ballista::execution::hash_aggregate::HashAggregateExec;
+// use ballista::execution::parquet_scan::ParquetScanExec;
+// use ballista::execution::physical_plan::{AggregateMode, ColumnarBatchStream, PhysicalPlan};
+//
+// use ballista::dataframe::max;
+// use datafusion::logicalplan::col_index;
+// use std::rc::Rc;
+//
 // #[test]
 // fn hash_aggregate() -> std::io::Result<()> {
 //     smol::run(async {

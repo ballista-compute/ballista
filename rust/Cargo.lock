@@ -236,6 +236,7 @@ dependencies = [
  "prost",
  "prost-build",
  "prost-types",
+ "random-fast-rng",
  "reqwest 0.9.24",
  "smol",
  "sqlparser",
@@ -2114,6 +2115,21 @@ checksum = "cbf7e9e623549b0e21f6e97cf8ecf247c1a8fd2e8a992ae265314300b2455d5c"
 dependencies = [
  "rand_core 0.3.1",
 ]
+
+[[package]]
+name = "random-fast-rng"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "95784e84a571f44dc7fd4f0d3ab3f493d3c07b90d695450890490a89d83905a3"
+dependencies = [
+ "random-trait",
+]
+
+[[package]]
+name = "random-trait"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d3186af2e04abe646626095b37293d7485027e8591c56430dfda49894a28447"
 
 [[package]]
 name = "rdrand"

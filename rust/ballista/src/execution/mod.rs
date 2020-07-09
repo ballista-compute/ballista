@@ -17,6 +17,7 @@
 pub mod expressions;
 pub mod filter;
 pub mod hash_aggregate;
+pub mod in_memory;
 pub mod parquet_scan;
 pub mod physical_plan;
 pub mod projection;

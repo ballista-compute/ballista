@@ -30,6 +30,7 @@ crossbeam = "0.7"
 smol = "0.1.18"
 async-trait = "0.1.36"
 async-mutex = "1.1.5"
+random-fast-rng = "0.1.1"
 
 # For local development and debugging
 #arrow = { path = "../../../arrow/rust/arrow" }

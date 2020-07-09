@@ -43,6 +43,7 @@ use crate::execution::shuffle_reader::ShuffleReaderExec;
 use crate::execution::shuffled_hash_join::ShuffledHashJoinExec;
 
 use crate::execution::expressions::aggregate::Max;
+use crate::execution::in_memory::InMemoryTableScanExec;
 use async_trait::async_trait;
 use std::fmt::Debug;
 
@@ -153,6 +154,7 @@ pub type MaybeColumnarBatch = Result<Option<ColumnarBatch>>;
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ColumnarBatch {
+    schema: Arc<Schema>,
     columns: Vec<ColumnarValue>,
 }
 
@@ -163,13 +165,28 @@ impl ColumnarBatch {
             .iter()
             .map(|c| ColumnarValue::Columnar(c.clone()))
             .collect();
-        Self { columns }
+        Self {
+            schema: batch.schema().clone(),
+            columns,
+        }
     }
 
     pub fn from_values(values: &[ColumnarValue]) -> Self {
+        let schema = Schema::new(
+            values
+                .iter()
+                .enumerate()
+                .map(|(i, value)| Field::new(&format!("c{}", i), value.data_type().clone(), true))
+                .collect(),
+        );
         Self {
+            schema: Arc::new(schema),
             columns: values.to_vec(),
         }
+    }
+
+    pub fn schema(&self) -> Arc<Schema> {
+        self.schema.clone()
     }
 
     pub fn num_columns(&self) -> usize {
@@ -203,6 +220,13 @@ impl ColumnarValue {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    pub fn data_type(&self) -> &DataType {
+        match self {
+            ColumnarValue::Scalar(_, _) => unimplemented!(),
+            ColumnarValue::Columnar(array) => array.data_type(),
+        }
+    }
 }
 
 /// Enumeration wrapping physical plan structs so that they can be represented in a tree easily
@@ -223,6 +247,8 @@ pub enum PhysicalPlan {
     ShuffleReader(Rc<ShuffleReaderExec>),
     /// Scans a partitioned data source
     ParquetScan(Rc<ParquetScanExec>),
+    /// Scans an in-memory table
+    InMemoryTableScan(Rc<InMemoryTableScanExec>),
 }
 
 impl PhysicalPlan {
@@ -234,6 +260,7 @@ impl PhysicalPlan {
             Self::ParquetScan(exec) => exec.clone(),
             Self::ShuffleExchange(exec) => exec.clone(),
             Self::ShuffleReader(exec) => exec.clone(),
+            Self::InMemoryTableScan(exec) => exec.clone(),
             _ => unimplemented!(),
         }
     }

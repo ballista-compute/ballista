@@ -1,48 +1,57 @@
 extern crate ballista;
 
-// use ballista::execution::hash_aggregate::HashAggregateExec;
-// use ballista::execution::parquet_scan::ParquetScanExec;
-// use ballista::execution::physical_plan::{AggregateMode, ColumnarBatchStream, PhysicalPlan};
-//
-// use ballista::dataframe::max;
-// use datafusion::logicalplan::col_index;
-// use std::rc::Rc;
-//
-// #[test]
-// fn hash_aggregate() -> std::io::Result<()> {
-//     smol::run(async {
-//         let path = nyc_path();
-//
-//         let parquet = PhysicalPlan::ParquetScan(Rc::new(
-//             ParquetScanExec::try_new(&path, Some(vec![3, 10])).unwrap(),
-//         ));
-//         println!("{:?}", parquet.as_execution_plan().schema());
-//
-//         let hash_agg = PhysicalPlan::HashAggregate(Rc::new(
-//             HashAggregateExec::try_new(
-//                 AggregateMode::Partial,
-//                 vec![col_index(0)],
-//                 vec![max(col_index(1))],
-//                 Rc::new(parquet),
-//             )
-//             .unwrap(),
-//         ));
-//         println!("{:?}", hash_agg.as_execution_plan().schema());
-//
-//         let stream: ColumnarBatchStream = hash_agg.as_execution_plan().execute(0).unwrap();
-//         while let Some(batch) = stream.next().await.unwrap() {
-//             println!(
-//                 "batch with {} rows and {} columns",
-//                 batch.num_rows(),
-//                 batch.num_columns()
-//             );
-//             println!("{:?}", batch);
-//         }
-//         std::io::Result::Ok(())
-//     })
-// }
-//
-// fn nyc_path() -> String {
-//     //TODO use env var for path
-//     "/mnt/nyctaxi/parquet/year=2019".to_owned()
-// }
+use std::rc::Rc;
+
+use ballista::arrow::datatypes::{DataType, Field, Schema};
+use ballista::dataframe::max;
+use ballista::datafusion::logicalplan::col_index;
+use ballista::datagen::DataGen;
+use ballista::execution::hash_aggregate::HashAggregateExec;
+use ballista::execution::in_memory::InMemoryTableScanExec;
+use ballista::execution::physical_plan::{AggregateMode, ColumnarBatchStream, PhysicalPlan};
+
+#[test]
+fn hash_aggregate() -> std::io::Result<()> {
+    smol::run(async {
+        //TODO remove unwraps
+
+        let mut gen = DataGen::default();
+
+        let schema = Schema::new(vec![
+            Field::new("c0", DataType::Int64, true),
+            Field::new("c1", DataType::UInt64, false),
+        ]);
+        let batch = gen.create_batch(&schema, 4096).unwrap();
+
+        let in_memory_exec =
+            PhysicalPlan::InMemoryTableScan(Rc::new(InMemoryTableScanExec::new(vec![
+                batch.clone(),
+                batch,
+            ])));
+
+        let hash_agg = PhysicalPlan::HashAggregate(Rc::new(
+            HashAggregateExec::try_new(
+                AggregateMode::Partial,
+                vec![col_index(0)],
+                vec![max(col_index(1))],
+                Rc::new(in_memory_exec),
+            )
+            .unwrap(),
+        ));
+
+        let stream: ColumnarBatchStream = hash_agg.as_execution_plan().execute(0).unwrap();
+        let mut results = vec![];
+        while let Some(batch) = stream.next().await.unwrap() {
+            results.push(batch);
+        }
+
+        assert_eq!(1, results.len());
+
+        let batch = &results[0];
+
+        assert_eq!(3961, batch.num_rows());
+        assert_eq!(2, batch.num_columns());
+
+        std::io::Result::Ok(())
+    })
+}

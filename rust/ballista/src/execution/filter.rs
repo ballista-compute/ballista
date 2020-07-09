@@ -42,7 +42,7 @@ impl ExecutionPlan for FilterExec {
 
     fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
         //TODO compile filter expr
-        let expr = compile_expression(&self.filter_expr, &self.child)?;
+        let expr = compile_expression(&self.filter_expr, &self.schema())?;
         Ok(Arc::new(FilterIter {
             input: self.child.as_execution_plan().execute(partition_index)?,
             filter_expr: expr,
@@ -58,6 +58,10 @@ struct FilterIter {
 
 #[async_trait]
 impl ColumnarBatchIter for FilterIter {
+    fn schema(&self) -> Arc<Schema> {
+        self.input.schema()
+    }
+
     async fn next(&self) -> Result<Option<ColumnarBatch>> {
         let _input = self.input.next().await?;
         unimplemented!()

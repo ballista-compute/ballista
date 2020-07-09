@@ -36,7 +36,7 @@ pub struct ProjectionExec {
 
 impl ProjectionExec {
     pub fn try_new(expr: &[Expr], child: Rc<PhysicalPlan>) -> Result<Self> {
-        let exprs = compile_expressions(&expr, child.as_ref())?;
+        let exprs = compile_expressions(&expr, &child.as_execution_plan().schema())?;
 
         let input_schema = child.as_execution_plan().schema();
 
@@ -84,6 +84,10 @@ struct ProjectionIter {
 
 #[async_trait]
 impl ColumnarBatchIter for ProjectionIter {
+    fn schema(&self) -> Arc<Schema> {
+        unimplemented!()
+    }
+
     async fn next(&self) -> Result<Option<ColumnarBatch>> {
         match self.input.next().await? {
             Some(batch) => {

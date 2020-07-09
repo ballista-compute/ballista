@@ -195,10 +195,10 @@ pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Rc<PhysicalPlan>> {
             } else {
                 // Create partial hash aggregate to run against partitions in parallel
                 let partial_hash_exec = HashAggregateExec::try_new(
-                        AggregateMode::Partial,
-                        group_expr.clone(),
-                        aggr_expr.clone(),
-                        input,
+                    AggregateMode::Partial,
+                    group_expr.clone(),
+                    aggr_expr.clone(),
+                    input,
                 )?;
                 let partial = Rc::new(PhysicalPlan::HashAggregate(Rc::new(partial_hash_exec)));
                 // Create final hash aggregate to run on the coalesced partition of the results
@@ -210,7 +210,9 @@ pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Rc<PhysicalPlan>> {
                     aggr_expr.clone(),
                     partial,
                 )?;
-                Ok(Rc::new(PhysicalPlan::HashAggregate(Rc::new(final_hash_exec))))
+                Ok(Rc::new(PhysicalPlan::HashAggregate(Rc::new(
+                    final_hash_exec,
+                ))))
             }
         }
         LogicalPlan::ParquetScan { path, .. } => {

@@ -21,17 +21,21 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-//use async_mutex::Mutex;
-
-use crate::arrow::datatypes::Schema;
-use crate::datafusion::logicalplan::Expr;
-use crate::error::Result;
-use crate::execution::physical_plan::{
-    compile_expressions, AggregateMode, ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream,
-    Distribution, ExecutionPlan, Expression, Partitioning, PhysicalPlan, AggregateExpr,
-    compile_aggregate_expressions, Accumulator
-};
+use crossbeam::channel::{unbounded, Receiver, Sender};
 use fnv::FnvHashMap;
+use smol::Task;
+
+use crate::arrow::array::StringBuilder;
+use crate::arrow::array::{self, ArrayRef};
+use crate::arrow::datatypes::{DataType, Schema};
+use crate::datafusion::logicalplan::{Expr, ScalarValue};
+use crate::error::{BallistaError, Result};
+use crate::execution::physical_plan::{
+    compile_aggregate_expressions, compile_expressions, Accumulator, AggregateExpr, AggregateMode,
+    ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ColumnarValue, Distribution,
+    ExecutionPlan, Expression, MaybeColumnarBatch, Partitioning, PhysicalPlan,
+};
+use std::time::Instant;
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -40,6 +44,7 @@ pub struct HashAggregateExec {
     pub(crate) group_expr: Vec<Arc<dyn Expression>>,
     pub(crate) aggr_expr: Vec<Arc<dyn AggregateExpr>>,
     pub(crate) child: Rc<PhysicalPlan>,
+    schema: Arc<Schema>,
 }
 
 impl HashAggregateExec {
@@ -49,15 +54,30 @@ impl HashAggregateExec {
         aggr_expr: Vec<Expr>,
         child: Rc<PhysicalPlan>,
     ) -> Result<Self> {
+        let group_expr = compile_expressions(&group_expr, &child.as_execution_plan().schema())?;
+        let aggr_expr =
+            compile_aggregate_expressions(&aggr_expr, &child.as_execution_plan().schema())?;
+        let input_schema = child.as_execution_plan().schema();
 
-        let group_expr = compile_expressions(&group_expr, &child)?;
-        let aggr_expr = compile_aggregate_expressions(&aggr_expr, &child)?;
+        let mut fields = group_expr
+            .iter()
+            .map(|e| e.to_schema_field(&input_schema))
+            .collect::<Result<Vec<_>>>()?;
+        fields.extend(
+            aggr_expr
+                .iter()
+                .map(|e| e.to_schema_field(&input_schema))
+                .collect::<Result<Vec<_>>>()?,
+        );
+
+        let schema = Arc::new(Schema::new(fields));
 
         Ok(Self {
             mode,
             group_expr,
             aggr_expr,
             child,
+            schema,
         })
     }
 
@@ -68,13 +88,14 @@ impl HashAggregateExec {
             group_expr: self.group_expr.clone(),
             aggr_expr: self.aggr_expr.clone(),
             child: new_children[0].clone(),
+            schema: self.schema().clone(),
         }
     }
 }
 
 impl ExecutionPlan for HashAggregateExec {
     fn schema(&self) -> Arc<Schema> {
-        unimplemented!()
+        self.schema.clone()
     }
 
     fn output_partitioning(&self) -> Partitioning {
@@ -105,93 +126,416 @@ impl ExecutionPlan for HashAggregateExec {
     }
 }
 
+/// Create array from `key` attribute in map entry (representing a grouping scalar value)
+macro_rules! extract_group_val {
+    ($BUILDER:ident, $TY:ident, $MAP:expr, $COL_INDEX:expr) => {{
+        let mut builder = array::$BUILDER::new($MAP.len());
+        let mut err = false;
+        for k in $MAP.keys() {
+            match k[$COL_INDEX] {
+                GroupByScalar::$TY(n) => builder.append_value(n).unwrap(),
+                _ => err = true,
+            }
+        }
+        if err {
+            Err(BallistaError::General(
+                "unexpected type when creating grouping array from aggregate map".to_string(),
+            ))
+        } else {
+            Ok(Arc::new(builder.finish()) as ArrayRef)
+        }
+    }};
+}
+
+/// Create array from `value` attribute in map entry (representing an aggregate scalar
+/// value)
+macro_rules! extract_aggr_value {
+    ($BUILDER:ident, $TY:ident, $TY2:ty, $MAP:expr, $COL_INDEX:expr) => {{
+        let mut builder = array::$BUILDER::new($MAP.len());
+        let mut err = false;
+        for v in $MAP.values() {
+            match v[$COL_INDEX].as_ref().lock().unwrap().get_value()? {
+                Some(ScalarValue::$TY(n)) => builder.append_value(n as $TY2).unwrap(),
+                None => builder.append_null().unwrap(),
+                _ => err = true,
+            }
+        }
+        if err {
+            Err(BallistaError::General(
+                "unexpected type when creating aggregate array from aggregate map".to_string(),
+            ))
+        } else {
+            Ok(Arc::new(builder.finish()) as ArrayRef)
+        }
+    }};
+}
+
+/// Create array from single accumulator value
+// macro_rules! aggr_array_from_accumulator {
+//     ($BUILDER:ident, $TY:ident, $TY2:ty, $VALUE:expr) => {{
+//         let mut builder = $BUILDER::new(1);
+//         match $VALUE {
+//             Some(ScalarValue::$TY(n)) => {
+//                 builder.append_value(n as $TY2)?;
+//                 Ok(Arc::new(builder.finish()) as ArrayRef)
+//             }
+//             None => {
+//                 builder.append_null()?;
+//                 Ok(Arc::new(builder.finish()) as ArrayRef)
+//             }
+//             _ => Err(BallistaError::General(
+//                 "unexpected type when creating aggregate array from aggregate map".to_string(),
+//             )),
+//         }
+//     }};
+// }
+
+macro_rules! update_accumulators {
+    ($ARRAY:ident, $ARRAY_TY:ident, $SCALAR_TY:expr, $COL:expr, $ACCUM:expr) => {{
+        let primitive_array = $ARRAY.as_any().downcast_ref::<array::$ARRAY_TY>().unwrap();
+
+        for row in 0..$ARRAY.len() {
+            if $ARRAY.is_valid(row) {
+                let value = $SCALAR_TY(primitive_array.value(row));
+                let mut accum = $ACCUM[row][$COL].lock().unwrap();
+                accum.accumulate(&ColumnarValue::Scalar(Some(value), 1))?;
+            }
+        }
+    }};
+}
+
+/// AccumularSet is the value in the hash map
+type AccumulatorSet = Vec<Arc<Mutex<dyn Accumulator>>>;
+
+#[allow(dead_code)]
 struct HashAggregateIter {
-    input: ColumnarBatchStream,
-    group_expr: Vec<Arc<dyn Expression>>,
-    aggr_expr: Vec<Arc<dyn AggregateExpr>>,
-    state: Arc<Mutex<HashAggregateState>>,
+    task: Task<Result<()>>,
+    rx: Receiver<MaybeColumnarBatch>,
 }
 
 impl HashAggregateIter {
-    fn new(input: ColumnarBatchStream,
-           group_expr: Vec<Arc<dyn Expression>>,
-           aggr_expr: Vec<Arc<dyn AggregateExpr>>) -> Self {
-        Self { input, group_expr, aggr_expr,
-            state: Arc::new(Mutex::new(HashAggregateState::new())) }
+    fn new(
+        input: ColumnarBatchStream,
+        group_expr: Vec<Arc<dyn Expression>>,
+        aggr_expr: Vec<Arc<dyn AggregateExpr>>,
+    ) -> Self {
+        let (tx, rx): (Sender<MaybeColumnarBatch>, Receiver<MaybeColumnarBatch>) = unbounded();
+        let task = create_task(input.clone(), group_expr.clone(), aggr_expr.clone(), tx);
+        Self { task, rx }
     }
 }
 
-/// internal mutable state used during execution of a hash aggregate
-struct HashAggregateState {
-    /// Map of grouping values to accumulator sets
-    accum_map: FnvHashMap<Vec<GroupByScalar>, AccumulatorSet>
-}
+fn create_task(
+    input: ColumnarBatchStream,
+    group_expr: Vec<Arc<dyn Expression>>,
+    aggr_expr: Vec<Arc<dyn AggregateExpr>>,
+    tx: Sender<MaybeColumnarBatch>,
+) -> Task<Result<()>> {
+    Task::spawn(async move {
+        let start = Instant::now();
+        let mut batch_count = 0;
+        let mut row_count = 0;
 
-impl HashAggregateState {
-    fn new() -> Self {
-        Self {
-            accum_map: FnvHashMap::default()
+        // hash map of grouping values to accumulators
+        let mut map: FnvHashMap<Vec<GroupByScalar>, AccumulatorSet> = FnvHashMap::default();
+
+        // create vector large enough to hold the grouping key that can be re-used per row to
+        // avoid the cost of creating a new vector each time
+        let mut key = Vec::with_capacity(group_expr.len());
+        for _ in 0..group_expr.len() {
+            key.push(GroupByScalar::UInt32(0));
         }
-    }
-}
-type AccumulatorSet = Vec<Arc<Mutex<dyn Accumulator>>>;
 
-#[async_trait]
-impl ColumnarBatchIter for HashAggregateIter {
-    async fn next(&self) -> Result<Option<ColumnarBatch>> {
-
-        while let Some(batch) = self.input.next().await? {
-
-            let mut state = self.state.lock().unwrap();
+        // iterate over all the input batches .. not that in partial mode it would be valid
+        // to emit batches periodically and reset the accumlator map to reduce memory pressure
+        while let Some(batch) = input.next().await? {
+            batch_count += 1;
+            row_count += batch.num_rows();
 
             // evaluate the grouping expressions against this batch
-            let group_keys = self
-                .group_expr
+            let group_values = group_expr
                 .iter()
                 .map(|e| e.evaluate(&batch))
                 .collect::<Result<Vec<_>>>()?;
 
-            // evaluate the inputs to the aggregate expressions for this batch
-            let aggr_input_values = self
-                .aggr_expr
-                .iter()
-                .map(|expr| expr.evaluate_input(&batch))
-                .collect::<Result<Vec<_>>>()?;
+            // iterate over each row in the batch and create the accumulators for each grouping key
+            let mut accumulators: Vec<AccumulatorSet> = Vec::with_capacity(batch.num_rows());
 
-            //TODO try doing loops of map lookups, then loops of accumulation as per the talk
-            // from spark ai summit, to better leverage SIMD
+            for row in 0..batch.num_rows() {
+                // create grouping key for this row
+                create_key(&group_values, row, &mut key)?;
 
-            for i in 0..group_keys.len() {
-
-                // create keys
-                let keys: Vec<GroupByScalar> = vec![];
-
-                // do map lookup
-                let updated = match state.accum_map.get(&keys) {
-                    Some(accum_set) => {
-                        //TODO update accumulators
-                        true
-                    }
-                    None => false
-                };
-
-                if !updated {
-                    // create accumulators
-                    let accumulators: Vec<Arc<Mutex<dyn Accumulator>>> = self
-                        .aggr_expr
+                if let Some(accumulator_set) = map.get(&key) {
+                    accumulators.push(accumulator_set.clone());
+                } else {
+                    let accumulator_set: AccumulatorSet = aggr_expr
                         .iter()
                         .map(|expr| expr.create_accumulator())
                         .collect();
 
-                    //TODO update accumulators
-
-                    state.accum_map.insert(keys, accumulators);
+                    map.insert(key.clone(), accumulator_set.clone());
+                    accumulators.push(accumulator_set);
                 }
+            }
+
+            // iterate over each aggregate expression
+            for col in 0..aggr_expr.len() {
+                // evaluate the aggregate expression
+                let value = aggr_expr[col].evaluate_input(&batch)?;
+
+                match &value {
+                    ColumnarValue::Columnar(array) => match array.data_type() {
+                        DataType::Int8 => update_accumulators!(
+                            array,
+                            Int8Array,
+                            ScalarValue::Int8,
+                            col,
+                            accumulators
+                        ),
+                        DataType::Int16 => update_accumulators!(
+                            array,
+                            Int16Array,
+                            ScalarValue::Int16,
+                            col,
+                            accumulators
+                        ),
+                        DataType::Int32 => update_accumulators!(
+                            array,
+                            Int32Array,
+                            ScalarValue::Int32,
+                            col,
+                            accumulators
+                        ),
+                        DataType::Int64 => update_accumulators!(
+                            array,
+                            Int64Array,
+                            ScalarValue::Int64,
+                            col,
+                            accumulators
+                        ),
+                        DataType::UInt8 => update_accumulators!(
+                            array,
+                            UInt8Array,
+                            ScalarValue::UInt8,
+                            col,
+                            accumulators
+                        ),
+                        DataType::UInt16 => update_accumulators!(
+                            array,
+                            UInt16Array,
+                            ScalarValue::UInt16,
+                            col,
+                            accumulators
+                        ),
+                        DataType::UInt32 => update_accumulators!(
+                            array,
+                            UInt32Array,
+                            ScalarValue::UInt32,
+                            col,
+                            accumulators
+                        ),
+                        DataType::UInt64 => update_accumulators!(
+                            array,
+                            UInt64Array,
+                            ScalarValue::UInt64,
+                            col,
+                            accumulators
+                        ),
+                        DataType::Float32 => update_accumulators!(
+                            array,
+                            Float32Array,
+                            ScalarValue::Float32,
+                            col,
+                            accumulators
+                        ),
+                        DataType::Float64 => update_accumulators!(
+                            array,
+                            Float64Array,
+                            ScalarValue::Float64,
+                            col,
+                            accumulators
+                        ),
+                        other => {
+                            return Err(BallistaError::General(format!(
+                                "Unsupported data type {:?} for result of aggregate expression",
+                                other
+                            )));
+                        }
+                    },
+                    _ => unimplemented!(),
+                };
             }
         }
 
-        //TODO return aggregate result
-        Ok(None)
+        // prepare results
+        let batch = create_batch_from_accum_map(
+            &map,
+            input.as_ref().schema().as_ref(),
+            &group_expr,
+            &aggr_expr,
+        )?;
+
+        // send the result batch over the channel
+        tx.send(Ok(Some(batch))).unwrap();
+
+        // send EOF marker
+        tx.send(Ok(None)).unwrap();
+
+        println!(
+            "HashAggregate processed {} batches and {} rows in {} ms",
+            batch_count,
+            row_count,
+            start.elapsed().as_millis()
+        );
+
+        Ok(())
+    })
+}
+
+/// Create a Vec<GroupByScalar> that can be used as a map key
+fn create_key(
+    group_by_keys: &[ColumnarValue],
+    row: usize,
+    vec: &mut Vec<GroupByScalar>,
+) -> Result<()> {
+    for i in 0..group_by_keys.len() {
+        let col = &group_by_keys[i];
+        match col {
+            ColumnarValue::Columnar(col) => match col.data_type() {
+                DataType::UInt8 => {
+                    let array = col.as_any().downcast_ref::<array::UInt8Array>().unwrap();
+                    vec[i] = GroupByScalar::UInt8(array.value(row))
+                }
+                DataType::UInt16 => {
+                    let array = col.as_any().downcast_ref::<array::UInt16Array>().unwrap();
+                    vec[i] = GroupByScalar::UInt16(array.value(row))
+                }
+                DataType::UInt32 => {
+                    let array = col.as_any().downcast_ref::<array::UInt32Array>().unwrap();
+                    vec[i] = GroupByScalar::UInt32(array.value(row))
+                }
+                DataType::UInt64 => {
+                    let array = col.as_any().downcast_ref::<array::UInt64Array>().unwrap();
+                    vec[i] = GroupByScalar::UInt64(array.value(row))
+                }
+                DataType::Int8 => {
+                    let array = col.as_any().downcast_ref::<array::Int8Array>().unwrap();
+                    vec[i] = GroupByScalar::Int8(array.value(row))
+                }
+                DataType::Int16 => {
+                    let array = col.as_any().downcast_ref::<array::Int16Array>().unwrap();
+                    vec[i] = GroupByScalar::Int16(array.value(row))
+                }
+                DataType::Int32 => {
+                    let array = col.as_any().downcast_ref::<array::Int32Array>().unwrap();
+                    vec[i] = GroupByScalar::Int32(array.value(row))
+                }
+                DataType::Int64 => {
+                    let array = col.as_any().downcast_ref::<array::Int64Array>().unwrap();
+                    vec[i] = GroupByScalar::Int64(array.value(row))
+                }
+                DataType::Utf8 => {
+                    let array = col.as_any().downcast_ref::<array::StringArray>().unwrap();
+                    vec[i] = GroupByScalar::Utf8(String::from(array.value(row)))
+                }
+                _ => {
+                    return Err(BallistaError::General(
+                        "Unsupported GROUP BY data type".to_string(),
+                    ))
+                }
+            },
+            _ => unimplemented!(),
+        }
+    }
+    Ok(())
+}
+
+/// Create a columnar batch from the hash map
+fn create_batch_from_accum_map(
+    map: &FnvHashMap<Vec<GroupByScalar>, AccumulatorSet>,
+    input_schema: &Schema,
+    group_expr: &Vec<Arc<dyn Expression>>,
+    aggr_expr: &Vec<Arc<dyn AggregateExpr>>,
+) -> Result<ColumnarBatch> {
+    // build the result arrays
+    let mut arrays: Vec<ArrayRef> = Vec::with_capacity(group_expr.len() + aggr_expr.len());
+
+    // grouping values
+    for i in 0..group_expr.len() {
+        let data_type = group_expr[i].data_type(&input_schema)?;
+        let array = match data_type {
+            DataType::UInt8 => extract_group_val!(UInt8Builder, UInt8, map, i),
+            DataType::UInt16 => extract_group_val!(UInt16Builder, UInt16, map, i),
+            DataType::UInt32 => extract_group_val!(UInt32Builder, UInt32, map, i),
+            DataType::UInt64 => extract_group_val!(UInt64Builder, UInt64, map, i),
+            DataType::Int8 => extract_group_val!(Int8Builder, Int8, map, i),
+            DataType::Int16 => extract_group_val!(Int16Builder, Int16, map, i),
+            DataType::Int32 => extract_group_val!(Int32Builder, Int32, map, i),
+            DataType::Int64 => extract_group_val!(Int64Builder, Int64, map, i),
+            DataType::Utf8 => {
+                let mut builder = StringBuilder::new(1);
+                for k in map.keys() {
+                    match &k[i] {
+                        GroupByScalar::Utf8(s) => builder.append_value(&s).unwrap(),
+                        _ => {
+                            return Err(BallistaError::General(
+                                "Unexpected value for Utf8 group column".to_string(),
+                            ))
+                        }
+                    }
+                }
+                Ok(Arc::new(builder.finish()) as ArrayRef)
+            }
+            _ => Err(BallistaError::General(
+                "Unsupported group by expr".to_string(),
+            )),
+        };
+        arrays.push(array?);
+    }
+
+    // aggregate values
+    for i in 0..aggr_expr.len() {
+        let data_type = aggr_expr[i].data_type(&input_schema)?;
+        let array = match data_type {
+            DataType::UInt8 => extract_aggr_value!(UInt64Builder, UInt8, u64, map, i),
+            DataType::UInt16 => extract_aggr_value!(UInt64Builder, UInt16, u64, map, i),
+            DataType::UInt32 => extract_aggr_value!(UInt64Builder, UInt32, u64, map, i),
+            DataType::UInt64 => extract_aggr_value!(UInt64Builder, UInt64, u64, map, i),
+            DataType::Int8 => extract_aggr_value!(Int64Builder, Int8, i64, map, i),
+            DataType::Int16 => extract_aggr_value!(Int64Builder, Int16, i64, map, i),
+            DataType::Int32 => extract_aggr_value!(Int64Builder, Int32, i64, map, i),
+            DataType::Int64 => extract_aggr_value!(Int64Builder, Int64, i64, map, i),
+            DataType::Float32 => extract_aggr_value!(Float32Builder, Float32, f32, map, i),
+            DataType::Float64 => extract_aggr_value!(Float64Builder, Float64, f64, map, i),
+            _ => Err(BallistaError::General(
+                "Unsupported aggregate expr".to_string(),
+            )),
+        };
+        arrays.push(array?);
+    }
+
+    let values: Vec<ColumnarValue> = arrays
+        .iter()
+        .map(|a| ColumnarValue::Columnar(a.clone()))
+        .collect();
+
+    Ok(ColumnarBatch::from_values(&values))
+}
+
+#[async_trait]
+impl ColumnarBatchIter for HashAggregateIter {
+    fn schema(&self) -> Arc<Schema> {
+        unimplemented!()
+    }
+
+    async fn next(&self) -> Result<Option<ColumnarBatch>> {
+        let channel = self.rx.clone();
+        Task::blocking(async move {
+            channel
+                .recv()
+                .map_err(|e| BallistaError::General(format!("{:?}", e.to_string())))?
+        })
+        .await
     }
 }
 

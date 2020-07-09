@@ -19,7 +19,8 @@ use std::thread;
 
 use crate::error::{BallistaError, Result};
 use crate::execution::physical_plan::{
-    ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ExecutionPlan, Partitioning,
+    ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ExecutionPlan, MaybeColumnarBatch,
+    Partitioning,
 };
 
 use crate::arrow::datatypes::Schema;
@@ -33,30 +34,49 @@ use async_trait::async_trait;
 use crossbeam::channel::{unbounded, Receiver, Sender};
 use smol::Task;
 
-type MaybeColumnarBatch = Result<Option<ColumnarBatch>>;
-
 #[derive(Debug, Clone)]
 pub struct ParquetScanExec {
     pub(crate) path: String,
     pub(crate) filenames: Vec<String>,
     projection: Option<Vec<usize>>,
+    output_schema: Arc<Schema>,
 }
 
 impl ParquetScanExec {
     pub fn try_new(path: &str, projection: Option<Vec<usize>>) -> Result<Self> {
         let mut filenames: Vec<String> = vec![];
         common::build_file_list(path, &mut filenames, ".parquet")?;
+
+        let filename = &filenames[0];
+        let file = File::open(filename)?;
+        let file_reader = Rc::new(SerializedFileReader::new(file).unwrap()); //TODO error handling
+        let mut arrow_reader = ParquetFileArrowReader::new(file_reader);
+        let schema = arrow_reader.get_schema().unwrap(); //TODO error handling
+
+        let projected_fields = match &projection {
+            Some(p) => p.clone(),
+            None => (0..schema.fields().len()).collect(),
+        };
+
+        let projected_schema = Schema::new(
+            projected_fields
+                .iter()
+                .map(|i| schema.field(*i).clone())
+                .collect(),
+        );
+
         Ok(Self {
             path: path.to_owned(),
             filenames,
             projection,
+            output_schema: Arc::new(projected_schema),
         })
     }
 }
 
 impl ExecutionPlan for ParquetScanExec {
     fn schema(&self) -> Arc<Schema> {
-        unimplemented!()
+        self.output_schema.clone()
     }
 
     fn output_partitioning(&self) -> Partitioning {
@@ -74,7 +94,7 @@ impl ExecutionPlan for ParquetScanExec {
 }
 
 pub struct ParquetBatchIter {
-    // schema: Arc<Schema>,
+    schema: Arc<Schema>,
     pub response_rx: Receiver<MaybeColumnarBatch>,
 }
 
@@ -91,7 +111,7 @@ impl ParquetBatchIter {
             None => (0..schema.fields().len()).collect(),
         };
 
-        let _projected_schema = Schema::new(
+        let projected_schema = Schema::new(
             projection
                 .iter()
                 .map(|i| schema.field(*i).clone())
@@ -115,21 +135,17 @@ impl ParquetBatchIter {
                     let mut arrow_reader = ParquetFileArrowReader::new(file_reader);
                     match arrow_reader.get_record_reader_by_columns(projection, batch_size) {
                         Ok(mut batch_reader) => loop {
-                            println!("reading batch");
                             match batch_reader.next_batch() {
                                 Ok(Some(batch)) => {
-                                    println!("sending batch");
                                     response_tx
                                         .send(Ok(Some(ColumnarBatch::from_arrow(&batch))))
                                         .unwrap();
                                 }
                                 Ok(None) => {
-                                    println!("sending eof");
                                     response_tx.send(Ok(None)).unwrap();
                                     break;
                                 }
                                 Err(e) => {
-                                    println!("sending error");
                                     response_tx
                                         .send(Err(BallistaError::General(format!("{:?}", e))))
                                         .unwrap();
@@ -154,12 +170,19 @@ impl ParquetBatchIter {
             }
         });
 
-        Ok(Self { response_rx })
+        Ok(Self {
+            schema: Arc::new(projected_schema),
+            response_rx,
+        })
     }
 }
 
 #[async_trait]
 impl ColumnarBatchIter for ParquetBatchIter {
+    fn schema(&self) -> Arc<Schema> {
+        self.schema.clone()
+    }
+
     async fn next(&self) -> Result<Option<ColumnarBatch>> {
         let channel = self.response_rx.clone();
         Task::blocking(async move { channel.recv().unwrap() }).await

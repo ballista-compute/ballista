@@ -6,8 +6,8 @@ use ballista::arrow::datatypes::{DataType, Field, Schema};
 use ballista::dataframe::max;
 use ballista::datafusion::logicalplan::col_index;
 use ballista::datagen::DataGen;
-use ballista::execution::hash_aggregate::HashAggregateExec;
-use ballista::execution::in_memory::InMemoryTableScanExec;
+use ballista::execution::operators::HashAggregateExec;
+use ballista::execution::operators::InMemoryTableScanExec;
 use ballista::execution::physical_plan::{AggregateMode, ColumnarBatchStream, PhysicalPlan};
 
 #[test]

@@ -15,13 +15,6 @@
 //! Experimental distributed query execution support.
 
 pub mod expressions;
-pub mod filter;
-pub mod hash_aggregate;
-pub mod in_memory;
-pub mod parquet_scan;
+pub mod operators;
 pub mod physical_plan;
-pub mod projection;
 pub mod scheduler;
-pub mod shuffle_exchange;
-pub mod shuffle_reader;
-pub mod shuffled_hash_join;

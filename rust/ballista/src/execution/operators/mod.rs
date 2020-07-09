@@ -12,10 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::column::col;
-pub use self::max::max;
-pub use self::min::min;
+//! Physical operators.
 
-mod column;
-mod max;
-mod min;
+pub use filter::FilterExec;
+pub use hash_aggregate::HashAggregateExec;
+pub use in_memory::InMemoryTableScanExec;
+pub use parquet_scan::ParquetScanExec;
+pub use projection::ProjectionExec;
+pub use shuffle_exchange::ShuffleExchangeExec;
+pub use shuffle_reader::ShuffleReaderExec;
+pub use shuffled_hash_join::ShuffledHashJoinExec;
+
+mod filter;
+mod hash_aggregate;
+mod in_memory;
+mod parquet_scan;
+mod projection;
+mod shuffle_exchange;
+mod shuffle_reader;
+mod shuffled_hash_join;

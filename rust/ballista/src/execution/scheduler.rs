@@ -21,12 +21,12 @@ use uuid::Uuid;
 
 use crate::datafusion::logicalplan::LogicalPlan;
 use crate::error::{BallistaError, Result};
-use crate::execution::hash_aggregate::HashAggregateExec;
-use crate::execution::parquet_scan::ParquetScanExec;
+use crate::execution::operators::HashAggregateExec;
+use crate::execution::operators::ParquetScanExec;
+use crate::execution::operators::ProjectionExec;
+use crate::execution::operators::ShuffleExchangeExec;
+use crate::execution::operators::ShuffleReaderExec;
 use crate::execution::physical_plan::{AggregateMode, Distribution, Partitioning, PhysicalPlan};
-use crate::execution::projection::ProjectionExec;
-use crate::execution::shuffle_exchange::ShuffleExchangeExec;
-use crate::execution::shuffle_reader::ShuffleReaderExec;
 
 /// A Job typically represents a single query and the query is executed in stages. Stages are
 /// separated by map operations (shuffles) to re-partition data before the next stage starts.

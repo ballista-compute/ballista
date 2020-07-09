@@ -23,7 +23,7 @@
 //! The physical plan also accounts for partitioning and ordering of data between operators.
 
 use std::cell::RefCell;
-use std::fmt;
+use std::fmt::{self, Debug};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -33,19 +33,13 @@ use crate::arrow::record_batch::RecordBatch;
 use crate::datafusion::logicalplan::Expr;
 use crate::datafusion::logicalplan::ScalarValue;
 use crate::error::{ballista_error, Result};
-use crate::execution::expressions::simple::ColumnReference;
-use crate::execution::filter::FilterExec;
-use crate::execution::hash_aggregate::HashAggregateExec;
-use crate::execution::parquet_scan::ParquetScanExec;
-use crate::execution::projection::ProjectionExec;
-use crate::execution::shuffle_exchange::ShuffleExchangeExec;
-use crate::execution::shuffle_reader::ShuffleReaderExec;
-use crate::execution::shuffled_hash_join::ShuffledHashJoinExec;
+use crate::execution::expressions::{col, max, min};
+use crate::execution::operators::{
+    FilterExec, HashAggregateExec, InMemoryTableScanExec, ParquetScanExec, ProjectionExec,
+    ShuffleExchangeExec, ShuffleReaderExec, ShuffledHashJoinExec,
+};
 
-use crate::execution::expressions::aggregate::Max;
-use crate::execution::in_memory::InMemoryTableScanExec;
 use async_trait::async_trait;
-use std::fmt::Debug;
 
 /// Stream of columnar batches using futures
 pub type ColumnarBatchStream = Arc<dyn ColumnarBatchIter>;
@@ -393,7 +387,7 @@ impl Partitioning {
 /// Create a physical expression from a logical expression
 pub fn compile_expression(expr: &Expr, _input: &Schema) -> Result<Arc<dyn Expression>> {
     match expr {
-        Expr::Column(n) => Ok(Arc::new(ColumnReference::new(*n))),
+        Expr::Column(n) => Ok(col(*n)),
         other => Err(ballista_error(&format!(
             "Unsupported expression {:?}",
             other
@@ -418,13 +412,8 @@ pub fn compile_aggregate_expression(
                 // "avg" => Ok(Arc::new(Avg::new(
                 //     self.create_physical_expr(&args[0], input_schema)?,
                 // ))),
-                "max" => Ok(Arc::new(Max::new(compile_expression(
-                    &args[0],
-                    input_schema,
-                )?))),
-                // "min" => Ok(Arc::new(Min::new(
-                //     self.create_physical_expr(&args[0], input_schema)?,
-                // ))),
+                "min" => Ok(min(compile_expression(&args[0], input_schema)?)),
+                "max" => Ok(max(compile_expression(&args[0], input_schema)?)),
                 // "count" => Ok(Arc::new(Count::new(
                 //     self.create_physical_expr(&args[0], input_schema)?,
                 // ))),

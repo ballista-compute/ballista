@@ -15,7 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-//! Hash Aggregate operator. This is based on the implementation from DataFusion.
+//! Ballista Hash Aggregate operator. This is based on the implementation from DataFusion in the
+//! Apache Arrow project.
 
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -88,7 +89,7 @@ impl HashAggregateExec {
             group_expr: self.group_expr.clone(),
             aggr_expr: self.aggr_expr.clone(),
             child: new_children[0].clone(),
-            schema: self.schema().clone(),
+            schema: self.schema(),
         }
     }
 }
@@ -132,8 +133,8 @@ macro_rules! extract_group_val {
         let mut builder = array::$BUILDER::new($MAP.len());
         let mut err = false;
         for k in $MAP.keys() {
-            match k[$COL_INDEX] {
-                GroupByScalar::$TY(n) => builder.append_value(n).unwrap(),
+            match k.get($COL_INDEX) {
+                Some(GroupByScalar::$TY(n)) => builder.append_value(*n).unwrap(),
                 _ => err = true,
             }
         }
@@ -279,9 +280,9 @@ fn create_task(
             }
 
             // iterate over each aggregate expression
-            for col in 0..aggr_expr.len() {
+            for (col, expr) in aggr_expr.iter().enumerate() {
                 // evaluate the aggregate expression
-                let value = aggr_expr[col].evaluate_input(&batch)?;
+                let value = expr.evaluate_input(&batch)?;
 
                 match &value {
                     ColumnarValue::Columnar(array) => match array.data_type() {
@@ -454,8 +455,8 @@ fn create_key(
 fn create_batch_from_accum_map(
     map: &FnvHashMap<Vec<GroupByScalar>, AccumulatorSet>,
     input_schema: &Schema,
-    group_expr: &Vec<Arc<dyn Expression>>,
-    aggr_expr: &Vec<Arc<dyn AggregateExpr>>,
+    group_expr: &[Arc<dyn Expression>],
+    aggr_expr: &[Arc<dyn AggregateExpr>],
 ) -> Result<ColumnarBatch> {
     // build the result arrays
     let mut arrays: Vec<ArrayRef> = Vec::with_capacity(group_expr.len() + aggr_expr.len());

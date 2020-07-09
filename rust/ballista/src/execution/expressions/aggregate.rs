@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use crate::arrow::array::{self, ArrayRef};
+use crate::arrow::array;
 use crate::arrow::compute;
 use crate::arrow::datatypes::{DataType, Schema};
 use crate::datafusion::logicalplan::ScalarValue;
@@ -58,7 +56,7 @@ impl AggregateExpr for Max {
         }
     }
 
-    fn nullable(&self, input_schema: &Schema) -> Result<bool> {
+    fn nullable(&self, _input_schema: &Schema) -> Result<bool> {
         Ok(true)
     }
 

@@ -38,8 +38,9 @@ use std::time::Instant;
 pub struct ParquetScanExec {
     pub(crate) path: String,
     pub(crate) filenames: Vec<String>,
-    projection: Option<Vec<usize>>,
-    output_schema: Arc<Schema>,
+    pub(crate) projection: Option<Vec<usize>>,
+    pub(crate) parquet_schema: Arc<Schema>,
+    pub(crate) output_schema: Arc<Schema>,
 }
 
 impl ParquetScanExec {
@@ -71,6 +72,7 @@ impl ParquetScanExec {
             path: path.to_owned(),
             filenames,
             projection,
+            parquet_schema: Arc::new(schema),
             output_schema: Arc::new(projected_schema),
         })
     }

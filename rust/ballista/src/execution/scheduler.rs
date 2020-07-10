@@ -86,6 +86,15 @@ impl Stage {
     }
 }
 
+/// Task that can be sent to an executor for execution
+pub struct Task {
+    pub(crate) job_uuid: Uuid,
+    pub(crate) stage_id: usize,
+    pub(crate) task_id: usize,
+    pub(crate) partition_id: usize,
+    pub(crate) plan: PhysicalPlan,
+}
+
 /// Create a Job (DAG of stages) from a physical execution plan.
 pub fn create_job(plan: Rc<PhysicalPlan>) -> Result<Job> {
     let mut scheduler = Scheduler::new();

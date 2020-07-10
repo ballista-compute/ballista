@@ -43,8 +43,8 @@ use std::time::Instant;
 #[derive(Debug)]
 pub struct HashAggregateExec {
     pub(crate) mode: AggregateMode,
-    pub(crate) group_expr: Vec<Arc<dyn Expression>>,
-    pub(crate) aggr_expr: Vec<Arc<dyn AggregateExpr>>,
+    pub(crate) group_expr: Vec<Expr>,
+    pub(crate) aggr_expr: Vec<Expr>,
     pub(crate) child: Rc<PhysicalPlan>,
     schema: Arc<Schema>,
 }
@@ -56,17 +56,18 @@ impl HashAggregateExec {
         aggr_expr: Vec<Expr>,
         child: Rc<PhysicalPlan>,
     ) -> Result<Self> {
-        let group_expr = compile_expressions(&group_expr, &child.as_execution_plan().schema())?;
-        let aggr_expr =
-            compile_aggregate_expressions(&aggr_expr, &child.as_execution_plan().schema())?;
-        let input_schema = child.as_execution_plan().schema();
+        //TODO should just use schema from logical plan rather than derive it here?
 
-        let mut fields = group_expr
+        let input_schema = child.as_execution_plan().schema();
+        let compiled_group_expr = compile_expressions(&group_expr, &input_schema)?;
+        let compiled_aggr_expr = compile_aggregate_expressions(&aggr_expr, &input_schema)?;
+
+        let mut fields = compiled_group_expr
             .iter()
             .map(|e| e.to_schema_field(&input_schema))
             .collect::<Result<Vec<_>>>()?;
         fields.extend(
-            aggr_expr
+            compiled_aggr_expr
                 .iter()
                 .map(|e| e.to_schema_field(&input_schema))
                 .collect::<Result<Vec<_>>>()?,
@@ -119,12 +120,13 @@ impl ExecutionPlan for HashAggregateExec {
     }
 
     fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
-        let input = self.child.as_execution_plan().execute(partition_index)?;
+        let child_exec = self.child.as_execution_plan();
+        let input_schema = child_exec.schema();
+        let input = child_exec.execute(partition_index)?;
+        let group_expr = compile_expressions(&self.group_expr, &input_schema)?;
+        let aggr_expr = compile_aggregate_expressions(&self.aggr_expr, &input_schema)?;
         Ok(Arc::new(HashAggregateIter::new(
-            &self.mode,
-            input,
-            self.group_expr.clone(),
-            self.aggr_expr.clone(),
+            &self.mode, input, group_expr, aggr_expr,
         )))
     }
 }

@@ -145,6 +145,7 @@ message SelectionExecNode {
 enum AggregateMode {
   PARTIAL = 0;
   FINAL = 1;
+  COMPLETE = 2;
 }
 
 message HashAggregateExecNode {
@@ -173,7 +174,8 @@ message Task {
   string job_uuid = 1;
   uint32 stage_id = 2;
   uint32 task_id = 3;
-  PhysicalPlanNode plan = 4;
+  uint32 partition_id = 4;
+  PhysicalPlanNode plan = 5;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

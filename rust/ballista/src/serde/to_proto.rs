@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::error::BallistaError;
-use crate::logical_plan::Action;
-use crate::protobuf;
-
-use crate::datafusion::logicalplan::{Expr, LogicalPlan, ScalarValue};
+use std::convert::TryInto;
 
 use crate::arrow::datatypes::{DataType, Schema};
-
-use std::convert::TryInto;
+use crate::datafusion::logicalplan::{Expr, LogicalPlan, ScalarValue};
+use crate::error::BallistaError;
+use crate::execution::physical_plan::{AggregateMode, PhysicalPlan};
+use crate::execution::scheduler::Task;
+use crate::logical_plan::Action;
+use crate::protobuf;
 
 impl TryInto<protobuf::Action> for Action {
     type Error = BallistaError;
@@ -94,7 +94,7 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
                 has_header,
                 ..
             } => {
-                let mut node = empty_plan_node();
+                let mut node = empty_logical_plan_node();
 
                 let projected_field_names = match projection {
                     Some(p) => p.iter().map(|i| schema.field(*i).name().clone()).collect(),
@@ -118,7 +118,7 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
                 projection,
                 ..
             } => {
-                let mut node = empty_plan_node();
+                let mut node = empty_logical_plan_node();
 
                 let projected_field_names = match projection {
                     Some(p) => p.iter().map(|i| schema.field(*i).name().clone()).collect(),
@@ -138,7 +138,7 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
             }
             LogicalPlan::Projection { expr, input, .. } => {
                 let input: protobuf::LogicalPlanNode = input.as_ref().to_owned().try_into()?;
-                let mut node = empty_plan_node();
+                let mut node = empty_logical_plan_node();
                 node.input = Some(Box::new(input));
                 node.projection = Some(protobuf::ProjectionNode {
                     expr: expr
@@ -150,7 +150,7 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
             }
             LogicalPlan::Selection { expr, input } => {
                 let input: protobuf::LogicalPlanNode = input.as_ref().to_owned().try_into()?;
-                let mut node = empty_plan_node();
+                let mut node = empty_logical_plan_node();
                 node.input = Some(Box::new(input));
                 node.selection = Some(protobuf::SelectionNode {
                     expr: Some(expr.try_into()?),
@@ -164,7 +164,7 @@ impl TryInto<protobuf::LogicalPlanNode> for LogicalPlan {
                 ..
             } => {
                 let input: protobuf::LogicalPlanNode = input.as_ref().to_owned().try_into()?;
-                let mut node = empty_plan_node();
+                let mut node = empty_logical_plan_node();
                 node.input = Some(Box::new(input));
                 node.aggregate = Some(protobuf::AggregateNode {
                     group_expr: group_expr
@@ -219,11 +219,11 @@ impl TryInto<protobuf::LogicalExprNode> for Expr {
                 let mut expr = empty_expr_node();
 
                 let aggr_function = match name.as_str() {
-                    "MIN" => Ok(0),   // TODO use protobuf enum
-                    "MAX" => Ok(1),   // TODO use protobuf enum
-                    "SUM" => Ok(2),   // TODO use protobuf enum
-                    "AVG" => Ok(3),   // TODO use protobuf enum
-                    "COUNT" => Ok(4), // TODO use protobuf enum
+                    "MIN" => Ok(protobuf::AggregateFunction::Min),
+                    "MAX" => Ok(protobuf::AggregateFunction::Max),
+                    "SUM" => Ok(protobuf::AggregateFunction::Sum),
+                    "AVG" => Ok(protobuf::AggregateFunction::Avg),
+                    "COUNT" => Ok(protobuf::AggregateFunction::Count),
                     other => Err(BallistaError::NotImplemented(format!(
                         "Aggregate function {:?}",
                         other
@@ -231,13 +231,78 @@ impl TryInto<protobuf::LogicalExprNode> for Expr {
                 }?;
 
                 expr.aggregate_expr = Some(Box::new(protobuf::AggregateExprNode {
-                    aggr_function,
+                    aggr_function: aggr_function.into(),
                     expr: Some(Box::new(args[0].clone().try_into()?)),
                 }));
                 Ok(expr)
             }
             _ => Err(BallistaError::NotImplemented(format!("{:?}", self))),
         }
+    }
+}
+
+impl TryInto<protobuf::PhysicalPlanNode> for PhysicalPlan {
+    type Error = BallistaError;
+
+    fn try_into(self) -> Result<protobuf::PhysicalPlanNode, Self::Error> {
+        match self {
+            PhysicalPlan::HashAggregate(exec) => {
+                let input: protobuf::PhysicalPlanNode =
+                    exec.child.as_ref().to_owned().try_into()?;
+                let mut node = empty_physical_plan_node();
+                node.input = Some(Box::new(input));
+                node.hash_aggregate = Some(protobuf::HashAggregateExecNode {
+                    mode: match exec.mode {
+                        AggregateMode::Partial => protobuf::AggregateMode::Partial,
+                        AggregateMode::Final => protobuf::AggregateMode::Final,
+                        AggregateMode::Complete => protobuf::AggregateMode::Complete,
+                    }
+                    .into(),
+                    group_expr: exec
+                        .group_expr
+                        .iter()
+                        .map(|expr| expr.to_owned().try_into())
+                        .collect::<Result<Vec<_>, BallistaError>>()?,
+                    aggr_expr: exec
+                        .aggr_expr
+                        .iter()
+                        .map(|expr| expr.to_owned().try_into())
+                        .collect::<Result<Vec<_>, BallistaError>>()?,
+                });
+                Ok(node)
+            }
+            PhysicalPlan::ParquetScan(exec) => {
+                let mut node = empty_physical_plan_node();
+                let schema = &exec.parquet_schema;
+                let projection: Vec<String> = match &exec.projection {
+                    Some(p) => p.iter().map(|i| schema.field(*i).name().clone()).collect(),
+                    _ => vec![],
+                };
+                node.scan = Some(protobuf::ScanExecNode {
+                    path: exec.path.clone(),
+                    projection,
+                    file_format: "parquet".to_owned(),
+                    schema: None,
+                    has_header: false,
+                });
+                Ok(node)
+            }
+            _ => Err(BallistaError::NotImplemented(format!("{:?}", self))),
+        }
+    }
+}
+
+impl TryInto<protobuf::Task> for Task {
+    type Error = BallistaError;
+
+    fn try_into(self) -> Result<protobuf::Task, Self::Error> {
+        Ok(protobuf::Task {
+            job_uuid: self.job_uuid.to_string(),
+            stage_id: self.stage_id as u32,
+            task_id: self.task_id as u32,
+            partition_id: self.partition_id as u32,
+            plan: Some(self.plan.try_into()?),
+        })
     }
 }
 
@@ -260,7 +325,7 @@ fn empty_expr_node() -> protobuf::LogicalExprNode {
 }
 
 /// Create an empty LogicalPlanNode
-fn empty_plan_node() -> protobuf::LogicalPlanNode {
+fn empty_logical_plan_node() -> protobuf::LogicalPlanNode {
     protobuf::LogicalPlanNode {
         scan: None,
         input: None,
@@ -268,5 +333,19 @@ fn empty_plan_node() -> protobuf::LogicalPlanNode {
         selection: None,
         limit: None,
         aggregate: None,
+    }
+}
+
+/// Create an empty PhysicalPlanNode
+fn empty_physical_plan_node() -> protobuf::PhysicalPlanNode {
+    protobuf::PhysicalPlanNode {
+        scan: None,
+        input: None,
+        projection: None,
+        selection: None,
+        global_limit: None,
+        local_limit: None,
+        shuffle: None,
+        hash_aggregate: None,
     }
 }

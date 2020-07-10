@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::convert::TryInto;
+use std::rc::Rc;
 
 use crate::arrow::datatypes::{DataType, Field, Schema};
 use crate::datafusion::execution::physical_plan::csv::CsvReadOptions;
@@ -21,6 +22,8 @@ use crate::datafusion::logicalplan::{
 };
 
 use crate::error::{ballista_error, BallistaError};
+use crate::execution::operators::{HashAggregateExec, ParquetScanExec};
+use crate::execution::physical_plan::{AggregateMode, PhysicalPlan};
 use crate::logical_plan::Action;
 use crate::protobuf;
 
@@ -109,7 +112,7 @@ impl TryInto<Expr> for protobuf::LogicalExprNode {
         if let Some(binary_expr) = self.binary_expr {
             Ok(Expr::BinaryExpr {
                 left: Box::new(parse_required_expr(binary_expr.l)?),
-                op: Operator::Eq, //TODO parse binary_expr.op.clone(),
+                op: from_proto_binary_op(&binary_expr.op)?,
                 right: Box::new(parse_required_expr(binary_expr.r)?),
             })
         } else if self.has_column_index {
@@ -126,9 +129,11 @@ impl TryInto<Expr> for protobuf::LogicalExprNode {
             Ok(Expr::Literal(ScalarValue::Int64(self.literal_long)))
         } else if let Some(aggregate_expr) = self.aggregate_expr {
             let name = match aggregate_expr.aggr_function {
-                0 => Ok("MIN"),
-                1 => Ok("MAX"),
-                2 => Ok("SUM"),
+                f if f == protobuf::AggregateFunction::Min as i32 => Ok("MIN"),
+                f if f == protobuf::AggregateFunction::Max as i32 => Ok("MAX"),
+                f if f == protobuf::AggregateFunction::Sum as i32 => Ok("SUM"),
+                f if f == protobuf::AggregateFunction::Avg as i32 => Ok("AVG"),
+                f if f == protobuf::AggregateFunction::Count as i32 => Ok("COUNT"),
                 other => Err(ballista_error(&format!(
                     "Unsupported aggregate function '{:?}'",
                     other
@@ -185,20 +190,34 @@ impl TryInto<Action> for protobuf::Action {
     }
 }
 
-fn from_proto_arrow_type(dt: i32 /*protobuf::ArrowType*/) -> Result<DataType, BallistaError> {
-    //TODO how to match on protobuf enums ?
+fn from_proto_binary_op(op: &str) -> Result<Operator, BallistaError> {
+    match op {
+        "Eq" => Ok(Operator::Eq),
+        "NotEq" => Ok(Operator::NotEq),
+        "LtEq" => Ok(Operator::LtEq),
+        "Lt" => Ok(Operator::Lt),
+        "Gt" => Ok(Operator::Gt),
+        "GtEq" => Ok(Operator::GtEq),
+        other => Err(ballista_error(&format!(
+            "Unsupported binary operator '{:?}'",
+            other
+        ))),
+    }
+}
+
+fn from_proto_arrow_type(dt: i32) -> Result<DataType, BallistaError> {
     match dt {
-        /*protobuf::ArrowType::Uint8*/ 2 => Ok(DataType::UInt8),
-        /*protobuf::ArrowType::Int8*/ 3 => Ok(DataType::Int8),
-        /*protobuf::ArrowType::UInt16*/ 4 => Ok(DataType::UInt16),
-        /*protobuf::ArrowType::Int16*/ 5 => Ok(DataType::Int16),
-        /*protobuf::ArrowType::UInt32*/ 6 => Ok(DataType::UInt32),
-        /*protobuf::ArrowType::Int32*/ 7 => Ok(DataType::Int32),
-        /*protobuf::ArrowType::UInt64*/ 8 => Ok(DataType::UInt64),
-        /*protobuf::ArrowType::Int64*/ 9 => Ok(DataType::Int64),
-        /*protobuf::ArrowType::Float*/ 11 => Ok(DataType::Float32),
-        /*protobuf::ArrowType::Double*/ 12 => Ok(DataType::Float64),
-        /*protobuf::ArrowType::Utf8*/ 13 => Ok(DataType::Utf8),
+        dt if dt == protobuf::ArrowType::Uint8 as i32 => Ok(DataType::UInt8),
+        dt if dt == protobuf::ArrowType::Int8 as i32 => Ok(DataType::Int8),
+        dt if dt == protobuf::ArrowType::Uint16 as i32 => Ok(DataType::UInt16),
+        dt if dt == protobuf::ArrowType::Int16 as i32 => Ok(DataType::Int16),
+        dt if dt == protobuf::ArrowType::Uint32 as i32 => Ok(DataType::UInt32),
+        dt if dt == protobuf::ArrowType::Int32 as i32 => Ok(DataType::Int32),
+        dt if dt == protobuf::ArrowType::Uint64 as i32 => Ok(DataType::UInt64),
+        dt if dt == protobuf::ArrowType::Int64 as i32 => Ok(DataType::Int64),
+        dt if dt == protobuf::ArrowType::Float as i32 => Ok(DataType::Float32),
+        dt if dt == protobuf::ArrowType::Double as i32 => Ok(DataType::Float64),
+        dt if dt == protobuf::ArrowType::Utf8 as i32 => Ok(DataType::Utf8),
         other => Err(BallistaError::General(format!(
             "Unsupported data type {:?}",
             other
@@ -219,6 +238,69 @@ impl TryInto<Schema> for protobuf::Schema {
             })
             .collect::<Result<Vec<_>, _>>()?;
         Ok(Schema::new(fields))
+    }
+}
+
+impl TryInto<PhysicalPlan> for protobuf::PhysicalPlanNode {
+    type Error = BallistaError;
+
+    fn try_into(self) -> Result<PhysicalPlan, Self::Error> {
+        if let Some(aggregate) = self.hash_aggregate {
+            let input: PhysicalPlan = self.input.unwrap().as_ref().to_owned().try_into()?;
+            let mode = match aggregate.mode {
+                mode if mode == protobuf::AggregateMode::Partial as i32 => {
+                    Ok(AggregateMode::Partial)
+                }
+                mode if mode == protobuf::AggregateMode::Final as i32 => Ok(AggregateMode::Final),
+                mode if mode == protobuf::AggregateMode::Complete as i32 => {
+                    Ok(AggregateMode::Complete)
+                }
+                other => Err(ballista_error(&format!(
+                    "Unsupported aggregate mode '{}' for hash aggregate",
+                    other
+                ))),
+            }?;
+            let group_expr = aggregate
+                .group_expr
+                .iter()
+                .map(|expr| expr.to_owned().try_into())
+                .collect::<Result<Vec<_>, _>>()?;
+            let aggr_expr = aggregate
+                .aggr_expr
+                .iter()
+                .map(|expr| expr.to_owned().try_into())
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(PhysicalPlan::HashAggregate(Rc::new(
+                HashAggregateExec::try_new(mode, group_expr, aggr_expr, Rc::new(input))?,
+            )))
+        } else if let Some(scan) = self.scan {
+            let schema: Schema = scan.schema.unwrap().try_into()?;
+
+            let projection: Vec<usize> = scan
+                .projection
+                .iter()
+                .map(|name| schema.index_of(name))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            println!("projection: {:?}", projection);
+
+            match scan.file_format.as_str() {
+                "parquet" => Ok(PhysicalPlan::ParquetScan(Rc::new(
+                    ParquetScanExec::try_new(
+                        &scan.path, None, //TODO convert projection column names to indices
+                    )?,
+                ))),
+                other => Err(ballista_error(&format!(
+                    "Unsupported file format '{}' for file scan",
+                    other
+                ))),
+            }
+        } else {
+            Err(ballista_error(&format!(
+                "Unsupported physical plan '{:?}'",
+                self
+            )))
+        }
     }
 }
 

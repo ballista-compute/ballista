@@ -20,7 +20,6 @@ use std::sync::{Arc, Mutex};
 
 use crate::arrow::datatypes::Schema;
 use crate::arrow::record_batch::RecordBatch;
-use crate::datafusion::execution::context::ExecutionContext;
 use crate::distributed::scheduler::{self, create_job, create_physical_plan, ensure_requirements};
 use crate::serde::decode_protobuf;
 use flight::{
@@ -30,6 +29,8 @@ use flight::{
 };
 
 use crate::error::{ballista_error, BallistaError};
+use crate::execution::physical_plan::ExecutionContext;
+
 use futures::{Stream, StreamExt};
 use tonic::{Request, Response, Status, Streaming};
 
@@ -73,27 +74,29 @@ impl FlightService for FlightServiceImpl {
 
         println!("do_get: {:?}", action);
 
-        let results = execute_action(&action)
-            .await
-            .map_err(|e| to_tonic_err(&e.into()))?;
+        // let results = execute_action(&action)
+        //     .await
+        //     .map_err(|e| to_tonic_err(&e.into()))?;
+        //
+        // let mut flights: Vec<Result<FlightData, Status>> =
+        //     vec![Ok(FlightData::from(&results.schema))];
+        //
+        // let mut batches: Vec<Result<FlightData, Status>> = results
+        //     .data
+        //     .iter()
+        //     .map(|batch| {
+        //         println!("batch schema: {:?}", batch.schema());
+        //
+        //         Ok(FlightData::from(batch))
+        //     })
+        //     .collect();
+        //
+        // flights.append(&mut batches);
+        //
+        // let output = futures::stream::iter(flights);
+        // Ok(Response::new(Box::pin(output) as Self::DoGetStream))
 
-        let mut flights: Vec<Result<FlightData, Status>> =
-            vec![Ok(FlightData::from(&results.schema))];
-
-        let mut batches: Vec<Result<FlightData, Status>> = results
-            .data
-            .iter()
-            .map(|batch| {
-                println!("batch schema: {:?}", batch.schema());
-
-                Ok(FlightData::from(batch))
-            })
-            .collect();
-
-        flights.append(&mut batches);
-
-        let output = futures::stream::iter(flights);
-        Ok(Response::new(Box::pin(output) as Self::DoGetStream))
+        unimplemented!()
     }
 
     async fn get_schema(
@@ -204,20 +207,22 @@ impl FlightService for FlightServiceImpl {
 
         let action = decode_protobuf(&action.body.to_vec()).map_err(|e| to_tonic_err(&e))?;
 
-        let results = execute_action(&action)
-            .await
-            .map_err(|e| to_tonic_err(&e.into()))?;
+        // let results = execute_action(&action)
+        //     .await
+        //     .map_err(|e| to_tonic_err(&e.into()))?;
+        //
+        // let key = "tbd"; // generate uuid here
+        //
+        // self.results.lock().unwrap().insert(key.to_owned(), results);
+        //
+        // let result = vec![Ok(flight::Result {
+        //     body: key.as_bytes().to_vec(),
+        // })];
+        //
+        // let output = futures::stream::iter(result);
+        // Ok(Response::new(Box::pin(output) as Self::DoActionStream))
 
-        let key = "tbd"; // generate uuid here
-
-        self.results.lock().unwrap().insert(key.to_owned(), results);
-
-        let result = vec![Ok(flight::Result {
-            body: key.as_bytes().to_vec(),
-        })];
-
-        let output = futures::stream::iter(result);
-        Ok(Response::new(Box::pin(output) as Self::DoActionStream))
+        unimplemented!()
     }
 
     async fn list_actions(
@@ -256,11 +261,11 @@ impl FlightService for FlightServiceImpl {
 //     data.to_vec()
 // }
 
-async fn execute_action(action: &scheduler::Action) -> Result<Results, BallistaError> {
+async fn execute_action(ctx: Arc<dyn ExecutionContext>, action: &scheduler::Action) -> Result<Results, BallistaError> {
     match &action {
         scheduler::Action::ExecuteTask { task } => {
             println!("Executing task {:?}", task);
-            let stream = task.plan.as_execution_plan().execute(task.partition_id)?;
+            let stream = task.plan.as_execution_plan().execute(ctx, task.partition_id)?;
 
             let mut results = vec![];
             while let Some(batch) = stream.next().await? {
@@ -274,30 +279,32 @@ async fn execute_action(action: &scheduler::Action) -> Result<Results, BallistaE
         scheduler::Action::Collect { plan: logical_plan } => {
             println!("Logical plan: {:?}", logical_plan);
 
-            // create local execution context
-            let ctx = ExecutionContext::new();
+            // // create local execution context
+            // let ctx = ExecutionContext::new();
+            //
+            // // create the query plan
+            // let optimized_plan = ctx.optimize(&logical_plan)?;
+            //
+            // println!("Optimized Plan: {:?}", optimized_plan);
+            //
+            // let batch_size = 1024 * 1024;
+            // let physical_plan = ctx.create_physical_plan(&optimized_plan, batch_size)?;
+            //
+            // // execute the query
+            // let results = ctx.collect(physical_plan.as_ref())?;
+            //
+            // println!("Executed query");
+            //
+            // // add an initial FlightData message that sends schema
+            // let schema = physical_plan.schema();
+            // println!("physical plan schema: {:?}", &schema);
+            //
+            // Ok(Results {
+            //     schema: schema.as_ref().clone(),
+            //     data: results,
+            // })
 
-            // create the query plan
-            let optimized_plan = ctx.optimize(&logical_plan)?;
-
-            println!("Optimized Plan: {:?}", optimized_plan);
-
-            let batch_size = 1024 * 1024;
-            let physical_plan = ctx.create_physical_plan(&optimized_plan, batch_size)?;
-
-            // execute the query
-            let results = ctx.collect(physical_plan.as_ref())?;
-
-            println!("Executed query");
-
-            // add an initial FlightData message that sends schema
-            let schema = physical_plan.schema();
-            println!("physical plan schema: {:?}", &schema);
-
-            Ok(Results {
-                schema: schema.as_ref().clone(),
-                data: results,
-            })
+            unimplemented!()
         }
         other => Err(ballista_error(&format!(
             "Invalid Ballista action: {:?}",

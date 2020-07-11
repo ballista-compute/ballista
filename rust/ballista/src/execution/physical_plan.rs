@@ -40,6 +40,7 @@ use crate::execution::operators::{
 };
 
 use async_trait::async_trait;
+use crate::distributed::scheduler::Task;
 
 /// Stream of columnar batches using futures
 pub type ColumnarBatchStream = Arc<dyn ColumnarBatchIter>;
@@ -56,6 +57,27 @@ pub trait ColumnarBatchIter: Sync + Send {
     /// Notify the iterator that no more results will be fetched, so that resouArces
     /// can be freed immediately.
     async fn close(&self) {}
+}
+
+/// Convenience method to read a stream until completion
+pub async fn consume_stream(stream: &dyn ColumnarBatchIter) -> Result<Vec<ColumnarBatch>> {
+    let mut results = vec![];
+    while let Some(batch) = stream.next().await? {
+        results.push(batch);
+    }
+    Ok(results)
+}
+
+/// Someone has to keep track of all of these shuffles
+pub trait ShuffleManager : Send + Sync + Debug {
+    /// Read a local or remote shuffle partition
+    fn read_shuffle(&self, shuffle_id: &str) -> Result<ColumnarBatchStream>;
+}
+
+#[async_trait]
+pub trait ExecutionContext {
+    async fn execute_task(&self, executor_id: usize, task: &Task) -> Result<String>;
+    async fn shuffle_manager(&self) -> Arc<dyn ShuffleManager>;
 }
 
 /// Base trait for all operators
@@ -90,7 +112,8 @@ pub trait ExecutionPlan {
     }
 
     /// Runs this query against one partition returning a stream of columnar batches
-    fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream>;
+    //TODO make async
+    fn execute(&self, ctx: Arc<dyn ExecutionContext>, partition_index: usize) -> Result<ColumnarBatchStream>;
 }
 
 pub trait Expression: Send + Sync + Debug {

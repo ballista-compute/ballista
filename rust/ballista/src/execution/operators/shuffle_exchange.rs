@@ -16,9 +16,7 @@ use std::sync::Arc;
 
 use crate::arrow::datatypes::Schema;
 use crate::error::Result;
-use crate::execution::physical_plan::{
-    ColumnarBatchStream, ExecutionPlan, Partitioning, PhysicalPlan,
-};
+use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan, Partitioning, PhysicalPlan, ExecutionContext};
 
 #[derive(Debug, Clone)]
 pub struct ShuffleExchangeExec {
@@ -40,7 +38,7 @@ impl ExecutionPlan for ShuffleExchangeExec {
         unimplemented!()
     }
 
-    fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
+    fn execute(&self, _ctx: Arc<dyn ExecutionContext>, _partition_index: usize) -> Result<ColumnarBatchStream> {
         unimplemented!()
     }
 }

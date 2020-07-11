@@ -6,12 +6,12 @@ use ballista::arrow::datatypes::{DataType, Field, Schema};
 use ballista::dataframe::max;
 use ballista::datafusion::logicalplan::col_index;
 use ballista::datagen::DataGen;
-use ballista::distributed::executor::{Executor, ExecutorImpl};
-use ballista::distributed::scheduler::{create_job, ensure_requirements, execute_job};
+use ballista::distributed::executor::{DefaultExecutor, Executor};
+use ballista::distributed::scheduler::{create_job, ensure_requirements, execute_job, LocalModeContext};
 use ballista::error::Result;
 use ballista::execution::operators::HashAggregateExec;
 use ballista::execution::operators::InMemoryTableScanExec;
-use ballista::execution::physical_plan::{AggregateMode, PhysicalPlan};
+use ballista::execution::physical_plan::{AggregateMode, PhysicalPlan, ExecutionContext};
 
 #[test]
 fn hash_aggregate() -> Result<()> {
@@ -58,10 +58,13 @@ fn hash_aggregate() -> Result<()> {
 
         assert_eq!(expected, format!("{:?}", plan));
 
-        let executor = ExecutorImpl::default();
-        let executors: Vec<Arc<dyn Executor>> = vec![Arc::new(executor)];
+        let ctx = Arc::new(LocalModeContext::new());
+        let executor = DefaultExecutor::new(ctx.clone());
+
+        //let executors: Vec<Arc<dyn Executor>> = vec![Arc::new(executor)];
+
         let job = create_job(plan)?;
-        let results = execute_job(&job, executors.clone()).await?;
+        let results = execute_job(&job, ctx.clone()).await?;
 
         assert_eq!(1, results.len());
 

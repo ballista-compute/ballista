@@ -17,53 +17,55 @@ use std::sync::{Arc, Mutex};
 
 use crate::distributed::scheduler::Task;
 use crate::error::{ballista_error, Result};
-use crate::execution::physical_plan::ColumnarBatch;
+use crate::execution::physical_plan::{ColumnarBatch, ExecutionContext};
 
 use async_trait::async_trait;
 
-#[async_trait]
+// #[async_trait]
 pub trait Executor {
-    async fn execute_task(&self, task: &Task) -> Result<String>;
+    fn execute_task(&self, ctx: Arc<dyn ExecutionContext>, task: &Task) -> Result<String>;
     fn collect(&self, result_id: &str) -> Result<Vec<ColumnarBatch>>;
 }
 
-pub struct ExecutorImpl {
+/// Core executor logic lives here
+pub struct DefaultExecutor {
+    /// Execution context is required to interact with other executors in the cluster
+    ctx: Arc<dyn ExecutionContext>,
+    /// Local store of shuffle partitions
     results: Arc<Mutex<HashMap<String, Vec<ColumnarBatch>>>>,
 }
 
-impl ExecutorImpl {
-    pub fn new() -> Self {
+impl DefaultExecutor {
+    pub fn new(ctx: Arc<dyn ExecutionContext>) -> Self {
         Self {
+            ctx,
             results: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
 
-impl Default for ExecutorImpl {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// #[async_trait]
+impl Executor for DefaultExecutor {
 
-#[async_trait]
-impl Executor for ExecutorImpl {
-    async fn execute_task(&self, task: &Task) -> Result<String> {
-        // execute the query
-        let stream = task.plan.as_execution_plan().execute(task.partition_id)?;
+    fn execute_task(&self, ctx: Arc<dyn ExecutionContext>, task: &Task) -> Result<String> {
+        smol::run(async {
+            // execute the query
+            let stream = task.plan.as_execution_plan().execute(ctx, task.partition_id)?;
 
-        // fetch the results
-        let mut results = vec![];
-        while let Some(batch) = stream.next().await? {
-            results.push(batch);
-        }
+            // fetch the results
+            let mut results = vec![];
+            while let Some(batch) = stream.next().await? {
+                results.push(batch);
+            }
 
-        // store the results
-        let key = task.key();
-        let mut map = self.results.lock().unwrap();
-        map.insert(key.clone(), results);
+            // store the results
+            let key = task.key();
+            let mut map = self.results.lock().unwrap();
+            map.insert(key.clone(), results);
 
-        // return the result id
-        Ok(key)
+            // return the result id
+            Ok(key)
+        })
     }
 
     fn collect(&self, result_id: &str) -> Result<Vec<ColumnarBatch>> {

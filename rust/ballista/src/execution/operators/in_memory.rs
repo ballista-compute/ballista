@@ -20,9 +20,7 @@ use std::sync::Arc;
 
 use crate::arrow::datatypes::Schema;
 use crate::error::Result;
-use crate::execution::physical_plan::{
-    ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ExecutionPlan, Partitioning,
-};
+use crate::execution::physical_plan::{ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ExecutionPlan, Partitioning, ExecutionContext};
 
 use async_trait::async_trait;
 
@@ -46,7 +44,7 @@ impl ExecutionPlan for InMemoryTableScanExec {
         Partitioning::UnknownPartitioning(self.data.len())
     }
 
-    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+    fn execute(&self, _ctx: Arc<dyn ExecutionContext>, partition_index: usize) -> Result<ColumnarBatchStream> {
         let partition = &self.data[partition_index];
         Ok(Arc::new(InMemoryTableScanIter::new(partition)))
     }

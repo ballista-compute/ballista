@@ -15,10 +15,7 @@
 use std::sync::Arc;
 
 use crate::error::Result;
-use crate::execution::physical_plan::{
-    compile_expressions, ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ColumnarValue,
-    ExecutionPlan, Expression, Partitioning, PhysicalPlan,
-};
+use crate::execution::physical_plan::{compile_expressions, ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ColumnarValue, ExecutionPlan, Expression, Partitioning, PhysicalPlan, ExecutionContext};
 use arrow::datatypes::Schema;
 use async_trait::async_trait;
 use datafusion::logicalplan::Expr;
@@ -68,9 +65,9 @@ impl ExecutionPlan for ProjectionExec {
         self.child.as_execution_plan().output_partitioning()
     }
 
-    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+    fn execute(&self, ctx: Arc<dyn ExecutionContext>, partition_index: usize) -> Result<ColumnarBatchStream> {
         Ok(Arc::new(ProjectionIter {
-            input: self.child.as_execution_plan().execute(partition_index)?,
+            input: self.child.as_execution_plan().execute(ctx.clone(), partition_index)?,
             projection: self.exprs.clone(),
         }))
     }

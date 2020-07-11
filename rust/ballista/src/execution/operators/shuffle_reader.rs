@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::error::Result;
-use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan};
-use arrow::datatypes::Schema;
 use std::sync::Arc;
-use crate::execution::shuffle_manager::ShuffleManager;
+
+use crate::error::Result;
+use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan, ExecutionContext};
+use crate::arrow::datatypes::Schema;
+use crate::execution::physical_plan::ShuffleManager;
 
 #[derive(Debug, Clone)]
 pub struct ShuffleReaderExec {
@@ -31,14 +32,8 @@ impl ExecutionPlan for ShuffleReaderExec {
         unimplemented!()
     }
 
-    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
-
-        //TODO which partition id? map partition or reduce partition?
-
-        let _executor_id = self.shuffle_manager.get_executor_id(self.stage_id, partition_index)?;
-
-        // TODO send Flight request to the executor asking for the partition(s)
-
-        unimplemented!()
+    fn execute(&self, ctx: Arc<dyn ExecutionContext>, partition_index: usize) -> Result<ColumnarBatchStream> {
+        let shuffle_id = "tbd";
+        self.shuffle_manager.read_shuffle(shuffle_id)
     }
 }

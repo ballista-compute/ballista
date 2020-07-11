@@ -17,10 +17,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::error::{BallistaError, Result};
-use crate::execution::physical_plan::{
-    ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ExecutionPlan, MaybeColumnarBatch,
-    Partitioning,
-};
+use crate::execution::physical_plan::{ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ExecutionPlan, MaybeColumnarBatch, Partitioning, ExecutionContext};
 
 use crate::arrow::datatypes::Schema;
 use crate::arrow::record_batch::RecordBatchReader;
@@ -89,7 +86,7 @@ impl ExecutionPlan for ParquetScanExec {
         Partitioning::UnknownPartitioning(self.filenames.len())
     }
 
-    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+    fn execute(&self, _ctx: Arc<dyn ExecutionContext>, partition_index: usize) -> Result<ColumnarBatchStream> {
         Ok(Arc::new(ParquetBatchIter::try_new(
             &self.filenames[partition_index],
             self.projection.clone(),

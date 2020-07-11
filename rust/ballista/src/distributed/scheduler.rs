@@ -16,23 +16,24 @@
 //! and co-ordinating execution of these stages and tasks across the cluster.
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::datafusion::logicalplan::LogicalPlan;
-use crate::distributed::executor::Executor;
+use crate::distributed::executor::{DefaultExecutor, Executor};
 use crate::error::{ballista_error, BallistaError, Result};
 use crate::execution::operators::HashAggregateExec;
 use crate::execution::operators::ParquetScanExec;
 use crate::execution::operators::ProjectionExec;
 use crate::execution::operators::ShuffleExchangeExec;
 use crate::execution::operators::ShuffleReaderExec;
-use crate::execution::physical_plan::{
-    AggregateMode, ColumnarBatch, Distribution, Partitioning, PhysicalPlan,
-};
-use std::collections::HashMap;
-use crate::execution::shuffle_manager::ShuffleManager;
+use crate::execution::physical_plan::{AggregateMode, ColumnarBatch, Distribution, Partitioning, PhysicalPlan, ColumnarBatchStream, ExecutionContext, consume_stream};
+use crate::execution::physical_plan::ShuffleManager;
+
+use async_trait::async_trait;
+
 
 /// Action that can be sent to an executor
 #[derive(Debug, Clone)]
@@ -161,7 +162,7 @@ enum StageStatus {
 /// Execute a job directly against executors as starting point
 pub async fn execute_job(
     job: &Job,
-    executors: Vec<Arc<dyn Executor>>,
+    ctx: Arc<dyn ExecutionContext>,
 ) -> Result<Vec<ColumnarBatch>> {
     let mut map = HashMap::new();
 
@@ -199,21 +200,22 @@ pub async fn execute_job(
                         let parts = exec.output_partitioning().partition_count();
 
                         //TODO do partitions in parallel
-                        let mut results = vec![];
+                        let mut shuffle_ids = vec![];
                         for partition in 0..parts {
                             println!("Running stage {} partition {}", stage.id, partition);
                             let task = Task::new(job.id, stage.id, 0, 0, plan);
 
                             //TODO balance load across the executors
-                            let exec = &executors[0];
-
-                            results.push(exec.execute_task(&task).await?);
+                            let executor_id = 0;
+                            shuffle_ids.push(ctx.execute_task(executor_id, &task).await?);
                         }
 
                         map.insert(stage.id, StageStatus::Completed);
 
                         if stage.id == job.root_stage_id {
-                            let data = executors[0].collect(&results[0])?;
+                            let shuffle_manager = ctx.shuffle_manager().await;
+                            let stream = shuffle_manager.read_shuffle(&shuffle_ids[0])?;
+                            let data = consume_stream(stream.as_ref()).await?;
                             return Ok(data);
                         }
                     } else {
@@ -233,7 +235,28 @@ struct DumbShuffleManager {
 }
 
 impl ShuffleManager for DumbShuffleManager {
-    fn get_executor_id(&self, stage_id: usize, partition_id: usize) -> Result<usize> {
+    fn read_shuffle(&self, shuffle_id: &str) -> Result<ColumnarBatchStream> {
+        unimplemented!()
+    }
+}
+
+/// Local mode simulates a cluster of executors within a single process
+pub struct LocalModeContext {
+}
+
+impl LocalModeContext {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+#[async_trait]
+impl ExecutionContext for LocalModeContext {
+    async fn execute_task(&self, executor_id: usize, task: &Task) -> Result<String> {
+        unimplemented!()
+    }
+
+    async fn shuffle_manager(&self) -> Arc<dyn ShuffleManager> {
         unimplemented!()
     }
 }

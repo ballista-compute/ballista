@@ -234,17 +234,24 @@ pub async fn execute_job(
 }
 
 #[derive(Debug)]
-struct DumbShuffleManager {
-
+struct LocalModeShuffleManager {
+    executors: Arc<Mutex<HashMap<Uuid, ChannelPair>>>
 }
 
-impl ShuffleManager for DumbShuffleManager {
+impl LocalModeShuffleManager {
+    fn new(executors: Arc<Mutex<HashMap<Uuid, ChannelPair>>>) -> Self {
+        Self { executors }
+    }
+}
+
+impl ShuffleManager for LocalModeShuffleManager {
     fn read_shuffle(&self, shuffle_id: &str) -> Result<ColumnarBatchStream> {
         unimplemented!()
     }
 }
 
 /// Communication channels between executor and context
+#[derive(Debug)]
 pub struct ChannelPair {
     /// Send to executor
     pub(crate) tx: Sender<()>,
@@ -299,14 +306,13 @@ impl ExecutionContext for LocalModeContext {
     }
 
     async fn shuffle_manager(&self) -> Arc<dyn ShuffleManager> {
-        unimplemented!()
+        Arc::new(LocalModeShuffleManager::new(self.executors.clone()))
     }
 }
 
 pub struct Scheduler {
     job: Job,
     next_stage_id: usize,
-    shuffle_manager: Arc<dyn ShuffleManager>
 }
 
 impl Scheduler {
@@ -319,7 +325,6 @@ impl Scheduler {
         Self {
             job,
             next_stage_id: 0,
-            shuffle_manager: Arc::new(DumbShuffleManager {})
         }
     }
 
@@ -363,8 +368,7 @@ impl Scheduler {
                 // return a shuffle reader to read the results from the stage
                 Ok(Arc::new(PhysicalPlan::ShuffleReader(Arc::new(
                     ShuffleReaderExec {
-                        stage_id: new_stage_id,
-                        shuffle_manager: self.shuffle_manager.clone()
+                        shuffle_id: "tbd".to_owned(),
                     },
                 ))))
             }

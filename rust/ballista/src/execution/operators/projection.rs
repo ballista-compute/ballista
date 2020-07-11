@@ -52,6 +52,7 @@ impl ProjectionExec {
     }
 }
 
+#[async_trait]
 impl ExecutionPlan for ProjectionExec {
     fn schema(&self) -> Arc<Schema> {
         self.schema.clone()
@@ -65,9 +66,9 @@ impl ExecutionPlan for ProjectionExec {
         self.child.as_execution_plan().output_partitioning()
     }
 
-    fn execute(&self, ctx: Arc<dyn ExecutionContext>, partition_index: usize) -> Result<ColumnarBatchStream> {
+    async fn execute(&self, ctx: Arc<dyn ExecutionContext>, partition_index: usize) -> Result<ColumnarBatchStream> {
         Ok(Arc::new(ProjectionIter {
-            input: self.child.as_execution_plan().execute(ctx.clone(), partition_index)?,
+            input: self.child.as_execution_plan().execute(ctx.clone(), partition_index).await?,
             projection: self.exprs.clone(),
         }))
     }

@@ -265,7 +265,7 @@ async fn execute_action(ctx: Arc<dyn ExecutionContext>, action: &scheduler::Acti
     match &action {
         scheduler::Action::ExecuteTask { task } => {
             println!("Executing task {:?}", task);
-            let stream = task.plan.as_execution_plan().execute(ctx, task.partition_id)?;
+            let stream = task.plan.as_execution_plan().execute(ctx, task.partition_id).await?;
 
             let mut results = vec![];
             while let Some(batch) = stream.next().await? {

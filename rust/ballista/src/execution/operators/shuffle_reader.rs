@@ -19,21 +19,23 @@ use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan, Execut
 use crate::arrow::datatypes::Schema;
 use crate::execution::physical_plan::ShuffleManager;
 
+use async_trait::async_trait;
+
 #[derive(Debug, Clone)]
 pub struct ShuffleReaderExec {
     /// query stage that produced the shuffle output that this reader needs to read
-    pub(crate) stage_id: usize,
-    /// Shuffle manager for locating shuffle data
-    pub(crate) shuffle_manager: Arc<dyn ShuffleManager>
+    pub(crate) shuffle_id: String,
 }
 
+#[async_trait]
 impl ExecutionPlan for ShuffleReaderExec {
     fn schema(&self) -> Arc<Schema> {
         unimplemented!()
     }
 
-    fn execute(&self, ctx: Arc<dyn ExecutionContext>, partition_index: usize) -> Result<ColumnarBatchStream> {
-        let shuffle_id = "tbd";
-        self.shuffle_manager.read_shuffle(shuffle_id)
+    async fn execute(&self, ctx: Arc<dyn ExecutionContext>, partition_index: usize) -> Result<ColumnarBatchStream> {
+        // let shuffle_manager = ctx.shuffle_manager().await;
+        // Ok(shuffle_manager.read_shuffle(&self.shuffle_id).await)
+        unimplemented!()
     }
 }

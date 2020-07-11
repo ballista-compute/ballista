@@ -17,15 +17,15 @@ use std::sync::{Arc, Mutex};
 
 use crate::distributed::scheduler::{Task, ChannelPair};
 use crate::error::{ballista_error, Result};
-use crate::execution::physical_plan::{ColumnarBatch, ExecutionContext};
+use crate::execution::physical_plan::{ColumnarBatch, ExecutionContext, consume_stream};
 
 use async_trait::async_trait;
 use crossbeam::channel::{unbounded, Receiver, Sender};
 use uuid::Uuid;
 
-// #[async_trait]
+#[async_trait]
 pub trait Executor {
-    fn execute_task(&self, ctx: Arc<dyn ExecutionContext>, task: &Task) -> Result<String>;
+    async fn execute_task(&self, ctx: Arc<dyn ExecutionContext>, task: Task) -> Result<()>;
     fn collect(&self, result_id: &str) -> Result<Vec<ColumnarBatch>>;
 }
 
@@ -56,28 +56,25 @@ impl DefaultExecutor {
     }
 }
 
-// #[async_trait]
+
+
+#[async_trait]
 impl Executor for DefaultExecutor {
 
-    fn execute_task(&self, ctx: Arc<dyn ExecutionContext>, task: &Task) -> Result<String> {
-        smol::run(async {
-            // execute the query
-            let stream = task.plan.as_execution_plan().execute(ctx, task.partition_id)?;
-
-            // fetch the results
-            let mut results = vec![];
-            while let Some(batch) = stream.next().await? {
-                results.push(batch);
-            }
-
-            // store the results
-            let key = task.key();
-            let mut map = self.results.lock().unwrap();
-            map.insert(key.clone(), results);
-
-            // return the result id
-            Ok(key)
-        })
+    async fn execute_task(&self, ctx: Arc<dyn ExecutionContext>, task: Task) -> Result<()> {
+        // //smol::run(async {
+        //     let stream = task.plan.as_execution_plan().execute(ctx, task.partition_id).await?;
+        //     let mut results = consume_stream(stream.as_ref()).await?;
+        //
+        //     // store the results
+        //     let key = task.key();
+        //     let mut map = self.results.lock().unwrap();
+        //     map.insert(key.clone(), results);
+        //
+        //     // return the result id
+        //     Ok(key)
+        // //})
+        Ok(())
     }
 
     fn collect(&self, result_id: &str) -> Result<Vec<ColumnarBatch>> {

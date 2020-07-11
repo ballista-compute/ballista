@@ -18,6 +18,8 @@ use crate::arrow::datatypes::Schema;
 use crate::error::Result;
 use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan, Partitioning, PhysicalPlan, ExecutionContext};
 
+use async_trait::async_trait;
+
 #[derive(Debug, Clone)]
 pub struct ShuffleExchangeExec {
     pub(crate) child: Arc<PhysicalPlan>,
@@ -33,12 +35,13 @@ impl ShuffleExchangeExec {
     }
 }
 
+#[async_trait]
 impl ExecutionPlan for ShuffleExchangeExec {
     fn schema(&self) -> Arc<Schema> {
         unimplemented!()
     }
 
-    fn execute(&self, _ctx: Arc<dyn ExecutionContext>, _partition_index: usize) -> Result<ColumnarBatchStream> {
+    async fn execute(&self, _ctx: Arc<dyn ExecutionContext>, _partition_index: usize) -> Result<ColumnarBatchStream> {
         unimplemented!()
     }
 }

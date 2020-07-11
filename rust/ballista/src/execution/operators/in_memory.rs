@@ -34,6 +34,7 @@ impl InMemoryTableScanExec {
     }
 }
 
+#[async_trait]
 impl ExecutionPlan for InMemoryTableScanExec {
     fn schema(&self) -> Arc<Schema> {
         //TODO assumes some data exists
@@ -44,7 +45,7 @@ impl ExecutionPlan for InMemoryTableScanExec {
         Partitioning::UnknownPartitioning(self.data.len())
     }
 
-    fn execute(&self, _ctx: Arc<dyn ExecutionContext>, partition_index: usize) -> Result<ColumnarBatchStream> {
+    async fn execute(&self, _ctx: Arc<dyn ExecutionContext>, partition_index: usize) -> Result<ColumnarBatchStream> {
         let partition = &self.data[partition_index];
         Ok(Arc::new(InMemoryTableScanIter::new(partition)))
     }

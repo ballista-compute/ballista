@@ -26,6 +26,7 @@ pub struct FilterExec {
     filter_expr: Arc<Expr>,
 }
 
+#[async_trait]
 impl ExecutionPlan for FilterExec {
     fn schema(&self) -> Arc<Schema> {
         unimplemented!()
@@ -35,11 +36,11 @@ impl ExecutionPlan for FilterExec {
         vec![self.child.clone()]
     }
 
-    fn execute(&self, ctx: Arc<dyn ExecutionContext>, partition_index: usize) -> Result<ColumnarBatchStream> {
+    async fn execute(&self, ctx: Arc<dyn ExecutionContext>, partition_index: usize) -> Result<ColumnarBatchStream> {
         //TODO compile filter expr
         let expr = compile_expression(&self.filter_expr, &self.schema())?;
         Ok(Arc::new(FilterIter {
-            input: self.child.as_execution_plan().execute(ctx, partition_index)?,
+            input: self.child.as_execution_plan().execute(ctx, partition_index).await?,
             filter_expr: expr,
         }))
     }

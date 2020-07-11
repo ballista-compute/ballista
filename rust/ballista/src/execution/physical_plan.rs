@@ -76,7 +76,7 @@ pub trait ShuffleManager : Send + Sync + Debug {
 }
 
 #[async_trait]
-pub trait ExecutionContext {
+pub trait ExecutionContext : Send + Sync {
     fn register(&self, executor_id: Uuid, channels: ChannelPair) -> Result<()>;
     fn get_executor_ids(&self) -> Result<Vec<Uuid>>;
     async fn execute_task(&self, executor_id: &Uuid, task: &Task) -> Result<String>;
@@ -84,7 +84,8 @@ pub trait ExecutionContext {
 }
 
 /// Base trait for all operators
-pub trait ExecutionPlan {
+#[async_trait]
+pub trait ExecutionPlan : Send + Sync {
     /// Specified the output schema of this operator.
     fn schema(&self) -> Arc<Schema>;
 
@@ -115,8 +116,7 @@ pub trait ExecutionPlan {
     }
 
     /// Runs this query against one partition returning a stream of columnar batches
-    //TODO make async
-    fn execute(&self, ctx: Arc<dyn ExecutionContext>, partition_index: usize) -> Result<ColumnarBatchStream>;
+    async fn execute(&self, ctx: Arc<dyn ExecutionContext>, partition_index: usize) -> Result<ColumnarBatchStream>;
 }
 
 pub trait Expression: Send + Sync + Debug {
@@ -321,7 +321,7 @@ impl PhysicalPlan {
                 exec.as_ref().child.fmt_with_indent(f, indent + 1)
             }
             PhysicalPlan::ShuffleReader(exec) => {
-                write!(f, "ShuffleReader: stage_id={}", exec.stage_id)
+                write!(f, "ShuffleReader: stage_id={}", exec.shuffle_id)
             }
             PhysicalPlan::Projection(_exec) => write!(f, "Projection:"),
             PhysicalPlan::Filter(_exec) => write!(f, "Filter:"),

@@ -24,7 +24,7 @@ use crate::distributed::scheduler::{
 };
 use crate::error::{ballista_error, Result};
 use crate::execution::physical_plan::{
-    Action, ColumnarBatch, ColumnarBatchStream, ExecutionContext, ShuffleId, ShuffleManager,
+    Action, ColumnarBatch, ExecutionContext, PhysicalPlan, ShuffleId, ShuffleManager,
 };
 
 use crate::distributed::client::execute_action;
@@ -57,7 +57,7 @@ impl ExecutionContext for ExecutorContext {
         Arc::new(DefaultShuffleManager {})
     }
 
-    async fn execute_task(&self, executor_id: &Uuid, task: &ExecutionTask) -> Result<ShuffleId> {
+    async fn execute_task(&self, _executor_id: &Uuid, _task: &ExecutionTask) -> Result<ShuffleId> {
         unimplemented!()
     }
 }
@@ -140,40 +140,45 @@ impl Executor for BallistaExecutor {
     }
 
     async fn execute_query(&self, logical_plan: &LogicalPlan) -> Result<ShufflePartition> {
-        // note that this used DataFusion and not the new Ballista async / distributed
-        // query execution
+        let ballista_execution = true;
 
-        let plan = create_physical_plan(logical_plan)?;
-        let plan = ensure_requirements(plan.as_ref())?;
-        let job = create_job(plan)?;
-        job.explain();
+        if ballista_execution {
+            smol::run(async {
+                let plan: Arc<PhysicalPlan> = create_physical_plan(logical_plan)?;
+                let plan = ensure_requirements(plan.as_ref())?;
+                let job = create_job(plan)?;
+                job.explain();
+                let batches = execute_job(&job, self.ctx.clone()).await?;
 
-        // let batches = execute_job(&job, self.ctx.clone()).await?;
-        //
-        // Ok(ShufflePartition {
-        //     schema: batches[0].schema().as_ref().clone(),
-        //     data: batches.iter().map(|b| b.to_arrow()).collect::<Result<Vec<_>>>()?
-        // })
+                Ok(ShufflePartition {
+                    schema: batches[0].schema().as_ref().clone(),
+                    data: batches
+                        .iter()
+                        .map(|b| b.to_arrow())
+                        .collect::<Result<Vec<_>>>()?,
+                })
+            })
+        } else {
+            // legacy DataFusion execution
 
-        unimplemented!()
+            // create local execution context
+            let ctx = DFContext::new();
 
-        // // create local execution context
-        // let ctx = DFContext::new();
-        //
-        // // create the query plan
-        // let optimized_plan = ctx.optimize(&logical_plan)?;
-        //
-        // let batch_size = 1024 * 1024;
-        // let physical_plan = ctx.create_physical_plan(&optimized_plan, batch_size)?;
-        //
-        // // execute the query
-        // let results = ctx.collect(physical_plan.as_ref())?;
-        //
-        // let schema = physical_plan.schema();
-        //
-        // Ok(ShufflePartition {
-        //     schema: schema.as_ref().clone(),
-        //     data: results,
-        // })
+            // create the query plan
+            let optimized_plan = ctx.optimize(&logical_plan)?;
+
+            let batch_size = 1024 * 1024;
+            let physical_plan = ctx.create_physical_plan(&optimized_plan, batch_size)?;
+
+            // execute the query
+            let results = ctx.collect(physical_plan.as_ref())?;
+
+            let schema = physical_plan.schema();
+
+            Ok(ShufflePartition {
+                schema: schema.as_ref().clone(),
+                data: results,
+            })
+        }
     }
 }

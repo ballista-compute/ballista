@@ -181,7 +181,7 @@ impl Scheduler {
                     partition_id: 0, // not used in this context
                 };
                 Ok(Arc::new(PhysicalPlan::ShuffleReader(Arc::new(
-                    ShuffleReaderExec::new(exec.schema().clone(), shuffle_id),
+                    ShuffleReaderExec::new(exec.schema(), shuffle_id),
                 ))))
             }
             PhysicalPlan::HashAggregate(exec) => {

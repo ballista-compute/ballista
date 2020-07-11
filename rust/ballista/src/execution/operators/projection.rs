@@ -20,8 +20,7 @@ use crate::execution::physical_plan::{
 use arrow::datatypes::Schema;
 use async_trait::async_trait;
 use datafusion::logicalplan::Expr;
-use std::rc::Rc;
-use tonic::codegen::Arc;
+use std::sync::Arc;
 
 /// Projection operator.
 #[derive(Debug, Clone)]
@@ -29,13 +28,13 @@ pub struct ProjectionExec {
     /// Logical expressions for the projection.
     exprs: Vec<Arc<dyn Expression>>,
     /// The input operator to apply the projection to.
-    pub(crate) child: Rc<PhysicalPlan>,
+    pub(crate) child: Arc<PhysicalPlan>,
     /// The resulting schema of the projection.
     schema: Arc<Schema>,
 }
 
 impl ProjectionExec {
-    pub fn try_new(expr: &[Expr], child: Rc<PhysicalPlan>) -> Result<Self> {
+    pub fn try_new(expr: &[Expr], child: Arc<PhysicalPlan>) -> Result<Self> {
         let exprs = compile_expressions(&expr, &child.as_execution_plan().schema())?;
 
         let input_schema = child.as_execution_plan().schema();
@@ -60,7 +59,7 @@ impl ExecutionPlan for ProjectionExec {
         self.schema.clone()
     }
 
-    fn children(&self) -> Vec<Rc<PhysicalPlan>> {
+    fn children(&self) -> Vec<Arc<PhysicalPlan>> {
         vec![self.child.clone()]
     }
 

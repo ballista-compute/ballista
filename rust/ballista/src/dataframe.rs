@@ -448,7 +448,7 @@ impl DataFrame {
     }
 
     pub async fn collect(&self) -> Result<Vec<RecordBatch>> {
-        let action = Action::Collect {
+        let action = Action::InteractiveQuery {
             plan: self.plan.clone(),
         };
 

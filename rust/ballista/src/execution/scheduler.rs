@@ -17,6 +17,7 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::datafusion::logicalplan::LogicalPlan;
@@ -72,7 +73,7 @@ pub struct Stage {
     /// A list of stages that must complete before this stage can execute.
     pub prior_stages: Vec<usize>,
     /// The physical plan to execute for this stage
-    pub plan: Option<Rc<PhysicalPlan>>,
+    pub plan: Option<Arc<PhysicalPlan>>,
 }
 
 impl Stage {
@@ -87,7 +88,8 @@ impl Stage {
 }
 
 /// Task that can be sent to an executor for execution
-pub struct Task {
+#[derive(Debug, Clone)]
+pub struct ExecutionTask {
     pub(crate) job_uuid: Uuid,
     pub(crate) stage_id: usize,
     pub(crate) task_id: usize,
@@ -96,7 +98,7 @@ pub struct Task {
 }
 
 /// Create a Job (DAG of stages) from a physical execution plan.
-pub fn create_job(plan: Rc<PhysicalPlan>) -> Result<Job> {
+pub fn create_job(plan: Arc<PhysicalPlan>) -> Result<Job> {
     let mut scheduler = Scheduler::new();
     scheduler.create_job(plan)?;
     Ok(scheduler.job)
@@ -119,7 +121,7 @@ impl Scheduler {
         }
     }
 
-    fn create_job(&mut self, plan: Rc<PhysicalPlan>) -> Result<()> {
+    fn create_job(&mut self, plan: Arc<PhysicalPlan>) -> Result<()> {
         let new_stage_id = self.next_stage_id;
         self.next_stage_id += 1;
         let new_stage = Rc::new(RefCell::new(Stage::new(new_stage_id)));
@@ -131,9 +133,9 @@ impl Scheduler {
 
     fn visit_plan(
         &mut self,
-        plan: Rc<PhysicalPlan>,
+        plan: Arc<PhysicalPlan>,
         current_stage: Rc<RefCell<Stage>>,
-    ) -> Result<Rc<PhysicalPlan>> {
+    ) -> Result<Arc<PhysicalPlan>> {
         //
         match plan.as_ref() {
             PhysicalPlan::ShuffleExchange(exec) => {
@@ -156,7 +158,7 @@ impl Scheduler {
                     .push(new_stage_id);
 
                 // return a shuffle reader to read the results from the stage
-                Ok(Rc::new(PhysicalPlan::ShuffleReader(Rc::new(
+                Ok(Arc::new(PhysicalPlan::ShuffleReader(Arc::new(
                     ShuffleReaderExec {
                         stage_id: new_stage_id,
                     },
@@ -164,7 +166,7 @@ impl Scheduler {
             }
             PhysicalPlan::HashAggregate(exec) => {
                 let child = self.visit_plan(exec.child.clone(), current_stage)?;
-                Ok(Rc::new(PhysicalPlan::HashAggregate(Rc::new(
+                Ok(Arc::new(PhysicalPlan::HashAggregate(Arc::new(
                     exec.with_new_children(vec![child]),
                 ))))
             }
@@ -175,11 +177,11 @@ impl Scheduler {
 }
 
 /// Convert a logical plan into a physical plan
-pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Rc<PhysicalPlan>> {
+pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Arc<PhysicalPlan>> {
     match plan {
         LogicalPlan::Projection { input, expr, .. } => {
             let exec = ProjectionExec::try_new(expr, create_physical_plan(input)?)?;
-            Ok(Rc::new(PhysicalPlan::Projection(Rc::new(exec))))
+            Ok(Arc::new(PhysicalPlan::Projection(Arc::new(exec))))
         }
         LogicalPlan::Aggregate {
             input,
@@ -200,7 +202,7 @@ pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Rc<PhysicalPlan>> {
                     aggr_expr.clone(),
                     input,
                 )?;
-                Ok(Rc::new(PhysicalPlan::HashAggregate(Rc::new(exec))))
+                Ok(Arc::new(PhysicalPlan::HashAggregate(Arc::new(exec))))
             } else {
                 // Create partial hash aggregate to run against partitions in parallel
                 let partial_hash_exec = HashAggregateExec::try_new(
@@ -209,7 +211,7 @@ pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Rc<PhysicalPlan>> {
                     aggr_expr.clone(),
                     input,
                 )?;
-                let partial = Rc::new(PhysicalPlan::HashAggregate(Rc::new(partial_hash_exec)));
+                let partial = Arc::new(PhysicalPlan::HashAggregate(Arc::new(partial_hash_exec)));
                 // Create final hash aggregate to run on the coalesced partition of the results
                 // from the partial hash aggregate
                 // TODO these are not the correct expressions being passed in here for the final agg
@@ -219,28 +221,28 @@ pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Rc<PhysicalPlan>> {
                     aggr_expr.clone(),
                     partial,
                 )?;
-                Ok(Rc::new(PhysicalPlan::HashAggregate(Rc::new(
+                Ok(Arc::new(PhysicalPlan::HashAggregate(Arc::new(
                     final_hash_exec,
                 ))))
             }
         }
         LogicalPlan::ParquetScan { path, .. } => {
             let exec = ParquetScanExec::try_new(&path, None)?;
-            Ok(Rc::new(PhysicalPlan::ParquetScan(Rc::new(exec))))
+            Ok(Arc::new(PhysicalPlan::ParquetScan(Arc::new(exec))))
         }
         other => Err(BallistaError::General(format!("unsupported {:?}", other))),
     }
 }
 
 /// Optimizer rule to insert shuffles as needed
-pub fn ensure_requirements(plan: &PhysicalPlan) -> Result<Rc<PhysicalPlan>> {
+pub fn ensure_requirements(plan: &PhysicalPlan) -> Result<Arc<PhysicalPlan>> {
     let execution_plan = plan.as_execution_plan();
 
     // recurse down and replace children
     if execution_plan.children().is_empty() {
-        return Ok(Rc::new(plan.clone()));
+        return Ok(Arc::new(plan.clone()));
     }
-    let children: Vec<Rc<PhysicalPlan>> = execution_plan
+    let children: Vec<Arc<PhysicalPlan>> = execution_plan
         .children()
         .iter()
         .map(|c| ensure_requirements(c.as_ref()))
@@ -248,7 +250,7 @@ pub fn ensure_requirements(plan: &PhysicalPlan) -> Result<Rc<PhysicalPlan>> {
 
     match execution_plan.required_child_distribution() {
         Distribution::SinglePartition => {
-            let new_children: Vec<Rc<PhysicalPlan>> = children
+            let new_children: Vec<Arc<PhysicalPlan>> = children
                 .iter()
                 .map(|c| {
                     if c.as_execution_plan()
@@ -256,21 +258,21 @@ pub fn ensure_requirements(plan: &PhysicalPlan) -> Result<Rc<PhysicalPlan>> {
                         .partition_count()
                         > 1
                     {
-                        Rc::new(PhysicalPlan::ShuffleExchange(Rc::new(
+                        Arc::new(PhysicalPlan::ShuffleExchange(Arc::new(
                             ShuffleExchangeExec::new(
                                 c.clone(),
                                 Partitioning::UnknownPartitioning(1),
                             ),
                         )))
                     } else {
-                        Rc::new(plan.clone())
+                        Arc::new(plan.clone())
                     }
                 })
                 .collect();
 
-            Ok(Rc::new(plan.with_new_children(new_children)))
+            Ok(Arc::new(plan.with_new_children(new_children)))
         }
-        _ => Ok(Rc::new(plan.clone())),
+        _ => Ok(Arc::new(plan.clone())),
     }
 }
 

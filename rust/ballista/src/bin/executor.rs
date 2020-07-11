@@ -14,10 +14,10 @@
 
 use std::sync::Arc;
 
-use ballista::BALLISTA_VERSION;
 use ballista::distributed::executor::{BallistaExecutor, Executor};
 use ballista::distributed::flight_service::FlightServiceImpl;
 use ballista::flight::flight_service_server::FlightServiceServer;
+use ballista::BALLISTA_VERSION;
 
 use tonic::transport::Server;
 

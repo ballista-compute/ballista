@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::rc::Rc;
-
 use async_trait::async_trait;
 
 use crate::error::Result;
@@ -23,12 +21,12 @@ use crate::execution::physical_plan::{
 };
 use arrow::datatypes::Schema;
 use datafusion::logicalplan::Expr;
-use tonic::codegen::Arc;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct FilterExec {
-    pub(crate) child: Rc<PhysicalPlan>,
-    filter_expr: Rc<Expr>,
+    pub(crate) child: Arc<PhysicalPlan>,
+    filter_expr: Arc<Expr>,
 }
 
 impl ExecutionPlan for FilterExec {
@@ -36,7 +34,7 @@ impl ExecutionPlan for FilterExec {
         unimplemented!()
     }
 
-    fn children(&self) -> Vec<Rc<PhysicalPlan>> {
+    fn children(&self) -> Vec<Arc<PhysicalPlan>> {
         vec![self.child.clone()]
     }
 

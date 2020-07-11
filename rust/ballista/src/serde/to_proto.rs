@@ -19,7 +19,7 @@ use crate::datafusion::logicalplan::{Expr, LogicalPlan, ScalarValue};
 use crate::error::BallistaError;
 use crate::execution::physical_plan::Action;
 use crate::execution::physical_plan::{AggregateMode, PhysicalPlan};
-use crate::execution::scheduler::Task;
+use crate::execution::scheduler::ExecutionTask;
 use crate::protobuf;
 
 impl TryInto<protobuf::Action> for Action {
@@ -27,7 +27,7 @@ impl TryInto<protobuf::Action> for Action {
 
     fn try_into(self) -> Result<protobuf::Action, Self::Error> {
         match self {
-            Action::Collect { plan } => {
+            Action::InteractiveQuery { plan } => {
                 let plan_proto: protobuf::LogicalPlanNode = plan.try_into()?;
                 Ok(protobuf::Action {
                     query: Some(plan_proto),
@@ -292,7 +292,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for PhysicalPlan {
     }
 }
 
-impl TryInto<protobuf::Task> for Task {
+impl TryInto<protobuf::Task> for ExecutionTask {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<protobuf::Task, Self::Error> {

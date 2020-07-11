@@ -12,15 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+
 use crate::arrow::datatypes::Schema;
 use crate::arrow::record_batch::RecordBatch;
 use crate::datafusion::execution::context::ExecutionContext;
 use crate::datafusion::logicalplan::LogicalPlan;
-use crate::error::Result;
+use crate::error::{ballista_error, Result};
 use crate::execution::physical_plan::ShuffleId;
+use crate::execution::scheduler::ExecutionTask;
 
 use async_trait::async_trait;
 
+#[derive(Clone)]
 pub struct ShufflePartition {
     pub(crate) schema: Schema,
     pub(crate) data: Vec<RecordBatch>,
@@ -29,25 +34,57 @@ pub struct ShufflePartition {
 #[async_trait]
 pub trait Executor: Send + Sync {
     /// Execute a query and store the resulting shuffle partitions in memory
-    async fn do_task(&self) -> ShuffleId;
+    async fn do_task(&self, task: &ExecutionTask) -> Result<ShuffleId>;
+
+    /// Collect the results of a prior task that resulted in a shuffle partition
+    fn collect(&self, shuffle_id: &ShuffleId) -> Result<ShufflePartition>;
 
     /// Execute a query and return results
     async fn execute_query(&self, plan: &LogicalPlan) -> Result<ShufflePartition>;
 }
 
-pub struct BallistaExecutor {}
+#[allow(dead_code)]
+pub struct BallistaExecutor {
+    shuffle_partitions: Arc<Mutex<HashMap<String, ShufflePartition>>>,
+}
 
 #[allow(clippy::new_without_default)]
 impl BallistaExecutor {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            shuffle_partitions: Arc::new(Mutex::new(HashMap::new())),
+        }
     }
 }
 
 #[async_trait]
 impl Executor for BallistaExecutor {
-    async fn do_task(&self) -> ShuffleId {
-        unimplemented!()
+    async fn do_task(&self, task: &ExecutionTask) -> Result<ShuffleId> {
+        let shuffle_id = ShuffleId::new(task.job_uuid, task.stage_id, task.partition_id);
+
+        // TODO why does this not compile?
+        // smol::run(async {
+        //     let exec_plan = task.plan.as_execution_plan();
+        //     let stream = exec_plan.execute(task.partition_id).await?;
+        //     let mut batches = vec![];
+        //     while let Some(batch) = stream.next().await? {
+        //         batches.push(batch);
+        //     }
+        // });
+
+        Ok(shuffle_id)
+    }
+
+    fn collect(&self, shuffle_id: &ShuffleId) -> Result<ShufflePartition> {
+        let key = format!(
+            "{}:{}:{}",
+            shuffle_id.job_uuid, shuffle_id.stage_id, shuffle_id.partition_id
+        );
+        let shuffle_partitions = self.shuffle_partitions.lock().unwrap();
+        match shuffle_partitions.get(&key) {
+            Some(partition) => Ok(partition.clone()),
+            _ => Err(ballista_error("invalid shuffle partition id")),
+        }
     }
 
     async fn execute_query(&self, logical_plan: &LogicalPlan) -> Result<ShufflePartition> {

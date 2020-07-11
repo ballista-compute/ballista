@@ -40,7 +40,9 @@ use crate::execution::operators::{
     ShuffleExchangeExec, ShuffleReaderExec, ShuffledHashJoinExec,
 };
 
+use crate::execution::scheduler::ExecutionTask;
 use async_trait::async_trait;
+use uuid::Uuid;
 
 /// Stream of columnar batches using futures
 pub type ColumnarBatchStream = Arc<dyn ColumnarBatchIter>;
@@ -86,12 +88,12 @@ pub trait ExecutionPlan {
 
     /// Get the children of this plan. Leaf nodes have no children. Unary nodes have a single
     /// child. Binary nodes have two children.
-    fn children(&self) -> Vec<Rc<PhysicalPlan>> {
+    fn children(&self) -> Vec<Arc<PhysicalPlan>> {
         vec![]
     }
 
     /// Runs this query against one partition returning a stream of columnar batches
-    fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream>;
+    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream>;
 }
 
 pub trait Expression: Send + Sync + Debug {
@@ -147,7 +149,11 @@ pub trait Accumulator: Send + Sync {
 #[derive(Debug, Clone)]
 pub enum Action {
     /// Execute the query with DataFusion and return the results
-    Collect { plan: LogicalPlan },
+    InteractiveQuery { plan: LogicalPlan },
+    /// Execute a query and store the results in memory
+    Execute(ExecutionTask),
+    /// Collect a shuffle
+    Collect(ShuffleId),
     /// Execute the query and write the results to CSV
     WriteCsv { plan: LogicalPlan, path: String },
     /// Execute the query and write the results to Parquet
@@ -255,25 +261,25 @@ impl ColumnarValue {
 #[derive(Clone)]
 pub enum PhysicalPlan {
     /// Projection.
-    Projection(Rc<ProjectionExec>),
+    Projection(Arc<ProjectionExec>),
     /// Filter a.k.a predicate.
-    Filter(Rc<FilterExec>),
+    Filter(Arc<FilterExec>),
     /// Hash aggregate
-    HashAggregate(Rc<HashAggregateExec>),
+    HashAggregate(Arc<HashAggregateExec>),
     /// Performs a hash join of two child relations by first shuffling the data using the join keys.
     ShuffledHashJoin(ShuffledHashJoinExec),
     /// Performs a shuffle that will result in the desired partitioning.
-    ShuffleExchange(Rc<ShuffleExchangeExec>),
+    ShuffleExchange(Arc<ShuffleExchangeExec>),
     /// Reads results from a ShuffleExchange
-    ShuffleReader(Rc<ShuffleReaderExec>),
+    ShuffleReader(Arc<ShuffleReaderExec>),
     /// Scans a partitioned data source
-    ParquetScan(Rc<ParquetScanExec>),
+    ParquetScan(Arc<ParquetScanExec>),
     /// Scans an in-memory table
-    InMemoryTableScan(Rc<InMemoryTableScanExec>),
+    InMemoryTableScan(Arc<InMemoryTableScanExec>),
 }
 
 impl PhysicalPlan {
-    pub fn as_execution_plan(&self) -> Rc<dyn ExecutionPlan> {
+    pub fn as_execution_plan(&self) -> Arc<dyn ExecutionPlan> {
         match self {
             Self::Projection(exec) => exec.clone(),
             Self::Filter(exec) => exec.clone(),
@@ -286,10 +292,10 @@ impl PhysicalPlan {
         }
     }
 
-    pub fn with_new_children(&self, new_children: Vec<Rc<PhysicalPlan>>) -> PhysicalPlan {
+    pub fn with_new_children(&self, new_children: Vec<Arc<PhysicalPlan>>) -> PhysicalPlan {
         match self {
             Self::HashAggregate(exec) => {
-                Self::HashAggregate(Rc::new(exec.with_new_children(new_children)))
+                Self::HashAggregate(Arc::new(exec.with_new_children(new_children)))
             }
             _ => unimplemented!(),
         }
@@ -384,7 +390,7 @@ pub enum AggregateMode {
 
 #[derive(Debug, Clone)]
 pub struct SortOrder {
-    child: Rc<Expr>,
+    child: Arc<Expr>,
     direction: SortDirection,
     null_ordering: NullOrdering,
 }
@@ -398,7 +404,7 @@ pub enum NullOrdering {
 #[derive(Debug, Clone)]
 pub enum Partitioning {
     UnknownPartitioning(usize),
-    HashPartitioning(usize, Vec<Rc<Expr>>),
+    HashPartitioning(usize, Vec<Arc<Expr>>),
 }
 
 impl Partitioning {
@@ -411,7 +417,22 @@ impl Partitioning {
     }
 }
 
-pub struct ShuffleId {}
+#[derive(Debug, Clone)]
+pub struct ShuffleId {
+    pub(crate) job_uuid: Uuid,
+    pub(crate) stage_id: usize,
+    pub(crate) partition_id: usize,
+}
+
+impl ShuffleId {
+    pub fn new(job_uuid: Uuid, stage_id: usize, partition_id: usize) -> Self {
+        Self {
+            job_uuid,
+            stage_id,
+            partition_id,
+        }
+    }
+}
 
 /// Create a physical expression from a logical expression
 pub fn compile_expression(expr: &Expr, _input: &Schema) -> Result<Arc<dyn Expression>> {

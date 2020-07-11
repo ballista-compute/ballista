@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::execution::physical_plan::PhysicalPlan;
 
 #[derive(Debug, Clone)]
 pub struct ShuffledHashJoinExec {
-    pub(crate) left: Rc<PhysicalPlan>,
-    pub(crate) right: Rc<PhysicalPlan>,
+    pub(crate) left: Arc<PhysicalPlan>,
+    pub(crate) right: Arc<PhysicalPlan>,
 }

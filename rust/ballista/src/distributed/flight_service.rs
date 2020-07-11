@@ -70,7 +70,20 @@ impl FlightService for FlightServiceImpl {
 
         println!("do_get: {:?}", action);
         match &action {
-            physical_plan::Action::Collect { plan } => {
+            physical_plan::Action::Execute(task) => {
+                self.executor
+                    .do_task(task)
+                    .await
+                    .map_err(|e| to_tonic_err(&e))?;
+                unimplemented!()
+            }
+            physical_plan::Action::Collect(shuffle_id) => {
+                self.executor
+                    .collect(shuffle_id)
+                    .map_err(|e| to_tonic_err(&e))?;
+                unimplemented!()
+            }
+            physical_plan::Action::InteractiveQuery { plan } => {
                 let results = self
                     .executor
                     .execute_query(plan)
@@ -125,7 +138,7 @@ impl FlightService for FlightServiceImpl {
         let action = decode_protobuf(&request.cmd.to_vec()).map_err(|e| to_tonic_err(&e))?;
 
         match &action {
-            physical_plan::Action::Collect { plan: logical_plan } => {
+            physical_plan::Action::InteractiveQuery { plan: logical_plan } => {
                 println!("Logical plan: {:?}", logical_plan);
 
                 let plan = create_physical_plan(&logical_plan).map_err(|e| to_tonic_err(&e))?;

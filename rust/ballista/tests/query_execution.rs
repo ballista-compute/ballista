@@ -1,6 +1,6 @@
 extern crate ballista;
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use ballista::arrow::datatypes::{DataType, Field, Schema};
 use ballista::dataframe::max;
@@ -24,17 +24,17 @@ fn hash_aggregate() -> std::io::Result<()> {
         let batch = gen.create_batch(&schema, 4096).unwrap();
 
         let in_memory_exec =
-            PhysicalPlan::InMemoryTableScan(Rc::new(InMemoryTableScanExec::new(vec![
+            PhysicalPlan::InMemoryTableScan(Arc::new(InMemoryTableScanExec::new(vec![
                 batch.clone(),
                 batch,
             ])));
 
-        let hash_agg = PhysicalPlan::HashAggregate(Rc::new(
+        let hash_agg = PhysicalPlan::HashAggregate(Arc::new(
             HashAggregateExec::try_new(
                 AggregateMode::Partial,
                 vec![col_index(0)],
                 vec![max(col_index(1))],
-                Rc::new(in_memory_exec),
+                Arc::new(in_memory_exec),
             )
             .unwrap(),
         ));

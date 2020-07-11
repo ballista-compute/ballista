@@ -15,7 +15,7 @@
 use crate::error::Result;
 use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan};
 use arrow::datatypes::Schema;
-use tonic::codegen::Arc;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct ShuffleReaderExec {

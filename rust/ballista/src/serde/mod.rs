@@ -61,7 +61,7 @@ mod tests {
         .and_then(|plan| plan.build())
         .unwrap();
 
-        let action = Action::Collect {
+        let action = Action::InteractiveQuery {
             plan: plan.clone(),
             // tables: vec![TableMeta::Csv {
             //     table_name: "employee".to_owned(),
@@ -99,7 +99,7 @@ mod tests {
         .and_then(|plan| plan.build())
         .unwrap();
 
-        let action = Action::Collect {
+        let action = Action::InteractiveQuery {
             plan: plan.clone(),
             // tables: vec![TableMeta::Csv {
             //     table_name: "employee".to_owned(),

@@ -45,7 +45,7 @@ pub struct HashAggregateExec {
     pub(crate) mode: AggregateMode,
     pub(crate) group_expr: Vec<Expr>,
     pub(crate) aggr_expr: Vec<Expr>,
-    pub(crate) child: Rc<PhysicalPlan>,
+    pub(crate) child: Arc<PhysicalPlan>,
     schema: Arc<Schema>,
 }
 
@@ -54,7 +54,7 @@ impl HashAggregateExec {
         mode: AggregateMode,
         group_expr: Vec<Expr>,
         aggr_expr: Vec<Expr>,
-        child: Rc<PhysicalPlan>,
+        child: Arc<PhysicalPlan>,
     ) -> Result<Self> {
         //TODO should just use schema from logical plan rather than derive it here?
 
@@ -84,7 +84,7 @@ impl HashAggregateExec {
         })
     }
 
-    pub fn with_new_children(&self, new_children: Vec<Rc<PhysicalPlan>>) -> HashAggregateExec {
+    pub fn with_new_children(&self, new_children: Vec<Arc<PhysicalPlan>>) -> HashAggregateExec {
         assert!(new_children.len() == 1);
         HashAggregateExec {
             mode: self.mode.clone(),
@@ -103,19 +103,21 @@ impl ExecutionPlan for HashAggregateExec {
 
     fn output_partitioning(&self) -> Partitioning {
         match self.mode {
+            AggregateMode::Final => Partitioning::SinglePartition,
+            AggregateMode::Complete => Partitioning::SinglePartition,
             AggregateMode::Partial => self.child.as_execution_plan().output_partitioning(),
-            _ => Partitioning::UnknownPartitioning(1),
         }
     }
 
     fn required_child_distribution(&self) -> Distribution {
         match self.mode {
+            AggregateMode::Final => Distribution::SinglePartition,
+            AggregateMode::Complete => Distribution::SinglePartition,
             AggregateMode::Partial => Distribution::UnspecifiedDistribution,
-            _ => Distribution::SinglePartition,
         }
     }
 
-    fn children(&self) -> Vec<Rc<PhysicalPlan>> {
+    fn children(&self) -> Vec<Arc<PhysicalPlan>> {
         vec![self.child.clone()]
     }
 
@@ -126,7 +128,11 @@ impl ExecutionPlan for HashAggregateExec {
         let group_expr = compile_expressions(&self.group_expr, &input_schema)?;
         let aggr_expr = compile_aggregate_expressions(&self.aggr_expr, &input_schema)?;
         Ok(Arc::new(HashAggregateIter::new(
-            &self.mode, input, group_expr, aggr_expr,
+            &self.mode,
+            input,
+            group_expr,
+            aggr_expr,
+            self.schema.clone(),
         )))
     }
 }
@@ -214,6 +220,7 @@ type AccumulatorSet = Vec<Rc<RefCell<dyn Accumulator>>>;
 
 #[allow(dead_code)]
 struct HashAggregateIter {
+    output_schema: Arc<Schema>,
     task: Task<Result<()>>,
     rx: Receiver<MaybeColumnarBatch>,
 }
@@ -224,6 +231,7 @@ impl HashAggregateIter {
         input: ColumnarBatchStream,
         group_expr: Vec<Arc<dyn Expression>>,
         aggr_expr: Vec<Arc<dyn AggregateExpr>>,
+        output_schema: Arc<Schema>,
     ) -> Self {
         let (tx, rx): (Sender<MaybeColumnarBatch>, Receiver<MaybeColumnarBatch>) = unbounded();
 
@@ -234,7 +242,11 @@ impl HashAggregateIter {
             aggr_expr.clone(),
             tx,
         );
-        Self { task, rx }
+        Self {
+            task,
+            rx,
+            output_schema,
+        }
     }
 }
 
@@ -541,7 +553,7 @@ fn create_batch_from_accum_map(
 #[async_trait]
 impl ColumnarBatchIter for HashAggregateIter {
     fn schema(&self) -> Arc<Schema> {
-        unimplemented!()
+        self.output_schema.clone()
     }
 
     async fn next(&self) -> Result<Option<ColumnarBatch>> {

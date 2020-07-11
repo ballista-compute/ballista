@@ -20,10 +20,10 @@ extern crate ballista;
 use ballista::arrow::datatypes::{DataType, Field, Schema};
 use ballista::arrow::record_batch::RecordBatch;
 use ballista::arrow::util::pretty;
-use ballista::cluster;
-use ballista::cluster::Executor;
 use ballista::dataframe::{max, Context, CsvReadOptions};
 use ballista::datafusion::logicalplan::*;
+use ballista::distributed::cluster;
+use ballista::distributed::cluster::Executor;
 use ballista::error::Result;
 use ballista::BALLISTA_VERSION;
 

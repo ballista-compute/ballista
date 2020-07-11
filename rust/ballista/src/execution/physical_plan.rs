@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Ballista Physical Plan (Experimental).
+//! Ballista Physical Plan.
 //!
 //! The physical plan is a serializable data structure describing how the plan will be executed.
 //!
@@ -53,7 +53,7 @@ pub trait ColumnarBatchIter: Sync + Send {
     /// Get the next batch from the stream, or None if the stream has ended
     async fn next(&self) -> Result<Option<ColumnarBatch>>;
 
-    /// Notify the iterator that no more results will be fetched, so that resources
+    /// Notify the iterator that no more results will be fetched, so that resouArces
     /// can be freed immediately.
     async fn close(&self) {}
 }
@@ -85,7 +85,7 @@ pub trait ExecutionPlan {
 
     /// Get the children of this plan. Leaf nodes have no children. Unary nodes have a single
     /// child. Binary nodes have two children.
-    fn children(&self) -> Vec<Rc<PhysicalPlan>> {
+    fn children(&self) -> Vec<Arc<PhysicalPlan>> {
         vec![]
     }
 
@@ -228,25 +228,25 @@ impl ColumnarValue {
 #[derive(Clone)]
 pub enum PhysicalPlan {
     /// Projection.
-    Projection(Rc<ProjectionExec>),
+    Projection(Arc<ProjectionExec>),
     /// Filter a.k.a predicate.
-    Filter(Rc<FilterExec>),
+    Filter(Arc<FilterExec>),
     /// Hash aggregate
-    HashAggregate(Rc<HashAggregateExec>),
+    HashAggregate(Arc<HashAggregateExec>),
     /// Performs a hash join of two child relations by first shuffling the data using the join keys.
-    ShuffledHashJoin(ShuffledHashJoinExec),
+    ShuffleHashJoin(ShuffledHashJoinExec),
     /// Performs a shuffle that will result in the desired partitioning.
-    ShuffleExchange(Rc<ShuffleExchangeExec>),
+    ShuffleExchange(Arc<ShuffleExchangeExec>),
     /// Reads results from a ShuffleExchange
-    ShuffleReader(Rc<ShuffleReaderExec>),
-    /// Scans a partitioned data source
-    ParquetScan(Rc<ParquetScanExec>),
+    ShuffleReader(Arc<ShuffleReaderExec>),
+    /// Scans a partitioned data souArce
+    ParquetScan(Arc<ParquetScanExec>),
     /// Scans an in-memory table
-    InMemoryTableScan(Rc<InMemoryTableScanExec>),
+    InMemoryTableScan(Arc<InMemoryTableScanExec>),
 }
 
 impl PhysicalPlan {
-    pub fn as_execution_plan(&self) -> Rc<dyn ExecutionPlan> {
+    pub fn as_execution_plan(&self) -> Arc<dyn ExecutionPlan> {
         match self {
             Self::Projection(exec) => exec.clone(),
             Self::Filter(exec) => exec.clone(),
@@ -259,10 +259,10 @@ impl PhysicalPlan {
         }
     }
 
-    pub fn with_new_children(&self, new_children: Vec<Rc<PhysicalPlan>>) -> PhysicalPlan {
+    pub fn with_new_children(&self, new_children: Vec<Arc<PhysicalPlan>>) -> PhysicalPlan {
         match self {
             Self::HashAggregate(exec) => {
-                Self::HashAggregate(Rc::new(exec.with_new_children(new_children)))
+                Self::HashAggregate(Arc::new(exec.with_new_children(new_children)))
             }
             _ => unimplemented!(),
         }
@@ -299,7 +299,8 @@ impl PhysicalPlan {
             }
             PhysicalPlan::Projection(_exec) => write!(f, "Projection:"),
             PhysicalPlan::Filter(_exec) => write!(f, "Filter:"),
-            _ => write!(f, "???"),
+            PhysicalPlan::ShuffleHashJoin(_exec) => write!(f, "ShuffleHashJoin:"),
+            PhysicalPlan::InMemoryTableScan(_exec) => write!(f, "InMemoryTableScan:"),
         }
     }
 }
@@ -357,7 +358,7 @@ pub enum AggregateMode {
 
 #[derive(Debug, Clone)]
 pub struct SortOrder {
-    child: Rc<Expr>,
+    child: Arc<Expr>,
     direction: SortDirection,
     null_ordering: NullOrdering,
 }
@@ -370,14 +371,16 @@ pub enum NullOrdering {
 
 #[derive(Debug, Clone)]
 pub enum Partitioning {
+    SinglePartition,
     UnknownPartitioning(usize),
-    HashPartitioning(usize, Vec<Rc<Expr>>),
+    HashPartitioning(usize, Vec<Arc<Expr>>),
 }
 
 impl Partitioning {
     pub fn partition_count(&self) -> usize {
         use Partitioning::*;
         match self {
+            SinglePartition => 1,
             UnknownPartitioning(n) => *n,
             HashPartitioning(n, _) => *n,
         }

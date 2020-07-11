@@ -12,10 +12,11 @@ option java_outer_classname = "BallistaProto";
 
 message Action {
 
-  // interactive query
+  // interactive query using logical plan
   LogicalPlanNode query = 1;
 
-  //TODO: write_csv, write_parquet, repartition, etc
+  // execute a query and store the results in memory
+  Task execute_task = 2;
 
 }
 

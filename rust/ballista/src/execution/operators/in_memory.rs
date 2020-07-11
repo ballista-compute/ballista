@@ -21,28 +21,34 @@ use std::sync::Arc;
 use crate::arrow::datatypes::Schema;
 use crate::error::Result;
 use crate::execution::physical_plan::{
-    ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ExecutionPlan,
+    ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ExecutionPlan, Partitioning,
 };
 
 use async_trait::async_trait;
 
 pub struct InMemoryTableScanExec {
-    data: Vec<ColumnarBatch>,
+    data: Vec<Vec<ColumnarBatch>>,
 }
 
 impl InMemoryTableScanExec {
-    pub fn new(data: Vec<ColumnarBatch>) -> Self {
+    pub fn new(data: Vec<Vec<ColumnarBatch>>) -> Self {
         Self { data }
     }
 }
 
 impl ExecutionPlan for InMemoryTableScanExec {
     fn schema(&self) -> Arc<Schema> {
-        self.data[0].schema()
+        //TODO assumes some data exists
+        self.data[0][0].schema()
     }
 
-    fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
-        Ok(Arc::new(InMemoryTableScanIter::new(self.data.clone())))
+    fn output_partitioning(&self) -> Partitioning {
+        Partitioning::UnknownPartitioning(self.data.len())
+    }
+
+    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+        let partition = &self.data[partition_index];
+        Ok(Arc::new(InMemoryTableScanIter::new(partition)))
     }
 }
 
@@ -52,10 +58,10 @@ pub struct InMemoryTableScanIter {
 }
 
 impl InMemoryTableScanIter {
-    fn new(data: Vec<ColumnarBatch>) -> Self {
+    fn new(data: &Vec<ColumnarBatch>) -> Self {
         Self {
             index: Arc::new(AtomicUsize::new(0)),
-            data,
+            data: data.clone(),
         }
     }
 }

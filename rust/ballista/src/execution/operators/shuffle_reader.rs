@@ -15,12 +15,15 @@
 use crate::error::Result;
 use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan};
 use arrow::datatypes::Schema;
-use tonic::codegen::Arc;
+use std::sync::Arc;
+use crate::execution::shuffle_manager::ShuffleManager;
 
 #[derive(Debug, Clone)]
 pub struct ShuffleReaderExec {
-    // query stage that produced the shuffle output that this reader needs to read
-    pub stage_id: usize,
+    /// query stage that produced the shuffle output that this reader needs to read
+    pub(crate) stage_id: usize,
+    /// Shuffle manager for locating shuffle data
+    pub(crate) shuffle_manager: Arc<dyn ShuffleManager>
 }
 
 impl ExecutionPlan for ShuffleReaderExec {
@@ -28,8 +31,14 @@ impl ExecutionPlan for ShuffleReaderExec {
         unimplemented!()
     }
 
-    fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
+    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+
+        //TODO which partition id? map partition or reduce partition?
+
+        let _executor_id = self.shuffle_manager.get_executor_id(self.stage_id, partition_index)?;
+
         // TODO send Flight request to the executor asking for the partition(s)
+
         unimplemented!()
     }
 }

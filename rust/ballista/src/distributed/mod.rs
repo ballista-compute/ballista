@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Query execution
-
-pub mod expressions;
-pub mod operators;
-pub mod physical_plan;
-pub mod shuffle_manager;
+pub mod client;
+pub mod cluster;
+pub mod executor;
+pub mod flight_service;
+pub mod scheduler;

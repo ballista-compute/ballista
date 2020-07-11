@@ -16,10 +16,10 @@ use std::convert::TryInto;
 
 use crate::arrow::datatypes::{DataType, Schema};
 use crate::datafusion::logicalplan::{Expr, LogicalPlan, ScalarValue};
+use crate::distributed::scheduler::Action;
+use crate::distributed::scheduler::Task;
 use crate::error::BallistaError;
 use crate::execution::physical_plan::{AggregateMode, PhysicalPlan};
-use crate::execution::scheduler::Task;
-use crate::logical_plan::Action;
 use crate::protobuf;
 
 impl TryInto<protobuf::Action> for Action {
@@ -31,6 +31,7 @@ impl TryInto<protobuf::Action> for Action {
                 let plan_proto: protobuf::LogicalPlanNode = plan.try_into()?;
                 Ok(protobuf::Action {
                     query: Some(plan_proto),
+                    execute_task: None,
                 })
             }
             _ => unimplemented!(),

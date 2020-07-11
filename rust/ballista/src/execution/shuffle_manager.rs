@@ -12,17 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Ballista Logical Plan
+use std::fmt::Debug;
 
-use crate::datafusion::logicalplan::LogicalPlan;
+use crate::error::Result;
 
-/// Action that can be sent to an executor
-#[derive(Debug, Clone)]
-pub enum Action {
-    /// Execute the query and return the results
-    Collect { plan: LogicalPlan },
-    /// Execute the query and write the results to CSV
-    WriteCsv { plan: LogicalPlan, path: String },
-    /// Execute the query and write the results to Parquet
-    WriteParquet { plan: LogicalPlan, path: String },
+/// Someone has to keep track of all of these shuffles
+pub trait ShuffleManager : Send + Sync + Debug {
+    /// Where's my stuff?
+    fn get_executor_id(&self, stage_id: usize, partition_id: usize) -> Result<usize>;
 }
+

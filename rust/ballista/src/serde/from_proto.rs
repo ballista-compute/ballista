@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use std::convert::TryInto;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::arrow::datatypes::{DataType, Field, Schema};
 use crate::datafusion::execution::physical_plan::csv::CsvReadOptions;
@@ -21,10 +21,10 @@ use crate::datafusion::logicalplan::{
     Expr, LogicalPlan, LogicalPlanBuilder, Operator, ScalarValue,
 };
 
+use crate::distributed::scheduler::Action;
 use crate::error::{ballista_error, BallistaError};
 use crate::execution::operators::{HashAggregateExec, ParquetScanExec};
 use crate::execution::physical_plan::{AggregateMode, PhysicalPlan};
-use crate::logical_plan::Action;
 use crate::protobuf;
 
 impl TryInto<LogicalPlan> for protobuf::LogicalPlanNode {
@@ -270,8 +270,8 @@ impl TryInto<PhysicalPlan> for protobuf::PhysicalPlanNode {
                 .iter()
                 .map(|expr| expr.to_owned().try_into())
                 .collect::<Result<Vec<_>, _>>()?;
-            Ok(PhysicalPlan::HashAggregate(Rc::new(
-                HashAggregateExec::try_new(mode, group_expr, aggr_expr, Rc::new(input))?,
+            Ok(PhysicalPlan::HashAggregate(Arc::new(
+                HashAggregateExec::try_new(mode, group_expr, aggr_expr, Arc::new(input))?,
             )))
         } else if let Some(scan) = self.scan {
             let schema: Schema = scan.schema.unwrap().try_into()?;
@@ -285,7 +285,7 @@ impl TryInto<PhysicalPlan> for protobuf::PhysicalPlanNode {
             println!("projection: {:?}", projection);
 
             match scan.file_format.as_str() {
-                "parquet" => Ok(PhysicalPlan::ParquetScan(Rc::new(
+                "parquet" => Ok(PhysicalPlan::ParquetScan(Arc::new(
                     ParquetScanExec::try_new(
                         &scan.path, None, //TODO convert projection column names to indices
                     )?,

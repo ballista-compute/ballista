@@ -77,7 +77,7 @@ impl FlightService for FlightServiceImpl {
                     .map_err(|e| to_tonic_err(&e))?;
                 unimplemented!()
             }
-            physical_plan::Action::Collect(shuffle_id) => {
+            physical_plan::Action::FetchShuffle(shuffle_id) => {
                 self.executor
                     .collect(shuffle_id)
                     .map_err(|e| to_tonic_err(&e))?;
@@ -108,7 +108,6 @@ impl FlightService for FlightServiceImpl {
                 let output = futures::stream::iter(flights);
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
-            _ => unimplemented!(),
         }
     }
 

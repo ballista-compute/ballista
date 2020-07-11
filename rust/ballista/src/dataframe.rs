@@ -17,7 +17,6 @@ use std::sync::{Arc, RwLock};
 
 use crate::arrow::datatypes::{DataType, Schema};
 use crate::arrow::record_batch::RecordBatch;
-use crate::client;
 use crate::datafusion;
 pub use crate::datafusion::datasource::csv::CsvReadOptions;
 use crate::datafusion::datasource::parquet::ParquetTable;
@@ -29,6 +28,7 @@ use crate::datafusion::logicalplan::{
 use crate::datafusion::optimizer::utils::exprlist_to_fields;
 use crate::datafusion::sql::parser::{DFASTNode, DFParser};
 use crate::datafusion::sql::planner::{SchemaProvider, SqlToRel};
+use crate::distributed::client;
 use crate::error::{BallistaError, Result};
 use crate::execution::physical_plan::Action;
 

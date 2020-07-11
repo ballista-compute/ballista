@@ -61,6 +61,15 @@ pub trait ColumnarBatchIter: Sync + Send {
     async fn close(&self) {}
 }
 
+pub trait ExecutionContext: Send + Sync {
+    fn shuffle_manager(&self) -> Arc<dyn ShuffleManager>;
+}
+
+#[async_trait]
+pub trait ShuffleManager: Send + Sync {
+    async fn read_shuffle(&self, shuffle_id: &ShuffleId) -> Result<Vec<ColumnarBatch>>;
+}
+
 /// Base trait for all operators
 #[async_trait]
 pub trait ExecutionPlan: Send + Sync {
@@ -154,11 +163,7 @@ pub enum Action {
     /// Execute a query and store the results in memory
     Execute(ExecutionTask),
     /// Collect a shuffle
-    Collect(ShuffleId),
-    /// Execute the query and write the results to CSV
-    WriteCsv { plan: LogicalPlan, path: String },
-    /// Execute the query and write the results to Parquet
-    WriteParquet { plan: LogicalPlan, path: String },
+    FetchShuffle(ShuffleId),
 }
 
 pub type MaybeColumnarBatch = Result<Option<ColumnarBatch>>;

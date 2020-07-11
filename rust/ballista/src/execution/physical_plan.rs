@@ -179,6 +179,21 @@ impl ColumnarBatch {
         }
     }
 
+    pub fn to_arrow(&self) -> Result<RecordBatch> {
+        let arrays = self
+            .columns
+            .iter()
+            .map(|c| match c {
+                ColumnarValue::Columnar(array) => Ok(array.clone()),
+                ColumnarValue::Scalar(_, _) => {
+                    // note that this can be implemented easily if needed
+                    Err(ballista_error("Cannot convert scalar value to Arrow array"))
+                }
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(RecordBatch::try_new(self.schema.clone(), arrays)?)
+    }
+
     pub fn schema(&self) -> Arc<Schema> {
         self.schema.clone()
     }
@@ -383,6 +398,8 @@ impl Partitioning {
         }
     }
 }
+
+pub struct ShuffleId {}
 
 /// Create a physical expression from a logical expression
 pub fn compile_expression(expr: &Expr, _input: &Schema) -> Result<Arc<dyn Expression>> {

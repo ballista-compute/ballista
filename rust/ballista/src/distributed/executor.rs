@@ -19,14 +19,17 @@ use crate::arrow::datatypes::Schema;
 use crate::arrow::record_batch::RecordBatch;
 use crate::datafusion::execution::context::ExecutionContext as DFContext;
 use crate::datafusion::logicalplan::LogicalPlan;
+use crate::distributed::scheduler::{
+    create_job, create_physical_plan, ensure_requirements, execute_job, ExecutionTask,
+};
 use crate::error::{ballista_error, Result};
 use crate::execution::physical_plan::{
-    Action, ColumnarBatch, ExecutionContext, ShuffleId, ShuffleManager,
+    Action, ColumnarBatch, ColumnarBatchStream, ExecutionContext, ShuffleId, ShuffleManager,
 };
-use crate::execution::scheduler::ExecutionTask;
 
 use crate::distributed::client::execute_action;
 use async_trait::async_trait;
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct ShufflePartition {
@@ -48,9 +51,14 @@ pub trait Executor: Send + Sync {
 
 pub struct ExecutorContext {}
 
+#[async_trait]
 impl ExecutionContext for ExecutorContext {
     fn shuffle_manager(&self) -> Arc<dyn ShuffleManager> {
         Arc::new(DefaultShuffleManager {})
+    }
+
+    async fn execute_task(&self, executor_id: &Uuid, task: &ExecutionTask) -> Result<ShuffleId> {
+        unimplemented!()
     }
 }
 
@@ -135,23 +143,37 @@ impl Executor for BallistaExecutor {
         // note that this used DataFusion and not the new Ballista async / distributed
         // query execution
 
-        // create local execution context
-        let ctx = DFContext::new();
+        let plan = create_physical_plan(logical_plan)?;
+        let plan = ensure_requirements(plan.as_ref())?;
+        let job = create_job(plan)?;
+        job.explain();
 
-        // create the query plan
-        let optimized_plan = ctx.optimize(&logical_plan)?;
+        // let batches = execute_job(&job, self.ctx.clone()).await?;
+        //
+        // Ok(ShufflePartition {
+        //     schema: batches[0].schema().as_ref().clone(),
+        //     data: batches.iter().map(|b| b.to_arrow()).collect::<Result<Vec<_>>>()?
+        // })
 
-        let batch_size = 1024 * 1024;
-        let physical_plan = ctx.create_physical_plan(&optimized_plan, batch_size)?;
+        unimplemented!()
 
-        // execute the query
-        let results = ctx.collect(physical_plan.as_ref())?;
-
-        let schema = physical_plan.schema();
-
-        Ok(ShufflePartition {
-            schema: schema.as_ref().clone(),
-            data: results,
-        })
+        // // create local execution context
+        // let ctx = DFContext::new();
+        //
+        // // create the query plan
+        // let optimized_plan = ctx.optimize(&logical_plan)?;
+        //
+        // let batch_size = 1024 * 1024;
+        // let physical_plan = ctx.create_physical_plan(&optimized_plan, batch_size)?;
+        //
+        // // execute the query
+        // let results = ctx.collect(physical_plan.as_ref())?;
+        //
+        // let schema = physical_plan.schema();
+        //
+        // Ok(ShufflePartition {
+        //     schema: schema.as_ref().clone(),
+        //     data: results,
+        // })
     }
 }

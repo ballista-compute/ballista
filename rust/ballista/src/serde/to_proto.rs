@@ -16,10 +16,10 @@ use std::convert::TryInto;
 
 use crate::arrow::datatypes::{DataType, Schema};
 use crate::datafusion::logicalplan::{Expr, LogicalPlan, ScalarValue};
+use crate::distributed::scheduler::ExecutionTask;
 use crate::error::BallistaError;
 use crate::execution::physical_plan::Action;
 use crate::execution::physical_plan::{AggregateMode, PhysicalPlan};
-use crate::execution::scheduler::ExecutionTask;
 use crate::protobuf;
 
 impl TryInto<protobuf::Action> for Action {
@@ -299,8 +299,8 @@ impl TryInto<protobuf::Task> for ExecutionTask {
         Ok(protobuf::Task {
             job_uuid: self.job_uuid.to_string(),
             stage_id: self.stage_id as u32,
-            task_id: self.task_id as u32,
             partition_id: self.partition_id as u32,
+            task_id: 0,
             plan: Some(self.plan.try_into()?),
         })
     }

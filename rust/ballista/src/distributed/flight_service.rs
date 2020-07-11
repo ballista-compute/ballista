@@ -17,8 +17,8 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
 use crate::distributed::executor::{Executor, ShufflePartition};
+use crate::distributed::scheduler::{create_job, create_physical_plan, ensure_requirements};
 use crate::execution::physical_plan;
-use crate::execution::scheduler::{create_job, create_physical_plan, ensure_requirements};
 use crate::serde::decode_protobuf;
 
 use crate::flight::{

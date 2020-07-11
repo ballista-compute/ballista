@@ -40,7 +40,7 @@ use crate::execution::operators::{
     ShuffleExchangeExec, ShuffleReaderExec, ShuffledHashJoinExec,
 };
 
-use crate::execution::scheduler::ExecutionTask;
+use crate::distributed::scheduler::ExecutionTask;
 use async_trait::async_trait;
 use uuid::Uuid;
 
@@ -61,8 +61,10 @@ pub trait ColumnarBatchIter: Sync + Send {
     async fn close(&self) {}
 }
 
+#[async_trait]
 pub trait ExecutionContext: Send + Sync {
     fn shuffle_manager(&self) -> Arc<dyn ShuffleManager>;
+    async fn execute_task(&self, executor_id: &Uuid, task: &ExecutionTask) -> Result<ShuffleId>;
 }
 
 #[async_trait]

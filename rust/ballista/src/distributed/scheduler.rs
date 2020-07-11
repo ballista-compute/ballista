@@ -21,15 +21,17 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::datafusion::logicalplan::LogicalPlan;
-use crate::error::{BallistaError, Result};
+use crate::error::{ballista_error, BallistaError, Result};
 use crate::execution::operators::HashAggregateExec;
 use crate::execution::operators::ParquetScanExec;
 use crate::execution::operators::ProjectionExec;
 use crate::execution::operators::ShuffleExchangeExec;
 use crate::execution::operators::ShuffleReaderExec;
 use crate::execution::physical_plan::{
-    AggregateMode, Distribution, ExecutionPlan, Partitioning, PhysicalPlan, ShuffleId,
+    AggregateMode, ColumnarBatch, Distribution, ExecutionContext, ExecutionPlan, Partitioning,
+    PhysicalPlan, ShuffleId,
 };
+use std::collections::HashMap;
 
 /// A Job typically represents a single query and the query is executed in stages. Stages are
 /// separated by map operations (shuffles) to re-partition data before the next stage starts.
@@ -40,6 +42,8 @@ pub struct Job {
     /// A list of stages within this job. There can be dependencies between stages to form
     /// a directed acyclic graph (DAG).
     pub stages: Vec<Rc<RefCell<Stage>>>,
+    /// The root stage id that produces the final results
+    pub root_stage_id: usize,
 }
 
 impl Job {
@@ -94,9 +98,19 @@ impl Stage {
 pub struct ExecutionTask {
     pub(crate) job_uuid: Uuid,
     pub(crate) stage_id: usize,
-    pub(crate) task_id: usize,
     pub(crate) partition_id: usize,
     pub(crate) plan: PhysicalPlan,
+}
+
+impl ExecutionTask {
+    pub fn new(job_uuid: Uuid, stage_id: usize, partition_id: usize, plan: PhysicalPlan) -> Self {
+        Self {
+            job_uuid,
+            stage_id,
+            partition_id,
+            plan,
+        }
+    }
 }
 
 /// Create a Job (DAG of stages) from a physical execution plan.
@@ -116,6 +130,7 @@ impl Scheduler {
         let job = Job {
             id: Uuid::new_v4(),
             stages: vec![],
+            root_stage_id: 0,
         };
         Self {
             job,
@@ -179,6 +194,81 @@ impl Scheduler {
             _ => unimplemented!(),
         }
     }
+}
+
+enum StageStatus {
+    Pending,
+    Completed,
+}
+
+/// Execute a job directly against executors as starting point
+pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Vec<ColumnarBatch>> {
+    //TODO
+    //let executors = ctx.get_executor_ids()?;
+
+    let mut map = HashMap::new();
+
+    for stage in &job.stages {
+        let stage = stage.borrow_mut();
+        map.insert(stage.id, StageStatus::Pending);
+    }
+
+    // loop until all stages are complete
+    let mut num_completed = 0;
+    while num_completed < job.stages.len() {
+        num_completed = 0;
+
+        //TODO do stages in parallel when possible
+        for stage in &job.stages {
+            let stage = stage.borrow_mut();
+            let status = map.get(&stage.id).unwrap();
+            match status {
+                StageStatus::Completed => {
+                    num_completed += 1;
+                }
+                StageStatus::Pending => {
+                    // have prior stages already completed ?
+                    if stage.prior_stages.iter().all(|id| match map.get(id) {
+                        Some(StageStatus::Completed) => true,
+                        _ => false,
+                    }) {
+                        println!("Running stage {}", stage.id);
+                        let plan = stage
+                            .plan
+                            .as_ref()
+                            .expect("all stages should have plans at execution time");
+
+                        let exec = plan.as_execution_plan();
+                        let parts = exec.output_partitioning().partition_count();
+
+                        //TODO do partitions in parallel
+                        let mut shuffle_ids = vec![];
+                        for partition in 0..parts {
+                            println!("Running stage {} partition {}", stage.id, partition);
+                            let task =
+                                ExecutionTask::new(job.id, stage.id, 0, plan.as_ref().clone());
+
+                            //TODO balance load across the executors
+                            let executor_id = Uuid::new_v4(); // TODO &executors[0];
+                            shuffle_ids.push(ctx.execute_task(&executor_id, &task).await?);
+                        }
+
+                        map.insert(stage.id, StageStatus::Completed);
+
+                        if stage.id == job.root_stage_id {
+                            let shuffle_manager = ctx.shuffle_manager();
+                            let data = shuffle_manager.read_shuffle(&shuffle_ids[0]).await?;
+                            return Ok(data);
+                        }
+                    } else {
+                        println!("Cannot run stage {} yet", stage.id);
+                    }
+                }
+            }
+        }
+    }
+
+    Err(ballista_error("oops"))
 }
 
 /// Convert a logical plan into a physical plan

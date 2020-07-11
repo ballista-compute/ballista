@@ -17,8 +17,8 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
 use crate::distributed::executor::{Executor, ShufflePartition};
+use crate::execution::physical_plan;
 use crate::execution::scheduler::{create_job, create_physical_plan, ensure_requirements};
-use crate::logical_plan;
 use crate::serde::decode_protobuf;
 
 use crate::flight::{
@@ -70,7 +70,7 @@ impl FlightService for FlightServiceImpl {
 
         println!("do_get: {:?}", action);
         match &action {
-            logical_plan::Action::Collect { plan } => {
+            physical_plan::Action::Collect { plan } => {
                 let results = self
                     .executor
                     .execute_query(plan)
@@ -125,7 +125,7 @@ impl FlightService for FlightServiceImpl {
         let action = decode_protobuf(&request.cmd.to_vec()).map_err(|e| to_tonic_err(&e))?;
 
         match &action {
-            logical_plan::Action::Collect { plan: logical_plan } => {
+            physical_plan::Action::Collect { plan: logical_plan } => {
                 println!("Logical plan: {:?}", logical_plan);
 
                 let plan = create_physical_plan(&logical_plan).map_err(|e| to_tonic_err(&e))?;

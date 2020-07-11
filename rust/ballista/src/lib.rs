@@ -37,6 +37,5 @@ pub mod datagen;
 pub mod distributed;
 pub mod error;
 pub mod execution;
-pub mod logical_plan;
 pub mod serde;
 pub mod utils;

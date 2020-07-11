@@ -16,7 +16,7 @@ use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
 use crate::error::BallistaError;
-use crate::logical_plan::Action;
+use crate::execution::physical_plan::Action;
 use crate::protobuf;
 
 use crate::arrow::datatypes::Schema;

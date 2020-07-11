@@ -17,9 +17,9 @@ use std::convert::TryInto;
 use crate::arrow::datatypes::{DataType, Schema};
 use crate::datafusion::logicalplan::{Expr, LogicalPlan, ScalarValue};
 use crate::error::BallistaError;
+use crate::execution::physical_plan::Action;
 use crate::execution::physical_plan::{AggregateMode, PhysicalPlan};
 use crate::execution::scheduler::Task;
-use crate::logical_plan::Action;
 use crate::protobuf;
 
 impl TryInto<protobuf::Action> for Action {

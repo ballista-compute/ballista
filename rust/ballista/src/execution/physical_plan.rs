@@ -31,6 +31,7 @@ use crate::arrow::array::ArrayRef;
 use crate::arrow::datatypes::{DataType, Field, Schema};
 use crate::arrow::record_batch::RecordBatch;
 use crate::datafusion::logicalplan::Expr;
+use crate::datafusion::logicalplan::LogicalPlan;
 use crate::datafusion::logicalplan::ScalarValue;
 use crate::error::{ballista_error, Result};
 use crate::execution::expressions::{col, max, min};
@@ -140,6 +141,17 @@ pub trait Accumulator: Send + Sync {
     fn accumulate(&mut self, value: &ColumnarValue) -> Result<()>;
     /// Get the final value for the accumulator
     fn get_value(&self) -> Result<Option<ScalarValue>>;
+}
+
+/// Action that can be sent to an executor
+#[derive(Debug, Clone)]
+pub enum Action {
+    /// Execute the query with DataFusion and return the results
+    Collect { plan: LogicalPlan },
+    /// Execute the query and write the results to CSV
+    WriteCsv { plan: LogicalPlan, path: String },
+    /// Execute the query and write the results to Parquet
+    WriteParquet { plan: LogicalPlan, path: String },
 }
 
 pub type MaybeColumnarBatch = Result<Option<ColumnarBatch>>;

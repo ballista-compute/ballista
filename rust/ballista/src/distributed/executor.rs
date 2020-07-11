@@ -15,11 +15,13 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::distributed::scheduler::Task;
+use crate::distributed::scheduler::{Task, ChannelPair};
 use crate::error::{ballista_error, Result};
 use crate::execution::physical_plan::{ColumnarBatch, ExecutionContext};
 
 use async_trait::async_trait;
+use crossbeam::channel::{unbounded, Receiver, Sender};
+use uuid::Uuid;
 
 // #[async_trait]
 pub trait Executor {
@@ -29,6 +31,8 @@ pub trait Executor {
 
 /// Core executor logic lives here
 pub struct DefaultExecutor {
+    /// Unique id
+    uuid: Uuid,
     /// Execution context is required to interact with other executors in the cluster
     ctx: Arc<dyn ExecutionContext>,
     /// Local store of shuffle partitions
@@ -36,11 +40,19 @@ pub struct DefaultExecutor {
 }
 
 impl DefaultExecutor {
-    pub fn new(ctx: Arc<dyn ExecutionContext>) -> Self {
-        Self {
+    pub fn try_new(ctx: Arc<dyn ExecutionContext>) -> Result<Self> {
+
+        let uuid = Uuid::new_v4();
+
+        let (tx, rx) = unbounded();
+
+        ctx.register(uuid, ChannelPair::new(tx, rx))?;
+
+        Ok(Self {
+            uuid,
             ctx,
             results: Arc::new(Mutex::new(HashMap::new())),
-        }
+        })
     }
 }
 

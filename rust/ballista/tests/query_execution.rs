@@ -59,9 +59,12 @@ fn hash_aggregate() -> Result<()> {
         assert_eq!(expected, format!("{:?}", plan));
 
         let ctx = Arc::new(LocalModeContext::new());
-        let executor = DefaultExecutor::new(ctx.clone());
 
-        //let executors: Vec<Arc<dyn Executor>> = vec![Arc::new(executor)];
+        // create some executors
+        let executors: Vec<Arc<dyn Executor>> = vec![
+            Arc::new(DefaultExecutor::try_new(ctx.clone())?),
+            Arc::new(DefaultExecutor::try_new(ctx.clone())?),
+        ];
 
         let job = create_job(plan)?;
         let results = execute_job(&job, ctx.clone()).await?;

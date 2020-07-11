@@ -18,7 +18,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
 use crate::datafusion::logicalplan::LogicalPlan;
@@ -33,6 +33,7 @@ use crate::execution::physical_plan::{AggregateMode, ColumnarBatch, Distribution
 use crate::execution::physical_plan::ShuffleManager;
 
 use async_trait::async_trait;
+use crossbeam::channel::{unbounded, Receiver, Sender};
 
 
 /// Action that can be sent to an executor
@@ -164,6 +165,9 @@ pub async fn execute_job(
     job: &Job,
     ctx: Arc<dyn ExecutionContext>,
 ) -> Result<Vec<ColumnarBatch>> {
+
+    let executors = ctx.get_executor_ids()?;
+
     let mut map = HashMap::new();
 
     for stage in &job.stages {
@@ -206,7 +210,7 @@ pub async fn execute_job(
                             let task = Task::new(job.id, stage.id, 0, 0, plan);
 
                             //TODO balance load across the executors
-                            let executor_id = 0;
+                            let executor_id = &executors[0];
                             shuffle_ids.push(ctx.execute_task(executor_id, &task).await?);
                         }
 
@@ -240,20 +244,58 @@ impl ShuffleManager for DumbShuffleManager {
     }
 }
 
+/// Communication channels between executor and context
+pub struct ChannelPair {
+    /// Send to executor
+    pub(crate) tx: Sender<()>,
+    /// Recieve from executor
+    pub(crate) rx: Receiver<()>
+}
+
+impl ChannelPair {
+    pub fn new(tx: Sender<()>, rx: Receiver<()>) -> Self {
+        Self { tx, rx }
+    }
+}
+
 /// Local mode simulates a cluster of executors within a single process
 pub struct LocalModeContext {
+    executors: Arc<Mutex<HashMap<Uuid, ChannelPair>>>
 }
 
 impl LocalModeContext {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            executors: Arc::new(Mutex::new(HashMap::new()))
+        }
     }
+
 }
 
 #[async_trait]
 impl ExecutionContext for LocalModeContext {
-    async fn execute_task(&self, executor_id: usize, task: &Task) -> Result<String> {
-        unimplemented!()
+    fn register(&self, executor_id: Uuid, channels: ChannelPair) -> Result<()> {
+        let mut executors = self.executors.lock().unwrap();
+        executors.insert(executor_id, channels);
+        Ok(())
+    }
+
+    fn get_executor_ids(&self) -> Result<Vec<Uuid>> {
+        let executors = self.executors.lock().unwrap();
+        Ok(executors.keys().map(|key| key.clone()).collect())
+    }
+
+
+    async fn execute_task(&self, executor_id: &Uuid, task: &Task) -> Result<String> {
+        let executors = self.executors.lock().unwrap();
+        match executors.get(executor_id) {
+            Some(channel) => {
+                channel.tx.send(()).unwrap();
+                let shuffle_id = channel.rx.recv().unwrap();
+                Ok("shuffle-id-tbd".to_owned())
+            },
+            _ => panic!()
+        }
     }
 
     async fn shuffle_manager(&self) -> Arc<dyn ShuffleManager> {

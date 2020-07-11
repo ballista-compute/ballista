@@ -40,7 +40,8 @@ use crate::execution::operators::{
 };
 
 use async_trait::async_trait;
-use crate::distributed::scheduler::Task;
+use crate::distributed::scheduler::{Task, ChannelPair};
+use uuid::Uuid;
 
 /// Stream of columnar batches using futures
 pub type ColumnarBatchStream = Arc<dyn ColumnarBatchIter>;
@@ -76,7 +77,9 @@ pub trait ShuffleManager : Send + Sync + Debug {
 
 #[async_trait]
 pub trait ExecutionContext {
-    async fn execute_task(&self, executor_id: usize, task: &Task) -> Result<String>;
+    fn register(&self, executor_id: Uuid, channels: ChannelPair) -> Result<()>;
+    fn get_executor_ids(&self) -> Result<Vec<Uuid>>;
+    async fn execute_task(&self, executor_id: &Uuid, task: &Task) -> Result<String>;
     async fn shuffle_manager(&self) -> Arc<dyn ShuffleManager>;
 }
 

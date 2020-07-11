@@ -24,7 +24,7 @@ use tonic::transport::Server;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "0.0.0.0:50051".parse()?;
-    let executor: Arc<dyn Executor> = Arc::new(BallistaExecutor::new());
+    let executor: Arc<dyn Executor> = Arc::new(BallistaExecutor::default());
     let service = FlightServiceImpl::new(executor);
     let server = FlightServiceServer::new(service);
     println!(

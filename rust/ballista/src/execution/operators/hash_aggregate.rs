@@ -35,7 +35,7 @@ use crate::error::{BallistaError, Result};
 use crate::execution::physical_plan::{
     compile_aggregate_expressions, compile_expressions, Accumulator, AggregateExpr, AggregateMode,
     ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ColumnarValue, Distribution,
-    ExecutionPlan, Expression, MaybeColumnarBatch, Partitioning, PhysicalPlan,
+    ExecutionContext, ExecutionPlan, Expression, MaybeColumnarBatch, Partitioning, PhysicalPlan,
 };
 use std::time::Instant;
 
@@ -120,10 +120,14 @@ impl ExecutionPlan for HashAggregateExec {
         vec![self.child.clone()]
     }
 
-    async fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+    async fn execute(
+        &self,
+        ctx: Arc<dyn ExecutionContext>,
+        partition_index: usize,
+    ) -> Result<ColumnarBatchStream> {
         let child_exec = self.child.as_execution_plan();
         let input_schema = child_exec.schema();
-        let input = child_exec.execute(partition_index).await?;
+        let input = child_exec.execute(ctx.clone(), partition_index).await?;
         let group_expr = compile_expressions(&self.group_expr, &input_schema)?;
         let aggr_expr = compile_aggregate_expressions(&self.aggr_expr, &input_schema)?;
         Ok(Arc::new(HashAggregateIter::new(

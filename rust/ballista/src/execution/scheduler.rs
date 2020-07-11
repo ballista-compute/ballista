@@ -27,7 +27,9 @@ use crate::execution::operators::ParquetScanExec;
 use crate::execution::operators::ProjectionExec;
 use crate::execution::operators::ShuffleExchangeExec;
 use crate::execution::operators::ShuffleReaderExec;
-use crate::execution::physical_plan::{AggregateMode, Distribution, Partitioning, PhysicalPlan};
+use crate::execution::physical_plan::{
+    AggregateMode, Distribution, Partitioning, PhysicalPlan, ShuffleId,
+};
 
 /// A Job typically represents a single query and the query is executed in stages. Stages are
 /// separated by map operations (shuffles) to re-partition data before the next stage starts.
@@ -160,7 +162,11 @@ impl Scheduler {
                 // return a shuffle reader to read the results from the stage
                 Ok(Arc::new(PhysicalPlan::ShuffleReader(Arc::new(
                     ShuffleReaderExec {
-                        stage_id: new_stage_id,
+                        shuffle_id: ShuffleId {
+                            job_uuid: self.job.id,
+                            stage_id: new_stage_id,
+                            partition_id: 0, // not used in this context
+                        },
                     },
                 ))))
             }

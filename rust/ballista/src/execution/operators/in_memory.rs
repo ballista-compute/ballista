@@ -21,7 +21,7 @@ use std::sync::Arc;
 use crate::arrow::datatypes::Schema;
 use crate::error::Result;
 use crate::execution::physical_plan::{
-    ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ExecutionPlan,
+    ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ExecutionContext, ExecutionPlan,
 };
 
 use async_trait::async_trait;
@@ -42,7 +42,11 @@ impl ExecutionPlan for InMemoryTableScanExec {
         self.data[0].schema()
     }
 
-    async fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
+    async fn execute(
+        &self,
+        _ctx: Arc<dyn ExecutionContext>,
+        _partition_index: usize,
+    ) -> Result<ColumnarBatchStream> {
         Ok(Arc::new(InMemoryTableScanIter::new(self.data.clone())))
     }
 }

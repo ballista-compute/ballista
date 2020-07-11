@@ -19,7 +19,7 @@ use crate::datafusion::logicalplan::Expr;
 use crate::error::Result;
 use crate::execution::physical_plan::{
     compile_expression, ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ColumnarValue,
-    ExecutionPlan, Expression, PhysicalPlan,
+    ExecutionContext, ExecutionPlan, Expression, PhysicalPlan,
 };
 
 use async_trait::async_trait;
@@ -40,14 +40,18 @@ impl ExecutionPlan for FilterExec {
         vec![self.child.clone()]
     }
 
-    async fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+    async fn execute(
+        &self,
+        ctx: Arc<dyn ExecutionContext>,
+        partition_index: usize,
+    ) -> Result<ColumnarBatchStream> {
         //TODO compile filter expr
         let expr = compile_expression(&self.filter_expr, &self.schema())?;
         Ok(Arc::new(FilterIter {
             input: self
                 .child
                 .as_execution_plan()
-                .execute(partition_index)
+                .execute(ctx.clone(), partition_index)
                 .await?,
             filter_expr: expr,
         }))

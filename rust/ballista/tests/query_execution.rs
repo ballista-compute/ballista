@@ -5,6 +5,7 @@ use std::sync::Arc;
 use ballista::arrow::datatypes::{DataType, Field, Schema};
 use ballista::dataframe::max;
 use ballista::datafusion::logicalplan::col_index;
+use ballista::distributed::executor::ExecutorContext;
 use ballista::execution::operators::HashAggregateExec;
 use ballista::execution::operators::InMemoryTableScanExec;
 use ballista::execution::physical_plan::{AggregateMode, ColumnarBatchStream, PhysicalPlan};
@@ -39,7 +40,10 @@ fn hash_aggregate() -> std::io::Result<()> {
             .unwrap(),
         ));
 
-        let stream: ColumnarBatchStream = hash_agg.as_execution_plan().execute(0).await.unwrap();
+        let ctx = Arc::new(ExecutorContext {});
+
+        let stream: ColumnarBatchStream =
+            hash_agg.as_execution_plan().execute(ctx, 0).await.unwrap();
         let mut results = vec![];
         while let Some(batch) = stream.next().await.unwrap() {
             results.push(batch);

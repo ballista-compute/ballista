@@ -17,10 +17,10 @@ use std::sync::{Arc, Mutex};
 
 use crate::arrow::datatypes::Schema;
 use crate::arrow::record_batch::RecordBatch;
-use crate::datafusion::execution::context::ExecutionContext;
+use crate::datafusion::execution::context::ExecutionContext as DFContext;
 use crate::datafusion::logicalplan::LogicalPlan;
 use crate::error::{ballista_error, Result};
-use crate::execution::physical_plan::ShuffleId;
+use crate::execution::physical_plan::{ExecutionContext, ShuffleId, ShuffleManager};
 use crate::execution::scheduler::ExecutionTask;
 
 use async_trait::async_trait;
@@ -43,17 +43,31 @@ pub trait Executor: Send + Sync {
     async fn execute_query(&self, plan: &LogicalPlan) -> Result<ShufflePartition>;
 }
 
-#[allow(dead_code)]
+pub struct ExecutorContext {}
+
+impl ExecutionContext for ExecutorContext {
+    fn shuffle_manager(&self) -> Arc<dyn ShuffleManager> {
+        unimplemented!()
+    }
+}
+
 pub struct BallistaExecutor {
+    ctx: Arc<dyn ExecutionContext>,
     shuffle_partitions: Arc<Mutex<HashMap<String, ShufflePartition>>>,
 }
 
-#[allow(clippy::new_without_default)]
 impl BallistaExecutor {
-    pub fn new() -> Self {
+    pub fn new(ctx: Arc<dyn ExecutionContext>) -> Self {
         Self {
+            ctx,
             shuffle_partitions: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+}
+
+impl Default for BallistaExecutor {
+    fn default() -> Self {
+        BallistaExecutor::new(Arc::new(ExecutorContext {}))
     }
 }
 
@@ -63,7 +77,9 @@ impl Executor for BallistaExecutor {
         let shuffle_id = ShuffleId::new(task.job_uuid, task.stage_id, task.partition_id);
 
         let exec_plan = task.plan.as_execution_plan();
-        let stream = exec_plan.execute(task.partition_id).await?;
+        let stream = exec_plan
+            .execute(self.ctx.clone(), task.partition_id)
+            .await?;
         let mut batches = vec![];
         while let Some(batch) = stream.next().await? {
             batches.push(batch.to_arrow()?);
@@ -102,7 +118,7 @@ impl Executor for BallistaExecutor {
         // query execution
 
         // create local execution context
-        let ctx = ExecutionContext::new();
+        let ctx = DFContext::new();
 
         // create the query plan
         let optimized_plan = ctx.optimize(&logical_plan)?;

@@ -103,7 +103,11 @@ pub trait ExecutionPlan: Send + Sync {
     }
 
     /// Runs this query against one partition returning a stream of columnar batches
-    async fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream>;
+    async fn execute(
+        &self,
+        ctx: Arc<dyn ExecutionContext>,
+        partition_index: usize,
+    ) -> Result<ColumnarBatchStream>;
 }
 
 pub trait Expression: Send + Sync + Debug {
@@ -334,7 +338,7 @@ impl PhysicalPlan {
                 exec.as_ref().child.fmt_with_indent(f, indent + 1)
             }
             PhysicalPlan::ShuffleReader(exec) => {
-                write!(f, "ShuffleReader: stage_id={}", exec.stage_id)
+                write!(f, "ShuffleReader: shuffle_id={:?}", exec.shuffle_id)
             }
             PhysicalPlan::Projection(_exec) => write!(f, "Projection:"),
             PhysicalPlan::Filter(_exec) => write!(f, "Filter:"),

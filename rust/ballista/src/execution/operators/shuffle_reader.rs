@@ -16,14 +16,16 @@ use std::sync::Arc;
 
 use crate::arrow::datatypes::Schema;
 use crate::error::Result;
-use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan};
+use crate::execution::physical_plan::{
+    ColumnarBatchStream, ExecutionContext, ExecutionPlan, ShuffleId,
+};
 
+use crate::execution::operators::InMemoryTableScanExec;
 use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
 pub struct ShuffleReaderExec {
-    // query stage that produced the shuffle output that this reader needs to read
-    pub stage_id: usize,
+    pub(crate) shuffle_id: ShuffleId,
 }
 
 #[async_trait]
@@ -32,8 +34,13 @@ impl ExecutionPlan for ShuffleReaderExec {
         unimplemented!()
     }
 
-    async fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
-        // TODO send Flight request to the executor asking for the partition(s)
-        unimplemented!()
+    async fn execute(
+        &self,
+        ctx: Arc<dyn ExecutionContext>,
+        partition_index: usize,
+    ) -> Result<ColumnarBatchStream> {
+        let batches = ctx.shuffle_manager().read_shuffle(&self.shuffle_id).await?;
+        let exec = InMemoryTableScanExec::new(batches);
+        exec.execute(ctx.clone(), partition_index).await
     }
 }

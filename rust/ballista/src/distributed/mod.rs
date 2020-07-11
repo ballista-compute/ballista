@@ -16,4 +16,3 @@ pub mod client;
 pub mod cluster;
 pub mod executor;
 pub mod flight_service;
-pub mod localmode;

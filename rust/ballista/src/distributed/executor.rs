@@ -20,9 +20,12 @@ use crate::arrow::record_batch::RecordBatch;
 use crate::datafusion::execution::context::ExecutionContext as DFContext;
 use crate::datafusion::logicalplan::LogicalPlan;
 use crate::error::{ballista_error, Result};
-use crate::execution::physical_plan::{ExecutionContext, ShuffleId, ShuffleManager};
+use crate::execution::physical_plan::{
+    Action, ColumnarBatch, ExecutionContext, ShuffleId, ShuffleManager,
+};
 use crate::execution::scheduler::ExecutionTask;
 
+use crate::distributed::client::execute_action;
 use async_trait::async_trait;
 
 #[derive(Clone)]
@@ -47,7 +50,22 @@ pub struct ExecutorContext {}
 
 impl ExecutionContext for ExecutorContext {
     fn shuffle_manager(&self) -> Arc<dyn ShuffleManager> {
-        unimplemented!()
+        Arc::new(DefaultShuffleManager {})
+    }
+}
+
+pub struct DefaultShuffleManager {}
+
+#[async_trait]
+impl ShuffleManager for DefaultShuffleManager {
+    async fn read_shuffle(&self, shuffle_id: &ShuffleId) -> Result<Vec<ColumnarBatch>> {
+        // TODO etcd lookup to find executor
+        let batches =
+            execute_action("localhost", 50051, Action::FetchShuffle(shuffle_id.clone())).await?;
+        Ok(batches
+            .iter()
+            .map(|b| ColumnarBatch::from_arrow(b))
+            .collect())
     }
 }
 

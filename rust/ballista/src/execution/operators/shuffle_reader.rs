@@ -25,7 +25,14 @@ use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
 pub struct ShuffleReaderExec {
+    schema: Arc<Schema>,
     pub(crate) shuffle_id: ShuffleId,
+}
+
+impl ShuffleReaderExec {
+    pub fn new(schema: Arc<Schema>, shuffle_id: ShuffleId) -> Self {
+        Self { schema, shuffle_id }
+    }
 }
 
 #[async_trait]

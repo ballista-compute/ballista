@@ -28,7 +28,7 @@ use crate::execution::operators::ProjectionExec;
 use crate::execution::operators::ShuffleExchangeExec;
 use crate::execution::operators::ShuffleReaderExec;
 use crate::execution::physical_plan::{
-    AggregateMode, Distribution, Partitioning, PhysicalPlan, ShuffleId,
+    AggregateMode, Distribution, ExecutionPlan, Partitioning, PhysicalPlan, ShuffleId,
 };
 
 /// A Job typically represents a single query and the query is executed in stages. Stages are
@@ -160,14 +160,13 @@ impl Scheduler {
                     .push(new_stage_id);
 
                 // return a shuffle reader to read the results from the stage
+                let shuffle_id = ShuffleId {
+                    job_uuid: self.job.id,
+                    stage_id: new_stage_id,
+                    partition_id: 0, // not used in this context
+                };
                 Ok(Arc::new(PhysicalPlan::ShuffleReader(Arc::new(
-                    ShuffleReaderExec {
-                        shuffle_id: ShuffleId {
-                            job_uuid: self.job.id,
-                            stage_id: new_stage_id,
-                            partition_id: 0, // not used in this context
-                        },
-                    },
+                    ShuffleReaderExec::new(exec.schema().clone(), shuffle_id),
                 ))))
             }
             PhysicalPlan::HashAggregate(exec) => {

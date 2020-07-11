@@ -12,10 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::sync::Arc;
+
+use crate::arrow::datatypes::Schema;
 use crate::error::Result;
 use crate::execution::physical_plan::{ColumnarBatchStream, ExecutionPlan};
-use arrow::datatypes::Schema;
-use std::sync::Arc;
+
+use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
 pub struct ShuffleReaderExec {
@@ -23,12 +26,13 @@ pub struct ShuffleReaderExec {
     pub stage_id: usize,
 }
 
+#[async_trait]
 impl ExecutionPlan for ShuffleReaderExec {
     fn schema(&self) -> Arc<Schema> {
         unimplemented!()
     }
 
-    fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
+    async fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
         // TODO send Flight request to the executor asking for the partition(s)
         unimplemented!()
     }

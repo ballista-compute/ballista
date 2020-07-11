@@ -62,15 +62,25 @@ impl Executor for BallistaExecutor {
     async fn do_task(&self, task: &ExecutionTask) -> Result<ShuffleId> {
         let shuffle_id = ShuffleId::new(task.job_uuid, task.stage_id, task.partition_id);
 
-        // TODO why does this not compile?
-        // smol::run(async {
-        //     let exec_plan = task.plan.as_execution_plan();
-        //     let stream = exec_plan.execute(task.partition_id).await?;
-        //     let mut batches = vec![];
-        //     while let Some(batch) = stream.next().await? {
-        //         batches.push(batch);
-        //     }
-        // });
+        let exec_plan = task.plan.as_execution_plan();
+        let stream = exec_plan.execute(task.partition_id).await?;
+        let mut batches = vec![];
+        while let Some(batch) = stream.next().await? {
+            batches.push(batch.to_arrow()?);
+        }
+
+        let key = format!(
+            "{}:{}:{}",
+            shuffle_id.job_uuid, shuffle_id.stage_id, shuffle_id.partition_id
+        );
+        let mut shuffle_partitions = self.shuffle_partitions.lock().unwrap();
+        shuffle_partitions.insert(
+            key,
+            ShufflePartition {
+                schema: stream.schema().as_ref().clone(),
+                data: batches,
+            },
+        );
 
         Ok(shuffle_id)
     }

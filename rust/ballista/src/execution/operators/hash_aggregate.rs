@@ -96,6 +96,7 @@ impl HashAggregateExec {
     }
 }
 
+#[async_trait]
 impl ExecutionPlan for HashAggregateExec {
     fn schema(&self) -> Arc<Schema> {
         self.schema.clone()
@@ -119,10 +120,10 @@ impl ExecutionPlan for HashAggregateExec {
         vec![self.child.clone()]
     }
 
-    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+    async fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
         let child_exec = self.child.as_execution_plan();
         let input_schema = child_exec.schema();
-        let input = child_exec.execute(partition_index)?;
+        let input = child_exec.execute(partition_index).await?;
         let group_expr = compile_expressions(&self.group_expr, &input_schema)?;
         let aggr_expr = compile_aggregate_expressions(&self.aggr_expr, &input_schema)?;
         Ok(Arc::new(HashAggregateIter::new(

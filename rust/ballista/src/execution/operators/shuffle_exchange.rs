@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::sync::Arc;
+
 use crate::arrow::datatypes::Schema;
 use crate::error::Result;
 use crate::execution::physical_plan::{
     ColumnarBatchStream, ExecutionPlan, Partitioning, PhysicalPlan,
 };
 
-use std::sync::Arc;
+use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
 pub struct ShuffleExchangeExec {
@@ -35,12 +37,13 @@ impl ShuffleExchangeExec {
     }
 }
 
+#[async_trait]
 impl ExecutionPlan for ShuffleExchangeExec {
     fn schema(&self) -> Arc<Schema> {
         unimplemented!()
     }
 
-    fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
+    async fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
         unimplemented!()
     }
 }

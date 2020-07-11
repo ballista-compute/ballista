@@ -12,16 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use async_trait::async_trait;
+use std::sync::Arc;
 
+use crate::arrow::datatypes::Schema;
+use crate::datafusion::logicalplan::Expr;
 use crate::error::Result;
 use crate::execution::physical_plan::{
     compile_expression, ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ColumnarValue,
     ExecutionPlan, Expression, PhysicalPlan,
 };
-use arrow::datatypes::Schema;
-use datafusion::logicalplan::Expr;
-use std::sync::Arc;
+
+use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
 pub struct FilterExec {
@@ -29,6 +30,7 @@ pub struct FilterExec {
     filter_expr: Arc<Expr>,
 }
 
+#[async_trait]
 impl ExecutionPlan for FilterExec {
     fn schema(&self) -> Arc<Schema> {
         unimplemented!()
@@ -38,11 +40,15 @@ impl ExecutionPlan for FilterExec {
         vec![self.child.clone()]
     }
 
-    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+    async fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
         //TODO compile filter expr
         let expr = compile_expression(&self.filter_expr, &self.schema())?;
         Ok(Arc::new(FilterIter {
-            input: self.child.as_execution_plan().execute(partition_index)?,
+            input: self
+                .child
+                .as_execution_plan()
+                .execute(partition_index)
+                .await?,
             filter_expr: expr,
         }))
     }

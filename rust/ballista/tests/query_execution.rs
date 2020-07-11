@@ -39,7 +39,7 @@ fn hash_aggregate() -> std::io::Result<()> {
             .unwrap(),
         ));
 
-        let stream: ColumnarBatchStream = hash_agg.as_execution_plan().execute(0).unwrap();
+        let stream: ColumnarBatchStream = hash_agg.as_execution_plan().execute(0).await.unwrap();
         let mut results = vec![];
         while let Some(batch) = stream.next().await.unwrap() {
             results.push(batch);

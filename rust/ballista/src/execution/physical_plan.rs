@@ -62,7 +62,8 @@ pub trait ColumnarBatchIter: Sync + Send {
 }
 
 /// Base trait for all operators
-pub trait ExecutionPlan {
+#[async_trait]
+pub trait ExecutionPlan: Send + Sync {
     /// Specified the output schema of this operator.
     fn schema(&self) -> Arc<Schema>;
 
@@ -93,7 +94,7 @@ pub trait ExecutionPlan {
     }
 
     /// Runs this query against one partition returning a stream of columnar batches
-    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream>;
+    async fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream>;
 }
 
 pub trait Expression: Send + Sync + Debug {

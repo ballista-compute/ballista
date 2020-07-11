@@ -78,6 +78,7 @@ impl ParquetScanExec {
     }
 }
 
+#[async_trait]
 impl ExecutionPlan for ParquetScanExec {
     fn schema(&self) -> Arc<Schema> {
         self.output_schema.clone()
@@ -89,7 +90,7 @@ impl ExecutionPlan for ParquetScanExec {
         Partitioning::UnknownPartitioning(self.filenames.len())
     }
 
-    fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
+    async fn execute(&self, partition_index: usize) -> Result<ColumnarBatchStream> {
         Ok(Arc::new(ParquetBatchIter::try_new(
             &self.filenames[partition_index],
             self.projection.clone(),

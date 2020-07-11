@@ -36,12 +36,13 @@ impl InMemoryTableScanExec {
     }
 }
 
+#[async_trait]
 impl ExecutionPlan for InMemoryTableScanExec {
     fn schema(&self) -> Arc<Schema> {
         self.data[0].schema()
     }
 
-    fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
+    async fn execute(&self, _partition_index: usize) -> Result<ColumnarBatchStream> {
         Ok(Arc::new(InMemoryTableScanIter::new(self.data.clone())))
     }
 }

@@ -17,8 +17,8 @@ use crate::arrow::record_batch::RecordBatch;
 use crate::datafusion::execution::context::ExecutionContext;
 use crate::datafusion::logicalplan::LogicalPlan;
 use crate::error::Result;
-
 use crate::execution::physical_plan::ShuffleId;
+
 use async_trait::async_trait;
 
 pub struct ShufflePartition {

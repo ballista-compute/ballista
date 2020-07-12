@@ -18,7 +18,7 @@ use crate::arrow::datatypes::{DataType, Schema};
 use crate::datafusion::logicalplan::{Expr, LogicalPlan, ScalarValue};
 use crate::distributed::scheduler::ExecutionTask;
 use crate::error::BallistaError;
-use crate::execution::physical_plan::{Action, ExecutionPlan};
+use crate::execution::physical_plan::{Action, ExecutionPlan, ShuffleId};
 use crate::execution::physical_plan::{AggregateMode, PhysicalPlan};
 use crate::protobuf;
 
@@ -40,13 +40,11 @@ impl TryInto<protobuf::Action> for Action {
                 task: Some(task.try_into()?),
                 fetch_shuffle: None,
             }),
-            Action::FetchShuffle(_shuffle_id) => {
-                Ok(protobuf::Action {
-                    query: None,
-                    task: None,
-                    fetch_shuffle: None, //TODO
-                })
-            }
+            Action::FetchShuffle(shuffle_id) => Ok(protobuf::Action {
+                query: None,
+                task: None,
+                fetch_shuffle: Some(shuffle_id.try_into()?),
+            }),
         }
     }
 }
@@ -330,6 +328,18 @@ impl TryInto<protobuf::PhysicalPlanNode> for PhysicalPlan {
                 self
             ))),
         }
+    }
+}
+
+impl TryInto<protobuf::ShuffleId> for ShuffleId {
+    type Error = BallistaError;
+
+    fn try_into(self) -> Result<protobuf::ShuffleId, Self::Error> {
+        Ok(protobuf::ShuffleId {
+            job_uuid: self.job_uuid.to_string(),
+            stage_id: self.stage_id as u32,
+            partition_id: self.partition_id as u32,
+        })
     }
 }
 

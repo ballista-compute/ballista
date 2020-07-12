@@ -443,6 +443,8 @@ impl ShuffleId {
     }
 }
 
+pub struct ShuffleLocation {}
+
 /// Create a physical expression from a logical expression
 pub fn compile_expression(expr: &Expr, input: &Schema) -> Result<Arc<dyn Expression>> {
     match expr {

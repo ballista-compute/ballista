@@ -115,7 +115,7 @@ message PhysicalPlanNode {
 
 message ScanExecNode {
   string path = 1;
-  repeated string projection = 2;
+  repeated uint32 projection = 2;
   Schema schema = 3;
   string file_format = 4; // parquet or csv
   bool has_header = 5; // csv specific

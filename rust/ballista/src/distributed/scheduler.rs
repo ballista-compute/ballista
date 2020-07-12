@@ -211,10 +211,15 @@ enum StageStatus {
 
 /// Execute a job directly against executors as starting point
 pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Vec<ColumnarBatch>> {
-    let executors = ctx.get_executor_ids().await?;
+    let _executors = ctx.get_executor_ids().await?;
+
+    // for testing
+    let executors = vec![Uuid::new_v4()];
+
     println!("Executors: {:?}", executors);
 
     if executors.is_empty() {
+        println!("no executors found");
         return Err(ballista_error("no executors available"));
     }
 

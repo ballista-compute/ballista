@@ -286,14 +286,20 @@ impl TryInto<protobuf::PhysicalPlanNode> for PhysicalPlan {
             }
             PhysicalPlan::ParquetScan(exec) => {
                 let mut node = empty_physical_plan_node();
-                let schema = &exec.parquet_schema;
-                let projection: Vec<String> = match &exec.projection {
-                    Some(p) => p.iter().map(|i| schema.field(*i).name().clone()).collect(),
-                    _ => vec![],
-                };
+                let _schema = &exec.parquet_schema;
+                // let projection: Vec<String> = match &exec.projection {
+                //     Some(p) => p.iter().map(|i| schema.field(*i).name().clone()).collect(),
+                //     _ => vec![],
+                // };
                 node.scan = Some(protobuf::ScanExecNode {
                     path: exec.path.clone(),
-                    projection,
+                    projection: exec
+                        .projection
+                        .as_ref()
+                        .unwrap()
+                        .iter()
+                        .map(|n| *n as u32)
+                        .collect(),
                     file_format: "parquet".to_owned(),
                     schema: None,
                     has_header: false,

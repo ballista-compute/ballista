@@ -21,11 +21,14 @@ use crate::datafusion::logicalplan::{
     Expr, LogicalPlan, LogicalPlanBuilder, Operator, ScalarValue,
 };
 
+use crate::distributed::scheduler::ExecutionTask;
 use crate::error::{ballista_error, BallistaError};
 use crate::execution::operators::{HashAggregateExec, ParquetScanExec};
-use crate::execution::physical_plan::Action;
+use crate::execution::physical_plan::{Action, ShuffleLocation};
 use crate::execution::physical_plan::{AggregateMode, PhysicalPlan};
 use crate::protobuf;
+use std::collections::HashMap;
+use uuid::Uuid;
 
 impl TryInto<LogicalPlan> for protobuf::LogicalPlanNode {
     type Error = BallistaError;
@@ -160,32 +163,15 @@ impl TryInto<Action> for protobuf::Action {
     fn try_into(self) -> Result<Action, Self::Error> {
         if self.query.is_some() {
             let plan: LogicalPlan = self.query.unwrap().try_into()?;
-            // let tables = self
-            //     .table_meta
-            //     .iter()
-            //     .map(|t| {
-            //         if t.csv_meta.is_some() {
-            //             //TODO fix the ugly code and make safe
-            //             let csv_meta = t.csv_meta.as_ref().unwrap();
-            //             let schema: Result<Schema, _> =
-            //                 csv_meta.schema.as_ref().unwrap().clone().try_into();
-            //             schema.and_then(|schema| {
-            //                 Ok(TableMeta::Csv {
-            //                     table_name: t.table_name.to_owned(),
-            //                     path: t.filename.to_owned(),
-            //                     has_header: csv_meta.has_header,
-            //                     schema: schema,
-            //                 })
-            //             })
-            //         } else {
-            //             unimplemented!()
-            //         }
-            //     })
-            //     .collect::<Result<Vec<_>, _>>()?;
-
             Ok(Action::InteractiveQuery { plan })
+        } else if self.task.is_some() {
+            let task: ExecutionTask = self.task.unwrap().try_into()?;
+            Ok(Action::Execute(task))
         } else {
-            Err(BallistaError::NotImplemented(format!("{:?}", self)))
+            Err(BallistaError::NotImplemented(format!(
+                "from_proto(Action) {:?}",
+                self
+            )))
         }
     }
 }
@@ -222,6 +208,31 @@ fn from_proto_arrow_type(dt: i32) -> Result<DataType, BallistaError> {
             "Unsupported data type {:?}",
             other
         ))),
+    }
+}
+
+impl TryInto<ExecutionTask> for protobuf::Task {
+    type Error = BallistaError;
+
+    fn try_into(self) -> Result<ExecutionTask, Self::Error> {
+        //TODO
+        //let x: Vec<ShuffleLocation> = self.shuffle_loc.iter().map(|s| s.try_into()).collect::<Result<_,_>>()?;
+
+        Ok(ExecutionTask::new(
+            Uuid::parse_str(&self.job_uuid).unwrap(),
+            self.stage_id as usize,
+            self.partition_id as usize,
+            self.plan.unwrap().try_into()?,
+            HashMap::new(),
+        ))
+    }
+}
+
+impl TryInto<ShuffleLocation> for protobuf::ShuffleLocation {
+    type Error = BallistaError;
+
+    fn try_into(self) -> Result<ShuffleLocation, Self::Error> {
+        unimplemented!()
     }
 }
 
@@ -274,20 +285,11 @@ impl TryInto<PhysicalPlan> for protobuf::PhysicalPlanNode {
                 HashAggregateExec::try_new(mode, group_expr, aggr_expr, Arc::new(input))?,
             )))
         } else if let Some(scan) = self.scan {
-            let schema: Schema = scan.schema.unwrap().try_into()?;
-
-            let projection: Vec<usize> = scan
-                .projection
-                .iter()
-                .map(|name| schema.index_of(name))
-                .collect::<Result<Vec<_>, _>>()?;
-
-            println!("projection: {:?}", projection);
-
             match scan.file_format.as_str() {
                 "parquet" => Ok(PhysicalPlan::ParquetScan(Arc::new(
                     ParquetScanExec::try_new(
-                        &scan.path, None, //TODO convert projection column names to indices
+                        &scan.path,
+                        Some(scan.projection.iter().map(|n| *n as usize).collect()),
                     )?,
                 ))),
                 other => Err(ballista_error(&format!(

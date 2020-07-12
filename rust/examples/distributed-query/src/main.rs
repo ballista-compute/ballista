@@ -27,9 +27,9 @@ async fn main() -> Result<()> {
     println!("Ballista v{} Distributed Query Example", BALLISTA_VERSION);
 
     //TODO use command-line args
-    let nyc_taxi_path = "/mnt/nyctaxi";
+    let nyc_taxi_path = "/mnt/nyctaxi/parquet/year=2019";
     let executor_host = "localhost";
-    let executor_port = 1234;
+    let executor_port = 50051;
 
     let start = Instant::now();
     let ctx = Context::remote(executor_host, executor_port, HashMap::new());

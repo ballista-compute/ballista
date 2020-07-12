@@ -14,17 +14,49 @@
 
 use std::sync::Arc;
 
-use ballista::distributed::executor::{BallistaExecutor, Executor};
+use ballista::distributed::executor::{BallistaExecutor, DiscoveryMode, Executor, ExecutorConfig};
 use ballista::distributed::flight_service::FlightServiceImpl;
 use ballista::flight::flight_service_server::FlightServiceServer;
 use ballista::BALLISTA_VERSION;
 
+use structopt::StructOpt;
 use tonic::transport::Server;
+
+/// A basic example
+#[derive(StructOpt, Debug)]
+#[structopt(name = "basic")]
+struct Opt {
+    /// admin_level to consider
+    #[structopt(short, long)]
+    mode: Option<String>,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "0.0.0.0:50051".parse()?;
-    let executor: Arc<dyn Executor> = Arc::new(BallistaExecutor::default());
+    let opt = Opt::from_args();
+
+    let mode = match opt.mode {
+        Some(s) => match s.as_str() {
+            "k8s" => DiscoveryMode::Kubernetes,
+            "etcd" => DiscoveryMode::Etcd,
+            _ => unimplemented!(),
+        },
+        _ => DiscoveryMode::Standalone,
+    };
+
+    //TODO make configurable
+    let external_host = "localhost";
+    let external_port = 50051;
+    let bind_host = "0.0.0.0";
+    let bind_port = 50051;
+
+    let config = ExecutorConfig::new(mode, external_host, external_port);
+
+    println!("Running with config: {:?}", config);
+
+    let addr = format!("{}:{}", bind_host, bind_port);
+    let addr = addr.parse()?;
+    let executor: Arc<dyn Executor> = Arc::new(BallistaExecutor::new(config));
     let service = FlightServiceImpl::new(executor);
     let server = FlightServiceServer::new(service);
     println!(

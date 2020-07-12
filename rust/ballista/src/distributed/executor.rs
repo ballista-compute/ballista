@@ -19,6 +19,7 @@ use crate::arrow::datatypes::Schema;
 use crate::arrow::record_batch::RecordBatch;
 use crate::datafusion::execution::context::ExecutionContext as DFContext;
 use crate::datafusion::logicalplan::LogicalPlan;
+use crate::distributed::client::execute_action;
 use crate::distributed::scheduler::{
     create_job, create_physical_plan, ensure_requirements, execute_job, ExecutionTask,
 };
@@ -27,9 +28,33 @@ use crate::execution::physical_plan::{
     Action, ColumnarBatch, ExecutionContext, PhysicalPlan, ShuffleId, ShuffleManager,
 };
 
-use crate::distributed::client::execute_action;
 use async_trait::async_trait;
+use etcd_client::{Client, PutOptions};
 use uuid::Uuid;
+
+#[derive(Debug, Clone)]
+pub struct ExecutorConfig {
+    pub(crate) discovery_mode: DiscoveryMode,
+    host: String,
+    port: usize,
+}
+
+impl ExecutorConfig {
+    pub fn new(discovery_mode: DiscoveryMode, host: &str, port: usize) -> Self {
+        Self {
+            discovery_mode,
+            host: host.to_owned(),
+            port,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum DiscoveryMode {
+    Etcd,
+    Kubernetes,
+    Standalone,
+}
 
 #[derive(Clone)]
 pub struct ShufflePartition {
@@ -50,6 +75,12 @@ pub trait Executor: Send + Sync {
 }
 
 pub struct ExecutorContext {}
+
+impl ExecutorContext {
+    fn new() -> Self {
+        Self {}
+    }
+}
 
 #[async_trait]
 impl ExecutionContext for ExecutorContext {
@@ -78,22 +109,40 @@ impl ShuffleManager for DefaultShuffleManager {
 }
 
 pub struct BallistaExecutor {
+    config: ExecutorConfig,
     ctx: Arc<dyn ExecutionContext>,
     shuffle_partitions: Arc<Mutex<HashMap<String, ShufflePartition>>>,
 }
 
 impl BallistaExecutor {
-    pub fn new(ctx: Arc<dyn ExecutionContext>) -> Self {
+    pub fn new(config: ExecutorConfig) -> Self {
+        let uuid = Uuid::new_v4();
+
+        match &config.discovery_mode {
+            DiscoveryMode::Etcd => {
+                println!("Running in etcd mode");
+                smol::run(async {
+                    //TODO remove unwraps
+                    let mut client = Client::connect(["localhost:2379"], None).await.unwrap();
+                    let cluster_name = "default";
+                    let lease_time_seconds = 60;
+                    let key = format!("/ballista/{}/{}", cluster_name, &uuid);
+                    let value = format!("{}:{}", config.host, config.port);
+                    let lease = client.lease_grant(lease_time_seconds, None).await.unwrap();
+                    let options = PutOptions::new().with_lease(lease.id());
+                    let resp = client.put(key.clone(), value, Some(options)).await.unwrap();
+                    println!("Registered with etcd as {}. Response: {:?}.", key, resp);
+                });
+            }
+            DiscoveryMode::Kubernetes => println!("Running in k8s mode"),
+            DiscoveryMode::Standalone => println!("Running in standalone mode"),
+        }
+
         Self {
-            ctx,
+            config,
+            ctx: Arc::new(ExecutorContext::new()),
             shuffle_partitions: Arc::new(Mutex::new(HashMap::new())),
         }
-    }
-}
-
-impl Default for BallistaExecutor {
-    fn default() -> Self {
-        BallistaExecutor::new(Arc::new(ExecutorContext {}))
     }
 }
 
@@ -140,45 +189,51 @@ impl Executor for BallistaExecutor {
     }
 
     async fn execute_query(&self, logical_plan: &LogicalPlan) -> Result<ShufflePartition> {
-        let ballista_execution = true;
+        match &self.config.discovery_mode {
+            DiscoveryMode::Kubernetes =>
+            // experimental, not fully working yet
+            {
+                smol::run(async {
+                    let plan: Arc<PhysicalPlan> = create_physical_plan(logical_plan)?;
+                    let plan = ensure_requirements(plan.as_ref())?;
+                    let job = create_job(plan)?;
+                    job.explain();
+                    let batches = execute_job(&job, self.ctx.clone()).await?;
 
-        if ballista_execution {
-            smol::run(async {
-                let plan: Arc<PhysicalPlan> = create_physical_plan(logical_plan)?;
-                let plan = ensure_requirements(plan.as_ref())?;
-                let job = create_job(plan)?;
-                job.explain();
-                let batches = execute_job(&job, self.ctx.clone()).await?;
+                    Ok(ShufflePartition {
+                        schema: batches[0].schema().as_ref().clone(),
+                        data: batches
+                            .iter()
+                            .map(|b| b.to_arrow())
+                            .collect::<Result<Vec<_>>>()?,
+                    })
+                })
+            }
+
+            DiscoveryMode::Standalone => {
+                // legacy DataFusion execution
+
+                // create local execution context
+                let ctx = DFContext::new();
+
+                // create the query plan
+                let optimized_plan = ctx.optimize(&logical_plan)?;
+
+                let batch_size = 1024 * 1024;
+                let physical_plan = ctx.create_physical_plan(&optimized_plan, batch_size)?;
+
+                // execute the query
+                let results = ctx.collect(physical_plan.as_ref())?;
+
+                let schema = physical_plan.schema();
 
                 Ok(ShufflePartition {
-                    schema: batches[0].schema().as_ref().clone(),
-                    data: batches
-                        .iter()
-                        .map(|b| b.to_arrow())
-                        .collect::<Result<Vec<_>>>()?,
+                    schema: schema.as_ref().clone(),
+                    data: results,
                 })
-            })
-        } else {
-            // legacy DataFusion execution
+            }
 
-            // create local execution context
-            let ctx = DFContext::new();
-
-            // create the query plan
-            let optimized_plan = ctx.optimize(&logical_plan)?;
-
-            let batch_size = 1024 * 1024;
-            let physical_plan = ctx.create_physical_plan(&optimized_plan, batch_size)?;
-
-            // execute the query
-            let results = ctx.collect(physical_plan.as_ref())?;
-
-            let schema = physical_plan.schema();
-
-            Ok(ShufflePartition {
-                schema: schema.as_ref().clone(),
-                data: results,
-            })
+            _ => unimplemented!(),
         }
     }
 }

@@ -447,9 +447,10 @@ impl ShuffleId {
 }
 
 /// Create a physical expression from a logical expression
-pub fn compile_expression(expr: &Expr, _input: &Schema) -> Result<Arc<dyn Expression>> {
+pub fn compile_expression(expr: &Expr, input: &Schema) -> Result<Arc<dyn Expression>> {
     match expr {
         Expr::Column(n) => Ok(col(*n)),
+        Expr::UnresolvedColumn(name) => Ok(col(input.index_of(name)?)),
         other => Err(ballista_error(&format!(
             "Unsupported expression {:?}",
             other

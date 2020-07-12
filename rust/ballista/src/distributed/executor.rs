@@ -14,6 +14,7 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::thread;
 
 use crate::arrow::datatypes::Schema;
 use crate::arrow::record_batch::RecordBatch;
@@ -256,29 +257,34 @@ impl Executor for BallistaExecutor {
                 println!("Running distributed query");
 
                 // experimental distributed support, not fully working yet
-                smol::run(async {
-                    let plan: Arc<PhysicalPlan> = create_physical_plan(&logical_plan)?;
-                    println!("Physical plan:\n{:?}", plan);
+                let config = self.config.clone();
+                let handle = thread::spawn(move || {
+                    smol::run(async {
+                        let plan: Arc<PhysicalPlan> = create_physical_plan(&logical_plan)?;
+                        println!("Physical plan:\n{:?}", plan);
 
-                    let plan = ensure_requirements(plan.as_ref())?;
-                    println!("Optimized physical plan:\n{:?}", plan);
+                        let plan = ensure_requirements(plan.as_ref())?;
+                        println!("Optimized physical plan:\n{:?}", plan);
 
-                    let job = create_job(plan)?;
-                    job.explain();
+                        let job = create_job(plan)?;
+                        job.explain();
 
-                    // create new execution contrext specifically for this query
-                    let ctx = Arc::new(DefaultContext::new(&self.config, HashMap::new()));
+                        // create new execution contrext specifically for this query
+                        let ctx = Arc::new(DefaultContext::new(&config, HashMap::new()));
 
-                    let batches = execute_job(&job, ctx.clone()).await?;
+                        let batches = execute_job(&job, ctx.clone()).await?;
 
-                    Ok(ShufflePartition {
-                        schema: batches[0].schema().as_ref().clone(),
-                        data: batches
-                            .iter()
-                            .map(|b| b.to_arrow())
-                            .collect::<Result<Vec<_>>>()?,
+                        Ok(ShufflePartition {
+                            schema: batches[0].schema().as_ref().clone(),
+                            data: batches
+                                .iter()
+                                .map(|b| b.to_arrow())
+                                .collect::<Result<Vec<_>>>()?,
+                        })
                     })
-                })
+                });
+
+                handle.join().unwrap()
             }
         }
     }

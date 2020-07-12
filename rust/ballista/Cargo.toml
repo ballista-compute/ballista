@@ -27,7 +27,7 @@ reqwest = "0.9.18"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 sqlparser = "0.2.6"
 crossbeam = "0.7"
-smol = "0.1.18"
+smol = { version = "0.1.18", features = ["tokio02"] }
 async-trait = "0.1.36"
 random-fast-rng = "0.1.1"
 structopt = "0.3"

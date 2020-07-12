@@ -32,6 +32,7 @@ use crate::execution::physical_plan::{
     AggregateMode, ColumnarBatch, Distribution, ExecutionContext, ExecutionPlan, Partitioning,
     PhysicalPlan, ShuffleId,
 };
+use crate::distributed::executor::{DefaultContext, ExecutorConfig, DiscoveryMode};
 
 /// A Job typically represents a single query and the query is executed in stages. Stages are
 /// separated by map operations (shuffles) to re-partition data before the next stage starts.
@@ -287,6 +288,10 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                         stage_status_map.insert(stage.id, StageStatus::Completed);
 
                         if stage.id == job.root_stage_id {
+                            println!("reading final results from query!");
+                            //TODO remove hack
+                            let config = ExecutorConfig::new(DiscoveryMode::Etcd, "", 0, "localhost:2379");
+                            let ctx = Arc::new(DefaultContext::new(&config, shuffle_location_map.clone()));
                             let data = ctx.read_shuffle(&shuffle_ids[0]).await?;
                             return Ok(data);
                         }

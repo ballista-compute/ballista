@@ -144,9 +144,9 @@ impl ExecutionContext for DefaultContext {
                     .map(|b| ColumnarBatch::from_arrow(b))
                     .collect())
             }
-            _ => Err(ballista_error(
-                "Failed to resolve executor UUID for shuffle ID",
-            )),
+            _ => Err(ballista_error(&format!(
+                "Failed to resolve executor UUID for shuffle ID {:?}", shuffle_id
+            ))),
         }
     }
 }

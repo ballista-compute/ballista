@@ -278,13 +278,13 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
 
                             //TODO balance load across the executors
                             let executor_id = &executors[0];
-                            let executor_id = executor_id.clone();
+                            let executor_id = *executor_id;
 
                             let ctx = ctx.clone();
                             let handle = thread::spawn(move || {
                                 smol::run(async {
                                     Task::blocking(async move {
-                                        ctx.execute_task(executor_id.clone(), task).await
+                                        ctx.execute_task(executor_id, task).await
                                     })
                                     .await
                                 })
@@ -300,7 +300,7 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                         }
 
                         for (shuffle_id, executor_id) in shuffle_ids.iter().zip(executors_ids) {
-                            shuffle_location_map.insert(shuffle_id.clone(), executor_id.clone());
+                            shuffle_location_map.insert(*shuffle_id, executor_id);
                         }
                         stage_status_map.insert(stage.id, StageStatus::Completed);
 

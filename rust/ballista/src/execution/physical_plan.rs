@@ -186,7 +186,7 @@ impl ColumnarBatch {
             .map(|c| ColumnarValue::Columnar(c.clone()))
             .collect();
         Self {
-            schema: batch.schema().clone(),
+            schema: batch.schema(),
             columns,
         }
     }

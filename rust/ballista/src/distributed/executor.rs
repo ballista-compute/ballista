@@ -135,8 +135,7 @@ impl ExecutionContext for DefaultContext {
             Some(_uuid) => {
                 // TODO etcd lookup to find executor
                 let batches =
-                    execute_action("localhost", 50051, Action::FetchShuffle(shuffle_id.clone()))
-                        .await?;
+                    execute_action("localhost", 50051, Action::FetchShuffle(*shuffle_id)).await?;
                 Ok(batches
                     .iter()
                     .map(|b| ColumnarBatch::from_arrow(b))

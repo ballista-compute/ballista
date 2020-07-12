@@ -21,15 +21,11 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
-
-use async_trait::async_trait;
-use crossbeam::channel::{unbounded, Receiver, Sender};
-use fnv::FnvHashMap;
-use smol::Task;
+use std::time::Instant;
 
 use crate::arrow::array::StringBuilder;
 use crate::arrow::array::{self, ArrayRef};
-use crate::arrow::datatypes::{DataType, Schema};
+use crate::arrow::datatypes::{DataType, Field, Schema};
 use crate::datafusion::logicalplan::{Expr, ScalarValue};
 use crate::error::{BallistaError, Result};
 use crate::execution::physical_plan::{
@@ -37,7 +33,11 @@ use crate::execution::physical_plan::{
     ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ColumnarValue, Distribution,
     ExecutionContext, ExecutionPlan, Expression, MaybeColumnarBatch, Partitioning, PhysicalPlan,
 };
-use std::time::Instant;
+
+use async_trait::async_trait;
+use crossbeam::channel::{unbounded, Receiver, Sender};
+use fnv::FnvHashMap;
+use smol::Task;
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -130,8 +130,27 @@ impl ExecutionPlan for HashAggregateExec {
         let input = child_exec.execute(ctx.clone(), partition_index).await?;
         let group_expr = compile_expressions(&self.group_expr, &input_schema)?;
         let aggr_expr = compile_aggregate_expressions(&self.aggr_expr, &input_schema)?;
+        let a: Vec<Field> = group_expr
+            .iter()
+            .map(|e| e.to_schema_field(&input_schema))
+            .collect::<Result<_>>()?;
+        let b: Vec<Field> = aggr_expr
+            .iter()
+            .map(|e| e.to_schema_field(&input_schema))
+            .collect::<Result<_>>()?;
+        let mut fields = vec![];
+        for field in &a {
+            fields.push(field.clone());
+        }
+        for field in &b {
+            fields.push(field.clone());
+        }
         Ok(Arc::new(HashAggregateIter::new(
-            &self.mode, input, group_expr, aggr_expr,
+            &self.mode,
+            input,
+            group_expr,
+            aggr_expr,
+            Arc::new(Schema::new(fields)),
         )))
     }
 }
@@ -219,40 +238,18 @@ type AccumulatorSet = Vec<Rc<RefCell<dyn Accumulator>>>;
 
 #[allow(dead_code)]
 struct HashAggregateIter {
-    task: Task<Result<()>>,
+    schema: Arc<Schema>,
     rx: Receiver<MaybeColumnarBatch>,
 }
 
-impl HashAggregateIter {
-    fn new(
-        mode: &AggregateMode,
-        input: ColumnarBatchStream,
-        group_expr: Vec<Arc<dyn Expression>>,
-        aggr_expr: Vec<Arc<dyn AggregateExpr>>,
-    ) -> Self {
-        let (tx, rx): (Sender<MaybeColumnarBatch>, Receiver<MaybeColumnarBatch>) = unbounded();
-
-        let task = create_task(
-            mode,
-            input.clone(),
-            group_expr.clone(),
-            aggr_expr.clone(),
-            tx,
-        );
-        Self { task, rx }
-    }
-}
-
-fn create_task(
+fn run(
+    tx: Sender<MaybeColumnarBatch>,
     mode: &AggregateMode,
     input: ColumnarBatchStream,
     group_expr: Vec<Arc<dyn Expression>>,
     aggr_expr: Vec<Arc<dyn AggregateExpr>>,
-    tx: Sender<MaybeColumnarBatch>,
-) -> Task<Result<()>> {
-    let mode = mode.to_owned();
-
-    Task::local(async move {
+) -> Result<()> {
+    smol::run(async {
         let start = Instant::now();
         let mut batch_count = 0;
         let mut row_count = 0;
@@ -376,11 +373,12 @@ fn create_task(
                             col,
                             accumulators
                         ),
-                        other => {
-                            return Err(BallistaError::General(format!(
-                                "Unsupported data type {:?} for result of aggregate expression",
-                                other
-                            )));
+                        _other => {
+                            unimplemented!()
+                            // return Err(BallistaError::General(format!(
+                            //     "Unsupported data type {:?} for result of aggregate expression",
+                            //     other
+                            // )));
                         }
                     },
                     _ => unimplemented!(),
@@ -411,6 +409,28 @@ fn create_task(
 
         Ok(())
     })
+}
+
+impl HashAggregateIter {
+    fn new(
+        mode: &AggregateMode,
+        input: ColumnarBatchStream,
+        group_expr: Vec<Arc<dyn Expression>>,
+        aggr_expr: Vec<Arc<dyn AggregateExpr>>,
+        output_schema: Arc<Schema>,
+    ) -> Self {
+        let (tx, rx): (Sender<MaybeColumnarBatch>, Receiver<MaybeColumnarBatch>) = unbounded();
+
+        let mode = mode.clone();
+        let _ = std::thread::spawn(move || {
+            run(tx, &mode, input, group_expr, aggr_expr).unwrap();
+        });
+
+        Self {
+            schema: output_schema,
+            rx,
+        }
+    }
 }
 
 /// Create a Vec<GroupByScalar> that can be used as a map key
@@ -546,7 +566,7 @@ fn create_batch_from_accum_map(
 #[async_trait]
 impl ColumnarBatchIter for HashAggregateIter {
     fn schema(&self) -> Arc<Schema> {
-        unimplemented!()
+        self.schema.clone()
     }
 
     async fn next(&self) -> Result<Option<ColumnarBatch>> {

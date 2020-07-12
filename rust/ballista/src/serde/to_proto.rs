@@ -296,12 +296,24 @@ impl TryInto<protobuf::Task> for ExecutionTask {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<protobuf::Task, Self::Error> {
+        let mut shuffle_loc = vec![];
+
+        for (k, v) in self.shuffle_locations {
+            shuffle_loc.push(protobuf::ShuffleLocation {
+                job_uuid: k.job_uuid.to_string(),
+                stage_id: k.stage_id as u32,
+                partition_id: k.partition_id as u32,
+                executor_uuid: v.to_string(),
+            });
+        }
+
         Ok(protobuf::Task {
             job_uuid: self.job_uuid.to_string(),
             stage_id: self.stage_id as u32,
             partition_id: self.partition_id as u32,
             task_id: 0,
             plan: Some(self.plan.try_into()?),
+            shuffle_loc,
         })
     }
 }

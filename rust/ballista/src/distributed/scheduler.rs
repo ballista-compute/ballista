@@ -100,15 +100,23 @@ pub struct ExecutionTask {
     pub(crate) stage_id: usize,
     pub(crate) partition_id: usize,
     pub(crate) plan: PhysicalPlan,
+    pub(crate) shuffle_locations: HashMap<ShuffleId, Uuid>,
 }
 
 impl ExecutionTask {
-    pub fn new(job_uuid: Uuid, stage_id: usize, partition_id: usize, plan: PhysicalPlan) -> Self {
+    pub fn new(
+        job_uuid: Uuid,
+        stage_id: usize,
+        partition_id: usize,
+        plan: PhysicalPlan,
+        shuffle_locations: HashMap<ShuffleId, Uuid>,
+    ) -> Self {
         Self {
             job_uuid,
             stage_id,
             partition_id,
             plan,
+            shuffle_locations,
         }
     }
 }
@@ -206,11 +214,13 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
     //TODO
     //let executors = ctx.get_executor_ids()?;
 
-    let mut map = HashMap::new();
+    let mut shuffle_location_map: HashMap<ShuffleId, Uuid> = HashMap::new();
+
+    let mut stage_status_map = HashMap::new();
 
     for stage in &job.stages {
         let stage = stage.borrow_mut();
-        map.insert(stage.id, StageStatus::Pending);
+        stage_status_map.insert(stage.id, StageStatus::Pending);
     }
 
     // loop until all stages are complete
@@ -221,17 +231,18 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
         //TODO do stages in parallel when possible
         for stage in &job.stages {
             let stage = stage.borrow_mut();
-            let status = map.get(&stage.id).unwrap();
+            let status = stage_status_map.get(&stage.id).unwrap();
             match status {
-                StageStatus::Completed => {
-                    num_completed += 1;
-                }
                 StageStatus::Pending => {
                     // have prior stages already completed ?
-                    if stage.prior_stages.iter().all(|id| match map.get(id) {
-                        Some(StageStatus::Completed) => true,
-                        _ => false,
-                    }) {
+                    if stage
+                        .prior_stages
+                        .iter()
+                        .all(|id| match stage_status_map.get(id) {
+                            Some(StageStatus::Completed) => true,
+                            _ => false,
+                        })
+                    {
                         println!("Running stage {}", stage.id);
                         let plan = stage
                             .plan
@@ -245,15 +256,22 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                         let mut shuffle_ids = vec![];
                         for partition in 0..parts {
                             println!("Running stage {} partition {}", stage.id, partition);
-                            let task =
-                                ExecutionTask::new(job.id, stage.id, 0, plan.as_ref().clone());
+                            let task = ExecutionTask::new(
+                                job.id,
+                                stage.id,
+                                0,
+                                plan.as_ref().clone(),
+                                shuffle_location_map.clone(),
+                            );
 
                             //TODO balance load across the executors
                             let executor_id = Uuid::new_v4(); // TODO &executors[0];
-                            shuffle_ids.push(ctx.execute_task(&executor_id, &task).await?);
+                            let shuffle_id = ctx.execute_task(&executor_id, &task).await?;
+                            shuffle_location_map.insert(shuffle_id.clone(), executor_id);
+                            shuffle_ids.push(shuffle_id);
                         }
 
-                        map.insert(stage.id, StageStatus::Completed);
+                        stage_status_map.insert(stage.id, StageStatus::Completed);
 
                         if stage.id == job.root_stage_id {
                             let shuffle_manager = ctx.shuffle_manager();
@@ -263,6 +281,9 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                     } else {
                         println!("Cannot run stage {} yet", stage.id);
                     }
+                }
+                StageStatus::Completed => {
+                    num_completed += 1;
                 }
             }
         }

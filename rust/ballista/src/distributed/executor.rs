@@ -29,7 +29,7 @@ use crate::execution::physical_plan::{
 };
 
 use async_trait::async_trait;
-use etcd_client::{Client, PutOptions};
+use etcd_client::{Client, GetOptions, PutOptions};
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -84,6 +84,27 @@ impl ExecutorContext {
 
 #[async_trait]
 impl ExecutionContext for ExecutorContext {
+    async fn get_executor_ids(&self) -> Result<Vec<Uuid>> {
+        match Client::connect(["localhost:2379"], None).await {
+            Ok(mut client) => {
+                let cluster_name = "default";
+                let key = format!("/ballista/{}", cluster_name);
+                let options = GetOptions::new();
+                match client.get(key.clone(), Some(options)).await {
+                    Ok(response) => {
+                        println!("{:?}", response);
+                        Ok(vec![])
+                    }
+                    Err(e) => Err(ballista_error(&format!("etcd error {:?}", e.to_string()))),
+                }
+            }
+            Err(e) => Err(ballista_error(&format!(
+                "Failed to connect to etcd {:?}",
+                e.to_string()
+            ))),
+        }
+    }
+
     fn shuffle_manager(&self) -> Arc<dyn ShuffleManager> {
         Arc::new(DefaultShuffleManager {})
     }

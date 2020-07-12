@@ -223,30 +223,6 @@ impl Executor for BallistaExecutor {
 
     async fn execute_query(&self, logical_plan: &LogicalPlan) -> Result<ShufflePartition> {
         match &self.config.discovery_mode {
-            DiscoveryMode::Kubernetes =>
-            // experimental, not fully working yet
-            {
-                smol::run(async {
-                    let plan: Arc<PhysicalPlan> = create_physical_plan(logical_plan)?;
-                    let plan = ensure_requirements(plan.as_ref())?;
-                    let job = create_job(plan)?;
-                    job.explain();
-
-                    // create new execution contrext specifically for this query
-                    let ctx = Arc::new(DefaultContext::new(&self.config, HashMap::new()));
-
-                    let batches = execute_job(&job, ctx.clone()).await?;
-
-                    Ok(ShufflePartition {
-                        schema: batches[0].schema().as_ref().clone(),
-                        data: batches
-                            .iter()
-                            .map(|b| b.to_arrow())
-                            .collect::<Result<Vec<_>>>()?,
-                    })
-                })
-            }
-
             DiscoveryMode::Standalone => {
                 // legacy DataFusion execution
 
@@ -270,7 +246,28 @@ impl Executor for BallistaExecutor {
                 })
             }
 
-            _ => unimplemented!(),
+            // experimental distributed support, not fully working yet
+            _ => {
+                smol::run(async {
+                    let plan: Arc<PhysicalPlan> = create_physical_plan(logical_plan)?;
+                    let plan = ensure_requirements(plan.as_ref())?;
+                    let job = create_job(plan)?;
+                    job.explain();
+
+                    // create new execution contrext specifically for this query
+                    let ctx = Arc::new(DefaultContext::new(&self.config, HashMap::new()));
+
+                    let batches = execute_job(&job, ctx.clone()).await?;
+
+                    Ok(ShufflePartition {
+                        schema: batches[0].schema().as_ref().clone(),
+                        data: batches
+                            .iter()
+                            .map(|b| b.to_arrow())
+                            .collect::<Result<Vec<_>>>()?,
+                    })
+                })
+            }
         }
     }
 }

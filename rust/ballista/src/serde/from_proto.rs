@@ -24,7 +24,7 @@ use crate::datafusion::logicalplan::{
 use crate::distributed::scheduler::ExecutionTask;
 use crate::error::{ballista_error, BallistaError};
 use crate::execution::operators::{HashAggregateExec, ParquetScanExec};
-use crate::execution::physical_plan::{Action, ShuffleLocation};
+use crate::execution::physical_plan::{Action, ShuffleId, ShuffleLocation};
 use crate::execution::physical_plan::{AggregateMode, PhysicalPlan};
 use crate::protobuf;
 use std::collections::HashMap;
@@ -167,6 +167,9 @@ impl TryInto<Action> for protobuf::Action {
         } else if self.task.is_some() {
             let task: ExecutionTask = self.task.unwrap().try_into()?;
             Ok(Action::Execute(task))
+        } else if self.fetch_shuffle.is_some() {
+            let shuffle_id: ShuffleId = self.fetch_shuffle.unwrap().try_into()?;
+            Ok(Action::FetchShuffle(shuffle_id))
         } else {
             Err(BallistaError::NotImplemented(format!(
                 "from_proto(Action) {:?}",
@@ -215,15 +218,22 @@ impl TryInto<ExecutionTask> for protobuf::Task {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<ExecutionTask, Self::Error> {
-        //TODO
-        //let x: Vec<ShuffleLocation> = self.shuffle_loc.iter().map(|s| s.try_into()).collect::<Result<_,_>>()?;
+        let mut shuffle_locations: HashMap<ShuffleId, Uuid> = HashMap::new();
+        for loc in &self.shuffle_loc {
+            let shuffle_id = ShuffleId::new(
+                Uuid::parse_str(&loc.job_uuid).unwrap(),
+                loc.stage_id as usize,
+                loc.partition_id as usize,
+            );
+            shuffle_locations.insert(shuffle_id, Uuid::parse_str(&loc.executor_uuid).unwrap());
+        }
 
         Ok(ExecutionTask::new(
             Uuid::parse_str(&self.job_uuid).unwrap(),
             self.stage_id as usize,
             self.partition_id as usize,
             self.plan.unwrap().try_into()?,
-            HashMap::new(),
+            shuffle_locations,
         ))
     }
 }
@@ -232,7 +242,19 @@ impl TryInto<ShuffleLocation> for protobuf::ShuffleLocation {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<ShuffleLocation, Self::Error> {
-        unimplemented!()
+        Ok(ShuffleLocation {})
+    }
+}
+
+impl TryInto<ShuffleId> for protobuf::ShuffleId {
+    type Error = BallistaError;
+
+    fn try_into(self) -> Result<ShuffleId, Self::Error> {
+        Ok(ShuffleId::new(
+            Uuid::parse_str(&self.job_uuid).unwrap(),
+            self.stage_id as usize,
+            self.partition_id as usize,
+        ))
     }
 }
 

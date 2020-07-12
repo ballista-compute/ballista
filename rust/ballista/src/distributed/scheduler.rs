@@ -16,6 +16,7 @@
 //! and co-ordinating execution of these stages and tasks across the cluster.
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -31,7 +32,6 @@ use crate::execution::physical_plan::{
     AggregateMode, ColumnarBatch, Distribution, ExecutionContext, ExecutionPlan, Partitioning,
     PhysicalPlan, ShuffleId,
 };
-use std::collections::HashMap;
 
 /// A Job typically represents a single query and the query is executed in stages. Stages are
 /// separated by map operations (shuffles) to re-partition data before the next stage starts.
@@ -261,8 +261,8 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                         let exec = plan.as_execution_plan();
                         let parts = exec.output_partitioning().partition_count();
 
-                        //TODO do partitions in parallel
                         let mut shuffle_ids = vec![];
+
                         for partition in 0..parts {
                             println!("Running stage {} partition {}", stage.id, partition);
                             let task = ExecutionTask::new(

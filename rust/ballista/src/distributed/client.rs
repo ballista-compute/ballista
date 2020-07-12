@@ -33,9 +33,13 @@ pub async fn execute_action(
     action: Action,
 ) -> Result<Vec<RecordBatch>, BallistaError> {
     //TODO need to avoid connecting per request
-    let mut client = FlightServiceClient::connect(format!("http://{}:{}", host, port))
+
+    let addr = format!("http://{}:{}", host, port);
+    println!("Connecting to flight server at {}", addr);
+    let mut client = FlightServiceClient::connect(addr)
         .await
         .map_err(|e| BallistaError::General(format!("{:?}", e)))?;
+    println!("connected ok");
 
     let serialized_action: protobuf::Action = action.try_into()?;
     let mut buf: Vec<u8> = Vec::with_capacity(serialized_action.encoded_len());

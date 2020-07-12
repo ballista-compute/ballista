@@ -211,8 +211,12 @@ enum StageStatus {
 
 /// Execute a job directly against executors as starting point
 pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Vec<ColumnarBatch>> {
-    //TODO
-    //let executors = ctx.get_executor_ids()?;
+    let executors = ctx.get_executor_ids().await?;
+    println!("Executors: {:?}", executors);
+
+    if executors.is_empty() {
+        return Err(ballista_error("no executors available"));
+    }
 
     let mut shuffle_location_map: HashMap<ShuffleId, Uuid> = HashMap::new();
 
@@ -265,9 +269,13 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                             );
 
                             //TODO balance load across the executors
-                            let executor_id = Uuid::new_v4(); // TODO &executors[0];
-                            let shuffle_id = ctx.execute_task(&executor_id, &task).await?;
-                            shuffle_location_map.insert(shuffle_id.clone(), executor_id);
+                            let executor_id = &executors[0];
+
+                            println!("BEFORE execute_task");
+                            let shuffle_id = ctx.execute_task(executor_id, &task).await?;
+                            println!("AFTER execute_task");
+
+                            shuffle_location_map.insert(shuffle_id.clone(), *executor_id);
                             shuffle_ids.push(shuffle_id);
                         }
 

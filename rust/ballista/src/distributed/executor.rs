@@ -96,11 +96,14 @@ impl DefaultContext {}
 #[async_trait]
 impl ExecutionContext for DefaultContext {
     async fn get_executor_ids(&self) -> Result<Vec<Uuid>> {
+        println!("get_executor_ids");
         match Client::connect([&self.config.etcd_urls], None).await {
             Ok(mut client) => {
+                println!("get_executor_ids got client");
                 let cluster_name = "default";
                 let key = format!("/ballista/{}", cluster_name);
                 let options = GetOptions::new();
+                println!("get_executor_ids calling get");
                 match client.get(key.clone(), Some(options)).await {
                     Ok(response) => {
                         println!("{:?}", response);

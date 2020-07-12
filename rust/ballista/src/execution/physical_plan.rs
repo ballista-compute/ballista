@@ -319,9 +319,10 @@ impl PhysicalPlan {
         match self {
             PhysicalPlan::ParquetScan(exec) => write!(
                 f,
-                "ParquetScan: {:?}, partitions={}",
+                "ParquetScan: {:?}, partitions={}; projection={:?}",
                 exec.path,
-                exec.filenames.len()
+                exec.filenames.len(),
+                exec.projection
             ),
             PhysicalPlan::HashAggregate(exec) => {
                 write!(

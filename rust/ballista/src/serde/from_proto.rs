@@ -23,7 +23,7 @@ use crate::datafusion::logicalplan::{
 
 use crate::distributed::scheduler::ExecutionTask;
 use crate::error::{ballista_error, BallistaError};
-use crate::execution::operators::{HashAggregateExec, ParquetScanExec};
+use crate::execution::operators::{HashAggregateExec, ParquetScanExec, ShuffleReaderExec};
 use crate::execution::physical_plan::{Action, ShuffleId, ShuffleLocation};
 use crate::execution::physical_plan::{AggregateMode, PhysicalPlan};
 use crate::protobuf;
@@ -319,6 +319,13 @@ impl TryInto<PhysicalPlan> for protobuf::PhysicalPlanNode {
                     other
                 ))),
             }
+        } else if let Some(shuffle_reader) = self.shuffle_reader {
+            Ok(PhysicalPlan::ShuffleReader(Arc::new(
+                ShuffleReaderExec::new(
+                    Arc::new(shuffle_reader.schema.unwrap().try_into()?),
+                    shuffle_reader.shuffle_id.unwrap().try_into()?,
+                ),
+            )))
         } else {
             Err(ballista_error(&format!(
                 "Unsupported physical plan '{:?}'",

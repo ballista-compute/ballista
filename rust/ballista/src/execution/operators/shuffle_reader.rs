@@ -38,7 +38,7 @@ impl ShuffleReaderExec {
 #[async_trait]
 impl ExecutionPlan for ShuffleReaderExec {
     fn schema(&self) -> Arc<Schema> {
-        unimplemented!()
+        self.schema.clone()
     }
 
     async fn execute(

@@ -110,7 +110,7 @@ message PhysicalPlanNode {
   GlobalLimitExecNode global_limit = 22;
   LocalLimitExecNode local_limit = 23;
   HashAggregateExecNode hash_aggregate = 30;
-  ShuffleExecNode shuffle = 40;
+  ShuffleReaderExecNode shuffle_reader = 40;
 }
 
 message ScanExecNode {
@@ -141,8 +141,9 @@ message HashAggregateExecNode {
   AggregateMode mode = 3;
 }
 
-message ShuffleExecNode {
-
+message ShuffleReaderExecNode {
+  ShuffleId shuffle_id = 1;
+  Schema schema = 2;
 }
 
 message GlobalLimitExecNode {

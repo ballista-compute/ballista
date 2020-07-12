@@ -137,7 +137,7 @@ impl ParquetBatchIter {
 
         let filename = filename.to_string();
 
-        let task = Task::local(async move {
+        std::thread::spawn(move || {
             let start = Instant::now();
             let mut output_batches = 0;
             let mut output_rows = 0;
@@ -195,8 +195,6 @@ impl ParquetBatchIter {
                 start.elapsed().as_millis()
             );
         });
-
-        task.detach();
 
         Ok(Self {
             schema: Arc::new(projected_schema),

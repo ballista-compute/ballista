@@ -202,12 +202,12 @@ impl Context {
 
     /// Create a DataFrame from an existing set of RecordBatch instances
     pub fn create_dataframe(&self, batches: &[RecordBatch]) -> Result<DataFrame> {
-        let schema = batches[0].schema().as_ref();
+        let schema = batches[0].schema();
         let plan = LogicalPlan::InMemoryScan {
             data: vec![batches.to_vec()],
-            schema: Box::new(schema.clone()),
+            schema: Box::new(schema.as_ref().clone()),
             projection: None,
-            projected_schema: Box::new(schema.clone()),
+            projected_schema: Box::new(schema.as_ref().clone()),
         };
         Ok(DataFrame::from(self.state.clone(), plan))
     }

@@ -1,12 +1,16 @@
 # Distributed Query Execution
 
-*NOTE: this is a work-in-progress and is not functional yet*
-
-This example shows how to manually create a Ballista cluster of Rust executors and run an aggregate query using those executors.
+This example demontrates running a distributed query against a local Ballista cluster, using etcd for discovery.
 
 ## Prerequisites
 
-You will need to create a Ballista cluster in Kubernetes. This is documented in the [README](../../../kubernetes/README.md) in the top-level kubernetes folder.
+etcd must be running locally.
+
+## Start one or more executors
+
+```bash
+cargo run --release --bin executor -- --mode=etcd
+```
 
 ## Execute the query
 
@@ -17,11 +21,3 @@ query will create a physical plan and schedule execution in the cluster and then
 cargo run
 ``` 
 
-## Teardown
-
-Remove cluster:
-
-```bash
-kubectl delete -f parallel-aggregate-rs.yaml
-kubectl delete -f cluster-deployment.yaml
-```

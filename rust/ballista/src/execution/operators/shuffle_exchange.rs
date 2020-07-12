@@ -40,7 +40,7 @@ impl ShuffleExchangeExec {
 #[async_trait]
 impl ExecutionPlan for ShuffleExchangeExec {
     fn schema(&self) -> Arc<Schema> {
-        unimplemented!()
+        self.child.as_execution_plan().schema()
     }
 
     async fn execute(

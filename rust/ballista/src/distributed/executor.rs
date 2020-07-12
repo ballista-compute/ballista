@@ -116,8 +116,16 @@ impl ExecutionContext for DefaultContext {
         }
     }
 
-    async fn execute_task(&self, _executor_id: &Uuid, _task: &ExecutionTask) -> Result<ShuffleId> {
-        unimplemented!()
+    async fn execute_task(&self, _executor_id: &Uuid, task: &ExecutionTask) -> Result<ShuffleId> {
+        // TODO etcd lookup to find executor
+        let _batches = execute_action("localhost", 50051, Action::Execute(task.clone())).await?;
+
+        // TODO what is the point of returning this info since it is based on input arg?
+        Ok(ShuffleId::new(
+            task.job_uuid,
+            task.stage_id,
+            task.partition_id,
+        ))
     }
 
     async fn read_shuffle(&self, shuffle_id: &ShuffleId) -> Result<Vec<ColumnarBatch>> {
@@ -222,35 +230,36 @@ impl Executor for BallistaExecutor {
     }
 
     async fn execute_query(&self, logical_plan: &LogicalPlan) -> Result<ShufflePartition> {
+        println!("Logical plan:\n{:?}", logical_plan);
+        let ctx = DFContext::new();
+        let logical_plan = ctx.optimize(&logical_plan)?;
+        println!("Optimized logical plan:\n{:?}", logical_plan);
+
         match &self.config.discovery_mode {
             DiscoveryMode::Standalone => {
+                println!("Running standalone query");
+
                 // legacy DataFusion execution
-
-                // create local execution context
-                let ctx = DFContext::new();
-
-                // create the query plan
-                let optimized_plan = ctx.optimize(&logical_plan)?;
-
                 let batch_size = 1024 * 1024;
-                let physical_plan = ctx.create_physical_plan(&optimized_plan, batch_size)?;
-
-                // execute the query
+                let physical_plan = ctx.create_physical_plan(&logical_plan, batch_size)?;
                 let results = ctx.collect(physical_plan.as_ref())?;
-
                 let schema = physical_plan.schema();
-
                 Ok(ShufflePartition {
                     schema: schema.as_ref().clone(),
                     data: results,
                 })
             }
-
-            // experimental distributed support, not fully working yet
             _ => {
+                println!("Running distributed query");
+
+                // experimental distributed support, not fully working yet
                 smol::run(async {
-                    let plan: Arc<PhysicalPlan> = create_physical_plan(logical_plan)?;
+                    let plan: Arc<PhysicalPlan> = create_physical_plan(&logical_plan)?;
+                    println!("Physical plan:\n{:?}", plan);
+
                     let plan = ensure_requirements(plan.as_ref())?;
+                    println!("Optimized physical plan:\n{:?}", plan);
+
                     let job = create_job(plan)?;
                     job.explain();
 

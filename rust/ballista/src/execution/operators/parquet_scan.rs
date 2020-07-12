@@ -49,7 +49,10 @@ impl ParquetScanExec {
         common::build_file_list(path, &mut filenames, ".parquet")?;
 
         let filename = &filenames[0];
-        println!("Scanning {}", filename);
+        println!(
+            "Creating ParquetScanExec for {} with projection {:?}",
+            filename, projection
+        );
 
         let file = File::open(filename)?;
         let file_reader = Rc::new(SerializedFileReader::new(file).unwrap()); //TODO error handling

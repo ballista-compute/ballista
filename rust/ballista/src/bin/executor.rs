@@ -15,7 +15,7 @@
 use std::sync::Arc;
 
 use ballista::distributed::executor::{BallistaExecutor, DiscoveryMode, Executor, ExecutorConfig};
-use ballista::distributed::flight_service::FlightServiceImpl;
+use ballista::distributed::flight_service::BallistaFlightService;
 use ballista::flight::flight_service_server::FlightServiceServer;
 use ballista::BALLISTA_VERSION;
 
@@ -58,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = format!("{}:{}", bind_host, bind_port);
     let addr = addr.parse()?;
     let executor: Arc<dyn Executor> = Arc::new(BallistaExecutor::new(config));
-    let service = FlightServiceImpl::new(executor);
+    let service = BallistaFlightService::new(executor);
     let server = FlightServiceServer::new(service);
     println!(
         "Ballista v{} Rust Executor listening on {:?}",

@@ -31,9 +31,22 @@ impl TryInto<protobuf::Action> for Action {
                 let plan_proto: protobuf::LogicalPlanNode = plan.try_into()?;
                 Ok(protobuf::Action {
                     query: Some(plan_proto),
+                    task: None,
+                    fetch_shuffle: None,
                 })
             }
-            _ => unimplemented!(),
+            Action::Execute(task) => Ok(protobuf::Action {
+                query: None,
+                task: Some(task.try_into()?),
+                fetch_shuffle: None,
+            }),
+            Action::FetchShuffle(_shuffle_id) => {
+                Ok(protobuf::Action {
+                    query: None,
+                    task: None,
+                    fetch_shuffle: None, //TODO
+                })
+            }
         }
     }
 }

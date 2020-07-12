@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
+use crate::arrow::datatypes::{DataType, Field, Schema};
 use crate::distributed::executor::{Executor, ShufflePartition};
 use crate::distributed::scheduler::{create_job, create_physical_plan, ensure_requirements};
 use crate::execution::physical_plan;
@@ -32,14 +33,14 @@ use tonic::{Request, Response, Status, Streaming};
 
 /// Service implementing the Apache Arrow Flight Protocol
 #[derive(Clone)]
-pub struct FlightServiceImpl {
+pub struct BallistaFlightService {
     /// Ballista executor implementation
     executor: Arc<dyn Executor>,
     /// Results cache
     results_cache: Arc<Mutex<HashMap<String, ShufflePartition>>>,
 }
 
-impl FlightServiceImpl {
+impl BallistaFlightService {
     pub fn new(executor: Arc<dyn Executor>) -> Self {
         Self {
             executor,
@@ -51,7 +52,7 @@ impl FlightServiceImpl {
 type BoxedFlightStream<T> = Pin<Box<dyn Stream<Item = Result<T, Status>> + Send + Sync + 'static>>;
 
 #[tonic::async_trait]
-impl FlightService for FlightServiceImpl {
+impl FlightService for BallistaFlightService {
     type HandshakeStream = BoxedFlightStream<HandshakeResponse>;
     type ListFlightsStream = BoxedFlightStream<FlightInfo>;
     type DoGetStream = BoxedFlightStream<FlightData>;
@@ -71,17 +72,60 @@ impl FlightService for FlightServiceImpl {
         println!("do_get: {:?}", action);
         match &action {
             physical_plan::Action::Execute(task) => {
-                self.executor
+                let _shuffle_id = self
+                    .executor
                     .do_task(task)
                     .await
                     .map_err(|e| to_tonic_err(&e))?;
-                unimplemented!()
+
+                let results = ShufflePartition {
+                    schema: Schema::new(vec![Field::new("shuffle_id", DataType::Utf8, false)]),
+                    data: vec![],
+                };
+
+                // write results stream to client
+                let mut flights: Vec<Result<FlightData, Status>> =
+                    vec![Ok(FlightData::from(&results.schema))];
+
+                let mut batches: Vec<Result<FlightData, Status>> = results
+                    .data
+                    .iter()
+                    .map(|batch| {
+                        println!("batch schema: {:?}", batch.schema());
+
+                        Ok(FlightData::from(batch))
+                    })
+                    .collect();
+
+                flights.append(&mut batches);
+
+                let output = futures::stream::iter(flights);
+                Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
             physical_plan::Action::FetchShuffle(shuffle_id) => {
-                self.executor
+                let results = self
+                    .executor
                     .collect(shuffle_id)
                     .map_err(|e| to_tonic_err(&e))?;
-                unimplemented!()
+
+                // write results stream to client
+                let mut flights: Vec<Result<FlightData, Status>> =
+                    vec![Ok(FlightData::from(&results.schema))];
+
+                let mut batches: Vec<Result<FlightData, Status>> = results
+                    .data
+                    .iter()
+                    .map(|batch| {
+                        println!("batch schema: {:?}", batch.schema());
+
+                        Ok(FlightData::from(batch))
+                    })
+                    .collect();
+
+                flights.append(&mut batches);
+
+                let output = futures::stream::iter(flights);
+                Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
             physical_plan::Action::InteractiveQuery { plan } => {
                 let results = self
@@ -90,6 +134,7 @@ impl FlightService for FlightServiceImpl {
                     .await
                     .map_err(|e| to_tonic_err(&e))?;
 
+                // write results stream to client
                 let mut flights: Vec<Result<FlightData, Status>> =
                     vec![Ok(FlightData::from(&results.schema))];
 

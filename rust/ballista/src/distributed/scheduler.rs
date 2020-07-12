@@ -341,8 +341,10 @@ pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Arc<PhysicalPlan>> {
                 ))))
             }
         }
-        LogicalPlan::ParquetScan { path, .. } => {
-            let exec = ParquetScanExec::try_new(&path, None)?;
+        LogicalPlan::ParquetScan {
+            path, projection, ..
+        } => {
+            let exec = ParquetScanExec::try_new(&path, projection.clone())?;
             Ok(Arc::new(PhysicalPlan::ParquetScan(Arc::new(exec))))
         }
         other => Err(BallistaError::General(format!("unsupported {:?}", other))),

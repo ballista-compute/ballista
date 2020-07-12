@@ -320,10 +320,14 @@ impl TryInto<PhysicalPlan> for protobuf::PhysicalPlanNode {
                 ))),
             }
         } else if let Some(shuffle_reader) = self.shuffle_reader {
+            let mut shuffle_ids = vec![];
+            for s in &shuffle_reader.shuffle_id {
+                shuffle_ids.push(s.to_owned().try_into()?);
+            }
             Ok(PhysicalPlan::ShuffleReader(Arc::new(
                 ShuffleReaderExec::new(
                     Arc::new(shuffle_reader.schema.unwrap().try_into()?),
-                    shuffle_reader.shuffle_id.unwrap().try_into()?,
+                    shuffle_ids,
                 ),
             )))
         } else {

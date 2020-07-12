@@ -26,11 +26,11 @@ use async_trait::async_trait;
 #[derive(Debug, Clone)]
 pub struct ShuffleReaderExec {
     schema: Arc<Schema>,
-    pub(crate) shuffle_id: ShuffleId,
+    pub(crate) shuffle_id: Vec<ShuffleId>,
 }
 
 impl ShuffleReaderExec {
-    pub fn new(schema: Arc<Schema>, shuffle_id: ShuffleId) -> Self {
+    pub fn new(schema: Arc<Schema>, shuffle_id: Vec<ShuffleId>) -> Self {
         Self { schema, shuffle_id }
     }
 }
@@ -46,7 +46,11 @@ impl ExecutionPlan for ShuffleReaderExec {
         ctx: Arc<dyn ExecutionContext>,
         partition_index: usize,
     ) -> Result<ColumnarBatchStream> {
-        let batches = ctx.read_shuffle(&self.shuffle_id).await?;
+        //TODO read shuffles in parallel
+        let mut batches = vec![];
+        for shuffle_id in &self.shuffle_id {
+            batches.extend(ctx.read_shuffle(&shuffle_id).await?);
+        }
         let exec = InMemoryTableScanExec::new(batches);
         exec.execute(ctx.clone(), partition_index).await
     }

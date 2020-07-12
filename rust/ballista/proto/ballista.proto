@@ -142,7 +142,7 @@ message HashAggregateExecNode {
 }
 
 message ShuffleReaderExecNode {
-  ShuffleId shuffle_id = 1;
+  repeated ShuffleId shuffle_id = 1;
   Schema schema = 2;
 }
 

@@ -313,13 +313,16 @@ impl TryInto<protobuf::PhysicalPlanNode> for PhysicalPlan {
             PhysicalPlan::ShuffleReader(exec) => {
                 let schema: protobuf::Schema = exec.schema().as_ref().to_owned().try_into()?;
                 let mut node = empty_physical_plan_node();
+
+                let shuffle_id: Vec<protobuf::ShuffleId> = exec
+                    .shuffle_id
+                    .iter()
+                    .map(|s| s.to_owned().try_into())
+                    .collect::<Result<_, _>>()?;
+
                 node.shuffle_reader = Some(protobuf::ShuffleReaderExecNode {
                     schema: Some(schema),
-                    shuffle_id: Some(protobuf::ShuffleId {
-                        job_uuid: exec.shuffle_id.job_uuid.to_string(),
-                        stage_id: exec.shuffle_id.stage_id as u32,
-                        partition_id: exec.shuffle_id.partition_id as u32,
-                    }),
+                    shuffle_id,
                 });
                 Ok(node)
             }

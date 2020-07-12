@@ -186,11 +186,19 @@ impl Scheduler {
                     .push(new_stage_id);
 
                 // return a shuffle reader to read the results from the stage
-                let shuffle_id = ShuffleId {
-                    job_uuid: self.job.id,
-                    stage_id: new_stage_id,
-                    partition_id: 0, // not used in this context
-                };
+                let n = exec
+                    .child
+                    .as_execution_plan()
+                    .output_partitioning()
+                    .partition_count();
+
+                let shuffle_id = (0..n)
+                    .map(|n| ShuffleId {
+                        job_uuid: self.job.id,
+                        stage_id: new_stage_id,
+                        partition_id: n,
+                    })
+                    .collect();
                 Ok(Arc::new(PhysicalPlan::ShuffleReader(Arc::new(
                     ShuffleReaderExec::new(exec.schema(), shuffle_id),
                 ))))
@@ -271,7 +279,7 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                             let task = ExecutionTask::new(
                                 job.id,
                                 stage.id,
-                                0,
+                                partition,
                                 plan.as_ref().clone(),
                                 shuffle_location_map.clone(),
                             );

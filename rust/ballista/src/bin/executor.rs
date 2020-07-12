@@ -49,8 +49,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let external_port = 50051;
     let bind_host = "0.0.0.0";
     let bind_port = 50051;
+    let etcd_urls = "localhost:2379";
 
-    let config = ExecutorConfig::new(mode, external_host, external_port);
+    let config = ExecutorConfig::new(mode, external_host, external_port, etcd_urls);
 
     println!("Running with config: {:?}", config);
 

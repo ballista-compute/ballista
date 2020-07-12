@@ -274,8 +274,7 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                         stage_status_map.insert(stage.id, StageStatus::Completed);
 
                         if stage.id == job.root_stage_id {
-                            let shuffle_manager = ctx.shuffle_manager();
-                            let data = shuffle_manager.read_shuffle(&shuffle_ids[0]).await?;
+                            let data = ctx.read_shuffle(&shuffle_ids[0]).await?;
                             return Ok(data);
                         }
                     } else {

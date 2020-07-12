@@ -63,13 +63,8 @@ pub trait ColumnarBatchIter: Sync + Send {
 
 #[async_trait]
 pub trait ExecutionContext: Send + Sync {
-    fn shuffle_manager(&self) -> Arc<dyn ShuffleManager>;
     async fn get_executor_ids(&self) -> Result<Vec<Uuid>>;
     async fn execute_task(&self, executor_id: &Uuid, task: &ExecutionTask) -> Result<ShuffleId>;
-}
-
-#[async_trait]
-pub trait ShuffleManager: Send + Sync {
     async fn read_shuffle(&self, shuffle_id: &ShuffleId) -> Result<Vec<ColumnarBatch>>;
 }
 

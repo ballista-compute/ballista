@@ -46,7 +46,7 @@ impl ExecutionPlan for ShuffleReaderExec {
         ctx: Arc<dyn ExecutionContext>,
         partition_index: usize,
     ) -> Result<ColumnarBatchStream> {
-        let batches = ctx.shuffle_manager().read_shuffle(&self.shuffle_id).await?;
+        let batches = ctx.read_shuffle(&self.shuffle_id).await?;
         let exec = InMemoryTableScanExec::new(batches);
         exec.execute(ctx.clone(), partition_index).await
     }

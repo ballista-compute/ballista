@@ -47,6 +47,13 @@ use uuid::Uuid;
 /// Stream of columnar batches using futures
 pub type ColumnarBatchStream = Arc<dyn ColumnarBatchIter>;
 
+#[derive(Debug, Clone)]
+pub struct ExecutorMeta {
+    pub(crate) id: String,
+    pub(crate) host: String,
+    pub(crate) port: usize,
+}
+
 /// Async iterator over a stream of columnar batches
 #[async_trait]
 pub trait ColumnarBatchIter: Sync + Send {
@@ -63,8 +70,12 @@ pub trait ColumnarBatchIter: Sync + Send {
 
 #[async_trait]
 pub trait ExecutionContext: Send + Sync {
-    async fn get_executor_ids(&self) -> Result<Vec<Uuid>>;
-    async fn execute_task(&self, executor_id: Uuid, task: ExecutionTask) -> Result<ShuffleId>;
+    async fn get_executor_ids(&self) -> Result<Vec<ExecutorMeta>>;
+    async fn execute_task(
+        &self,
+        executor_id: ExecutorMeta,
+        task: ExecutionTask,
+    ) -> Result<ShuffleId>;
     async fn read_shuffle(&self, shuffle_id: &ShuffleId) -> Result<Vec<ColumnarBatch>>;
 }
 

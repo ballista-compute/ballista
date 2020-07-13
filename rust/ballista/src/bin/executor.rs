@@ -26,9 +26,13 @@ use tonic::transport::Server;
 #[derive(StructOpt, Debug)]
 #[structopt(name = "basic")]
 struct Opt {
-    /// admin_level to consider
+    /// discovery mode
     #[structopt(short, long)]
     mode: Option<String>,
+
+    /// bind port
+    #[structopt(short, long)]
+    port: usize,
 }
 
 #[tokio::main]
@@ -46,16 +50,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //TODO make configurable
     let external_host = "localhost";
-    let external_port = 50051;
     let bind_host = "0.0.0.0";
-    let bind_port = 50051;
+    let port = opt.port;
     let etcd_urls = "localhost:2379";
 
-    let config = ExecutorConfig::new(mode, external_host, external_port, etcd_urls);
+    let config = ExecutorConfig::new(mode, external_host, port, etcd_urls);
 
     println!("Running with config: {:?}", config);
 
-    let addr = format!("{}:{}", bind_host, bind_port);
+    let addr = format!("{}:{}", bind_host, port);
     let addr = addr.parse()?;
     let executor: Arc<dyn Executor> = Arc::new(BallistaExecutor::new(config));
     let service = BallistaFlightService::new(executor);

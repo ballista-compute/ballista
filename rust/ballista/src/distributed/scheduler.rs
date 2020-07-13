@@ -31,8 +31,8 @@ use crate::execution::operators::ProjectionExec;
 use crate::execution::operators::ShuffleExchangeExec;
 use crate::execution::operators::ShuffleReaderExec;
 use crate::execution::physical_plan::{
-    AggregateMode, ColumnarBatch, Distribution, ExecutionContext, ExecutionPlan, Partitioning,
-    PhysicalPlan, ShuffleId,
+    AggregateMode, ColumnarBatch, Distribution, ExecutionContext, ExecutionPlan, ExecutorMeta,
+    Partitioning, PhysicalPlan, ShuffleId,
 };
 use smol::Task;
 
@@ -103,7 +103,7 @@ pub struct ExecutionTask {
     pub(crate) stage_id: usize,
     pub(crate) partition_id: usize,
     pub(crate) plan: PhysicalPlan,
-    pub(crate) shuffle_locations: HashMap<ShuffleId, Uuid>,
+    pub(crate) shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
 }
 
 impl ExecutionTask {
@@ -112,7 +112,7 @@ impl ExecutionTask {
         stage_id: usize,
         partition_id: usize,
         plan: PhysicalPlan,
-        shuffle_locations: HashMap<ShuffleId, Uuid>,
+        shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
     ) -> Self {
         Self {
             job_uuid,
@@ -222,10 +222,7 @@ enum StageStatus {
 
 /// Execute a job directly against executors as starting point
 pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Vec<ColumnarBatch>> {
-    let _executors = ctx.get_executor_ids().await?;
-
-    // for testing
-    let executors = vec![Uuid::new_v4()];
+    let executors = ctx.get_executor_ids().await?;
 
     println!("Executors: {:?}", executors);
 
@@ -234,7 +231,7 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
         return Err(ballista_error("no executors available"));
     }
 
-    let mut shuffle_location_map: HashMap<ShuffleId, Uuid> = HashMap::new();
+    let mut shuffle_location_map: HashMap<ShuffleId, ExecutorMeta> = HashMap::new();
 
     let mut stage_status_map = HashMap::new();
 
@@ -274,6 +271,7 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
 
                         let mut threads = vec![];
                         let mut executors_ids = vec![];
+                        let mut executor_index = 0;
                         for partition in 0..parts {
                             println!("Running stage {} partition {}", stage.id, partition);
                             let task = ExecutionTask::new(
@@ -284,21 +282,26 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                                 shuffle_location_map.clone(),
                             );
 
-                            //TODO balance load across the executors
-                            let executor_id = &executors[0];
-                            let executor_id = *executor_id;
+                            // load balance across the executors
+                            let executor_id = &executors[executor_index];
+                            executor_index += 1;
+                            if executor_index == executors.len() {
+                                executor_index = 0;
+                            }
+
+                            let executor_id = executor_id.clone();
+                            executors_ids.push(executor_id.clone());
 
                             let ctx = ctx.clone();
                             let handle = thread::spawn(move || {
                                 smol::run(async {
                                     Task::blocking(async move {
-                                        ctx.execute_task(executor_id, task).await
+                                        ctx.execute_task(executor_id.clone(), task).await
                                     })
                                     .await
                                 })
                             });
                             threads.push(handle);
-                            executors_ids.push(executor_id);
                         }
 
                         let mut shuffle_ids = vec![];

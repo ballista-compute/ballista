@@ -26,7 +26,7 @@ use crate::distributed::scheduler::{
 };
 use crate::error::{ballista_error, Result};
 use crate::execution::physical_plan::{
-    Action, ColumnarBatch, ExecutionContext, PhysicalPlan, ShuffleId,
+    Action, ColumnarBatch, ExecutionContext, ExecutorMeta, PhysicalPlan, ShuffleId,
 };
 
 use async_trait::async_trait;
@@ -79,12 +79,15 @@ pub trait Executor: Send + Sync {
 
 pub struct DefaultContext {
     /// map from shuffle id to executor uuid
-    pub(crate) shuffle_locations: HashMap<ShuffleId, Uuid>,
+    pub(crate) shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
     config: ExecutorConfig,
 }
 
 impl DefaultContext {
-    pub fn new(config: &ExecutorConfig, shuffle_locations: HashMap<ShuffleId, Uuid>) -> Self {
+    pub fn new(
+        config: &ExecutorConfig,
+        shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
+    ) -> Self {
         Self {
             config: config.clone(),
             shuffle_locations,
@@ -96,46 +99,70 @@ impl DefaultContext {}
 
 #[async_trait]
 impl ExecutionContext for DefaultContext {
-    async fn get_executor_ids(&self) -> Result<Vec<Uuid>> {
+    async fn get_executor_ids(&self) -> Result<Vec<ExecutorMeta>> {
         println!("get_executor_ids");
         match Client::connect([&self.config.etcd_urls], None).await {
-            Ok(mut client) => {
-                println!("get_executor_ids got client");
-                let cluster_name = "default";
-                let key = format!("/ballista/{}", cluster_name);
-                let options = GetOptions::new();
-                println!("get_executor_ids calling get");
-                match client.get(key.clone(), Some(options)).await {
-                    Ok(response) => {
-                        println!("{:?}", response);
-                        Ok(vec![])
-                    }
-                    Err(e) => Err(ballista_error(&format!("etcd error {:?}", e.to_string()))),
-                }
-            }
             Err(e) => Err(ballista_error(&format!(
                 "Failed to connect to etcd {:?}",
                 e.to_string()
             ))),
+            Ok(mut client) => {
+                println!("get_executor_ids got client");
+                let cluster_name = "default";
+                let key = format!("/ballista/{}", cluster_name);
+                let resp = client
+                    .get(key, Some(GetOptions::new().with_all_keys()))
+                    .await
+                    .unwrap();
+
+                let mut execs = vec![];
+                for kv in resp.kvs() {
+                    let host_port = kv.value_str().unwrap();
+                    let executor_id = kv.key_str().unwrap();
+                    println!("\t{{{}: {}}}", executor_id, host_port);
+
+                    let x: Vec<_> = host_port.split(':').collect();
+                    let host = &x[0];
+                    let port = &x[1];
+
+                    execs.push(ExecutorMeta {
+                        id: executor_id.to_owned(),
+                        host: host.to_string(),
+                        port: port.to_string().parse::<usize>().unwrap(),
+                    });
+                }
+                Ok(execs)
+            }
         }
     }
 
-    async fn execute_task(&self, _executor_id: Uuid, task: ExecutionTask) -> Result<ShuffleId> {
+    async fn execute_task(
+        &self,
+        executor_meta: ExecutorMeta,
+        task: ExecutionTask,
+    ) -> Result<ShuffleId> {
         // TODO what is the point of returning this info since it is based on input arg?
         let shuffle_id = ShuffleId::new(task.job_uuid, task.stage_id, task.partition_id);
 
-        // TODO etcd lookup to find executor
-        let _batches = execute_action("localhost", 50051, Action::Execute(task)).await?;
+        let _ = execute_action(
+            &executor_meta.host,
+            executor_meta.port,
+            Action::Execute(task),
+        )
+        .await?;
 
         Ok(shuffle_id)
     }
 
     async fn read_shuffle(&self, shuffle_id: &ShuffleId) -> Result<Vec<ColumnarBatch>> {
         match self.shuffle_locations.get(shuffle_id) {
-            Some(_uuid) => {
-                // TODO etcd lookup to find executor
-                let batches =
-                    execute_action("localhost", 50051, Action::FetchShuffle(*shuffle_id)).await?;
+            Some(executor_meta) => {
+                let batches = execute_action(
+                    &executor_meta.host,
+                    executor_meta.port,
+                    Action::FetchShuffle(*shuffle_id),
+                )
+                .await?;
                 Ok(batches
                     .iter()
                     .map(|b| ColumnarBatch::from_arrow(b))

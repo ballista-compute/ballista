@@ -357,7 +357,9 @@ impl TryInto<protobuf::Task> for ExecutionTask {
                 job_uuid: k.job_uuid.to_string(),
                 stage_id: k.stage_id as u32,
                 partition_id: k.partition_id as u32,
-                executor_uuid: v.to_string(),
+                executor_id: v.id.to_string(),
+                executor_host: v.host.to_string(),
+                executor_port: v.port as u32,
             });
         }
 

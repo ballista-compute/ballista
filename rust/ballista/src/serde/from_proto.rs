@@ -24,7 +24,7 @@ use crate::datafusion::logicalplan::{
 use crate::distributed::scheduler::ExecutionTask;
 use crate::error::{ballista_error, BallistaError};
 use crate::execution::operators::{HashAggregateExec, ParquetScanExec, ShuffleReaderExec};
-use crate::execution::physical_plan::{Action, ShuffleId, ShuffleLocation};
+use crate::execution::physical_plan::{Action, ExecutorMeta, ShuffleId, ShuffleLocation};
 use crate::execution::physical_plan::{AggregateMode, PhysicalPlan};
 use crate::protobuf;
 use std::collections::HashMap;
@@ -218,14 +218,21 @@ impl TryInto<ExecutionTask> for protobuf::Task {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<ExecutionTask, Self::Error> {
-        let mut shuffle_locations: HashMap<ShuffleId, Uuid> = HashMap::new();
+        let mut shuffle_locations: HashMap<ShuffleId, ExecutorMeta> = HashMap::new();
         for loc in &self.shuffle_loc {
             let shuffle_id = ShuffleId::new(
                 Uuid::parse_str(&loc.job_uuid).unwrap(),
                 loc.stage_id as usize,
                 loc.partition_id as usize,
             );
-            shuffle_locations.insert(shuffle_id, Uuid::parse_str(&loc.executor_uuid).unwrap());
+
+            let exec = ExecutorMeta {
+                id: loc.executor_id.to_owned(),
+                host: loc.executor_host.to_owned(),
+                port: loc.executor_port as usize,
+            };
+
+            shuffle_locations.insert(shuffle_id, exec).unwrap();
         }
 
         Ok(ExecutionTask::new(

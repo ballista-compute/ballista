@@ -1,18 +1,21 @@
 # Distributed Query Execution
 
-This example demonstrates running a distributed query against a local Ballista cluster, using etcd for discovery.
+This example demonstrates running a distributed query against a local Ballista cluster.
 
-## Prerequisites
+## Using a local standalone cluster
+
+### Prerequisites
 
 etcd must be running locally.
 
-## Start one or more executors
+### Start one or more executors
 
 ```bash
-cargo run --release --bin executor -- --mode=etcd
+cargo run --bin executor -- --mode etcd --port 50051
+cargo run --bin executor -- --mode etcd --port 50052
 ```
 
-## Execute the query
+### Execute the query
 
 The example will create a logical query plan and submit it to the cluster for execution. The executor receiving the 
 query will create a physical plan and schedule execution in the cluster and then return the results.
@@ -21,7 +24,9 @@ query will create a physical plan and schedule execution in the cluster and then
 cargo run
 ``` 
 
-## K8s
+## Using Kubernetes
+
+NOTE: these instructions are out of date.
 
 ## Prerequisites
 

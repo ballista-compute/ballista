@@ -22,9 +22,7 @@ pub use crate::datafusion::datasource::csv::CsvReadOptions;
 use crate::datafusion::datasource::parquet::ParquetTable;
 use crate::datafusion::datasource::MemTable;
 use crate::datafusion::datasource::TableProvider;
-use crate::datafusion::logicalplan::{
-    Expr, FunctionMeta, LogicalPlan, LogicalPlanBuilder, ScalarValue,
-};
+use crate::datafusion::logicalplan::{Expr, FunctionMeta, LogicalPlan, LogicalPlanBuilder};
 use crate::datafusion::optimizer::utils::exprlist_to_fields;
 use crate::datafusion::sql::parser::{DFASTNode, DFParser};
 use crate::datafusion::sql::planner::{SchemaProvider, SqlToRel};
@@ -389,7 +387,7 @@ impl DataFrame {
         Ok(Self::from(
             self.ctx_state.clone(),
             LogicalPlan::Limit {
-                expr: Expr::Literal(ScalarValue::UInt64(n as u64)),
+                n,
                 input: Box::new(self.plan.clone()),
                 schema: self.plan.schema().clone(),
             },

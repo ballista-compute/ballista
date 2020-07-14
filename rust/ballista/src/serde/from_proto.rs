@@ -232,7 +232,7 @@ impl TryInto<ExecutionTask> for protobuf::Task {
                 port: loc.executor_port as usize,
             };
 
-            shuffle_locations.insert(shuffle_id, exec).unwrap();
+            shuffle_locations.insert(shuffle_id, exec);
         }
 
         Ok(ExecutionTask::new(
@@ -319,6 +319,7 @@ impl TryInto<PhysicalPlan> for protobuf::PhysicalPlanNode {
                     ParquetScanExec::try_new(
                         &scan.path,
                         Some(scan.projection.iter().map(|n| *n as usize).collect()),
+                        64 * 1024,
                     )?,
                 ))),
                 other => Err(ballista_error(&format!(

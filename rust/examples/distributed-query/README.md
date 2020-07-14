@@ -11,8 +11,8 @@ etcd must be running locally.
 ### Start one or more executors
 
 ```bash
-cargo run --bin executor -- --mode etcd --port 50051
-cargo run --bin executor -- --mode etcd --port 50052
+cargo run --release --bin executor -- --mode etcd --port 50051
+cargo run --release --bin executor -- --mode etcd --port 50052
 ```
 
 ### Execute the query

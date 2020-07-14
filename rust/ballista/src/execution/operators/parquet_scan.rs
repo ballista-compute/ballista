@@ -30,7 +30,7 @@ use crate::parquet::arrow::ParquetFileArrowReader;
 use crate::parquet::file::reader::SerializedFileReader;
 
 use async_trait::async_trait;
-use crossbeam::channel::{unbounded, Receiver, Sender};
+use crossbeam::channel::{bounded, Receiver, Sender};
 use smol::Task;
 use std::time::Instant;
 
@@ -41,19 +41,14 @@ pub struct ParquetScanExec {
     pub(crate) projection: Option<Vec<usize>>,
     pub(crate) parquet_schema: Arc<Schema>,
     pub(crate) output_schema: Arc<Schema>,
+    pub(crate) batch_size: usize,
 }
 
 impl ParquetScanExec {
-    pub fn try_new(path: &str, projection: Option<Vec<usize>>) -> Result<Self> {
+    pub fn try_new(path: &str, projection: Option<Vec<usize>>, batch_size: usize) -> Result<Self> {
         let mut filenames: Vec<String> = vec![];
         common::build_file_list(path, &mut filenames, ".parquet")?;
-
         let filename = &filenames[0];
-        println!(
-            "Creating ParquetScanExec for {} with projection {:?}",
-            filename, projection
-        );
-
         let file = File::open(filename)?;
         let file_reader = Rc::new(SerializedFileReader::new(file).unwrap()); //TODO error handling
         let mut arrow_reader = ParquetFileArrowReader::new(file_reader);
@@ -77,6 +72,7 @@ impl ParquetScanExec {
             projection,
             parquet_schema: Arc::new(schema),
             output_schema: Arc::new(projected_schema),
+            batch_size,
         })
     }
 }
@@ -101,6 +97,7 @@ impl ExecutionPlan for ParquetScanExec {
         Ok(Arc::new(ParquetBatchIter::try_new(
             &self.filenames[partition_index],
             self.projection.clone(),
+            self.batch_size,
         )?))
     }
 }
@@ -112,7 +109,11 @@ pub struct ParquetBatchIter {
 
 #[allow(dead_code)]
 impl ParquetBatchIter {
-    pub fn try_new(filename: &str, projection: Option<Vec<usize>>) -> Result<Self> {
+    pub fn try_new(
+        filename: &str,
+        projection: Option<Vec<usize>>,
+        batch_size: usize,
+    ) -> Result<Self> {
         let file = File::open(filename)?;
         let file_reader = Rc::new(SerializedFileReader::new(file).unwrap()); //TODO error handling
         let mut arrow_reader = ParquetFileArrowReader::new(file_reader);
@@ -130,10 +131,8 @@ impl ParquetBatchIter {
                 .collect(),
         );
 
-        // because the parquet implementation is not thread-safe, it is necessary to execute
-        // on a thread and communicate with channels
         let (response_tx, response_rx): (Sender<MaybeColumnarBatch>, Receiver<MaybeColumnarBatch>) =
-            unbounded();
+            bounded(2); // always be reading one batch ahead
 
         let filename = filename.to_string();
 
@@ -143,7 +142,6 @@ impl ParquetBatchIter {
             let mut output_rows = 0;
 
             //TODO error handling, remove unwraps
-            let batch_size = 64 * 1024; //TODO
             let file = File::open(&filename).unwrap();
             match SerializedFileReader::new(file) {
                 Ok(file_reader) => {

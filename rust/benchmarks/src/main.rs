@@ -25,7 +25,7 @@ use ballista::arrow::record_batch::RecordBatch;
 use ballista::arrow::util::pretty;
 use ballista::dataframe::{max, min, sum, Context, CsvReadOptions, DataFrame, CSV_BATCH_SIZE};
 use ballista::datafusion::logicalplan::*;
-use ballista::distributed::cluster;
+use ballista::distributed::k8s;
 use ballista::error::{BallistaError, Result};
 use ballista::BALLISTA_VERSION;
 
@@ -81,7 +81,7 @@ async fn k8s(path: &str, format: &str) -> Result<()> {
     let num_months: usize = 12;
 
     // get a list of ballista executors from kubernetes
-    let executors = cluster::get_executors(cluster_name, namespace).await?;
+    let executors = k8s::k8s_get_executors(cluster_name, namespace).await?;
 
     if executors.is_empty() {
         println!("No executors found");

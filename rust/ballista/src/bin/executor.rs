@@ -30,6 +30,16 @@ struct Opt {
     #[structopt(short, long)]
     mode: Option<String>,
 
+    /// etcd urls for use when discovery mode is `etcd`
+    #[structopt(long)]
+    etcd_urls: Option<String>,
+
+    #[structopt(long)]
+    bind_host: Option<String>,
+
+    #[structopt(long)]
+    external_host: Option<String>,
+
     /// bind port
     #[structopt(short, long)]
     port: usize,
@@ -48,13 +58,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => DiscoveryMode::Standalone,
     };
 
-    //TODO make configurable
-    let external_host = "localhost";
-    let bind_host = "0.0.0.0";
+    let external_host = opt.external_host.unwrap_or_else(|| "localhost".to_owned());
+    let bind_host = opt.bind_host.unwrap_or_else(|| "0.0.0.0".to_owned());
+    let etcd_urls = opt.etcd_urls.unwrap_or_else(|| "localhost:2379".to_owned());
     let port = opt.port;
-    let etcd_urls = "localhost:2379";
 
-    let config = ExecutorConfig::new(mode, external_host, port, etcd_urls);
+    let config = ExecutorConfig::new(mode, &external_host, port, &etcd_urls);
 
     println!("Running with config: {:?}", config);
 

@@ -29,8 +29,9 @@ use crate::execution::physical_plan::{
     Action, ColumnarBatch, ExecutionContext, ExecutorMeta, PhysicalPlan, ShuffleId,
 };
 
+use crate::distributed::etcd::{etcd_get_executors, start_etcd_thread};
+use crate::distributed::k8s::k8s_get_executors;
 use async_trait::async_trait;
-use etcd_client::{Client, GetOptions, PutOptions};
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -100,39 +101,10 @@ impl DefaultContext {}
 #[async_trait]
 impl ExecutionContext for DefaultContext {
     async fn get_executor_ids(&self) -> Result<Vec<ExecutorMeta>> {
-        println!("get_executor_ids");
-        match Client::connect([&self.config.etcd_urls], None).await {
-            Err(e) => Err(ballista_error(&format!(
-                "Failed to connect to etcd {:?}",
-                e.to_string()
-            ))),
-            Ok(mut client) => {
-                println!("get_executor_ids got client");
-                let cluster_name = "default";
-                let key = format!("/ballista/{}", cluster_name);
-                let resp = client
-                    .get(key, Some(GetOptions::new().with_all_keys()))
-                    .await
-                    .unwrap();
-
-                let mut execs = vec![];
-                for kv in resp.kvs() {
-                    let host_port = kv.value_str().unwrap();
-                    let executor_id = kv.key_str().unwrap();
-                    println!("\t{{{}: {}}}", executor_id, host_port);
-
-                    let x: Vec<_> = host_port.split(':').collect();
-                    let host = &x[0];
-                    let port = &x[1];
-
-                    execs.push(ExecutorMeta {
-                        id: executor_id.to_owned(),
-                        host: host.to_string(),
-                        port: port.to_string().parse::<usize>().unwrap(),
-                    });
-                }
-                Ok(execs)
-            }
+        match &self.config.discovery_mode {
+            DiscoveryMode::Etcd => etcd_get_executors(&self.config.etcd_urls, "default").await,
+            DiscoveryMode::Kubernetes => k8s_get_executors("default", "default").await,
+            DiscoveryMode::Standalone => unimplemented!(),
         }
     }
 
@@ -188,18 +160,13 @@ impl BallistaExecutor {
         match &config.discovery_mode {
             DiscoveryMode::Etcd => {
                 println!("Running in etcd mode");
-                smol::run(async {
-                    //TODO remove unwraps
-                    let mut client = Client::connect([&config.etcd_urls], None).await.unwrap();
-                    let cluster_name = "default";
-                    let lease_time_seconds = 60;
-                    let key = format!("/ballista/{}/{}", cluster_name, &uuid);
-                    let value = format!("{}:{}", config.host, config.port);
-                    let lease = client.lease_grant(lease_time_seconds, None).await.unwrap();
-                    let options = PutOptions::new().with_lease(lease.id());
-                    let resp = client.put(key.clone(), value, Some(options)).await.unwrap();
-                    println!("Registered with etcd as {}. Response: {:?}.", key, resp);
-                });
+                start_etcd_thread(
+                    &config.etcd_urls,
+                    "default",
+                    &uuid,
+                    &config.host,
+                    config.port,
+                );
             }
             DiscoveryMode::Kubernetes => println!("Running in k8s mode"),
             DiscoveryMode::Standalone => println!("Running in standalone mode"),

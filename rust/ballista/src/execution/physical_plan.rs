@@ -49,9 +49,9 @@ pub type ColumnarBatchStream = Arc<dyn ColumnarBatchIter>;
 
 #[derive(Debug, Clone)]
 pub struct ExecutorMeta {
-    pub(crate) id: String,
-    pub(crate) host: String,
-    pub(crate) port: usize,
+    pub id: String,
+    pub host: String,
+    pub port: usize,
 }
 
 /// Async iterator over a stream of columnar batches

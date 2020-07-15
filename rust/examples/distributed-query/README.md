@@ -11,8 +11,8 @@ etcd must be running locally.
 ### Start one or more executors
 
 ```bash
-cargo run --release --bin executor -- --mode etcd --port 50051
-cargo run --release --bin executor -- --mode etcd --port 50052
+cargo run --release --bin executor -- --mode etcd --port 50051 --etcd-urls localhost:2379
+cargo run --release --bin executor -- --mode etcd --port 50052 --etcd-urls localhost:2379
 ```
 
 ### Execute the query
@@ -26,7 +26,7 @@ cargo run
 
 ## Using Kubernetes
 
-NOTE: these instructions are out of date.
+NOTE: these instructions are out of date and will be updated prior to the 0.3.0 release.
 
 ## Prerequisites
 

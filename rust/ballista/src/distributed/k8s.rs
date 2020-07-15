@@ -12,34 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Ballista cluster management utilities
+//! Ballista k8s cluster management utilities
+
+use crate::error::BallistaError;
+use crate::execution::physical_plan::ExecutorMeta;
 
 use k8s_openapi::api;
 
-use crate::error::BallistaError;
-
 const CLUSTER_LABEL_KEY: &str = "ballista-cluster";
 
-/// Ballista executor
-pub struct Executor {
-    pub host: String,
-    pub port: usize,
-}
-
-impl Executor {
-    pub fn new(host: &str, port: usize) -> Self {
-        Self {
-            host: host.to_owned(),
-            port,
-        }
-    }
-}
-
 /// Get a list of executor nodes in a cluster by listing pods in the stateful set.
-pub async fn get_executors(
+pub async fn k8s_get_executors(
     cluster_name: &str,
     namespace: &str,
-) -> Result<Vec<Executor>, BallistaError> {
+) -> Result<Vec<ExecutorMeta>, BallistaError> {
     use api::core::v1::Pod;
 
     let client = kube::client::Client::try_default().await?;
@@ -54,7 +40,8 @@ pub async fn get_executors(
         .iter()
         .map(|pod| {
             let pod_meta = pod.metadata.as_ref().unwrap();
-            Executor {
+            ExecutorMeta {
+                id: "tbd".to_string(),
                 host: format!(
                     "{}.{}.{}",
                     pod_meta.name.as_ref().unwrap().clone(),

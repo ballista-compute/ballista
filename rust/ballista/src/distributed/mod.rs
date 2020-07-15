@@ -13,7 +13,8 @@
 // limitations under the License.
 
 pub mod client;
-pub mod cluster;
+pub mod etcd;
 pub mod executor;
 pub mod flight_service;
+pub mod k8s;
 pub mod scheduler;

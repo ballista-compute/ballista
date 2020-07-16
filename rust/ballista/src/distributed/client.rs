@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Client API for sending requests to executors.
+
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 

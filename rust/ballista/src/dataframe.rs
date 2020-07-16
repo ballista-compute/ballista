@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! The DataFrame API is the main entry point into Ballista.
+
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 

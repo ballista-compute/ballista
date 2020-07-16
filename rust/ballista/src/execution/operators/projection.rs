@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Projection operator.
+
 use crate::error::Result;
 use crate::execution::physical_plan::{
     compile_expressions, ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ColumnarValue,
@@ -22,7 +24,7 @@ use async_trait::async_trait;
 use datafusion::logicalplan::Expr;
 use std::sync::Arc;
 
-/// Projection operator.
+/// Projection operator evaluates expressions against an input.
 #[derive(Debug, Clone)]
 pub struct ProjectionExec {
     /// Logical expressions for the projection.

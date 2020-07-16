@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Experimental distributed query execution support.
+//! Query plan representation and execution logic.
 
 pub mod expressions;
 pub mod operators;

@@ -37,7 +37,7 @@ use crate::error::{ballista_error, Result};
 use crate::execution::expressions::{col, max, min};
 use crate::execution::operators::{
     FilterExec, HashAggregateExec, InMemoryTableScanExec, ParquetScanExec, ProjectionExec,
-    ShuffleExchangeExec, ShuffleReaderExec, ShuffledHashJoinExec,
+    ShuffleExchangeExec, ShuffleReaderExec,
 };
 
 use crate::distributed::scheduler::ExecutionTask;
@@ -285,8 +285,6 @@ pub enum PhysicalPlan {
     Filter(Arc<FilterExec>),
     /// Hash aggregate
     HashAggregate(Arc<HashAggregateExec>),
-    /// Performs a hash join of two child relations by first shuffling the data using the join keys.
-    ShuffledHashJoin(ShuffledHashJoinExec),
     /// Performs a shuffle that will result in the desired partitioning.
     ShuffleExchange(Arc<ShuffleExchangeExec>),
     /// Reads results from a ShuffleExchange
@@ -307,7 +305,6 @@ impl PhysicalPlan {
             Self::ShuffleExchange(exec) => exec.clone(),
             Self::ShuffleReader(exec) => exec.clone(),
             Self::InMemoryTableScan(exec) => exec.clone(),
-            _ => unimplemented!(),
         }
     }
 
@@ -396,6 +393,7 @@ pub enum SortDirection {
     Descending,
 }
 
+/// Aggregate operator modes.
 #[derive(Debug, Clone)]
 pub enum AggregateMode {
     /// Partial aggregation that can run in parallel per partition
@@ -421,6 +419,7 @@ pub enum NullOrdering {
     NullsLast,
 }
 
+/// Partitioning schemes supported by operators.
 #[derive(Debug, Clone)]
 pub enum Partitioning {
     UnknownPartitioning(usize),
@@ -437,6 +436,7 @@ impl Partitioning {
     }
 }
 
+/// Unique identifier for the output shuffle partition of an operator.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ShuffleId {
     pub(crate) job_uuid: Uuid,
@@ -456,7 +456,8 @@ impl ShuffleId {
 
 pub struct ShuffleLocation {}
 
-/// Create a physical expression from a logical expression
+/// Translate a logical expression into a physical expression that can be evaluated against
+/// input data.
 pub fn compile_expression(expr: &Expr, input: &Schema) -> Result<Arc<dyn Expression>> {
     match expr {
         Expr::Column(n) => Ok(col(*n)),
@@ -468,10 +469,14 @@ pub fn compile_expression(expr: &Expr, input: &Schema) -> Result<Arc<dyn Express
     }
 }
 
+/// Translate one or more logical expressions into physical expressions that can be evaluated
+/// against input data.
 pub fn compile_expressions(expr: &[Expr], input: &Schema) -> Result<Vec<Arc<dyn Expression>>> {
     expr.iter().map(|e| compile_expression(e, input)).collect()
 }
 
+/// Translate a logical aggregate expression into a physical expression that can be evaluated
+/// against input data.
 pub fn compile_aggregate_expression(
     expr: &Expr,
     input_schema: &Schema,
@@ -503,6 +508,8 @@ pub fn compile_aggregate_expression(
     }
 }
 
+/// Translate one or more logical aggregate expressions into physical expressions that can be evaluated
+/// against input data.
 pub fn compile_aggregate_expressions(
     expr: &[Expr],
     input: &Schema,

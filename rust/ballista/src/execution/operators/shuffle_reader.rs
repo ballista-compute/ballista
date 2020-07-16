@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Shuffle reader.
+
 use std::sync::Arc;
 
 use crate::arrow::datatypes::Schema;
@@ -23,6 +25,7 @@ use crate::execution::physical_plan::{
 use crate::execution::operators::InMemoryTableScanExec;
 use async_trait::async_trait;
 
+/// ShuffleReaderExec reads one or more partitions from remote executors.
 #[derive(Debug, Clone)]
 pub struct ShuffleReaderExec {
     schema: Arc<Schema>,

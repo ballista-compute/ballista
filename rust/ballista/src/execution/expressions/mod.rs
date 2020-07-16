@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Relational expressions that can be used in query plans.
+
 pub use self::column::col;
 pub use self::max::max;
 pub use self::min::min;

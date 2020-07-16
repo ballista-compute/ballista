@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Ballista is a proof-of-concept distributed compute platform based on Kubernetes and Apache Arrow.
+//! Ballista is a distributed compute platform implemented in Rust and based on Apache Arrow, with
+//! strong support for multiple programming languages and also provides interoperability with Apache
+//! Spark.
 
 #![feature(async_closure)]
 

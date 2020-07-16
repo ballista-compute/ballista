@@ -15,6 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
+//! In-memory table scan operator to represent data that has already been loaded into memory. This
+//! can be useful for testing and also for caching intermediate results in query plans.
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -26,6 +29,8 @@ use crate::execution::physical_plan::{
 
 use async_trait::async_trait;
 
+/// In-memory table scan operator to represent data that has already been loaded into memory. This
+/// can be useful for testing and also for caching intermediate results in query plans.
 pub struct InMemoryTableScanExec {
     data: Vec<ColumnarBatch>,
 }

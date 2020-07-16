@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Serde code to convert from Rust data structures to protocol buffers.
+
 use std::convert::TryInto;
 
 use crate::arrow::datatypes::{DataType, Schema};

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Parquet scan operator.
+
 use std::fs::File;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -34,6 +36,10 @@ use crossbeam::channel::{bounded, Receiver, Sender};
 use smol::Task;
 use std::time::Instant;
 
+/// ParquetScanExec reads Parquet files and applies an optional projection so that only necessary
+/// columns are loaded into memory. The partitioning scheme is currently rather simplistic with a
+/// one to one mapping of filename to partition. Also, there is currently no support for schema
+/// merging, so all partitions must have the same schema.
 #[derive(Debug, Clone)]
 pub struct ParquetScanExec {
     pub(crate) path: String,

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Core executor logic for executing queries and storing results in memory.
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;

@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Utilities for printing columnar batches
+
 use crate::arrow::array::*;
 use crate::arrow::datatypes::DataType;
 use crate::arrow::record_batch::RecordBatch;
 
-/** Create formatted result set from record batches */
+/// Create formatted result set from record batches
 pub fn result_str(results: &[RecordBatch]) -> Vec<String> {
     let mut result = vec![];
     for batch in results {

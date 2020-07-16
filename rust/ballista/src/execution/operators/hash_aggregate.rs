@@ -39,6 +39,7 @@ use crossbeam::channel::{unbounded, Receiver, Sender};
 use fnv::FnvHashMap;
 use smol::Task;
 
+/// HashAggregateExec applies a hash aggregate operation against its input.
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct HashAggregateExec {

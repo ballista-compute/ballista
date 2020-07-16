@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! This module contains boring but necessary code to convert between Rust data structures and
+//! protocol buffer representations. Ballista is designed to support multiple programming languages
+//! which is why protocol buffers was chosen for all communication between processes.
+
 use crate::error::BallistaError;
 use crate::execution::physical_plan::Action;
 use crate::protobuf;

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Serde code to convert from protocol buffers to Rust data structures.
+
 use std::convert::TryInto;
 use std::sync::Arc;
 

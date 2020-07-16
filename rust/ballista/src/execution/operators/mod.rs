@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Physical operators.
+//! Relational operators that can be used in query plans. Relational operators represent concepts
+//! such as projection, selection, aggregate, and join, and transform streams of data.
 
 pub use filter::FilterExec;
 pub use hash_aggregate::HashAggregateExec;
@@ -21,7 +22,6 @@ pub use parquet_scan::ParquetScanExec;
 pub use projection::ProjectionExec;
 pub use shuffle_exchange::ShuffleExchangeExec;
 pub use shuffle_reader::ShuffleReaderExec;
-pub use shuffled_hash_join::ShuffledHashJoinExec;
 
 mod filter;
 mod hash_aggregate;
@@ -30,4 +30,3 @@ mod parquet_scan;
 mod projection;
 mod shuffle_exchange;
 mod shuffle_reader;
-mod shuffled_hash_join;

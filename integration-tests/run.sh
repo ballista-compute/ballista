@@ -4,7 +4,7 @@
 docker-compose up -d
 
 # Wait for executors to start
-#sleep 10
+sleep 20
 
 # Run integration tests
 pushd rust

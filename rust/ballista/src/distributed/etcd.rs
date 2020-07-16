@@ -35,13 +35,13 @@ pub fn start_etcd_thread(
     let uuid = uuid.to_owned();
     thread::spawn(move || {
         smol::run(async move {
-            match Client::connect([etcd_urls], None).await {
-                Err(e) => println!("Failed to connect to etcd {:?}", e.to_string()),
-                Ok(mut client) => {
-                    let lease_time_seconds = 60;
-                    let key = format!("/ballista/{}/{}", cluster_name, &uuid);
-                    let value = format!("{}:{}", host, port);
-                    loop {
+            loop {
+                match Client::connect([&etcd_urls], None).await {
+                    Ok(mut client) => {
+                        println!("Connected to etcd at {} ok", etcd_urls);
+                        let lease_time_seconds = 60;
+                        let key = format!("/ballista/{}/{}", cluster_name, &uuid);
+                        let value = format!("{}:{}", host, port);
                         match client.lease_grant(lease_time_seconds, None).await {
                             Ok(lease) => {
                                 let options = PutOptions::new().with_lease(lease.id());
@@ -52,9 +52,10 @@ pub fn start_etcd_thread(
                             }
                             Err(e) => println!("etcd lease grant failed: {:?}", e.to_string()),
                         }
-                        thread::sleep(Duration::from_secs(15));
                     }
+                    Err(e) => println!("Failed to connect to etcd {:?}", e.to_string()),
                 }
+                thread::sleep(Duration::from_secs(15));
             }
         });
     });

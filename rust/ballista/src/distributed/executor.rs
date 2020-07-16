@@ -231,53 +231,32 @@ impl Executor for BallistaExecutor {
         let logical_plan = ctx.optimize(&logical_plan)?;
         println!("Optimized logical plan:\n{:?}", logical_plan);
 
-        match &self.config.discovery_mode {
-            DiscoveryMode::Standalone => {
-                println!("Running standalone query");
+        let config = self.config.clone();
+        let handle = thread::spawn(move || {
+            smol::run(async {
+                let plan: Arc<PhysicalPlan> = create_physical_plan(&logical_plan)?;
+                println!("Physical plan:\n{:?}", plan);
 
-                // legacy DataFusion execution
-                let batch_size = 1024 * 1024;
-                let physical_plan = ctx.create_physical_plan(&logical_plan, batch_size)?;
-                let results = ctx.collect(physical_plan.as_ref())?;
-                let schema = physical_plan.schema();
+                let plan = ensure_requirements(plan.as_ref())?;
+                println!("Optimized physical plan:\n{:?}", plan);
+
+                let job = create_job(plan)?;
+                job.explain();
+
+                // create new execution contrext specifically for this query
+                let ctx = Arc::new(DefaultContext::new(&config, HashMap::new()));
+
+                let batches = execute_job(&job, ctx.clone()).await?;
+
                 Ok(ShufflePartition {
-                    schema: schema.as_ref().clone(),
-                    data: results,
+                    schema: batches[0].schema().as_ref().clone(),
+                    data: batches
+                        .iter()
+                        .map(|b| b.to_arrow())
+                        .collect::<Result<Vec<_>>>()?,
                 })
-            }
-            _ => {
-                println!("Running distributed query");
-
-                // experimental distributed support, not fully working yet
-                let config = self.config.clone();
-                let handle = thread::spawn(move || {
-                    smol::run(async {
-                        let plan: Arc<PhysicalPlan> = create_physical_plan(&logical_plan)?;
-                        println!("Physical plan:\n{:?}", plan);
-
-                        let plan = ensure_requirements(plan.as_ref())?;
-                        println!("Optimized physical plan:\n{:?}", plan);
-
-                        let job = create_job(plan)?;
-                        job.explain();
-
-                        // create new execution contrext specifically for this query
-                        let ctx = Arc::new(DefaultContext::new(&config, HashMap::new()));
-
-                        let batches = execute_job(&job, ctx.clone()).await?;
-
-                        Ok(ShufflePartition {
-                            schema: batches[0].schema().as_ref().clone(),
-                            data: batches
-                                .iter()
-                                .map(|b| b.to_arrow())
-                                .collect::<Result<Vec<_>>>()?,
-                        })
-                    })
-                });
-
-                handle.join().unwrap()
-            }
-        }
+            })
+        });
+        handle.join().unwrap()
     }
 }

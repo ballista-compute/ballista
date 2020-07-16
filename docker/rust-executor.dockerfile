@@ -14,9 +14,6 @@ COPY rust/ballista/Cargo.toml /tmp/ballista/
 COPY rust/ballista/build.rs /tmp/ballista/
 COPY rust/ballista/src/ /tmp/ballista/src/
 
-# workaround for Arrow 0.17.0 build issue
-COPY rust/ballista/format/Flight.proto /format
-
 RUN cargo build --release
 
 # Copy the binary into a new container for a smaller docker image

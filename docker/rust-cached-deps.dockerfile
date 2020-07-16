@@ -15,9 +15,5 @@ COPY proto/ballista.proto /tmp/ballista/proto/
 COPY rust/ballista/build.rs /tmp/ballista/
 COPY rust/rust-toolchain /tmp/ballista/
 
-# workaround for Arrow 0.17.0 build issue
-RUN mkdir /format
-COPY rust/ballista/format/Flight.proto /format
-
 RUN cargo build --release
 

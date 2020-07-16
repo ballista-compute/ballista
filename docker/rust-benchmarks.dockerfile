@@ -1,23 +1,25 @@
 # Base image extends rust:nightly which extends debian:buster-slim
-FROM ballistacompute/rust-cached-deps:0.2.5 as build
+FROM ballistacompute/rust-cached-deps:0.3.0-SNAPSHOT as build
 
 # protobuf
 COPY proto/ballista.proto /tmp/ballista/proto/
 
-# Add Ballista
+# Compile Ballista
 RUN rm -rf /tmp/ballista/src/
-COPY rust/ballista/Cargo.* /tmp/ballista/
+
+#TODO relly need to copy whole project in, not just ballista crate, so we pick up the correct Cargo.lock
+RUN rm -rf /tmp/ballista/Cargo.lock
+
+COPY rust/ballista/Cargo.toml /tmp/ballista/
 COPY rust/ballista/build.rs /tmp/ballista/
 COPY rust/ballista/src/ /tmp/ballista/src/
-# workaround for Arrow 0.17.0 build issue
-COPY rust/ballista/format/Flight.proto /format
 
 # Benchmark source
 RUN mkdir -p /tmp/benchmarks/src
 WORKDIR /tmp/benchmarks/
 COPY rust/benchmarks/Cargo.* /tmp/benchmarks/
 COPY rust/benchmarks/src/ /tmp/benchmarks/src/
-
+COPY rust/rust-toolchain /tmp/benchmarks/
 RUN cargo build --release
 
 # Copy the binary into a new container for a smaller docker image

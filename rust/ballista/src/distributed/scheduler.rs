@@ -25,15 +25,16 @@ use uuid::Uuid;
 use crate::datafusion::logicalplan::LogicalPlan;
 use crate::distributed::executor::{DefaultContext, DiscoveryMode, ExecutorConfig};
 use crate::error::{ballista_error, BallistaError, Result};
-use crate::execution::operators::HashAggregateExec;
 use crate::execution::operators::ParquetScanExec;
 use crate::execution::operators::ProjectionExec;
 use crate::execution::operators::ShuffleExchangeExec;
 use crate::execution::operators::ShuffleReaderExec;
+use crate::execution::operators::{CsvScanExec, HashAggregateExec};
 use crate::execution::physical_plan::{
     AggregateMode, ColumnarBatch, Distribution, ExecutionContext, ExecutionPlan, ExecutorMeta,
     Partitioning, PhysicalPlan, ShuffleId,
 };
+use datafusion::execution::physical_plan::csv::CsvReadOptions;
 use smol::Task;
 
 /// A Job typically represents a single query and the query is executed in stages. Stages are
@@ -391,10 +392,21 @@ pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Arc<PhysicalPlan>> {
                 ))))
             }
         }
+        LogicalPlan::CsvScan {
+            path, projection, ..
+        } => {
+            //TODO make batch size and other csv options configurable from the context
+            let batch_size = 64 * 1024;
+            let options = CsvReadOptions::new();
+            let exec = CsvScanExec::try_new(&path, options, projection.clone(), batch_size)?;
+            Ok(Arc::new(PhysicalPlan::CsvScan(Arc::new(exec))))
+        }
         LogicalPlan::ParquetScan {
             path, projection, ..
         } => {
-            let exec = ParquetScanExec::try_new(&path, projection.clone(), 64 * 1024)?;
+            //TODO make batch size configurable from the context
+            let batch_size = 64 * 1024;
+            let exec = ParquetScanExec::try_new(&path, projection.clone(), batch_size)?;
             Ok(Arc::new(PhysicalPlan::ParquetScan(Arc::new(exec))))
         }
         other => Err(BallistaError::General(format!("unsupported {:?}", other))),

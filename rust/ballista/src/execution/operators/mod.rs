@@ -15,6 +15,7 @@
 //! Relational operators that can be used in query plans. Relational operators represent concepts
 //! such as projection, selection, aggregate, and join, and transform streams of data.
 
+pub use csv_scan::CsvScanExec;
 pub use filter::FilterExec;
 pub use hash_aggregate::HashAggregateExec;
 pub use in_memory::InMemoryTableScanExec;
@@ -23,6 +24,7 @@ pub use projection::ProjectionExec;
 pub use shuffle_exchange::ShuffleExchangeExec;
 pub use shuffle_reader::ShuffleReaderExec;
 
+mod csv_scan;
 mod filter;
 mod hash_aggregate;
 mod in_memory;

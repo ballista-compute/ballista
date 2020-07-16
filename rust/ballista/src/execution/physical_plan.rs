@@ -36,8 +36,8 @@ use crate::datafusion::logicalplan::ScalarValue;
 use crate::error::{ballista_error, Result};
 use crate::execution::expressions::{col, max, min};
 use crate::execution::operators::{
-    FilterExec, HashAggregateExec, InMemoryTableScanExec, ParquetScanExec, ProjectionExec,
-    ShuffleExchangeExec, ShuffleReaderExec,
+    CsvScanExec, FilterExec, HashAggregateExec, InMemoryTableScanExec, ParquetScanExec,
+    ProjectionExec, ShuffleExchangeExec, ShuffleReaderExec,
 };
 
 use crate::distributed::scheduler::ExecutionTask;
@@ -289,8 +289,10 @@ pub enum PhysicalPlan {
     ShuffleExchange(Arc<ShuffleExchangeExec>),
     /// Reads results from a ShuffleExchange
     ShuffleReader(Arc<ShuffleReaderExec>),
-    /// Scans a partitioned data source
+    /// Scans a partitioned Parquet data source
     ParquetScan(Arc<ParquetScanExec>),
+    /// Scans a partitioned CSV data source
+    CsvScan(Arc<CsvScanExec>),
     /// Scans an in-memory table
     InMemoryTableScan(Arc<InMemoryTableScanExec>),
 }
@@ -302,6 +304,7 @@ impl PhysicalPlan {
             Self::Filter(exec) => exec.clone(),
             Self::HashAggregate(exec) => exec.clone(),
             Self::ParquetScan(exec) => exec.clone(),
+            Self::CsvScan(exec) => exec.clone(),
             Self::ShuffleExchange(exec) => exec.clone(),
             Self::ShuffleReader(exec) => exec.clone(),
             Self::InMemoryTableScan(exec) => exec.clone(),
@@ -325,6 +328,13 @@ impl PhysicalPlan {
             }
         }
         match self {
+            PhysicalPlan::CsvScan(exec) => write!(
+                f,
+                "CsvScan: {:?}, partitions={}; projection={:?}",
+                exec.path,
+                exec.filenames.len(),
+                exec.projection
+            ),
             PhysicalPlan::ParquetScan(exec) => write!(
                 f,
                 "ParquetScan: {:?}, partitions={}; projection={:?}",

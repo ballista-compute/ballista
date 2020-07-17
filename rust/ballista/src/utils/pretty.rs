@@ -14,12 +14,14 @@
 
 //! Utilities for printing columnar batches
 
-use crate::arrow::array::*;
+use crate::arrow::array;
 use crate::arrow::datatypes::DataType;
 use crate::arrow::record_batch::RecordBatch;
+use crate::cast_array;
+use crate::error::{ballista_error, Result};
 
 /// Create formatted result set from record batches
-pub fn result_str(results: &[RecordBatch]) -> Vec<String> {
+pub fn result_str(results: &[RecordBatch]) -> Result<Vec<String>> {
     let mut result = vec![];
     for batch in results {
         for row_index in 0..batch.num_rows() {
@@ -32,47 +34,47 @@ pub fn result_str(results: &[RecordBatch]) -> Vec<String> {
 
                 match column.data_type() {
                     DataType::Int8 => {
-                        let array = column.as_any().downcast_ref::<Int8Array>().unwrap();
+                        let array = cast_array!(column, Int8Array)?;
                         str.push_str(&format!("{:?}", array.value(row_index)));
                     }
                     DataType::Int16 => {
-                        let array = column.as_any().downcast_ref::<Int16Array>().unwrap();
+                        let array = cast_array!(column, Int16Array)?;
                         str.push_str(&format!("{:?}", array.value(row_index)));
                     }
                     DataType::Int32 => {
-                        let array = column.as_any().downcast_ref::<Int32Array>().unwrap();
+                        let array = cast_array!(column, Int32Array)?;
                         str.push_str(&format!("{:?}", array.value(row_index)));
                     }
                     DataType::Int64 => {
-                        let array = column.as_any().downcast_ref::<Int64Array>().unwrap();
+                        let array = cast_array!(column, Int64Array)?;
                         str.push_str(&format!("{:?}", array.value(row_index)));
                     }
                     DataType::UInt8 => {
-                        let array = column.as_any().downcast_ref::<UInt8Array>().unwrap();
+                        let array = cast_array!(column, UInt8Array)?;
                         str.push_str(&format!("{:?}", array.value(row_index)));
                     }
                     DataType::UInt16 => {
-                        let array = column.as_any().downcast_ref::<UInt16Array>().unwrap();
+                        let array = cast_array!(column, UInt16Array)?;
                         str.push_str(&format!("{:?}", array.value(row_index)));
                     }
                     DataType::UInt32 => {
-                        let array = column.as_any().downcast_ref::<UInt32Array>().unwrap();
+                        let array = cast_array!(column, UInt32Array)?;
                         str.push_str(&format!("{:?}", array.value(row_index)));
                     }
                     DataType::UInt64 => {
-                        let array = column.as_any().downcast_ref::<UInt64Array>().unwrap();
+                        let array = cast_array!(column, UInt64Array)?;
                         str.push_str(&format!("{:?}", array.value(row_index)));
                     }
                     DataType::Float32 => {
-                        let array = column.as_any().downcast_ref::<Float32Array>().unwrap();
+                        let array = cast_array!(column, Float32Array)?;
                         str.push_str(&format!("{:?}", array.value(row_index)));
                     }
                     DataType::Float64 => {
-                        let array = column.as_any().downcast_ref::<Float64Array>().unwrap();
+                        let array = cast_array!(column, Float64Array)?;
                         str.push_str(&format!("{:?}", array.value(row_index)));
                     }
                     DataType::Utf8 => {
-                        let array = column.as_any().downcast_ref::<StringArray>().unwrap();
+                        let array = cast_array!(column, StringArray)?;
                         let s = array.value(row_index);
 
                         str.push_str(&format!("{:?}", s));
@@ -83,5 +85,5 @@ pub fn result_str(results: &[RecordBatch]) -> Vec<String> {
             result.push(str);
         }
     }
-    result
+    Ok(result)
 }

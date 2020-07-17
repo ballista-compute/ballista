@@ -34,12 +34,31 @@ use crate::protobuf;
 
 use uuid::Uuid;
 
+macro_rules! convert_required {
+    ($PB:expr) => {{
+        if let Some(field) = $PB.as_ref() {
+            field.try_into()
+        } else {
+            Err(ballista_error("Missing required field in protobuf"))
+        }
+    }};
+}
+
+macro_rules! convert_box_required {
+    ($PB:expr) => {{
+        if let Some(field) = $PB.as_ref() {
+            field.as_ref().try_into()
+        } else {
+            Err(ballista_error("Missing required field in protobuf"))
+        }
+    }};
+}
 impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<LogicalPlan, Self::Error> {
         if let Some(projection) = &self.projection {
-            let input: LogicalPlan = self.input.as_ref().unwrap().as_ref().try_into()?;
+            let input: LogicalPlan = convert_box_required!(self.input)?;
             LogicalPlanBuilder::from(&input)
                 .project(
                     projection
@@ -51,7 +70,7 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
                 .build()
                 .map_err(|e| e.into())
         } else if let Some(selection) = &self.selection {
-            let input: LogicalPlan = self.input.as_ref().unwrap().as_ref().try_into()?;
+            let input: LogicalPlan = convert_box_required!(self.input)?;
             LogicalPlanBuilder::from(&input)
                 .filter(
                     selection
@@ -63,7 +82,7 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
                 .build()
                 .map_err(|e| e.into())
         } else if let Some(aggregate) = &self.aggregate {
-            let input: LogicalPlan = self.input.as_ref().unwrap().as_ref().try_into()?;
+            let input: LogicalPlan = convert_box_required!(self.input)?;
             let group_expr = aggregate
                 .group_expr
                 .iter()
@@ -79,7 +98,7 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
                 .build()
                 .map_err(|e| e.into())
         } else if let Some(scan) = &self.scan {
-            let schema: Schema = scan.schema.as_ref().unwrap().try_into()?;
+            let schema: Schema = convert_required!(scan.schema)?;
 
             let projection: Vec<usize> = scan
                 .projection
@@ -171,13 +190,13 @@ impl TryInto<Action> for &protobuf::Action {
 
     fn try_into(self) -> Result<Action, Self::Error> {
         if self.query.is_some() {
-            let plan: LogicalPlan = self.query.as_ref().unwrap().try_into()?;
+            let plan: LogicalPlan = convert_required!(self.query)?;
             Ok(Action::InteractiveQuery { plan })
         } else if self.task.is_some() {
-            let task: ExecutionTask = self.task.as_ref().unwrap().try_into()?;
+            let task: ExecutionTask = convert_required!(self.task)?;
             Ok(Action::Execute(task))
         } else if self.fetch_shuffle.is_some() {
-            let shuffle_id: ShuffleId = self.fetch_shuffle.as_ref().unwrap().try_into()?;
+            let shuffle_id: ShuffleId = convert_required!(self.fetch_shuffle)?;
             Ok(Action::FetchShuffle(shuffle_id))
         } else {
             Err(BallistaError::NotImplemented(format!(
@@ -230,7 +249,7 @@ impl TryInto<ExecutionTask> for &protobuf::Task {
         let mut shuffle_locations: HashMap<ShuffleId, ExecutorMeta> = HashMap::new();
         for loc in &self.shuffle_loc {
             let shuffle_id = ShuffleId::new(
-                Uuid::parse_str(&loc.job_uuid).unwrap(),
+                Uuid::parse_str(&loc.job_uuid).expect("error parsing uuid in from_proto"),
                 loc.stage_id as usize,
                 loc.partition_id as usize,
             );
@@ -245,10 +264,10 @@ impl TryInto<ExecutionTask> for &protobuf::Task {
         }
 
         Ok(ExecutionTask::new(
-            Uuid::parse_str(&self.job_uuid).unwrap(),
+            Uuid::parse_str(&self.job_uuid).expect("error parsing uuid in from_proto"),
             self.stage_id as usize,
             self.partition_id as usize,
-            self.plan.as_ref().unwrap().try_into()?,
+            convert_required!(self.plan)?,
             shuffle_locations,
         ))
     }
@@ -267,7 +286,7 @@ impl TryInto<ShuffleId> for &protobuf::ShuffleId {
 
     fn try_into(self) -> Result<ShuffleId, Self::Error> {
         Ok(ShuffleId::new(
-            Uuid::parse_str(&self.job_uuid).unwrap(),
+            Uuid::parse_str(&self.job_uuid).expect("error parsing uuid in from_proto"),
             self.stage_id as usize,
             self.partition_id as usize,
         ))
@@ -295,7 +314,7 @@ impl TryInto<PhysicalPlan> for &protobuf::PhysicalPlanNode {
 
     fn try_into(self) -> Result<PhysicalPlan, Self::Error> {
         if let Some(aggregate) = &self.hash_aggregate {
-            let input: PhysicalPlan = self.input.as_ref().unwrap().as_ref().try_into()?;
+            let input: PhysicalPlan = convert_box_required!(self.input)?;
             let mode = match aggregate.mode {
                 mode if mode == protobuf::AggregateMode::Partial as i32 => {
                     Ok(AggregateMode::Partial)
@@ -358,7 +377,7 @@ impl TryInto<PhysicalPlan> for &protobuf::PhysicalPlanNode {
             }
             Ok(PhysicalPlan::ShuffleReader(Arc::new(
                 ShuffleReaderExec::new(
-                    Arc::new(shuffle_reader.schema.as_ref().unwrap().try_into()?),
+                    Arc::new(convert_required!(shuffle_reader.schema)?),
                     shuffle_ids,
                 ),
             )))

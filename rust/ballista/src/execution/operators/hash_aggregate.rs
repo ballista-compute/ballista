@@ -26,6 +26,7 @@ use std::time::Instant;
 use crate::arrow::array::StringBuilder;
 use crate::arrow::array::{self, ArrayRef};
 use crate::arrow::datatypes::{DataType, Field, Schema};
+use crate::cast_array;
 use crate::datafusion::logicalplan::{Expr, ScalarValue};
 use crate::error::{ballista_error, BallistaError, Result};
 use crate::execution::physical_plan::{
@@ -432,16 +433,6 @@ impl HashAggregateIter {
             rx,
         }
     }
-}
-
-/// Cast an Arrow Array to its expected type
-macro_rules! cast_array {
-    ($SELF:ident, $ARRAY_TYPE:ident) => {{
-        match $SELF.as_any().downcast_ref::<array::$ARRAY_TYPE>() {
-            Some(array) => Ok(array),
-            None => Err(ballista_error("Failed to cast array to expected type")),
-        }
-    }};
 }
 
 /// Create a Vec<GroupByScalar> that can be used as a map key

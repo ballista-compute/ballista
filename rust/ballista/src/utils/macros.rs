@@ -12,8 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Misc utils
-
-pub mod datagen;
-pub mod macros;
-pub mod pretty;
+/// Cast an Arrow Array to its expected type
+#[macro_export]
+macro_rules! cast_array {
+    ($SELF:ident, $ARRAY_TYPE:ident) => {{
+        match $SELF.as_any().downcast_ref::<array::$ARRAY_TYPE>() {
+            Some(array) => Ok(array),
+            None => Err(ballista_error("Failed to cast array to expected type")),
+        }
+    }};
+}

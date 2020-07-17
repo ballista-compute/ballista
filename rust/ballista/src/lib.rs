@@ -37,4 +37,6 @@ pub mod distributed;
 pub mod error;
 pub mod execution;
 pub mod serde;
+
+#[macro_use]
 pub mod utils;

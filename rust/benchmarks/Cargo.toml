@@ -1,9 +1,0 @@
-[package]
-name = "ballista-benchmarks"
-version = "0.3.0-SNAPSHOT"
-authors = ["Andy Grove <andygrove73@gmail.com>"]
-edition = "2018"
-
-[dependencies]
-ballista = { path="../ballista" }
-tokio = { version = "0.2", features = ["full"] }

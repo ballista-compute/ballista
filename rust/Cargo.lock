@@ -238,14 +238,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ballista-benchmarks"
-version = "0.3.0-SNAPSHOT"
-dependencies = [
- "ballista",
- "tokio 0.2.21",
-]
-
-[[package]]
 name = "base-x"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -2,7 +2,6 @@
 
 members = [
     "ballista",
-    "benchmarks",
     "examples/apache-spark-rust-bindings",
     "examples/distributed-query",
 ]

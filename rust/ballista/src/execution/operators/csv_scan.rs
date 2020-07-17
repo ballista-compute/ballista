@@ -170,7 +170,7 @@ impl ColumnarBatchIter for CsvBatchIter {
     }
 
     async fn next(&self) -> Result<Option<ColumnarBatch>> {
-        let mut reader = self.reader.lock().unwrap();
+        let mut reader = self.reader.lock().expect("failed to lock mutex");
         match reader.next() {
             Ok(Some(batch)) => Ok(Some(ColumnarBatch::from_arrow(&batch))),
             Ok(None) => Ok(None),

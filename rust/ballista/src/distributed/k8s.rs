@@ -31,31 +31,35 @@ pub async fn k8s_get_executors(
     let client = kube::client::Client::try_default().await?;
     let pods: kube::api::Api<Pod> = kube::api::Api::namespaced(client, namespace);
 
-    let executors = pods
+    let mut executors = vec![];
+
+    let pods = pods
         .list(
             &kube::api::ListParams::default()
                 .labels(&format!("{}={}", CLUSTER_LABEL_KEY, cluster_name)),
         )
-        .await?
-        .iter()
-        .map(|pod| {
-            let pod_meta = pod.metadata.as_ref().unwrap();
-            ExecutorMeta {
-                id: "tbd".to_string(),
-                host: format!(
-                    "{}.{}.{}",
-                    pod_meta.name.as_ref().unwrap().clone(),
-                    cluster_name,
-                    namespace,
-                ),
-                port: pod.spec.as_ref().unwrap().containers[0]
-                    .ports
-                    .as_ref()
-                    .unwrap()[0]
-                    .container_port as usize,
-            }
-        })
-        .collect();
+        .await?;
 
+    for pod in &pods {
+        if let Some(pod_meta) = pod.metadata.as_ref() {
+            if let Some(pod_name) = pod_meta.name.as_ref() {
+                if let Some(pod_spec) = pod.spec.as_ref() {
+                    if !pod_spec.containers.is_empty() {
+                        let host = format!("{}.{}.{}", pod_name, cluster_name, namespace,);
+
+                        if let Some(port) = pod_spec.containers[0].ports.as_ref() {
+                            if !port.is_empty() {
+                                executors.push(ExecutorMeta {
+                                    id: "tbd".to_string(),
+                                    host,
+                                    port: port[0].container_port as usize,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
     Ok(executors)
 }

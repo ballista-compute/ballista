@@ -203,7 +203,10 @@ impl Executor for BallistaExecutor {
             "{}:{}:{}",
             shuffle_id.job_uuid, shuffle_id.stage_id, shuffle_id.partition_id
         );
-        let mut shuffle_partitions = self.shuffle_partitions.lock().unwrap();
+        let mut shuffle_partitions = self
+            .shuffle_partitions
+            .lock()
+            .expect("failed to lock mutex");
         shuffle_partitions.insert(
             key,
             ShufflePartition {
@@ -220,7 +223,10 @@ impl Executor for BallistaExecutor {
             "{}:{}:{}",
             shuffle_id.job_uuid, shuffle_id.stage_id, shuffle_id.partition_id
         );
-        let shuffle_partitions = self.shuffle_partitions.lock().unwrap();
+        let shuffle_partitions = self
+            .shuffle_partitions
+            .lock()
+            .expect("failed to lock mutex");
         match shuffle_partitions.get(&key) {
             Some(partition) => Ok(partition.clone()),
             _ => Err(ballista_error("invalid shuffle partition id")),
@@ -259,6 +265,9 @@ impl Executor for BallistaExecutor {
                 })
             })
         });
-        handle.join().unwrap()
+        match handle.join() {
+            Ok(handle) => handle,
+            Err(e) => Err(ballista_error(&format!("Executor thread failed: {:?}", e))),
+        }
     }
 }

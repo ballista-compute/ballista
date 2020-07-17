@@ -65,10 +65,6 @@ pub fn start_etcd_thread(
 
 pub async fn etcd_get_executors(etcd_urls: &str, cluster_name: &str) -> Result<Vec<ExecutorMeta>> {
     match Client::connect([etcd_urls], None).await {
-        Err(e) => Err(ballista_error(&format!(
-            "Failed to connect to etcd {:?}",
-            e.to_string()
-        ))),
         Ok(mut client) => {
             println!("get_executor_ids got client");
             let key = format!("/ballista/{}", cluster_name);
@@ -79,8 +75,8 @@ pub async fn etcd_get_executors(etcd_urls: &str, cluster_name: &str) -> Result<V
 
             let mut execs = vec![];
             for kv in resp.kvs() {
-                let host_port = kv.value_str().unwrap();
-                let executor_id = kv.key_str().unwrap();
+                let executor_id = kv.key_str().expect("etcd - empty string in map key");
+                let host_port = kv.value_str().expect("etcd - empty string in map value");
                 let host_port: Vec<_> = host_port.split(':').collect();
                 if host_port.len() == 2 {
                     let host = &host_port[0];
@@ -96,5 +92,9 @@ pub async fn etcd_get_executors(etcd_urls: &str, cluster_name: &str) -> Result<V
             }
             Ok(execs)
         }
+        Err(e) => Err(ballista_error(&format!(
+            "Failed to connect to etcd {:?}",
+            e.to_string()
+        ))),
     }
 }

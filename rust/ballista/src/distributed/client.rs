@@ -17,7 +17,7 @@
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
-use crate::error::BallistaError;
+use crate::error::{ballista_error, BallistaError};
 use crate::execution::physical_plan::Action;
 use crate::protobuf;
 
@@ -58,26 +58,36 @@ pub async fn execute_action(
         .into_inner();
 
     // the schema should be the first message returned, else client should error
-    let flight_data = stream
-        .message()
-        .await
-        .map_err(|e| BallistaError::General(format!("{:?}", e)))?
-        .unwrap();
-
-    // convert FlightData to a stream
-    let schema = Arc::new(Schema::try_from(&flight_data)?);
-
-    // all the remaining stream messages should be dictionary and record batches
-    let mut batches = vec![];
-    while let Some(flight_data) = stream
+    match stream
         .message()
         .await
         .map_err(|e| BallistaError::General(format!("{:?}", e)))?
     {
-        // the unwrap is infallible and thus safe
-        let record_batch = flight_data_to_batch(&flight_data, schema.clone())?.unwrap();
-        batches.push(record_batch);
-    }
+        Some(flight_data) => {
+            // convert FlightData to a stream
+            let schema = Arc::new(Schema::try_from(&flight_data)?);
 
-    Ok(batches)
+            // all the remaining stream messages should be dictionary and record batches
+            let mut batches = vec![];
+            while let Some(flight_data) = stream
+                .message()
+                .await
+                .map_err(|e| BallistaError::General(format!("{:?}", e)))?
+            {
+                match flight_data_to_batch(&flight_data, schema.clone())? {
+                    Some(batch) => batches.push(batch),
+                    _ => {
+                        return Err(ballista_error(
+                            "Error converting flight data to columnar batch",
+                        ))
+                    }
+                }
+            }
+
+            Ok(batches)
+        }
+        None => Err(ballista_error(
+            "Did not receive schema batch from flight server",
+        )),
+    }
 }

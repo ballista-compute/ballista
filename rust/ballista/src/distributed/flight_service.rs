@@ -167,7 +167,12 @@ impl FlightService for BallistaFlightService {
         let request = request.into_inner();
         let uuid = &request.path[0];
 
-        match self.results_cache.lock().unwrap().get(uuid) {
+        match self
+            .results_cache
+            .lock()
+            .expect("failed to lock mutex")
+            .get(uuid)
+        {
             Some(results) => Ok(Response::new(SchemaResult::from(&results.schema))),
             _ => Err(Status::not_found("Invalid uuid")),
         }
@@ -208,7 +213,7 @@ impl FlightService for BallistaFlightService {
                 //
                 //     let uuid = "tbd";
                 //
-                //     match self.results.lock().unwrap().get(uuid) {
+                //     match self.results.lock().expect("failed to lock mutex").get(uuid) {
                 //         Some(results) => {
                 //             let schema_bytes = schema_to_bytes(&results.schema);
                 //

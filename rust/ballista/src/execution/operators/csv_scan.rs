@@ -28,6 +28,7 @@ use crate::error::{ballista_error, Result};
 
 use crate::execution::physical_plan::{
     ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ExecutionContext, ExecutionPlan,
+    Partitioning,
 };
 use async_trait::async_trait;
 
@@ -106,6 +107,10 @@ impl ExecutionPlan for CsvScanExec {
         self.projected_schema.clone()
     }
 
+    fn output_partitioning(&self) -> Partitioning {
+        Partitioning::UnknownPartitioning(self.filenames.len())
+    }
+
     async fn execute(
         &self,
         _ctx: Arc<dyn ExecutionContext>,
@@ -117,6 +122,7 @@ impl ExecutionPlan for CsvScanExec {
             self.has_header,
             self.delimiter,
             &self.projection,
+            self.projected_schema.clone(),
             self.batch_size,
         )?))
     }
@@ -137,12 +143,13 @@ impl CsvBatchIter {
         has_header: bool,
         delimiter: Option<u8>,
         projection: &Option<Vec<usize>>,
+        projected_schema: SchemaRef,
         batch_size: usize,
     ) -> Result<Self> {
         let file = File::open(filename)?;
         let reader = csv::Reader::new(
             file,
-            schema.clone(),
+            schema,
             has_header,
             delimiter,
             batch_size,
@@ -151,7 +158,7 @@ impl CsvBatchIter {
 
         Ok(Self {
             reader: Arc::new(Mutex::new(reader)),
-            schema,
+            schema: projected_schema,
         })
     }
 }

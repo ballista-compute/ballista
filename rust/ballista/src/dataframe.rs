@@ -260,7 +260,7 @@ impl Context {
         port: usize,
         action: Action,
     ) -> Result<Vec<RecordBatch>> {
-        client::execute_action(host, port, action).await
+        client::execute_action(host, port, &action).await
     }
 }
 

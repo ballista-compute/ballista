@@ -32,7 +32,7 @@ use prost::Message;
 pub async fn execute_action(
     host: &str,
     port: usize,
-    action: Action,
+    action: &Action,
 ) -> Result<Vec<RecordBatch>, BallistaError> {
     //TODO need to avoid connecting per request
 

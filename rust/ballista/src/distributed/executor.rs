@@ -121,7 +121,7 @@ impl ExecutionContext for DefaultContext {
         let _ = execute_action(
             &executor_meta.host,
             executor_meta.port,
-            Action::Execute(task),
+            &Action::Execute(task),
         )
         .await?;
 
@@ -134,7 +134,7 @@ impl ExecutionContext for DefaultContext {
                 let batches = execute_action(
                     &executor_meta.host,
                     executor_meta.port,
-                    Action::FetchShuffle(*shuffle_id),
+                    &Action::FetchShuffle(*shuffle_id),
                 )
                 .await?;
                 Ok(batches

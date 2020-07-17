@@ -14,6 +14,7 @@
 
 //! Serde code to convert from protocol buffers to Rust data structures.
 
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::sync::Arc;
 
@@ -22,57 +23,63 @@ use crate::datafusion::execution::physical_plan::csv::CsvReadOptions;
 use crate::datafusion::logicalplan::{
     Expr, LogicalPlan, LogicalPlanBuilder, Operator, ScalarValue,
 };
-
 use crate::distributed::scheduler::ExecutionTask;
 use crate::error::{ballista_error, BallistaError};
-use crate::execution::operators::{HashAggregateExec, ParquetScanExec, ShuffleReaderExec};
+use crate::execution::operators::{
+    CsvScanExec, HashAggregateExec, ParquetScanExec, ShuffleReaderExec,
+};
 use crate::execution::physical_plan::{Action, ExecutorMeta, ShuffleId, ShuffleLocation};
 use crate::execution::physical_plan::{AggregateMode, PhysicalPlan};
 use crate::protobuf;
-use std::collections::HashMap;
+
 use uuid::Uuid;
 
-impl TryInto<LogicalPlan> for protobuf::LogicalPlanNode {
+impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<LogicalPlan, Self::Error> {
-        if let Some(projection) = self.projection {
-            let input: LogicalPlan = self.input.unwrap().as_ref().to_owned().try_into()?;
+        if let Some(projection) = &self.projection {
+            let input: LogicalPlan = self.input.as_ref().unwrap().as_ref().try_into()?;
             LogicalPlanBuilder::from(&input)
                 .project(
                     projection
                         .expr
                         .iter()
-                        .map(|expr| expr.to_owned().try_into())
+                        .map(|expr| expr.try_into())
                         .collect::<Result<Vec<_>, _>>()?,
                 )?
                 .build()
                 .map_err(|e| e.into())
-        } else if let Some(selection) = self.selection {
-            let input: LogicalPlan = self.input.unwrap().as_ref().to_owned().try_into()?;
-            let expr: protobuf::LogicalExprNode = selection.expr.expect("expression required");
+        } else if let Some(selection) = &self.selection {
+            let input: LogicalPlan = self.input.as_ref().unwrap().as_ref().try_into()?;
             LogicalPlanBuilder::from(&input)
-                .filter(expr.try_into()?)?
+                .filter(
+                    selection
+                        .expr
+                        .as_ref()
+                        .expect("expression required")
+                        .try_into()?,
+                )?
                 .build()
                 .map_err(|e| e.into())
-        } else if let Some(aggregate) = self.aggregate {
-            let input: LogicalPlan = self.input.unwrap().as_ref().to_owned().try_into()?;
+        } else if let Some(aggregate) = &self.aggregate {
+            let input: LogicalPlan = self.input.as_ref().unwrap().as_ref().try_into()?;
             let group_expr = aggregate
                 .group_expr
                 .iter()
-                .map(|expr| expr.to_owned().try_into())
+                .map(|expr| expr.try_into())
                 .collect::<Result<Vec<_>, _>>()?;
             let aggr_expr = aggregate
                 .aggr_expr
                 .iter()
-                .map(|expr| expr.to_owned().try_into())
+                .map(|expr| expr.try_into())
                 .collect::<Result<Vec<_>, _>>()?;
             LogicalPlanBuilder::from(&input)
                 .aggregate(group_expr, aggr_expr)?
                 .build()
                 .map_err(|e| e.into())
-        } else if let Some(scan) = self.scan {
-            let schema: Schema = scan.schema.unwrap().try_into()?;
+        } else if let Some(scan) = &self.scan {
+            let schema: Schema = scan.schema.as_ref().unwrap().try_into()?;
 
             let projection: Vec<usize> = scan
                 .projection
@@ -110,20 +117,20 @@ impl TryInto<LogicalPlan> for protobuf::LogicalPlanNode {
     }
 }
 
-impl TryInto<Expr> for protobuf::LogicalExprNode {
+impl TryInto<Expr> for &protobuf::LogicalExprNode {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<Expr, Self::Error> {
-        if let Some(binary_expr) = self.binary_expr {
+        if let Some(binary_expr) = &self.binary_expr {
             Ok(Expr::BinaryExpr {
-                left: Box::new(parse_required_expr(binary_expr.l)?),
+                left: Box::new(parse_required_expr(&binary_expr.l)?),
                 op: from_proto_binary_op(&binary_expr.op)?,
-                right: Box::new(parse_required_expr(binary_expr.r)?),
+                right: Box::new(parse_required_expr(&binary_expr.r)?),
             })
         } else if self.has_column_index {
             Ok(Expr::Column(self.column_index as usize))
         } else if self.has_column_name {
-            Ok(Expr::UnresolvedColumn(self.column_name))
+            Ok(Expr::UnresolvedColumn(self.column_name.clone()))
         } else if self.has_literal_string {
             Ok(Expr::Literal(ScalarValue::Utf8(
                 self.literal_string.clone(),
@@ -132,7 +139,7 @@ impl TryInto<Expr> for protobuf::LogicalExprNode {
             Ok(Expr::Literal(ScalarValue::Float64(self.literal_double)))
         } else if self.has_literal_long {
             Ok(Expr::Literal(ScalarValue::Int64(self.literal_long)))
-        } else if let Some(aggregate_expr) = self.aggregate_expr {
+        } else if let Some(aggregate_expr) = &self.aggregate_expr {
             let name = match aggregate_expr.aggr_function {
                 f if f == protobuf::AggregateFunction::Min as i32 => Ok("MIN"),
                 f if f == protobuf::AggregateFunction::Max as i32 => Ok("MAX"),
@@ -147,7 +154,7 @@ impl TryInto<Expr> for protobuf::LogicalExprNode {
 
             Ok(Expr::AggregateFunction {
                 name: name.to_owned(),
-                args: vec![parse_required_expr(aggregate_expr.expr)?],
+                args: vec![parse_required_expr(&aggregate_expr.expr)?],
                 return_type: DataType::Boolean, //TODO
             })
         } else {
@@ -159,18 +166,18 @@ impl TryInto<Expr> for protobuf::LogicalExprNode {
     }
 }
 
-impl TryInto<Action> for protobuf::Action {
+impl TryInto<Action> for &protobuf::Action {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<Action, Self::Error> {
         if self.query.is_some() {
-            let plan: LogicalPlan = self.query.unwrap().try_into()?;
+            let plan: LogicalPlan = self.query.as_ref().unwrap().try_into()?;
             Ok(Action::InteractiveQuery { plan })
         } else if self.task.is_some() {
-            let task: ExecutionTask = self.task.unwrap().try_into()?;
+            let task: ExecutionTask = self.task.as_ref().unwrap().try_into()?;
             Ok(Action::Execute(task))
         } else if self.fetch_shuffle.is_some() {
-            let shuffle_id: ShuffleId = self.fetch_shuffle.unwrap().try_into()?;
+            let shuffle_id: ShuffleId = self.fetch_shuffle.as_ref().unwrap().try_into()?;
             Ok(Action::FetchShuffle(shuffle_id))
         } else {
             Err(BallistaError::NotImplemented(format!(
@@ -216,7 +223,7 @@ fn from_proto_arrow_type(dt: i32) -> Result<DataType, BallistaError> {
     }
 }
 
-impl TryInto<ExecutionTask> for protobuf::Task {
+impl TryInto<ExecutionTask> for &protobuf::Task {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<ExecutionTask, Self::Error> {
@@ -241,21 +248,21 @@ impl TryInto<ExecutionTask> for protobuf::Task {
             Uuid::parse_str(&self.job_uuid).unwrap(),
             self.stage_id as usize,
             self.partition_id as usize,
-            self.plan.unwrap().try_into()?,
+            self.plan.as_ref().unwrap().try_into()?,
             shuffle_locations,
         ))
     }
 }
 
-impl TryInto<ShuffleLocation> for protobuf::ShuffleLocation {
+impl TryInto<ShuffleLocation> for &protobuf::ShuffleLocation {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<ShuffleLocation, Self::Error> {
-        Ok(ShuffleLocation {})
+        Ok(ShuffleLocation {}) //TODO why empty?
     }
 }
 
-impl TryInto<ShuffleId> for protobuf::ShuffleId {
+impl TryInto<ShuffleId> for &protobuf::ShuffleId {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<ShuffleId, Self::Error> {
@@ -267,7 +274,7 @@ impl TryInto<ShuffleId> for protobuf::ShuffleId {
     }
 }
 
-impl TryInto<Schema> for protobuf::Schema {
+impl TryInto<Schema> for &protobuf::Schema {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<Schema, Self::Error> {
@@ -283,12 +290,12 @@ impl TryInto<Schema> for protobuf::Schema {
     }
 }
 
-impl TryInto<PhysicalPlan> for protobuf::PhysicalPlanNode {
+impl TryInto<PhysicalPlan> for &protobuf::PhysicalPlanNode {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<PhysicalPlan, Self::Error> {
-        if let Some(aggregate) = self.hash_aggregate {
-            let input: PhysicalPlan = self.input.unwrap().as_ref().to_owned().try_into()?;
+        if let Some(aggregate) = &self.hash_aggregate {
+            let input: PhysicalPlan = self.input.as_ref().unwrap().as_ref().try_into()?;
             let mode = match aggregate.mode {
                 mode if mode == protobuf::AggregateMode::Partial as i32 => {
                     Ok(AggregateMode::Partial)
@@ -305,38 +312,53 @@ impl TryInto<PhysicalPlan> for protobuf::PhysicalPlanNode {
             let group_expr = aggregate
                 .group_expr
                 .iter()
-                .map(|expr| expr.to_owned().try_into())
+                .map(|expr| expr.try_into())
                 .collect::<Result<Vec<_>, _>>()?;
             let aggr_expr = aggregate
                 .aggr_expr
                 .iter()
-                .map(|expr| expr.to_owned().try_into())
+                .map(|expr| expr.try_into())
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(PhysicalPlan::HashAggregate(Arc::new(
                 HashAggregateExec::try_new(mode, group_expr, aggr_expr, Arc::new(input))?,
             )))
-        } else if let Some(scan) = self.scan {
+        } else if let Some(scan) = &self.scan {
             match scan.file_format.as_str() {
-                "parquet" => Ok(PhysicalPlan::ParquetScan(Arc::new(
-                    ParquetScanExec::try_new(
+                "csv" => {
+                    //TODO read options and batch size from proto
+                    let options = CsvReadOptions::new();
+                    let batch_size = 64 * 1024;
+                    Ok(PhysicalPlan::CsvScan(Arc::new(CsvScanExec::try_new(
                         &scan.path,
+                        options,
                         Some(scan.projection.iter().map(|n| *n as usize).collect()),
-                        64 * 1024,
-                    )?,
-                ))),
+                        batch_size,
+                    )?)))
+                }
+                "parquet" => {
+                    //TODO read batch size from proto
+                    let batch_size = 64 * 1024;
+                    Ok(PhysicalPlan::ParquetScan(Arc::new(
+                        ParquetScanExec::try_new(
+                            &scan.path,
+                            Some(scan.projection.iter().map(|n| *n as usize).collect()),
+                            batch_size,
+                        )?,
+                    )))
+                }
                 other => Err(ballista_error(&format!(
                     "Unsupported file format '{}' for file scan",
                     other
                 ))),
             }
-        } else if let Some(shuffle_reader) = self.shuffle_reader {
+        } else if let Some(shuffle_reader) = &self.shuffle_reader {
             let mut shuffle_ids = vec![];
             for s in &shuffle_reader.shuffle_id {
-                shuffle_ids.push(s.to_owned().try_into()?);
+                shuffle_ids.push(s.try_into()?);
             }
             Ok(PhysicalPlan::ShuffleReader(Arc::new(
                 ShuffleReaderExec::new(
-                    Arc::new(shuffle_reader.schema.unwrap().try_into()?),
+                    Arc::new(shuffle_reader.schema.as_ref().unwrap().try_into()?),
                     shuffle_ids,
                 ),
             )))
@@ -349,9 +371,9 @@ impl TryInto<PhysicalPlan> for protobuf::PhysicalPlanNode {
     }
 }
 
-fn parse_required_expr(p: Option<Box<protobuf::LogicalExprNode>>) -> Result<Expr, BallistaError> {
+fn parse_required_expr(p: &Option<Box<protobuf::LogicalExprNode>>) -> Result<Expr, BallistaError> {
     match p {
-        Some(expr) => expr.as_ref().to_owned().try_into(),
+        Some(expr) => expr.as_ref().try_into(),
         None => Err(ballista_error("Missing required expression")),
     }
 }

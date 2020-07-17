@@ -32,7 +32,7 @@ pub fn decode_protobuf(bytes: &[u8]) -> Result<Action, BallistaError> {
     let mut buf = Cursor::new(bytes);
     protobuf::Action::decode(&mut buf)
         .map_err(|e| BallistaError::General(format!("{:?}", e)))
-        .and_then(|node| node.try_into())
+        .and_then(|node| (&node).try_into())
 }
 
 #[cfg(test)]
@@ -65,7 +65,7 @@ mod tests {
         .and_then(|plan| plan.build())
         .unwrap();
 
-        let action = Action::InteractiveQuery {
+        let action = &Action::InteractiveQuery {
             plan: plan.clone(),
             // tables: vec![TableMeta::Csv {
             //     table_name: "employee".to_owned(),
@@ -75,9 +75,9 @@ mod tests {
             // }],
         };
 
-        let proto: protobuf::Action = action.clone().try_into()?;
+        let proto: protobuf::Action = action.try_into()?;
 
-        let action2: Action = proto.try_into()?;
+        let action2: Action = (&proto).try_into()?;
 
         assert_eq!(format!("{:?}", action), format!("{:?}", action2));
 
@@ -103,7 +103,7 @@ mod tests {
         .and_then(|plan| plan.build())
         .unwrap();
 
-        let action = Action::InteractiveQuery {
+        let action = &Action::InteractiveQuery {
             plan: plan.clone(),
             // tables: vec![TableMeta::Csv {
             //     table_name: "employee".to_owned(),
@@ -113,9 +113,9 @@ mod tests {
             // }],
         };
 
-        let proto: protobuf::Action = action.clone().try_into()?;
+        let proto: protobuf::Action = action.try_into()?;
 
-        let action2: Action = proto.try_into()?;
+        let action2: Action = (&proto).try_into()?;
 
         assert_eq!(format!("{:?}", action), format!("{:?}", action2));
 

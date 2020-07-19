@@ -157,7 +157,7 @@ pub fn mult(l: Arc<dyn Expression>, r: Arc<dyn Expression>) -> Arc<dyn Expressio
 
 impl Expression for Multiply {
     fn name(&self) -> String {
-        format!("{} - {}", self.l.name(), self.r.name())
+        format!("{} * {}", self.l.name(), self.r.name())
     }
 
     fn data_type(&self, input_schema: &Schema) -> Result<DataType> {
@@ -213,7 +213,7 @@ pub fn div(l: Arc<dyn Expression>, r: Arc<dyn Expression>) -> Arc<dyn Expression
 
 impl Expression for Divide {
     fn name(&self) -> String {
-        format!("{} - {}", self.l.name(), self.r.name())
+        format!("{} / {}", self.l.name(), self.r.name())
     }
 
     fn data_type(&self, input_schema: &Schema) -> Result<DataType> {

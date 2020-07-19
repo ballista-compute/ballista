@@ -34,7 +34,7 @@ use crate::datafusion::logicalplan::Expr;
 use crate::datafusion::logicalplan::LogicalPlan;
 use crate::datafusion::logicalplan::ScalarValue;
 use crate::error::{ballista_error, Result};
-use crate::execution::expressions::{col, max, min};
+use crate::execution::expressions::{add, col, max, min};
 use crate::execution::operators::{
     CsvScanExec, FilterExec, HashAggregateExec, InMemoryTableScanExec, ParquetScanExec,
     ProjectionExec, ShuffleExchangeExec, ShuffleReaderExec,
@@ -42,6 +42,7 @@ use crate::execution::operators::{
 
 use crate::distributed::scheduler::ExecutionTask;
 use async_trait::async_trait;
+use datafusion::logicalplan::Operator;
 use uuid::Uuid;
 
 /// Stream of columnar batches using futures
@@ -273,6 +274,13 @@ impl ColumnarValue {
             ColumnarValue::Columnar(array) => array.data_type(),
         }
     }
+
+    pub fn to_arrow(&self) -> ArrayRef {
+        match self {
+            ColumnarValue::Columnar(array) => array.clone(),
+            ColumnarValue::Scalar(_, _) => unimplemented!(),
+        }
+    }
 }
 
 /// Enumeration wrapping physical plan structs so that they can be represented in a tree easily
@@ -472,6 +480,16 @@ pub fn compile_expression(expr: &Expr, input: &Schema) -> Result<Arc<dyn Express
     match expr {
         Expr::Column(n) => Ok(col(*n)),
         Expr::UnresolvedColumn(name) => Ok(col(input.index_of(name)?)),
+        Expr::BinaryExpr { left, op, right } => match op {
+            Operator::Plus => Ok(add(
+                compile_expression(left, input)?,
+                compile_expression(right, input)?,
+            )),
+            other => Err(ballista_error(&format!(
+                "Unsupported binary expression {:?}",
+                other
+            ))),
+        },
         other => Err(ballista_error(&format!(
             "Unsupported expression {:?}",
             other

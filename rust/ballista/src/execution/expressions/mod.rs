@@ -14,7 +14,7 @@
 
 //! Relational expressions that can be used in query plans.
 
-pub use self::arithmetic::add;
+pub use self::arithmetic::{add, div, mult, subtract};
 pub use self::column::col;
 pub use self::max::max;
 pub use self::min::min;

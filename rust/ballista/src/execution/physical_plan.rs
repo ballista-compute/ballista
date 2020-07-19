@@ -34,7 +34,7 @@ use crate::datafusion::logicalplan::Expr;
 use crate::datafusion::logicalplan::LogicalPlan;
 use crate::datafusion::logicalplan::ScalarValue;
 use crate::error::{ballista_error, Result};
-use crate::execution::expressions::{add, col, max, min};
+use crate::execution::expressions::{add, col, div, max, min, mult, subtract};
 use crate::execution::operators::{
     CsvScanExec, FilterExec, HashAggregateExec, InMemoryTableScanExec, ParquetScanExec,
     ProjectionExec, ShuffleExchangeExec, ShuffleReaderExec,
@@ -480,16 +480,20 @@ pub fn compile_expression(expr: &Expr, input: &Schema) -> Result<Arc<dyn Express
     match expr {
         Expr::Column(n) => Ok(col(*n)),
         Expr::UnresolvedColumn(name) => Ok(col(input.index_of(name)?)),
-        Expr::BinaryExpr { left, op, right } => match op {
-            Operator::Plus => Ok(add(
-                compile_expression(left, input)?,
-                compile_expression(right, input)?,
-            )),
-            other => Err(ballista_error(&format!(
-                "Unsupported binary expression {:?}",
-                other
-            ))),
-        },
+        Expr::BinaryExpr { left, op, right } => {
+            let l = compile_expression(left, input)?;
+            let r = compile_expression(right, input)?;
+            match op {
+                Operator::Plus => Ok(add(l, r)),
+                Operator::Minus => Ok(subtract(l, r)),
+                Operator::Multiply => Ok(mult(l, r)),
+                Operator::Divide => Ok(div(l, r)),
+                other => Err(ballista_error(&format!(
+                    "Unsupported binary operator {:?}",
+                    other
+                ))),
+            }
+        }
         other => Err(ballista_error(&format!(
             "Unsupported expression {:?}",
             other

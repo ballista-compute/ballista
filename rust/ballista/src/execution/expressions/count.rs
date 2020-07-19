@@ -17,7 +17,9 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::arrow::datatypes::{DataType, Schema};
+use crate::datafusion::logicalplan::ScalarValue;
 use crate::error::Result;
+use crate::execution::expressions::sum::SumAccumulator;
 use crate::execution::physical_plan::{
     Accumulator, AggregateExpr, AggregateMode, ColumnarBatch, ColumnarValue, Expression,
 };
@@ -39,19 +41,46 @@ impl AggregateExpr for Count {
     }
 
     fn data_type(&self, _input_schema: &Schema) -> Result<DataType> {
-        unimplemented!()
+        Ok(DataType::UInt64)
     }
 
     fn nullable(&self, _input_schema: &Schema) -> Result<bool> {
-        unimplemented!()
+        Ok(true)
     }
 
-    fn evaluate_input(&self, _batch: &ColumnarBatch) -> Result<ColumnarValue> {
-        unimplemented!()
+    fn evaluate_input(&self, batch: &ColumnarBatch) -> Result<ColumnarValue> {
+        self.input.evaluate(batch)
     }
 
-    fn create_accumulator(&self, _mode: &AggregateMode) -> Rc<RefCell<dyn Accumulator>> {
-        unimplemented!()
+    fn create_accumulator(&self, mode: &AggregateMode) -> Rc<RefCell<dyn Accumulator>> {
+        match mode {
+            AggregateMode::Partial => Rc::new(RefCell::new(CountAccumulator { count: 0 })),
+            _ => Rc::new(RefCell::new(SumAccumulator { sum: None })),
+        }
+    }
+}
+
+struct CountAccumulator {
+    count: u64,
+}
+
+impl Accumulator for CountAccumulator {
+    fn accumulate(&mut self, value: &ColumnarValue) -> Result<()> {
+        match value {
+            ColumnarValue::Columnar(array) => {
+                self.count += array.len() as u64 - array.null_count() as u64;
+            }
+            ColumnarValue::Scalar(value, _) => {
+                if value.is_some() {
+                    self.count += 1;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn get_value(&self) -> Result<Option<ScalarValue>> {
+        Ok(Some(ScalarValue::UInt64(self.count)))
     }
 }
 

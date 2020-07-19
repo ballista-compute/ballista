@@ -71,8 +71,8 @@ macro_rules! accumulate {
     }};
 }
 
-struct SumAccumulator {
-    sum: Option<ScalarValue>,
+pub struct SumAccumulator {
+    pub sum: Option<ScalarValue>,
 }
 
 impl Accumulator for SumAccumulator {

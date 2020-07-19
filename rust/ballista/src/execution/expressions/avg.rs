@@ -37,23 +37,26 @@ impl Avg {
 
 impl AggregateExpr for Avg {
     fn name(&self) -> String {
-        unimplemented!()
+        "AVG".to_owned()
     }
 
-    fn data_type(&self, _input_schema: &Schema) -> Result<DataType> {
-        unimplemented!()
+    fn data_type(&self, input_schema: &Schema) -> Result<DataType> {
+        self.input.data_type(input_schema)
     }
 
     fn nullable(&self, _input_schema: &Schema) -> Result<bool> {
-        unimplemented!()
+        Ok(true)
     }
 
-    fn evaluate_input(&self, _batch: &ColumnarBatch) -> Result<ColumnarValue> {
-        unimplemented!()
+    fn evaluate_input(&self, batch: &ColumnarBatch) -> Result<ColumnarValue> {
+        self.input.evaluate(batch)
     }
 
     fn create_accumulator(&self, _mode: &AggregateMode) -> Rc<RefCell<dyn Accumulator>> {
-        unimplemented!()
+        Rc::new(RefCell::new(AvgAccumulator {
+            sum: None,
+            count: None,
+        }))
     }
 }
 

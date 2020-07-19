@@ -43,7 +43,17 @@ impl AggregateExpr for Sum {
     }
 
     fn data_type(&self, input_schema: &Schema) -> Result<DataType> {
-        self.input.data_type(input_schema)
+        match self.input.data_type(input_schema)? {
+            DataType::Int8 | DataType::Int16 | DataType::Int32 | DataType::Int64 => {
+                Ok(DataType::Int64)
+            }
+            DataType::UInt8 | DataType::UInt16 | DataType::UInt32 | DataType::UInt64 => {
+                Ok(DataType::UInt64)
+            }
+            DataType::Float32 => Ok(DataType::Float32),
+            DataType::Float64 => Ok(DataType::Float64),
+            other => Err(ballista_error(&format!("SUM does not support {:?}", other))),
+        }
     }
 
     fn nullable(&self, _input_schema: &Schema) -> Result<bool> {

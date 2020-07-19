@@ -35,6 +35,20 @@ impl Default for DataGen {
     }
 }
 
+macro_rules! build_primitive_array {
+    ($SELF:ident, $ARRAY_TYPE:ident, $TY:ty, $NULLABLE:expr, $LEN:expr) => {{
+        let mut builder = array::$ARRAY_TYPE::builder($LEN);
+        for _ in 0..$LEN {
+            if $NULLABLE && $SELF.rng.get_u8() < 10 {
+                builder.append_null()?;
+            } else {
+                builder.append_value($SELF.rng.get_u64() as $TY)?;
+            }
+        }
+        Ok(Arc::new(builder.finish()))
+    }};
+}
+
 #[allow(dead_code)]
 impl DataGen {
     /// Create a data generator using a fixed seed for reproducible data.
@@ -52,28 +66,16 @@ impl DataGen {
         len: usize,
     ) -> Result<ArrayRef> {
         match data_type {
-            DataType::Int64 => {
-                let mut builder = array::Int64Array::builder(len);
-                for _ in 0..len {
-                    if nullable && self.rng.get_u8() < 10 {
-                        builder.append_null()?;
-                    } else {
-                        builder.append_value(self.rng.get_u64() as i64)?;
-                    }
-                }
-                Ok(Arc::new(builder.finish()))
-            }
-            DataType::UInt64 => {
-                let mut builder = array::UInt64Array::builder(len);
-                for _ in 0..len {
-                    if nullable && self.rng.get_u8() < 10 {
-                        builder.append_null()?;
-                    } else {
-                        builder.append_value(self.rng.get_u64())?;
-                    }
-                }
-                Ok(Arc::new(builder.finish()))
-            }
+            DataType::Int8 => build_primitive_array!(self, Int8Array, i8, nullable, len),
+            DataType::Int16 => build_primitive_array!(self, Int16Array, i16, nullable, len),
+            DataType::Int32 => build_primitive_array!(self, Int32Array, i32, nullable, len),
+            DataType::Int64 => build_primitive_array!(self, Int64Array, i64, nullable, len),
+            DataType::UInt8 => build_primitive_array!(self, UInt8Array, u8, nullable, len),
+            DataType::UInt16 => build_primitive_array!(self, UInt16Array, u16, nullable, len),
+            DataType::UInt32 => build_primitive_array!(self, UInt32Array, u32, nullable, len),
+            DataType::UInt64 => build_primitive_array!(self, UInt64Array, u64, nullable, len),
+            DataType::Float32 => build_primitive_array!(self, Float32Array, f32, nullable, len),
+            DataType::Float64 => build_primitive_array!(self, Float64Array, f64, nullable, len),
             _ => unimplemented!(),
         }
     }

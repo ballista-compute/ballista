@@ -520,6 +520,12 @@ pub fn max(expr: Expr) -> Expr {
 pub fn sum(expr: Expr) -> Expr {
     aggregate_expr("SUM", &expr)
 }
+pub fn avg(expr: Expr) -> Expr {
+    aggregate_expr("AVG", &expr)
+}
+pub fn count(expr: Expr) -> Expr {
+    aggregate_expr("COUNT", &expr)
+}
 
 /// Create a column expression based on a column name
 pub fn col(name: &str) -> Expr {

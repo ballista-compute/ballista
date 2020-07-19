@@ -3,7 +3,7 @@ extern crate ballista;
 use std::sync::Arc;
 
 use ballista::arrow::datatypes::{DataType, Field, Schema};
-use ballista::dataframe::max;
+use ballista::dataframe::{avg, count, max, min, sum};
 use ballista::datafusion::logicalplan::col_index;
 use ballista::distributed::executor::{DefaultContext, DiscoveryMode, ExecutorConfig};
 use ballista::execution::operators::HashAggregateExec;
@@ -20,8 +20,8 @@ fn hash_aggregate() -> std::io::Result<()> {
         let mut gen = DataGen::default();
 
         let schema = Schema::new(vec![
-            Field::new("c0", DataType::Int64, true),
-            Field::new("c1", DataType::UInt64, false),
+            Field::new("c0", DataType::Int8, true),
+            Field::new("c1", DataType::Int32, false),
         ]);
         let batch = gen.create_batch(&schema, 4096).unwrap();
 
@@ -35,7 +35,13 @@ fn hash_aggregate() -> std::io::Result<()> {
             HashAggregateExec::try_new(
                 AggregateMode::Partial,
                 vec![col_index(0)],
-                vec![max(col_index(1))],
+                vec![
+                    min(col_index(1)),
+                    max(col_index(1)),
+                    avg(col_index(1)),
+                    sum(col_index(1)),
+                    count(col_index(1)),
+                ],
                 Arc::new(in_memory_exec),
             )
             .unwrap(),
@@ -56,8 +62,8 @@ fn hash_aggregate() -> std::io::Result<()> {
 
         let batch = &results[0];
 
-        assert_eq!(3961, batch.num_rows());
-        assert_eq!(2, batch.num_columns());
+        assert_eq!(256, batch.num_rows());
+        assert_eq!(6, batch.num_columns());
 
         std::io::Result::Ok(())
     })

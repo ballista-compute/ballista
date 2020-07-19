@@ -37,7 +37,7 @@ impl Count {
 
 impl AggregateExpr for Count {
     fn name(&self) -> String {
-        unimplemented!()
+        "COUNT".to_owned()
     }
 
     fn data_type(&self, _input_schema: &Schema) -> Result<DataType> {

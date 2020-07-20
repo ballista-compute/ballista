@@ -607,6 +607,11 @@ pub fn lit_u64(n: u64) -> Expr {
     Expr::Literal(ScalarValue::UInt64(n))
 }
 
+/// Create a literal f32 expression
+pub fn lit_f32(n: f32) -> Expr {
+    Expr::Literal(ScalarValue::Float32(n))
+}
+
 /// Create a literal f64 expression
 pub fn lit_f64(n: f64) -> Expr {
     Expr::Literal(ScalarValue::Float64(n))

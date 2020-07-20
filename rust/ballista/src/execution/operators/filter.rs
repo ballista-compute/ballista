@@ -16,12 +16,17 @@
 
 use std::sync::Arc;
 
+use crate::arrow;
+use crate::arrow::array;
 use crate::arrow::datatypes::Schema;
 use crate::datafusion::logicalplan::Expr;
 use crate::error::{ballista_error, Result};
-use crate::execution::physical_plan::{
-    compile_expression, ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ColumnarValue,
-    ExecutionContext, ExecutionPlan, Expression, PhysicalPlan,
+use crate::{
+    cast_array,
+    execution::physical_plan::{
+        compile_expression, ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ColumnarValue,
+        ExecutionContext, ExecutionPlan, Expression, PhysicalPlan,
+    },
 };
 
 use async_trait::async_trait;
@@ -34,10 +39,20 @@ pub struct FilterExec {
     filter_expr: Arc<Expr>,
 }
 
+impl FilterExec {
+    pub fn new(child: &PhysicalPlan, filter_expr: &Expr) -> Self {
+        Self {
+            child: Arc::new(child.clone()),
+            filter_expr: Arc::new(filter_expr.clone()),
+        }
+    }
+}
+
 #[async_trait]
 impl ExecutionPlan for FilterExec {
     fn schema(&self) -> Arc<Schema> {
-        unimplemented!()
+        // a filter does not alter the schema
+        self.child.as_execution_plan().schema()
     }
 
     fn children(&self) -> Vec<Arc<PhysicalPlan>> {
@@ -85,6 +100,16 @@ impl ColumnarBatchIter for FilterIter {
 }
 
 /// Filter the provided batch based on the bitmask
-fn apply_filter(_batch: &ColumnarBatch, _bitmask: &ColumnarValue) -> Result<ColumnarBatch> {
-    Err(ballista_error("filter operator is not implemented yet"))
+fn apply_filter(batch: &ColumnarBatch, bitmask: &ColumnarValue) -> Result<ColumnarBatch> {
+    let predicate = bitmask.to_arrow()?;
+    let predicate = cast_array!(predicate, BooleanArray)?;
+
+    let mut filtered_arrays = Vec::with_capacity(batch.num_columns());
+    for i in 0..batch.num_columns() {
+        let array = batch.column(i);
+        let filtered_array = arrow::compute::filter(array.to_arrow()?.as_ref(), predicate)?;
+        filtered_arrays.push(ColumnarValue::Columnar(filtered_array));
+    }
+
+    Ok(ColumnarBatch::from_values(&filtered_arrays))
 }

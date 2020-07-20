@@ -37,7 +37,7 @@ use crate::datafusion::logicalplan::ScalarValue;
 use crate::distributed::scheduler::ExecutionTask;
 use crate::error::{ballista_error, Result};
 use crate::execution::expressions::{
-    add, alias, avg, col, count, div, max, min, mult, subtract, sum,
+    add, alias, avg, col, compare, count, div, max, min, mult, subtract, sum,
 };
 use crate::execution::operators::{
     CsvScanExec, FilterExec, HashAggregateExec, InMemoryTableScanExec, ParquetScanExec,
@@ -491,6 +491,12 @@ pub fn compile_expression(expr: &Expr, input: &Schema) -> Result<Arc<dyn Express
                 Operator::Minus => Ok(subtract(l, r)),
                 Operator::Multiply => Ok(mult(l, r)),
                 Operator::Divide => Ok(div(l, r)),
+                Operator::Lt
+                | Operator::LtEq
+                | Operator::Gt
+                | Operator::GtEq
+                | Operator::Eq
+                | Operator::NotEq => Ok(compare(l, op, r)),
                 other => Err(ballista_error(&format!(
                     "Unsupported binary operator {:?}",
                     other

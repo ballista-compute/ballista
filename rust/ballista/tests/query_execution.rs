@@ -24,7 +24,7 @@ fn hash_aggregate() -> std::io::Result<()> {
             Field::new("c0", DataType::Int8, true),
             Field::new("c1", DataType::Int32, false),
         ]);
-        let batch = gen.create_batch(&schema, 1024 * 1024).unwrap();
+        let batch = gen.create_batch(&schema, 1024).unwrap();
 
         let in_memory_exec =
             PhysicalPlan::InMemoryTableScan(Arc::new(InMemoryTableScanExec::new(vec![
@@ -67,7 +67,7 @@ fn hash_aggregate() -> std::io::Result<()> {
 
         let batch = &results[0];
 
-        assert_eq!(256, batch.num_rows());
+        assert_eq!(251, batch.num_rows());
         assert_eq!(6, batch.num_columns());
 
         std::io::Result::Ok(())

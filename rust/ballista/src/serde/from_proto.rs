@@ -154,10 +154,26 @@ impl TryInto<Expr> for &protobuf::LogicalExprNode {
             Ok(Expr::Literal(ScalarValue::Utf8(
                 self.literal_string.clone(),
             )))
-        } else if self.has_literal_double {
-            Ok(Expr::Literal(ScalarValue::Float64(self.literal_double)))
-        } else if self.has_literal_long {
-            Ok(Expr::Literal(ScalarValue::Int64(self.literal_long)))
+        } else if self.has_literal_f32 {
+            Ok(Expr::Literal(ScalarValue::Float32(self.literal_f32)))
+        } else if self.has_literal_f64 {
+            Ok(Expr::Literal(ScalarValue::Float64(self.literal_f64)))
+        } else if self.has_literal_i8 {
+            Ok(Expr::Literal(ScalarValue::Int8(self.literal_int as i8)))
+        } else if self.has_literal_i16 {
+            Ok(Expr::Literal(ScalarValue::Int16(self.literal_int as i16)))
+        } else if self.has_literal_i32 {
+            Ok(Expr::Literal(ScalarValue::Int32(self.literal_int as i32)))
+        } else if self.has_literal_i64 {
+            Ok(Expr::Literal(ScalarValue::Int64(self.literal_int as i64)))
+        } else if self.has_literal_u8 {
+            Ok(Expr::Literal(ScalarValue::UInt8(self.literal_uint as u8)))
+        } else if self.has_literal_u16 {
+            Ok(Expr::Literal(ScalarValue::UInt16(self.literal_uint as u16)))
+        } else if self.has_literal_u32 {
+            Ok(Expr::Literal(ScalarValue::UInt32(self.literal_uint as u32)))
+        } else if self.has_literal_u64 {
+            Ok(Expr::Literal(ScalarValue::UInt64(self.literal_uint as u64)))
         } else if let Some(aggregate_expr) = &self.aggregate_expr {
             let name = match aggregate_expr.aggr_function {
                 f if f == protobuf::AggregateFunction::Min as i32 => Ok("MIN"),
@@ -176,6 +192,11 @@ impl TryInto<Expr> for &protobuf::LogicalExprNode {
                 args: vec![parse_required_expr(&aggregate_expr.expr)?],
                 return_type: DataType::Boolean, //TODO
             })
+        } else if let Some(alias) = &self.alias {
+            Ok(Expr::Alias(
+                Box::new(parse_required_expr(&alias.expr)?),
+                alias.alias.clone(),
+            ))
         } else {
             Err(ballista_error(&format!(
                 "Unsupported logical expression '{:?}'",

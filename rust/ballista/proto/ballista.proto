@@ -20,21 +20,41 @@ message LogicalExprNode {
   uint32 column_index = 12;
   bool has_column_index = 13;
 
+  // alias
+  AliasNode alias = 14;
+
   // literals
   string literal_string = 21;
   bool has_literal_string = 22;
 
-  double literal_double = 23;
-  bool has_literal_double = 24;
+  int64 literal_int = 23;
+  bool has_literal_i8 = 24;
+  bool has_literal_i16 = 25;
+  bool has_literal_i32 = 26;
+  bool has_literal_i64 = 27;
 
-  int64 literal_long = 25;
-  bool has_literal_long = 26;
+  uint64 literal_uint = 28;
+  bool has_literal_u8 = 29;
+  bool has_literal_u16 = 30;
+  bool has_literal_u32 = 31;
+  bool has_literal_u64 = 32;
+
+  float literal_f32 = 33;
+  bool has_literal_f32 = 34;
+
+  double literal_f64 = 35;
+  bool has_literal_f64 = 36;
 
   // binary expressions
-  BinaryExprNode binary_expr = 30;
+  BinaryExprNode binary_expr = 40;
 
   // aggregate expressions
-  AggregateExprNode aggregate_expr = 40;
+  AggregateExprNode aggregate_expr = 50;
+}
+
+message AliasNode {
+  LogicalExprNode expr = 1;
+  string alias = 2;
 }
 
 message BinaryExprNode {

@@ -216,12 +216,86 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                 expr.column_name = name.to_owned();
                 Ok(expr)
             }
-            Expr::Literal(ScalarValue::Utf8(s)) => {
-                let mut expr = empty_expr_node();
-                expr.has_literal_string = true;
-                expr.literal_string = s.to_owned();
-                Ok(expr)
+            Expr::Alias(expr, alias) => {
+                let mut expr_node = empty_expr_node();
+                expr_node.alias = Some(Box::new(protobuf::AliasNode {
+                    expr: Some(Box::new(expr.as_ref().try_into()?)),
+                    alias: alias.to_owned(),
+                }));
+                Ok(expr_node)
             }
+            Expr::Literal(value) => match value {
+                ScalarValue::Utf8(s) => {
+                    let mut expr = empty_expr_node();
+                    expr.has_literal_string = true;
+                    expr.literal_string = s.to_owned();
+                    Ok(expr)
+                }
+                ScalarValue::Int8(n) => {
+                    let mut expr = empty_expr_node();
+                    expr.has_literal_i8 = true;
+                    expr.literal_int = *n as i64;
+                    Ok(expr)
+                }
+                ScalarValue::Int16(n) => {
+                    let mut expr = empty_expr_node();
+                    expr.has_literal_i16 = true;
+                    expr.literal_int = *n as i64;
+                    Ok(expr)
+                }
+                ScalarValue::Int32(n) => {
+                    let mut expr = empty_expr_node();
+                    expr.has_literal_i32 = true;
+                    expr.literal_int = *n as i64;
+                    Ok(expr)
+                }
+                ScalarValue::Int64(n) => {
+                    let mut expr = empty_expr_node();
+                    expr.has_literal_i64 = true;
+                    expr.literal_int = *n as i64;
+                    Ok(expr)
+                }
+                ScalarValue::UInt8(n) => {
+                    let mut expr = empty_expr_node();
+                    expr.has_literal_u8 = true;
+                    expr.literal_uint = *n as u64;
+                    Ok(expr)
+                }
+                ScalarValue::UInt16(n) => {
+                    let mut expr = empty_expr_node();
+                    expr.has_literal_u16 = true;
+                    expr.literal_uint = *n as u64;
+                    Ok(expr)
+                }
+                ScalarValue::UInt32(n) => {
+                    let mut expr = empty_expr_node();
+                    expr.has_literal_u32 = true;
+                    expr.literal_uint = *n as u64;
+                    Ok(expr)
+                }
+                ScalarValue::UInt64(n) => {
+                    let mut expr = empty_expr_node();
+                    expr.has_literal_u64 = true;
+                    expr.literal_uint = *n as u64;
+                    Ok(expr)
+                }
+                ScalarValue::Float32(n) => {
+                    let mut expr = empty_expr_node();
+                    expr.has_literal_f32 = true;
+                    expr.literal_f32 = *n;
+                    Ok(expr)
+                }
+                ScalarValue::Float64(n) => {
+                    let mut expr = empty_expr_node();
+                    expr.has_literal_f64 = true;
+                    expr.literal_f64 = *n;
+                    Ok(expr)
+                }
+                other => Err(BallistaError::NotImplemented(format!(
+                    "to_proto unsupported scalar value {:?}",
+                    other
+                ))),
+            },
             Expr::BinaryExpr { left, op, right } => {
                 let mut expr = empty_expr_node();
                 expr.binary_expr = Some(Box::new(protobuf::BinaryExprNode {
@@ -396,14 +470,25 @@ impl TryInto<protobuf::Task> for &ExecutionTask {
 /// Create an empty ExprNode
 fn empty_expr_node() -> protobuf::LogicalExprNode {
     protobuf::LogicalExprNode {
+        alias: None,
         column_name: "".to_owned(),
         has_column_name: false,
         literal_string: "".to_owned(),
         has_literal_string: false,
-        literal_double: 0.0,
-        has_literal_double: false,
-        literal_long: 0,
-        has_literal_long: false,
+        literal_int: 0,
+        literal_uint: 0,
+        literal_f32: 0.0,
+        literal_f64: 0.0,
+        has_literal_i8: false,
+        has_literal_i16: false,
+        has_literal_i32: false,
+        has_literal_i64: false,
+        has_literal_u8: false,
+        has_literal_u16: false,
+        has_literal_u32: false,
+        has_literal_u64: false,
+        has_literal_f32: false,
+        has_literal_f64: false,
         column_index: 0,
         has_column_index: false,
         binary_expr: None,

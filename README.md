@@ -100,6 +100,7 @@ benchmarks to drive requirements. The full roadmap is available [here](https://g
 The following examples should help illustrate the current capabilities of Ballista
 
 - [Distributed query execution in Rust](https://github.com/ballista-compute/ballista/tree/main/rust/examples/distributed-query)
+- [TPC-H Benchmark](https://github.com/ballista-compute/ballista/tree/main/rust/examples/tpch)
 - [Rust bindings for Apache Spark](https://github.com/ballista-compute/ballista/tree/main/rust/examples/apache-spark-rust-bindings)
 
 ## Documentation

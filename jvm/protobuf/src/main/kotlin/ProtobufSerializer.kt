@@ -84,11 +84,14 @@ class ProtobufSerializer {
       is LiteralString -> {
         LogicalExprNode.newBuilder().setHasLiteralString(true).setLiteralString(expr.str).build()
       }
+        is LiteralFloat -> {
+            LogicalExprNode.newBuilder().setHasLiteralF32(true).setLiteralF32(expr.n).build()
+        }
       is LiteralDouble -> {
-        LogicalExprNode.newBuilder().setHasLiteralDouble(true).setLiteralDouble(expr.n).build()
+        LogicalExprNode.newBuilder().setHasLiteralF64(true).setLiteralF64(expr.n).build()
       }
       is LiteralLong -> {
-        LogicalExprNode.newBuilder().setHasLiteralLong(true).setLiteralLong(expr.n).build()
+        LogicalExprNode.newBuilder().setHasLiteralI64(true).setLiteralInt(expr.n).build()
       }
       is BooleanBinaryExpr -> {
         val op =

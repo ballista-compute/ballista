@@ -68,10 +68,14 @@ class ProtobufDeserializer {
       col(node.columnName)
     } else if (node.hasLiteralString) {
       lit(node.literalString)
-    } else if (node.hasLiteralLong) {
-      lit(node.literalLong)
-    } else if (node.hasLiteralDouble) {
-      lit(node.literalDouble)
+    } else if (node.hasLiteralI8 || node.hasLiteralI16 || node.hasLiteralI32 || node.hasLiteralI64) {
+      lit(node.literalInt)
+    } else if (node.hasLiteralU8 || node.hasLiteralU16 || node.hasLiteralU32 || node.hasLiteralU64) {
+        lit(node.literalInt)
+    } else if (node.hasLiteralF32) {
+        lit(node.literalF32)
+    } else if (node.hasLiteralF64) {
+      lit(node.literalF64)
     } else if (node.hasAggregateExpr()) {
       val aggr = node.aggregateExpr
       val expr = fromProto(aggr.expr)

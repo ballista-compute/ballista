@@ -81,6 +81,21 @@ class LiteralLong(val n: Long) : LogicalExpr {
 fun lit(value: Long) = LiteralLong(value)
 
 /** Logical expression representing a literal double value. */
+class LiteralFloat(val n: Float) : LogicalExpr {
+
+  override fun toField(input: LogicalPlan): Field {
+    return Field(n.toString(), ArrowTypes.FloatType)
+  }
+
+  override fun toString(): String {
+    return n.toString()
+  }
+}
+
+/** Convenience method to create a LiteralFloat */
+fun lit(value: Float) = LiteralFloat(value)
+
+/** Logical expression representing a literal double value. */
 class LiteralDouble(val n: Double) : LogicalExpr {
 
   override fun toField(input: LogicalPlan): Field {

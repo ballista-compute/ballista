@@ -36,7 +36,9 @@ use crate::datafusion::logicalplan::Operator;
 use crate::datafusion::logicalplan::ScalarValue;
 use crate::distributed::scheduler::ExecutionTask;
 use crate::error::{ballista_error, Result};
-use crate::execution::expressions::{add, avg, col, count, div, max, min, mult, subtract, sum};
+use crate::execution::expressions::{
+    add, alias, avg, col, count, div, max, min, mult, subtract, sum,
+};
 use crate::execution::operators::{
     CsvScanExec, FilterExec, HashAggregateExec, InMemoryTableScanExec, ParquetScanExec,
     ProjectionExec, ShuffleExchangeExec, ShuffleReaderExec,
@@ -478,6 +480,7 @@ pub struct ShuffleLocation {}
 /// input data.
 pub fn compile_expression(expr: &Expr, input: &Schema) -> Result<Arc<dyn Expression>> {
     match expr {
+        Expr::Alias(expr, name) => Ok(alias(compile_expression(expr, input)?, name)),
         Expr::Column(n) => Ok(col(*n)),
         Expr::UnresolvedColumn(name) => Ok(col(input.index_of(name)?)),
         Expr::BinaryExpr { left, op, right } => {

@@ -24,6 +24,8 @@ pub use crate::datafusion::datasource::csv::CsvReadOptions;
 use crate::datafusion::datasource::parquet::ParquetTable;
 use crate::datafusion::datasource::MemTable;
 use crate::datafusion::datasource::TableProvider;
+use crate::datafusion::logicalplan::Operator;
+use crate::datafusion::logicalplan::ScalarValue;
 use crate::datafusion::logicalplan::{Expr, FunctionMeta, LogicalPlan, LogicalPlanBuilder};
 use crate::datafusion::optimizer::utils::exprlist_to_fields;
 use crate::datafusion::sql::parser::{DFASTNode, DFParser};
@@ -530,6 +532,84 @@ pub fn count(expr: Expr) -> Expr {
 /// Create a column expression based on a column name
 pub fn col(name: &str) -> Expr {
     Expr::UnresolvedColumn(name.to_owned())
+}
+
+pub fn alias(expr: &Expr, name: &str) -> Expr {
+    Expr::Alias(Box::new(expr.to_owned()), name.to_owned())
+}
+
+pub fn add(l: &Expr, r: &Expr) -> Expr {
+    binary_expr(l, Operator::Plus, r)
+}
+
+pub fn subtract(l: &Expr, r: &Expr) -> Expr {
+    binary_expr(l, Operator::Minus, r)
+}
+
+pub fn mult(l: &Expr, r: &Expr) -> Expr {
+    binary_expr(l, Operator::Multiply, r)
+}
+
+pub fn div(l: &Expr, r: &Expr) -> Expr {
+    binary_expr(l, Operator::Divide, r)
+}
+
+fn binary_expr(l: &Expr, op: Operator, r: &Expr) -> Expr {
+    Expr::BinaryExpr {
+        left: Box::new(l.to_owned()),
+        op,
+        right: Box::new(r.to_owned()),
+    }
+}
+
+/// Create a literal string expression
+pub fn lit_str(str: &str) -> Expr {
+    Expr::Literal(ScalarValue::Utf8(str.to_owned()))
+}
+
+/// Create a literal i8 expression
+pub fn lit_i8(n: i8) -> Expr {
+    Expr::Literal(ScalarValue::Int8(n))
+}
+
+/// Create a literal i16 expression
+pub fn lit_i16(n: i16) -> Expr {
+    Expr::Literal(ScalarValue::Int16(n))
+}
+
+/// Create a literal i32 expression
+pub fn lit_i32(n: i32) -> Expr {
+    Expr::Literal(ScalarValue::Int32(n))
+}
+
+/// Create a literal i64 expression
+pub fn lit_i64(n: i64) -> Expr {
+    Expr::Literal(ScalarValue::Int64(n))
+}
+
+/// Create a literal u8 expression
+pub fn lit_u8(n: u8) -> Expr {
+    Expr::Literal(ScalarValue::UInt8(n))
+}
+
+/// Create a literal u16 expression
+pub fn lit_u16(n: u16) -> Expr {
+    Expr::Literal(ScalarValue::UInt16(n))
+}
+
+/// Create a literal u32 expression
+pub fn lit_u32(n: u32) -> Expr {
+    Expr::Literal(ScalarValue::UInt32(n))
+}
+
+/// Create a literal u64 expression
+pub fn lit_u64(n: u64) -> Expr {
+    Expr::Literal(ScalarValue::UInt64(n))
+}
+
+/// Create a literal f64 expression
+pub fn lit_f64(n: f64) -> Expr {
+    Expr::Literal(ScalarValue::Float64(n))
 }
 
 /// Create an expression to represent a named aggregate function

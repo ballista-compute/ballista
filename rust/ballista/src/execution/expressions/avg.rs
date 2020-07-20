@@ -16,8 +16,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use crate::arrow::array;
+use crate::arrow::compute;
 use crate::arrow::datatypes::{DataType, Schema};
-use crate::datafusion::execution::physical_plan::common::get_scalar_value;
+use crate::cast_array;
 use crate::datafusion::logicalplan::ScalarValue;
 use crate::error::{ballista_error, Result};
 use crate::execution::physical_plan::{
@@ -95,9 +97,85 @@ impl Accumulator for AvgAccumulator {
     fn accumulate(&mut self, value: &ColumnarValue) -> Result<()> {
         match value {
             ColumnarValue::Columnar(array) => {
-                for row in 0..array.len() {
-                    self.accumulate(&ColumnarValue::Scalar(get_scalar_value(array, row)?, 1))?;
-                }
+                // calculate sum
+                let sum = match array.data_type() {
+                    DataType::UInt8 => match compute::sum(cast_array!(array, UInt8Array)?) {
+                        Some(n) => Ok(Some(ScalarValue::UInt8(n))),
+                        None => Ok(None),
+                    },
+                    DataType::UInt16 => match compute::sum(cast_array!(array, UInt16Array)?) {
+                        Some(n) => Ok(Some(ScalarValue::UInt16(n))),
+                        None => Ok(None),
+                    },
+                    DataType::UInt32 => match compute::sum(cast_array!(array, UInt32Array)?) {
+                        Some(n) => Ok(Some(ScalarValue::UInt32(n))),
+                        None => Ok(None),
+                    },
+                    DataType::UInt64 => match compute::sum(cast_array!(array, UInt64Array)?) {
+                        Some(n) => Ok(Some(ScalarValue::UInt64(n))),
+                        None => Ok(None),
+                    },
+                    DataType::Int8 => match compute::sum(cast_array!(array, Int8Array)?) {
+                        Some(n) => Ok(Some(ScalarValue::Int8(n))),
+                        None => Ok(None),
+                    },
+                    DataType::Int16 => match compute::sum(cast_array!(array, Int16Array)?) {
+                        Some(n) => Ok(Some(ScalarValue::Int16(n))),
+                        None => Ok(None),
+                    },
+                    DataType::Int32 => match compute::sum(cast_array!(array, Int32Array)?) {
+                        Some(n) => Ok(Some(ScalarValue::Int32(n))),
+                        None => Ok(None),
+                    },
+                    DataType::Int64 => match compute::sum(cast_array!(array, Int64Array)?) {
+                        Some(n) => Ok(Some(ScalarValue::Int64(n))),
+                        None => Ok(None),
+                    },
+                    DataType::Float32 => match compute::sum(cast_array!(array, Float32Array)?) {
+                        Some(n) => Ok(Some(ScalarValue::Float32(n))),
+                        None => Ok(None),
+                    },
+                    DataType::Float64 => match compute::sum(cast_array!(array, Float64Array)?) {
+                        Some(n) => Ok(Some(ScalarValue::Float64(n))),
+                        None => Ok(None),
+                    },
+                    _ => Err(ballista_error("Unsupported data type for SUM")),
+                }?;
+                // calculate average
+                let avg = match sum {
+                    Some(ScalarValue::Int8(n)) => {
+                        Ok(Some(ScalarValue::Float64(n as f64 / array.len() as f64)))
+                    }
+                    Some(ScalarValue::Int16(n)) => {
+                        Ok(Some(ScalarValue::Float64(n as f64 / array.len() as f64)))
+                    }
+                    Some(ScalarValue::Int32(n)) => {
+                        Ok(Some(ScalarValue::Float64(n as f64 / array.len() as f64)))
+                    }
+                    Some(ScalarValue::Int64(n)) => {
+                        Ok(Some(ScalarValue::Float64(n as f64 / array.len() as f64)))
+                    }
+                    Some(ScalarValue::UInt8(n)) => {
+                        Ok(Some(ScalarValue::Float64(n as f64 / array.len() as f64)))
+                    }
+                    Some(ScalarValue::UInt16(n)) => {
+                        Ok(Some(ScalarValue::Float64(n as f64 / array.len() as f64)))
+                    }
+                    Some(ScalarValue::UInt32(n)) => {
+                        Ok(Some(ScalarValue::Float64(n as f64 / array.len() as f64)))
+                    }
+                    Some(ScalarValue::UInt64(n)) => {
+                        Ok(Some(ScalarValue::Float64(n as f64 / array.len() as f64)))
+                    }
+                    Some(ScalarValue::Float32(n)) => {
+                        Ok(Some(ScalarValue::Float64(n as f64 / array.len() as f64)))
+                    }
+                    Some(ScalarValue::Float64(n)) => {
+                        Ok(Some(ScalarValue::Float64(n / array.len() as f64)))
+                    }
+                    _ => Err(ballista_error("tbd")),
+                }?;
+                self.accumulate(&ColumnarValue::Scalar(avg, 1))?;
             }
             ColumnarValue::Scalar(value, _) => {
                 if let Some(value) = value {

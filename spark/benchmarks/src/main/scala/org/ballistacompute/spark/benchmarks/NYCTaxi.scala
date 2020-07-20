@@ -21,7 +21,7 @@ import scala.reflect.io.File
 /**
   * Utility for converting CSV to Parquet.
   */
-object ConvertToParquet {
+object NYCTaxi {
 
   def main(arg: Array[String]): Unit = {
     for (year <- 2019 to 2019) {

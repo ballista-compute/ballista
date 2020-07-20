@@ -14,15 +14,17 @@
 
 //! Projection operator.
 
+use std::sync::Arc;
+
+use crate::arrow::datatypes::Schema;
+use crate::datafusion::logicalplan::Expr;
 use crate::error::Result;
 use crate::execution::physical_plan::{
     compile_expressions, ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ColumnarValue,
     ExecutionContext, ExecutionPlan, Expression, Partitioning, PhysicalPlan,
 };
-use arrow::datatypes::Schema;
+
 use async_trait::async_trait;
-use datafusion::logicalplan::Expr;
-use std::sync::Arc;
 
 /// Projection operator evaluates expressions against an input.
 #[derive(Debug, Clone)]

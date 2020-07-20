@@ -27,7 +27,10 @@ use std::fmt::{self, Debug};
 use std::rc::Rc;
 use std::sync::Arc;
 
-use crate::arrow::array::ArrayRef;
+use crate::arrow::array::{
+    ArrayRef, Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder,
+    Int8Builder, StringBuilder, UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder,
+};
 use crate::arrow::datatypes::{DataType, Field, Schema};
 use crate::arrow::record_batch::RecordBatch;
 use crate::datafusion::logicalplan::Expr;
@@ -37,7 +40,7 @@ use crate::datafusion::logicalplan::ScalarValue;
 use crate::distributed::scheduler::ExecutionTask;
 use crate::error::{ballista_error, Result};
 use crate::execution::expressions::{
-    add, alias, avg, col, compare, count, div, max, min, mult, subtract, sum,
+    add, alias, avg, col, compare, count, div, lit, max, min, mult, subtract, sum,
 };
 use crate::execution::operators::{
     CsvScanExec, FilterExec, HashAggregateExec, InMemoryTableScanExec, ParquetScanExec,
@@ -251,6 +254,16 @@ impl ColumnarBatch {
     }
 }
 
+macro_rules! build_literal_array {
+    ($LEN:expr, $BUILDER:ident, $VALUE:expr) => {{
+        let mut builder = $BUILDER::new($LEN);
+        for _ in 0..$LEN {
+            builder.append_value($VALUE)?;
+        }
+        Ok(Arc::new(builder.finish()))
+    }};
+}
+
 /// A columnar value can either be a scalar value or an Arrow array.
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -272,15 +285,45 @@ impl ColumnarValue {
 
     pub fn data_type(&self) -> &DataType {
         match self {
-            ColumnarValue::Scalar(_, _) => unimplemented!(),
             ColumnarValue::Columnar(array) => array.data_type(),
+            ColumnarValue::Scalar(Some(value), _) => match value {
+                ScalarValue::UInt8(_) => &DataType::UInt8,
+                ScalarValue::UInt16(_) => &DataType::UInt16,
+                ScalarValue::UInt32(_) => &DataType::UInt32,
+                ScalarValue::UInt64(_) => &DataType::UInt64,
+                ScalarValue::Int8(_) => &DataType::Int8,
+                ScalarValue::Int16(_) => &DataType::Int16,
+                ScalarValue::Int32(_) => &DataType::Int32,
+                ScalarValue::Int64(_) => &DataType::Int64,
+                ScalarValue::Float32(_) => &DataType::Float32,
+                ScalarValue::Float64(_) => &DataType::Float64,
+                _ => unimplemented!(),
+            },
+            _ => unimplemented!(),
         }
     }
 
-    pub fn to_arrow(&self) -> ArrayRef {
+    pub fn to_arrow(&self) -> Result<ArrayRef> {
         match self {
-            ColumnarValue::Columnar(array) => array.clone(),
-            ColumnarValue::Scalar(_, _) => unimplemented!(),
+            ColumnarValue::Columnar(array) => Ok(array.clone()),
+            ColumnarValue::Scalar(Some(value), n) => match value {
+                ScalarValue::Int8(value) => build_literal_array!(*n, Int8Builder, *value),
+                ScalarValue::Int16(value) => build_literal_array!(*n, Int16Builder, *value),
+                ScalarValue::Int32(value) => build_literal_array!(*n, Int32Builder, *value),
+                ScalarValue::Int64(value) => build_literal_array!(*n, Int64Builder, *value),
+                ScalarValue::UInt8(value) => build_literal_array!(*n, UInt8Builder, *value),
+                ScalarValue::UInt16(value) => build_literal_array!(*n, UInt16Builder, *value),
+                ScalarValue::UInt32(value) => build_literal_array!(*n, UInt32Builder, *value),
+                ScalarValue::UInt64(value) => build_literal_array!(*n, UInt64Builder, *value),
+                ScalarValue::Float32(value) => build_literal_array!(*n, Float32Builder, *value),
+                ScalarValue::Float64(value) => build_literal_array!(*n, Float64Builder, *value),
+                ScalarValue::Utf8(value) => build_literal_array!(*n, StringBuilder, value),
+                other => Err(ballista_error(&format!(
+                    "Unsupported literal type {:?}",
+                    other
+                ))),
+            },
+            _ => unimplemented!(),
         }
     }
 }
@@ -483,6 +526,7 @@ pub fn compile_expression(expr: &Expr, input: &Schema) -> Result<Arc<dyn Express
         Expr::Alias(expr, name) => Ok(alias(compile_expression(expr, input)?, name)),
         Expr::Column(n) => Ok(col(*n)),
         Expr::UnresolvedColumn(name) => Ok(col(input.index_of(name)?)),
+        Expr::Literal(value) => Ok(lit(value.to_owned())),
         Expr::BinaryExpr { left, op, right } => {
             let l = compile_expression(left, input)?;
             let r = compile_expression(right, input)?;
@@ -498,13 +542,13 @@ pub fn compile_expression(expr: &Expr, input: &Schema) -> Result<Arc<dyn Express
                 | Operator::Eq
                 | Operator::NotEq => Ok(compare(l, op, r)),
                 other => Err(ballista_error(&format!(
-                    "Unsupported binary operator {:?}",
+                    "Unsupported binary operator in compile_expression {:?}",
                     other
                 ))),
             }
         }
         other => Err(ballista_error(&format!(
-            "Unsupported expression {:?}",
+            "Unsupported expression in compile_expression {:?}",
             other
         ))),
     }
@@ -530,12 +574,12 @@ pub fn compile_aggregate_expression(
             "min" => Ok(min(compile_expression(&args[0], input_schema)?)),
             "sum" => Ok(sum(compile_expression(&args[0], input_schema)?)),
             other => Err(ballista_error(&format!(
-                "Unsupported aggregate function '{}'",
+                "Unsupported aggregate function in compile_aggregate_expression '{}'",
                 other
             ))),
         },
         other => Err(ballista_error(&format!(
-            "Unsupported aggregate expression {:?}",
+            "Unsupported aggregate expression in compile_aggregate_expression {:?}",
             other
         ))),
     }

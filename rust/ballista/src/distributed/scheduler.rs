@@ -22,6 +22,7 @@ use std::sync::Arc;
 use std::thread;
 use uuid::Uuid;
 
+use crate::datafusion::execution::physical_plan::csv::CsvReadOptions;
 use crate::datafusion::logicalplan::LogicalPlan;
 use crate::distributed::executor::{DefaultContext, DiscoveryMode, ExecutorConfig};
 use crate::error::{ballista_error, BallistaError, Result};
@@ -34,7 +35,7 @@ use crate::execution::physical_plan::{
     AggregateMode, ColumnarBatch, Distribution, ExecutionContext, ExecutionPlan, ExecutorMeta,
     Partitioning, PhysicalPlan, ShuffleId,
 };
-use datafusion::execution::physical_plan::csv::CsvReadOptions;
+
 use smol::Task;
 
 /// A Job typically represents a single query and the query is executed in stages. Stages are

@@ -78,8 +78,8 @@ impl Expression for Comparison {
     }
 
     fn evaluate(&self, input: &ColumnarBatch) -> Result<ColumnarValue> {
-        let l = self.l.evaluate(input)?.to_arrow();
-        let r = self.r.evaluate(input)?.to_arrow();
+        let l = self.l.evaluate(input)?.to_arrow()?;
+        let r = self.r.evaluate(input)?.to_arrow()?;
         if l.data_type() != r.data_type() {
             return Err(ballista_error(
                 "Both inputs to Comparison expression must have same type",

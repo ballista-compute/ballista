@@ -60,8 +60,8 @@ impl Expression for Add {
     }
 
     fn evaluate(&self, input: &ColumnarBatch) -> Result<ColumnarValue> {
-        let l = self.l.evaluate(input)?.to_arrow();
-        let r = self.r.evaluate(input)?.to_arrow();
+        let l = self.l.evaluate(input)?.to_arrow()?;
+        let r = self.r.evaluate(input)?.to_arrow()?;
         if l.data_type() != r.data_type() {
             return Err(ballista_error(
                 "Both inputs to Add expression must have same type",
@@ -114,8 +114,8 @@ impl Expression for Subtract {
     }
 
     fn evaluate(&self, input: &ColumnarBatch) -> Result<ColumnarValue> {
-        let l = self.l.evaluate(input)?.to_arrow();
-        let r = self.r.evaluate(input)?.to_arrow();
+        let l = self.l.evaluate(input)?.to_arrow()?;
+        let r = self.r.evaluate(input)?.to_arrow()?;
         if l.data_type() != r.data_type() {
             return Err(ballista_error(
                 "Both inputs to Subtract expression must have same type",
@@ -170,8 +170,8 @@ impl Expression for Multiply {
     }
 
     fn evaluate(&self, input: &ColumnarBatch) -> Result<ColumnarValue> {
-        let l = self.l.evaluate(input)?.to_arrow();
-        let r = self.r.evaluate(input)?.to_arrow();
+        let l = self.l.evaluate(input)?.to_arrow()?;
+        let r = self.r.evaluate(input)?.to_arrow()?;
         if l.data_type() != r.data_type() {
             return Err(ballista_error(
                 "Both inputs to Multiply expression must have same type",
@@ -226,8 +226,8 @@ impl Expression for Divide {
     }
 
     fn evaluate(&self, input: &ColumnarBatch) -> Result<ColumnarValue> {
-        let l = self.l.evaluate(input)?.to_arrow();
-        let r = self.r.evaluate(input)?.to_arrow();
+        let l = self.l.evaluate(input)?.to_arrow()?;
+        let r = self.r.evaluate(input)?.to_arrow()?;
         if l.data_type() != r.data_type() {
             return Err(ballista_error(
                 "Both inputs to Divide expression must have same type",

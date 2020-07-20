@@ -21,13 +21,12 @@ use ballista::arrow::datatypes::{DataType, Field, Schema};
 use ballista::arrow::record_batch::RecordBatch;
 use ballista::arrow::util::pretty;
 use ballista::dataframe::*;
-use ballista::datafusion::datasource::csv::CsvReadOptions;
 use ballista::error::Result;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     //TODO use command-line args
-    let path = "/mnt/tpch/100-partitioned/lineitem";
+    let path = "/mnt/tpch/parquet/10/lineitem";
     let executor_host = "localhost";
     let executor_port = 50051;
     let query_no = 1;
@@ -75,35 +74,31 @@ async fn main() -> Result<()> {
 ///     l_linestatus;
 ///
 async fn q1(ctx: &Context, path: &str) -> Result<Vec<RecordBatch>> {
-    let schema = lineitem_schema();
-    let options = CsvReadOptions::new().delimiter(b'|').schema(&schema);
-
     // TODO this is WIP and not the real query yet
 
-    ctx.read_csv(path, options, None)?
+    // ctx.read_csv(path, options, None)?
+    ctx.read_parquet(path, None)?
         // .filter(col("l_shipdate").lt(&lit_str("1998-12-01")))? // should be l_shipdate <= date '1998-12-01' - interval ':1' day (3)
         .aggregate(
             vec![col("l_returnflag"), col("l_linestatus")],
             vec![
-                sum(col("l_quantity")).alias("sum_qty"),
-                sum(col("l_extendedprice").alias("sum_base_price")),
+                sum(col("l_quantity")), /*.alias("sum_qty")*/
+                sum(col("l_extendedprice") /*.alias("sum_base_price")*/),
                 sum(mult(
                     &col("l_extendedprice"),
                     &subtract(&lit_f64(1_f64), &col("l_discount")),
-                ))
-                .alias("sum_disc_price"),
+                )), /*.alias("sum_disc_price")*/
                 sum(mult(
                     &mult(
                         &col("l_extendedprice"),
                         &subtract(&lit_f64(1_f64), &col("l_discount")),
                     ),
                     &add(&lit_f64(1_f64), &col("l_tax")),
-                ))
-                .alias("sum_charge"),
-                avg(col("l_quantity")).alias("avg_qty"),
-                avg(col("l_extendedprice")).alias("avg_price"),
-                avg(col("l_discount")).alias("avg_disc"),
-                count(col("l_quantity")).alias("count_order"), // should be count(*) not count(col)
+                )), /*.alias("sum_charge")*/
+                avg(col("l_quantity")),      /*.alias("avg_qty")*/
+                avg(col("l_extendedprice")), /*.alias("avg_price")*/
+                avg(col("l_discount")),      /*.alias("avg_disc")*/
+                count(col("l_quantity")), /*.alias("count_order")*/ // should be count(*) not count(col)
             ],
         )?
         //.sort()?
@@ -111,6 +106,7 @@ async fn q1(ctx: &Context, path: &str) -> Result<Vec<RecordBatch>> {
         .await
 }
 
+#[allow(dead_code)]
 fn lineitem_schema() -> Schema {
     Schema::new(vec![
         Field::new("l_orderkey", DataType::UInt32, true),

@@ -71,7 +71,7 @@ class ProtobufDeserializer {
     } else if (node.hasLiteralI8 || node.hasLiteralI16 || node.hasLiteralI32 || node.hasLiteralI64) {
       lit(node.literalInt)
     } else if (node.hasLiteralU8 || node.hasLiteralU16 || node.hasLiteralU32 || node.hasLiteralU64) {
-        lit(node.literalInt)
+        lit(node.literalUint)
     } else if (node.hasLiteralF32) {
         lit(node.literalF32)
     } else if (node.hasLiteralF64) {

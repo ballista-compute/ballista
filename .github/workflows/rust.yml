@@ -1,12 +1,10 @@
 name: Rust
 
-on: [push]
-
-#on:
-#  push:
-#    branches: [ main ]
-#  pull_request:
-#    branches: [ main ]
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 # Note, toolchain version must match the rustup version: either "nightly" or "nightly-YYYY-MM-DD"
 # and must contain the toolchain for the OS at the end.

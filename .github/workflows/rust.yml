@@ -72,7 +72,7 @@ jobs:
     - name: Setup Rust Nightly
       run: |
         rustup default nightly-2020-05-14
-        rustup toolchain install nightly-2020-05-14
+        rustup toolchain install nightly-2020-05-14 --no-self-update
         rustup component add rustfmt --toolchain nightly-2020-05-14-x86_64-pc-windows-msvc
     - name: Build Ballista
       run: |

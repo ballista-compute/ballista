@@ -1,8 +1,18 @@
 # Ballista: Distributed Compute Platform
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Version](https://img.shields.io/crates/v/ballista.svg)](https://crates.io/crates/ballista)
-[![Gitter Chat](https://badges.gitter.im/ballista-rs/community.svg)](https://gitter.im/ballista-rs/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![License][license-badge]][license-url]
+[![Crates.io][crates-badge]][crates-url]
+[![Gitter Chat][gitter-badge]][gitter-url]
+[![Discord chat][discord-badge]][discord-url]
+
+[license-badge]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
+[license-url]: https://opensource.org/licenses/Apache-2.0
+[crates-badge]: https://img.shields.io/crates/v/ballista.svg
+[crates-url]: https://crates.io/crates/ballista
+[discord-badge]: https://img.shields.io/discord/735486030626422884.svg?logo=discord&style=flat-square
+[discord-url]: https://discord.gg/95PMxSk
+[gitter-badge]: https://badges.gitter.im/ballista-rs/community.svg
+[gitter-url]: https://gitter.im/ballista-rs/community
 
 ## Overview
 

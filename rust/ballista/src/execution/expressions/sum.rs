@@ -39,7 +39,7 @@ impl Sum {
 
 impl AggregateExpr for Sum {
     fn name(&self) -> String {
-        "SUM".to_owned()
+        format!("SUM({:?})", self.input)
     }
 
     fn data_type(&self, input_schema: &Schema) -> Result<DataType> {
@@ -52,7 +52,10 @@ impl AggregateExpr for Sum {
             }
             DataType::Float32 => Ok(DataType::Float32),
             DataType::Float64 => Ok(DataType::Float64),
-            other => Err(ballista_error(&format!("SUM does not support {:?}", other))),
+            other => Err(ballista_error(&format!(
+                "SUM does not support {:?} for {:?} with schema {:?}",
+                other, self.input, input_schema
+            ))),
         }
     }
 

@@ -43,7 +43,7 @@ async fn execute(use_filter: bool) {
             AggregateMode::Partial,
             vec![col_index(0)],
             vec![
-                min(col_index(1)),
+                min(col_index(1)).alias("max_c1"),
                 max(col_index(1)),
                 avg(col_index(1)),
                 sum(col_index(1)),
@@ -74,6 +74,13 @@ async fn execute(use_filter: bool) {
 
     assert_eq!(251, batch.num_rows());
     assert_eq!(6, batch.num_columns());
+
+    assert_eq!(batch.column(0).data_type(), &DataType::Int8);
+    assert_eq!(batch.column(1).data_type(), &DataType::Int64);
+    assert_eq!(batch.column(2).data_type(), &DataType::Int64);
+    assert_eq!(batch.column(3).data_type(), &DataType::Float64);
+    assert_eq!(batch.column(4).data_type(), &DataType::Int64);
+    assert_eq!(batch.column(5).data_type(), &DataType::UInt64);
 }
 
 #[test]

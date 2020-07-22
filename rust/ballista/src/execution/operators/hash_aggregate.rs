@@ -157,47 +157,44 @@ impl ExecutionPlan for HashAggregateExec {
     }
 }
 
-/// Create array from `key` attribute in map entry (representing a grouping scalar value)
-macro_rules! extract_group_val {
-    ($BUILDER:ident, $TY:ident, $MAP:expr, $COL_INDEX:expr) => {{
-        let mut builder = array::$BUILDER::new($MAP.len());
-        let mut err = false;
-        for k in $MAP.keys() {
-            match k.get($COL_INDEX) {
-                Some(GroupByScalar::$TY(n)) => builder.append_value(*n).unwrap(),
-                _ => err = true,
-            }
-        }
-        if err {
-            Err(BallistaError::General(
-                "unexpected type when creating grouping array from aggregate map".to_string(),
-            ))
-        } else {
-            Ok(Arc::new(builder.finish()) as ArrayRef)
-        }
-    }};
-}
-
 /// Create array from `value` attribute in map entry (representing an aggregate scalar
 /// value)
 macro_rules! extract_aggr_value {
     ($BUILDER:ident, $TY:ident, $TY2:ty, $MAP:expr, $COL_INDEX:expr) => {{
         let mut builder = array::$BUILDER::new($MAP.len());
-        let mut err = false;
         for v in $MAP.values() {
             match v[$COL_INDEX].as_ref().borrow().get_value()? {
-                Some(ScalarValue::$TY(n)) => builder.append_value(n as $TY2).unwrap(),
-                None => builder.append_null().unwrap(),
-                _ => err = true,
+                None => builder.append_null()?,
+                Some(ScalarValue::$TY(n)) => builder.append_value(n as $TY2)?,
+                Some(other) => {
+                    return Err(ballista_error(&format!(
+                        "Unexpected value {:?} for aggregate expr #{}",
+                        other, $COL_INDEX
+                    )))
+                }
             }
         }
-        if err {
-            Err(BallistaError::General(
-                "unexpected type when creating aggregate array from aggregate map".to_string(),
-            ))
-        } else {
-            Ok(Arc::new(builder.finish()) as ArrayRef)
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    }};
+}
+
+/// Create array from `key` attribute in map entry (representing a grouping scalar value)
+macro_rules! extract_group_val {
+    ($BUILDER:ident, $TY:ident, $MAP:expr, $COL_INDEX:expr) => {{
+        let mut builder = array::$BUILDER::new($MAP.len());
+        for k in $MAP.keys() {
+            match k.get($COL_INDEX) {
+                None => builder.append_null()?,
+                Some(GroupByScalar::$TY(n)) => builder.append_value(*n)?,
+                Some(other) => {
+                    return Err(ballista_error(&format!(
+                        "Unexpected value {:?} for group expr #{}",
+                        other, $COL_INDEX
+                    )))
+                }
+            }
         }
+        Ok(Arc::new(builder.finish()) as ArrayRef)
     }};
 }
 
@@ -397,10 +394,17 @@ fn run(
         )?;
 
         // send the result batch over the channel
-        tx.send(Ok(Some(batch))).unwrap();
+        tx.send(Ok(Some(batch))).map_err(|e| {
+            ballista_error(&format!("Error sending hash aggregate result: {:?}", e))
+        })?;
 
         // send EOF marker
-        tx.send(Ok(None)).unwrap();
+        tx.send(Ok(None)).map_err(|e| {
+            ballista_error(&format!(
+                "Error sending hash aggregate end-of-stream: {:?}",
+                e
+            ))
+        })?;
 
         println!(
             "HashAggregate processed {} batches and {} rows in {} ms",
@@ -519,7 +523,7 @@ fn create_batch_from_accum_map(
                 let mut builder = StringBuilder::new(1);
                 for k in map.keys() {
                     match &k[i] {
-                        GroupByScalar::Utf8(s) => builder.append_value(&s).unwrap(),
+                        GroupByScalar::Utf8(s) => builder.append_value(&s)?,
                         _ => {
                             return Err(BallistaError::General(
                                 "Unexpected value for Utf8 group column".to_string(),

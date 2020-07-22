@@ -369,27 +369,22 @@ impl TryInto<PhysicalPlan> for &protobuf::PhysicalPlanNode {
         } else if let Some(scan) = &self.scan {
             match scan.file_format.as_str() {
                 "csv" => {
-                    //TODO read options and batch size from proto
+                    //TODO read options from proto
                     let options = CsvReadOptions::new();
-                    let batch_size = 64 * 1024;
                     Ok(PhysicalPlan::CsvScan(Arc::new(CsvScanExec::try_new(
                         &scan.path,
                         options,
                         Some(scan.projection.iter().map(|n| *n as usize).collect()),
-                        batch_size,
+                        scan.batch_size as usize,
                     )?)))
                 }
-                "parquet" => {
-                    //TODO read batch size from proto
-                    let batch_size = 64 * 1024;
-                    Ok(PhysicalPlan::ParquetScan(Arc::new(
-                        ParquetScanExec::try_new(
-                            &scan.path,
-                            Some(scan.projection.iter().map(|n| *n as usize).collect()),
-                            batch_size,
-                        )?,
-                    )))
-                }
+                "parquet" => Ok(PhysicalPlan::ParquetScan(Arc::new(
+                    ParquetScanExec::try_new(
+                        &scan.path,
+                        Some(scan.projection.iter().map(|n| *n as usize).collect()),
+                        scan.batch_size as usize,
+                    )?,
+                ))),
                 other => Err(ballista_error(&format!(
                     "Unsupported file format '{}' for file scan",
                     other

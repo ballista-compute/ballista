@@ -41,7 +41,7 @@ impl Max {
 
 impl AggregateExpr for Max {
     fn name(&self) -> String {
-        "MAX".to_string()
+        format!("MAX({:?})", self.expr)
     }
 
     fn data_type(&self, input_schema: &Schema) -> Result<DataType> {

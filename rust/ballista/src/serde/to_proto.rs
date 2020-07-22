@@ -378,6 +378,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for &PhysicalPlan {
                     file_format: "csv".to_owned(),
                     schema: Some(exec.schema().as_ref().try_into()?),
                     has_header: false,
+                    batch_size: exec.batch_size as u32,
                 });
                 Ok(node)
             }
@@ -400,6 +401,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for &PhysicalPlan {
                     file_format: "parquet".to_owned(),
                     schema: None,
                     has_header: false,
+                    batch_size: exec.batch_size as u32,
                 });
                 Ok(node)
             }

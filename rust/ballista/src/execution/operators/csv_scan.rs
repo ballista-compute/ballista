@@ -49,7 +49,7 @@ pub struct CsvScanExec {
     /// Schema after the projection has been applied
     projected_schema: SchemaRef,
     /// Batch size
-    batch_size: usize,
+    pub(crate) batch_size: usize,
 }
 
 impl CsvScanExec {

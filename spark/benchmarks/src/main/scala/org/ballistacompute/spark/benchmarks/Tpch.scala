@@ -6,7 +6,56 @@ import org.apache.spark.sql.{SaveMode, SparkSession}
 object Tpch {
 
   def main(arg: Array[String]): Unit = {
-    convertToParquet("/mnt/tpch/10/lineitem.tbl", "./tmp")
+    //convertToParquet("/mnt/tpch/10/lineitem.tbl", "./tmp")
+    q1()
+  }
+
+  def repartition(n: Int) {
+
+    val spark: SparkSession = SparkSession.builder
+      .appName(this.getClass.getName)
+      .master("local[1]")
+      .getOrCreate()
+
+      spark.read.parquet("/mnt/tpch/parquet/10/lineitem")
+      .repartition(n)
+      .write
+      .parquet(s"./tmp-$n")
+  }
+
+  def q1(): Unit = {
+
+    val spark: SparkSession = SparkSession.builder
+      .appName(this.getClass.getName)
+      .master("local[24]")
+      .getOrCreate()
+
+    spark.time {
+
+      spark.read.parquet("/mnt/tpch/parquet/10-24/lineitem").createOrReplaceTempView("lineitem")
+
+      val df = spark.sql(
+        """
+          | select
+          |     l_returnflag,
+          |     l_linestatus,
+          |     sum(l_quantity) as sum_qty,
+          |     sum(l_extendedprice) as sum_base_price,
+          |     sum(l_extendedprice * (1 - l_discount)) as sum_disc_price,
+          |     sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge,
+          |     avg(l_quantity) as avg_qty,
+          |     avg(l_extendedprice) as avg_price,
+          |     avg(l_discount) as avg_disc
+          | from
+          |     lineitem
+          | group by
+          |     l_returnflag,
+          |     l_linestatus
+          |""".stripMargin)
+
+      df.show()
+      df.explain()
+    }
   }
 
   def convertToParquet(csvPath: String, parquetPath: String) {

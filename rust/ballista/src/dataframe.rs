@@ -19,10 +19,8 @@ use std::sync::{Arc, RwLock};
 
 use crate::arrow::datatypes::{DataType, Schema};
 use crate::arrow::record_batch::RecordBatch;
-use crate::datafusion;
 pub use crate::datafusion::datasource::csv::CsvReadOptions;
 use crate::datafusion::datasource::parquet::ParquetTable;
-use crate::datafusion::datasource::MemTable;
 use crate::datafusion::datasource::TableProvider;
 use crate::datafusion::logicalplan::Operator;
 use crate::datafusion::logicalplan::ScalarValue;
@@ -37,66 +35,66 @@ use crate::execution::physical_plan::Action;
 pub const CSV_BATCH_SIZE: &str = "ballista.csv.batchSize";
 
 /// Configuration setting
-struct ConfigSetting {
-    key: String,
-    _description: String,
-    default_value: Option<String>,
-}
+// struct ConfigSetting {
+//     key: String,
+//     _description: String,
+//     default_value: Option<String>,
+// }
+//
+// impl ConfigSetting {
+//     pub fn new(key: &str, description: &str, default_value: Option<&str>) -> Self {
+//         Self {
+//             key: key.to_owned(),
+//             _description: description.to_owned(),
+//             default_value: default_value.map(|s| s.to_owned()),
+//         }
+//     }
+//
+//     pub fn default_value(&self) -> Option<String> {
+//         self.default_value.clone()
+//     }
+// }
 
-impl ConfigSetting {
-    pub fn new(key: &str, description: &str, default_value: Option<&str>) -> Self {
-        Self {
-            key: key.to_owned(),
-            _description: description.to_owned(),
-            default_value: default_value.map(|s| s.to_owned()),
-        }
-    }
+// struct Configs {
+//     configs: HashMap<String, ConfigSetting>,
+//     settings: HashMap<String, String>,
+// }
 
-    pub fn default_value(&self) -> Option<String> {
-        self.default_value.clone()
-    }
-}
-
-struct Configs {
-    configs: HashMap<String, ConfigSetting>,
-    settings: HashMap<String, String>,
-}
-
-impl Configs {
-    pub fn new(settings: HashMap<String, String>) -> Self {
-        let csv_batch_size: ConfigSetting = ConfigSetting::new(
-            CSV_BATCH_SIZE,
-            "Number of rows to read per batch",
-            Some("1024"),
-        );
-
-        let configs = vec![csv_batch_size];
-
-        let mut m = HashMap::new();
-        for config in configs {
-            m.insert(config.key.clone(), config);
-        }
-
-        Self {
-            configs: m,
-            settings,
-        }
-    }
-
-    pub fn get_setting(&self, name: &str) -> Option<String> {
-        match self.settings.get(name) {
-            Some(value) => Some(value.clone()),
-            None => match self.configs.get(name) {
-                Some(value) => value.default_value(),
-                None => None,
-            },
-        }
-    }
-
-    pub fn csv_batch_size(&self) -> Option<String> {
-        self.get_setting(CSV_BATCH_SIZE)
-    }
-}
+// impl Configs {
+//     pub fn new(settings: HashMap<String, String>) -> Self {
+//         let csv_batch_size: ConfigSetting = ConfigSetting::new(
+//             CSV_BATCH_SIZE,
+//             "Number of rows to read per batch",
+//             Some("1024"),
+//         );
+//
+//         let configs = vec![csv_batch_size];
+//
+//         let mut m = HashMap::new();
+//         for config in configs {
+//             m.insert(config.key.clone(), config);
+//         }
+//
+//         Self {
+//             configs: m,
+//             settings,
+//         }
+//     }
+//
+//     pub fn get_setting(&self, name: &str) -> Option<String> {
+//         match self.settings.get(name) {
+//             Some(value) => Some(value.clone()),
+//             None => match self.configs.get(name) {
+//                 Some(value) => value.default_value(),
+//                 None => None,
+//             },
+//         }
+//     }
+//
+//     pub fn csv_batch_size(&self) -> Option<String> {
+//         self.get_setting(CSV_BATCH_SIZE)
+//     }
+// }
 
 #[derive(Debug)]
 pub struct ContextSchemaProvider {
@@ -144,9 +142,6 @@ pub struct ContextState {
 
 #[derive(Debug, Clone)]
 pub enum ContextBackend {
-    Local {
-        settings: HashMap<String, String>,
-    },
     Remote {
         host: String,
         port: usize,
@@ -167,18 +162,6 @@ impl Context {
                 backend: ContextBackend::Spark {
                     master: master.to_owned(),
                     spark_settings: parse_settings(settings),
-                },
-            }),
-        }
-    }
-
-    /// Create a context for executing a query against a local in-process executor
-    pub fn local(settings: HashMap<&str, &str>) -> Self {
-        Self {
-            state: Arc::new(ContextState {
-                schema_provider: RwLock::new(ContextSchemaProvider::new()),
-                backend: ContextBackend::Local {
-                    settings: parse_settings(settings),
                 },
             }),
         }
@@ -420,35 +403,6 @@ impl DataFrame {
         println!("{:?}", self.plan);
     }
 
-    fn datafusion_collect(
-        &self,
-        ctx: &datafusion::execution::context::ExecutionContext,
-        settings: &HashMap<String, String>,
-    ) -> Result<Vec<RecordBatch>> {
-        let datafusion_plan = &self.plan;
-
-        println!("PreOptimized Plan: {:?}", datafusion_plan);
-        // create the query plan
-        let optimized_plan = ctx.optimize(&datafusion_plan)?;
-
-        println!("Optimized Plan: {:?}", optimized_plan);
-
-        let batch_size = Configs::new(settings.clone())
-            .csv_batch_size()
-            .unwrap()
-            .parse::<usize>()
-            .unwrap();
-
-        println!("batch_size={}", batch_size);
-
-        let physical_plan = ctx.create_physical_plan(&optimized_plan, batch_size)?;
-        println!("physicalplan schema: {:#?}", physical_plan.schema());
-
-        // execute the query
-        ctx.collect(physical_plan.as_ref())
-            .map_err(BallistaError::DataFusionError)
-    }
-
     pub async fn collect(&self) -> Result<Vec<RecordBatch>> {
         let action = Action::InteractiveQuery {
             plan: self.plan.clone(),
@@ -466,18 +420,6 @@ impl DataFrame {
                 Context::from(self.ctx_state.clone())
                     .execute_action(host, *port, action)
                     .await
-            }
-            ContextBackend::Local { settings } => {
-                // create local execution context
-                let mut datafusion_ctx = datafusion::execution::context::ExecutionContext::new();
-
-                for (name, df) in &self.ctx_state.schema_provider.read().unwrap().temp_tables {
-                    let partitions = vec![df.datafusion_collect(&datafusion_ctx, &settings)?];
-                    let mem_tbl = MemTable::new(Arc::new(*df.plan.schema().clone()), partitions)?;
-                    datafusion_ctx.register_table(name, Box::new(mem_tbl));
-                }
-
-                self.datafusion_collect(&datafusion_ctx, &settings)
             }
         }
     }
@@ -624,56 +566,5 @@ pub fn aggregate_expr(name: &str, expr: &Expr) -> Expr {
         name: name.to_string(),
         args: vec![expr.clone()],
         return_type,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::arrow::array::*;
-    use crate::arrow::datatypes::*;
-
-    #[test]
-    fn create_context_ux() {
-        let mut settings = HashMap::new();
-        settings.insert(CSV_BATCH_SIZE, "2048");
-        settings.insert("custom.setting", "/foo/bar");
-
-        let _ = Context::local(settings);
-    }
-
-    #[tokio::test]
-    async fn sql_ux() -> Result<()> {
-        let schema = Schema::new(vec![
-            Field::new("a", DataType::Int32, true),
-            Field::new("b", DataType::Utf8, true),
-        ]);
-        let batches = vec![RecordBatch::try_new(
-            Arc::new(schema),
-            vec![
-                Arc::new(Int32Array::from(vec![1, 2, 3, 4, 5])),
-                Arc::new(StringArray::from(vec!["a", "b", "c", "d", "e"])),
-            ],
-        )?];
-
-        let mut ctx = Context::local(HashMap::new());
-
-        let df = ctx
-            .create_dataframe(&batches)?
-            .project(vec![Expr::Wildcard])?;
-        ctx.register_temp_table("df", df)?;
-
-        let result = ctx.sql("SELECT * FROM df WHERE a > 3")?.collect().await?;
-
-        assert_eq!(result.len(), 1);
-        let batch = &result[0];
-        assert_eq!(batch.num_rows(), 2);
-        assert_eq!(batch.num_columns(), 2);
-        assert_eq!(batch.column(0).data(), Int32Array::from(vec![4, 5]).data(),);
-        assert_eq!(
-            batch.column(1).data(),
-            StringArray::from(vec!["d", "e"]).data(),
-        );
-        Ok(())
     }
 }

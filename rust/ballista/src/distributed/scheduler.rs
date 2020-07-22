@@ -36,6 +36,8 @@ use crate::execution::physical_plan::{
     Partitioning, PhysicalPlan, ShuffleId,
 };
 
+use crate::dataframe::{avg, count, max, min, sum};
+use datafusion::logicalplan::{col_index, Expr};
 use smol::Task;
 
 /// A Job typically represents a single query and the query is executed in stages. Stages are
@@ -364,7 +366,6 @@ pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Arc<PhysicalPlan>> {
                 .partition_count()
                 == 1
             {
-                println!("scheduler: single partition, so complete");
                 let exec = HashAggregateExec::try_new(
                     AggregateMode::Complete,
                     group_expr.clone(),
@@ -381,13 +382,54 @@ pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Arc<PhysicalPlan>> {
                     input,
                 )?;
                 let partial = Arc::new(PhysicalPlan::HashAggregate(Arc::new(partial_hash_exec)));
+
                 // Create final hash aggregate to run on the coalesced partition of the results
                 // from the partial hash aggregate
-                // TODO these are not the correct expressions being passed in here for the final agg
+
+                let mut final_group = vec![];
+                for i in 0..group_expr.len() {
+                    final_group.push(col_index(i as usize));
+                }
+
+                //TODO this is ugly and shows that the design needs revisiting here
+
+                let mut final_aggr = vec![];
+                for (i, expr) in aggr_expr.iter().enumerate() {
+                    let j = group_expr.len() + i;
+                    match expr {
+                        Expr::AggregateFunction { name, .. } => {
+                            let expr = match name.as_str() {
+                                "SUM" => sum(col_index(j)),
+                                "MIN" => min(col_index(j)),
+                                "MAX" => max(col_index(j)),
+                                "AVG" => avg(col_index(j)),
+                                "COUNT" => count(col_index(j)),
+                                _ => panic!(),
+                            };
+                            final_aggr.push(expr);
+                        }
+                        Expr::Alias(expr, alias) => match expr.as_ref() {
+                            Expr::AggregateFunction { name, .. } => {
+                                let expr = match name.as_str() {
+                                    "SUM" => sum(col_index(j)).alias(alias),
+                                    "MIN" => min(col_index(j)).alias(alias),
+                                    "MAX" => max(col_index(j)).alias(alias),
+                                    "AVG" => avg(col_index(j)).alias(alias),
+                                    "COUNT" => count(col_index(j)).alias(alias),
+                                    _ => panic!(),
+                                };
+                                final_aggr.push(expr);
+                            }
+                            _ => panic!(),
+                        },
+                        _ => panic!(),
+                    }
+                }
+
                 let final_hash_exec = HashAggregateExec::try_new(
                     AggregateMode::Final,
-                    group_expr.clone(),
-                    aggr_expr.clone(),
+                    final_group,
+                    final_aggr,
                     partial,
                 )?;
                 Ok(Arc::new(PhysicalPlan::HashAggregate(Arc::new(
@@ -408,7 +450,7 @@ pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Arc<PhysicalPlan>> {
             path, projection, ..
         } => {
             //TODO make batch size configurable from the context
-            let batch_size = 64 * 1024;
+            let batch_size = 1024 * 1024;
             let exec = ParquetScanExec::try_new(&path, projection.clone(), batch_size)?;
             Ok(Arc::new(PhysicalPlan::ParquetScan(Arc::new(exec))))
         }

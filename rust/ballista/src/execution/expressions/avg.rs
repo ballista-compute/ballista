@@ -39,7 +39,7 @@ impl Avg {
 
 impl AggregateExpr for Avg {
     fn name(&self) -> String {
-        "AVG".to_owned()
+        format!("AVG({:?})", self.input)
     }
 
     fn data_type(&self, input_schema: &Schema) -> Result<DataType> {

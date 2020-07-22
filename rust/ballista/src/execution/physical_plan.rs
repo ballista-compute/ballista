@@ -40,7 +40,7 @@ use crate::datafusion::logicalplan::ScalarValue;
 use crate::distributed::scheduler::ExecutionTask;
 use crate::error::{ballista_error, Result};
 use crate::execution::expressions::{
-    add, alias, avg, col, compare, count, div, lit, max, min, mult, subtract, sum,
+    add, alias, aliased_aggr, avg, col, compare, count, div, lit, max, min, mult, subtract, sum,
 };
 use crate::execution::operators::{
     CsvScanExec, FilterExec, HashAggregateExec, InMemoryTableScanExec, ParquetScanExec,
@@ -524,8 +524,8 @@ pub struct ShuffleLocation {}
 pub fn compile_expression(expr: &Expr, input: &Schema) -> Result<Arc<dyn Expression>> {
     match expr {
         Expr::Alias(expr, name) => Ok(alias(compile_expression(expr, input)?, name)),
-        Expr::Column(n) => Ok(col(*n)),
-        Expr::UnresolvedColumn(name) => Ok(col(input.index_of(name)?)),
+        Expr::Column(n) => Ok(col(*n, input.field(*n).name())),
+        Expr::UnresolvedColumn(name) => Ok(col(input.index_of(name)?, name)),
         Expr::Literal(value) => Ok(lit(value.to_owned())),
         Expr::BinaryExpr { left, op, right } => {
             let l = compile_expression(left, input)?;
@@ -567,6 +567,10 @@ pub fn compile_aggregate_expression(
     input_schema: &Schema,
 ) -> Result<Arc<dyn AggregateExpr>> {
     match expr {
+        Expr::Alias(expr, alias) => Ok(aliased_aggr(
+            compile_aggregate_expression(expr, input_schema)?,
+            alias,
+        )),
         Expr::AggregateFunction { name, args, .. } => match name.to_lowercase().as_ref() {
             "avg" => Ok(avg(compile_expression(&args[0], input_schema)?)),
             "count" => Ok(count(compile_expression(&args[0], input_schema)?)),

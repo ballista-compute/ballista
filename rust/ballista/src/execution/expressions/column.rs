@@ -28,16 +28,16 @@ pub struct Column {
 }
 
 impl Column {
-    pub fn new(index: usize) -> Self {
+    pub fn new(index: usize, name: &str) -> Self {
         Self {
             index,
-            name: format!("c{}", index),
+            name: name.to_owned(),
         }
     }
 }
 
-pub fn col(index: usize) -> Arc<dyn Expression> {
-    Arc::new(Column::new(index))
+pub fn col(index: usize, name: &str) -> Arc<dyn Expression> {
+    Arc::new(Column::new(index, name))
 }
 
 impl Expression for Column {

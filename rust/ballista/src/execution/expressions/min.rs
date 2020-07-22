@@ -41,7 +41,7 @@ impl Min {
 
 impl AggregateExpr for Min {
     fn name(&self) -> String {
-        "MIN".to_string()
+        format!("MIN({:?})", self.expr)
     }
 
     fn data_type(&self, input_schema: &Schema) -> Result<DataType> {

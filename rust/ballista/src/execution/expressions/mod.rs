@@ -14,7 +14,7 @@
 
 //! Relational expressions that can be used in query plans.
 
-pub use self::alias::alias;
+pub use self::alias::{alias, aliased_aggr};
 pub use self::arithmetic::{add, div, mult, subtract};
 pub use self::avg::avg;
 pub use self::column::col;

@@ -26,7 +26,7 @@ use crate::datafusion::logicalplan::{
 use crate::distributed::scheduler::ExecutionTask;
 use crate::error::{ballista_error, BallistaError};
 use crate::execution::operators::{
-    CsvScanExec, HashAggregateExec, ParquetScanExec, ShuffleReaderExec,
+    CsvScanExec, FilterExec, HashAggregateExec, ParquetScanExec, ShuffleReaderExec,
 };
 use crate::execution::physical_plan::{Action, ExecutorMeta, ShuffleId, ShuffleLocation};
 use crate::execution::physical_plan::{AggregateMode, PhysicalPlan};
@@ -338,7 +338,18 @@ impl TryInto<PhysicalPlan> for &protobuf::PhysicalPlanNode {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<PhysicalPlan, Self::Error> {
-        if let Some(aggregate) = &self.hash_aggregate {
+        if let Some(selection) = &self.selection {
+            let input: PhysicalPlan = convert_box_required!(self.input)?;
+            match selection.expr {
+                Some(ref protobuf_expr) => {
+                    let expr: Expr = protobuf_expr.try_into()?;
+                    Ok(PhysicalPlan::Filter(Arc::new(FilterExec::new(
+                        &input, &expr,
+                    ))))
+                }
+                _ => Err(ballista_error("from_proto: Selection expr missing")),
+            }
+        } else if let Some(aggregate) = &self.hash_aggregate {
             let input: PhysicalPlan = convert_box_required!(self.input)?;
             let mode = match aggregate.mode {
                 mode if mode == protobuf::AggregateMode::Partial as i32 => {

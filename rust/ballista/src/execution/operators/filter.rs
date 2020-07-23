@@ -36,7 +36,7 @@ use async_trait::async_trait;
 #[derive(Debug, Clone)]
 pub struct FilterExec {
     pub(crate) child: Arc<PhysicalPlan>,
-    filter_expr: Arc<Expr>,
+    pub(crate) filter_expr: Arc<Expr>,
 }
 
 impl FilterExec {
@@ -44,6 +44,16 @@ impl FilterExec {
         Self {
             child: Arc::new(child.clone()),
             filter_expr: Arc::new(filter_expr.clone()),
+        }
+    }
+}
+
+impl FilterExec {
+    pub fn with_new_children(&self, new_children: Vec<Arc<PhysicalPlan>>) -> FilterExec {
+        assert!(new_children.len() == 1);
+        FilterExec {
+            filter_expr: self.filter_expr.clone(),
+            child: new_children[0].clone(),
         }
     }
 }

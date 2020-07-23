@@ -340,6 +340,15 @@ impl TryInto<protobuf::PhysicalPlanNode> for &PhysicalPlan {
 
     fn try_into(self) -> Result<protobuf::PhysicalPlanNode, Self::Error> {
         match self {
+            PhysicalPlan::Filter(exec) => {
+                let input: protobuf::PhysicalPlanNode = exec.child.as_ref().try_into()?;
+                let mut node = empty_physical_plan_node();
+                node.input = Some(Box::new(input));
+                node.selection = Some(protobuf::SelectionExecNode {
+                    expr: Some(exec.as_ref().filter_expr.as_ref().try_into()?),
+                });
+                Ok(node)
+            }
             PhysicalPlan::HashAggregate(exec) => {
                 let input: protobuf::PhysicalPlanNode = exec.child.as_ref().try_into()?;
                 let mut node = empty_physical_plan_node();

@@ -22,22 +22,22 @@ use std::sync::Arc;
 use std::thread;
 use uuid::Uuid;
 
+use crate::dataframe::{avg, count, max, min, sum};
 use crate::datafusion::execution::physical_plan::csv::CsvReadOptions;
 use crate::datafusion::logicalplan::LogicalPlan;
+use crate::datafusion::logicalplan::{col_index, Expr};
 use crate::distributed::executor::{DefaultContext, DiscoveryMode, ExecutorConfig};
 use crate::error::{ballista_error, BallistaError, Result};
-use crate::execution::operators::ParquetScanExec;
 use crate::execution::operators::ProjectionExec;
 use crate::execution::operators::ShuffleExchangeExec;
 use crate::execution::operators::ShuffleReaderExec;
 use crate::execution::operators::{CsvScanExec, HashAggregateExec};
+use crate::execution::operators::{FilterExec, ParquetScanExec};
 use crate::execution::physical_plan::{
     AggregateMode, ColumnarBatch, Distribution, ExecutionContext, ExecutionPlan, ExecutorMeta,
     Partitioning, PhysicalPlan, ShuffleId,
 };
 
-use crate::dataframe::{avg, count, max, min, sum};
-use datafusion::logicalplan::{col_index, Expr};
 use smol::Task;
 
 /// A Job typically represents a single query and the query is executed in stages. Stages are
@@ -213,6 +213,12 @@ impl Scheduler {
                     exec.with_new_children(vec![child]),
                 ))))
             }
+            PhysicalPlan::Filter(exec) => {
+                let child = self.visit_plan(exec.child.clone(), current_stage)?;
+                Ok(Arc::new(PhysicalPlan::Filter(Arc::new(
+                    exec.with_new_children(vec![child]),
+                ))))
+            }
             PhysicalPlan::CsvScan(_) => Ok(plan.clone()),
             PhysicalPlan::ParquetScan(_) => Ok(plan.clone()),
             _ => Err(ballista_error("visit_plan unsupported operator")),
@@ -353,6 +359,11 @@ pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Arc<PhysicalPlan>> {
             let exec = ProjectionExec::try_new(expr, create_physical_plan(input)?)?;
             Ok(Arc::new(PhysicalPlan::Projection(Arc::new(exec))))
         }
+        LogicalPlan::Selection { input, expr, .. } => {
+            let input = create_physical_plan(input)?;
+            let exec = FilterExec::new(&input, expr);
+            Ok(Arc::new(PhysicalPlan::Filter(Arc::new(exec))))
+        }
         LogicalPlan::Aggregate {
             input,
             group_expr,
@@ -454,7 +465,10 @@ pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Arc<PhysicalPlan>> {
             let exec = ParquetScanExec::try_new(&path, projection.clone(), batch_size)?;
             Ok(Arc::new(PhysicalPlan::ParquetScan(Arc::new(exec))))
         }
-        other => Err(BallistaError::General(format!("unsupported {:?}", other))),
+        other => Err(BallistaError::General(format!(
+            "create_physical_plan unsupported operator {:?}",
+            other
+        ))),
     }
 }
 

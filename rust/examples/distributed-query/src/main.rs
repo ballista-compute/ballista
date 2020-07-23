@@ -34,12 +34,11 @@ struct Opt {
     executor_host: String,
 
     #[structopt(short = "p", long = "port", default_value = "50051")]
-    executor_port: usize
+    executor_port: usize,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-
     let opt: Opt = Opt::from_args();
     let path = opt.path.as_str();
     let executor_host = opt.executor_host.as_str();

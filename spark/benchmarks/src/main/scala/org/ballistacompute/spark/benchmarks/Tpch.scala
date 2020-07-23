@@ -7,8 +7,8 @@ object Tpch {
 
   def main(arg: Array[String]): Unit = {
     //convertToParquet("/mnt/tpch/10/lineitem.tbl", "./tmp")
-//    q1()
-    repartition(24)
+    q1()
+//    repartition(24)
   }
 
   def repartition(n: Int) {
@@ -49,6 +49,8 @@ object Tpch {
           |     avg(l_discount) as avg_disc
           | from
           |     lineitem
+          | where
+          |     l_shipdate < '1998-12-01'
           | group by
           |     l_returnflag,
           |     l_linestatus

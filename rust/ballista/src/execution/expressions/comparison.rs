@@ -96,6 +96,23 @@ impl Expression for Comparison {
             DataType::UInt64 => compare_op!(l, r, UInt64Array, &self.op),
             DataType::Float32 => compare_op!(l, r, Float32Array, &self.op),
             DataType::Float64 => compare_op!(l, r, Float64Array, &self.op),
+            DataType::Utf8 => {
+                let l = cast_array!(l, StringArray)?;
+                let r = cast_array!(r, StringArray)?;
+                let bools = match &self.op {
+                    Operator::Lt => Ok(compute::lt_utf8(l, r)?),
+                    Operator::LtEq => Ok(compute::lt_eq_utf8(l, r)?),
+                    Operator::Gt => Ok(compute::gt_utf8(l, r)?),
+                    Operator::GtEq => Ok(compute::gt_eq_utf8(l, r)?),
+                    Operator::Eq => Ok(compute::eq_utf8(l, r)?),
+                    Operator::NotEq => Ok(compute::neq_utf8(l, r)?),
+                    other => Err(ballista_error(&format!(
+                        "Invalid comparison operator '{:?}'",
+                        other
+                    ))),
+                }?;
+                Ok(ColumnarValue::Columnar(Arc::new(bools)))
+            }
             _ => Err(ballista_error(
                 "Unsupported datatype for Comparison expression",
             )),

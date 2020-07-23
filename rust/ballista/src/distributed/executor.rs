@@ -20,9 +20,14 @@ use std::thread;
 
 use crate::arrow::datatypes::Schema;
 use crate::arrow::record_batch::RecordBatch;
+use crate::datafusion;
 use crate::datafusion::execution::context::ExecutionContext as DFContext;
 use crate::datafusion::logicalplan::LogicalPlan;
+use crate::datafusion::logicalplan::{Expr, LogicalPlanBuilder};
+use crate::datafusion::optimizer::optimizer::OptimizerRule;
 use crate::distributed::client::execute_action;
+use crate::distributed::etcd::{etcd_get_executors, start_etcd_thread};
+use crate::distributed::k8s::k8s_get_executors;
 use crate::distributed::scheduler::{
     create_job, create_physical_plan, ensure_requirements, execute_job, ExecutionTask,
 };
@@ -31,8 +36,6 @@ use crate::execution::physical_plan::{
     Action, ColumnarBatch, ExecutionContext, ExecutorMeta, PhysicalPlan, ShuffleId,
 };
 
-use crate::distributed::etcd::{etcd_get_executors, start_etcd_thread};
-use crate::distributed::k8s::k8s_get_executors;
 use async_trait::async_trait;
 use uuid::Uuid;
 
@@ -236,6 +239,11 @@ impl Executor for BallistaExecutor {
     async fn execute_query(&self, logical_plan: &LogicalPlan) -> Result<ShufflePartition> {
         println!("Logical plan:\n{:?}", logical_plan);
         let ctx = DFContext::new();
+
+        // workaround for https://issues.apache.org/jira/browse/ARROW-9542
+        let mut rule = ResolveColumnsRule::new();
+        let logical_plan = rule.optimize(logical_plan)?;
+
         let logical_plan = ctx.optimize(&logical_plan)?;
         println!("Optimized logical plan:\n{:?}", logical_plan);
 
@@ -269,5 +277,109 @@ impl Executor for BallistaExecutor {
             Ok(handle) => handle,
             Err(e) => Err(ballista_error(&format!("Executor thread failed: {:?}", e))),
         }
+    }
+}
+
+/// Replace UnresolvedColumns with Columns
+pub struct ResolveColumnsRule {}
+
+impl ResolveColumnsRule {
+    #[allow(missing_docs)]
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Default for ResolveColumnsRule {
+    fn default() -> Self {
+        ResolveColumnsRule::new()
+    }
+}
+
+impl OptimizerRule for ResolveColumnsRule {
+    fn optimize(&mut self, plan: &LogicalPlan) -> datafusion::error::Result<LogicalPlan> {
+        match plan {
+            LogicalPlan::Projection { input, expr, .. } => {
+                Ok(LogicalPlanBuilder::from(&self.optimize(input)?)
+                    .project(rewrite_expr_list(expr, &input.schema())?)?
+                    .build()?)
+            }
+            LogicalPlan::Selection { expr, input } => {
+                Ok(LogicalPlanBuilder::from(&self.optimize(input)?)
+                    .filter(rewrite_expr(expr, &input.schema())?)?
+                    .build()?)
+            }
+            LogicalPlan::Aggregate {
+                input,
+                group_expr,
+                aggr_expr,
+                ..
+            } => Ok(LogicalPlanBuilder::from(&self.optimize(input)?)
+                .aggregate(
+                    rewrite_expr_list(group_expr, &input.schema())?,
+                    rewrite_expr_list(aggr_expr, &input.schema())?,
+                )?
+                .build()?),
+            LogicalPlan::Sort { input, expr, .. } => {
+                Ok(LogicalPlanBuilder::from(&self.optimize(input)?)
+                    .sort(rewrite_expr_list(expr, &input.schema())?)?
+                    .build()?)
+            }
+            _ => Ok(plan.clone()),
+        }
+    }
+}
+
+fn rewrite_expr_list(expr: &[Expr], schema: &Schema) -> datafusion::error::Result<Vec<Expr>> {
+    Ok(expr
+        .iter()
+        .map(|e| rewrite_expr(e, schema))
+        .collect::<datafusion::error::Result<Vec<_>>>()?)
+}
+
+fn rewrite_expr(expr: &Expr, schema: &Schema) -> datafusion::error::Result<Expr> {
+    match expr {
+        Expr::Alias(expr, alias) => Ok(rewrite_expr(&expr, schema)?.alias(&alias)),
+        Expr::UnresolvedColumn(name) => Ok(Expr::Column(schema.index_of(&name)?)),
+        Expr::BinaryExpr { left, op, right } => Ok(Expr::BinaryExpr {
+            left: Box::new(rewrite_expr(&left, schema)?),
+            op: op.clone(),
+            right: Box::new(rewrite_expr(&right, schema)?),
+        }),
+        Expr::Not(expr) => Ok(Expr::Not(Box::new(rewrite_expr(&expr, schema)?))),
+        Expr::IsNotNull(expr) => Ok(Expr::IsNotNull(Box::new(rewrite_expr(&expr, schema)?))),
+        Expr::IsNull(expr) => Ok(Expr::IsNull(Box::new(rewrite_expr(&expr, schema)?))),
+        Expr::Cast { expr, data_type } => Ok(Expr::Cast {
+            expr: Box::new(rewrite_expr(&expr, schema)?),
+            data_type: data_type.clone(),
+        }),
+        Expr::Sort {
+            expr,
+            asc,
+            nulls_first,
+        } => Ok(Expr::Sort {
+            expr: Box::new(rewrite_expr(&expr, schema)?),
+            asc: *asc,
+            nulls_first: *nulls_first,
+        }),
+        Expr::ScalarFunction {
+            name,
+            args,
+            return_type,
+        } => Ok(Expr::ScalarFunction {
+            name: name.clone(),
+            args: rewrite_expr_list(args, schema)?,
+            return_type: return_type.clone(),
+        }),
+        Expr::AggregateFunction {
+            name,
+            args,
+            return_type,
+        } => Ok(Expr::AggregateFunction {
+            name: name.clone(),
+            args: rewrite_expr_list(args, schema)?,
+            return_type: return_type.clone(),
+        }),
+        _ => Ok(expr.clone()),
     }
 }

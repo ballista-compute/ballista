@@ -8,6 +8,7 @@ object Tpch {
   def main(arg: Array[String]): Unit = {
     //convertToParquet("/mnt/tpch/10/lineitem.tbl", "./tmp")
     q1()
+//    adhoc()
 //    repartition(24)
   }
 
@@ -22,6 +23,34 @@ object Tpch {
       .repartition(n)
       .write
       .parquet(s"./tmp-$n")
+  }
+
+  def adhoc(): Unit = {
+
+    val spark: SparkSession = SparkSession.builder
+      .appName(this.getClass.getName)
+      .master("local[24]")
+      .getOrCreate()
+
+    spark.time {
+
+      spark.read.parquet("/mnt/tpch/parquet/10-24/lineitem").createOrReplaceTempView("lineitem")
+
+      val df = spark.sql(
+        """
+          | select
+          |     l_shipdate, count(*) as n
+          | from
+          |     lineitem
+          | group by
+          |     l_shipdate
+          | order by l_shipdate desc limit 10
+          |""".stripMargin)
+
+      df.show()
+      df.explain()
+    }
+
   }
 
   def q1(): Unit = {
@@ -46,11 +75,12 @@ object Tpch {
           |     sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge,
           |     avg(l_quantity) as avg_qty,
           |     avg(l_extendedprice) as avg_price,
-          |     avg(l_discount) as avg_disc
+          |     avg(l_discount) as avg_disc,
+          |     count(*) as count_order
           | from
           |     lineitem
           | where
-          |     l_shipdate < '1998-12-01'
+          |     l_shipdate < '1998-09-01'
           | group by
           |     l_returnflag,
           |     l_linestatus

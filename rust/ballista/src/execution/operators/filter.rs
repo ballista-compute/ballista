@@ -29,6 +29,7 @@ use crate::{
     },
 };
 
+use crate::execution::physical_plan::Partitioning;
 use async_trait::async_trait;
 
 /// FilterExec evaluates a boolean expression against each row of input to determine which rows
@@ -63,6 +64,10 @@ impl ExecutionPlan for FilterExec {
     fn schema(&self) -> Arc<Schema> {
         // a filter does not alter the schema
         self.child.as_execution_plan().schema()
+    }
+
+    fn output_partitioning(&self) -> Partitioning {
+        self.child.as_execution_plan().output_partitioning()
     }
 
     fn children(&self) -> Vec<Arc<PhysicalPlan>> {

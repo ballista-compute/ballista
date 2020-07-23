@@ -79,7 +79,7 @@ async fn q1(ctx: &Context, path: &str) -> Result<Vec<RecordBatch>> {
     // ctx.read_csv(path, options, None)?
     let df = ctx
         .read_parquet(path, None)?
-        .filter(col("l_shipdate").lt(&lit_str("1998-12-01")))? // should be l_shipdate <= date '1998-12-01' - interval ':1' day (3)
+        .filter(col("l_shipdate").lt(&lit_str("1998-09-01")))? // should be l_shipdate <= date '1998-12-01' - interval ':1' day (3)
         .aggregate(
             vec![col("l_returnflag"), col("l_linestatus")],
             vec![

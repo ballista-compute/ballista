@@ -32,7 +32,7 @@ use crate::parquet::arrow::ParquetFileArrowReader;
 use crate::parquet::file::reader::SerializedFileReader;
 
 use async_trait::async_trait;
-use crossbeam::channel::{bounded, Receiver, Sender};
+use crossbeam::channel::{unbounded, Receiver, Sender};
 use smol::Task;
 use std::time::Instant;
 
@@ -138,12 +138,13 @@ impl ParquetBatchIter {
         );
 
         let (response_tx, response_rx): (Sender<MaybeColumnarBatch>, Receiver<MaybeColumnarBatch>) =
-            bounded(2); // always be reading one batch ahead
+            unbounded();
 
         let filename = filename.to_string();
 
         std::thread::spawn(move || {
             let start = Instant::now();
+            let mut batch_read_time = 0;
             let mut output_batches = 0;
             let mut output_rows = 0;
 
@@ -155,7 +156,12 @@ impl ParquetBatchIter {
                     let mut arrow_reader = ParquetFileArrowReader::new(file_reader);
                     match arrow_reader.get_record_reader_by_columns(projection, batch_size) {
                         Ok(mut batch_reader) => loop {
-                            match batch_reader.next_batch() {
+                            // read the next batch
+                            let start_batch = Instant::now();
+                            let maybe_batch = batch_reader.next_batch();
+                            batch_read_time += start_batch.elapsed().as_millis();
+
+                            match maybe_batch {
                                 Ok(Some(batch)) => {
                                     output_batches += 1;
                                     output_rows += batch.num_rows();
@@ -193,9 +199,10 @@ impl ParquetBatchIter {
             }
 
             println!(
-                "ParquetScan scanned {} batches and {} rows in {} ms",
+                "ParquetScan scanned {} batches and {} rows in {} ms. Total duration {} ms.",
                 output_batches,
                 output_rows,
+                batch_read_time,
                 start.elapsed().as_millis()
             );
         });

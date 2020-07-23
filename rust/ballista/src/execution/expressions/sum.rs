@@ -74,12 +74,12 @@ impl AggregateExpr for Sum {
 
 macro_rules! accumulate {
     ($SELF:ident, $VALUE:expr, $ARRAY_TYPE:ident, $SCALAR_VARIANT:ident, $TY:ty) => {{
-        $SELF.sum = match $SELF.sum {
+        match $SELF.sum {
             Some(ScalarValue::$SCALAR_VARIANT(n)) => {
-                Some(ScalarValue::$SCALAR_VARIANT(n + $VALUE as $TY))
+                $SELF.sum = Some(ScalarValue::$SCALAR_VARIANT(n + $VALUE as $TY));
             }
             Some(_) => return Err(ballista_error("Unexpected ScalarValue variant")),
-            None => Some(ScalarValue::$SCALAR_VARIANT($VALUE as $TY)),
+            None => {}
         };
     }};
 }

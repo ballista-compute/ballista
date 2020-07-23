@@ -79,29 +79,29 @@ async fn q1(ctx: &Context, path: &str) -> Result<Vec<RecordBatch>> {
     // ctx.read_csv(path, options, None)?
     let df = ctx
         .read_parquet(path, None)?
-        .filter(col("l_shipdate").lt(&lit_str("1998-09-01")))? // should be l_shipdate <= date '1998-12-01' - interval ':1' day (3)
+        // .filter(col("l_shipdate").lt(&lit_str("1998-09-01")))? // should be l_shipdate <= date '1998-12-01' - interval ':1' day (3)
         .aggregate(
             vec![col("l_returnflag"), col("l_linestatus")],
             vec![
                 sum(col("l_quantity")).alias("sum_qty"),
-                sum(col("l_extendedprice")).alias("sum_base_price"),
-                sum(mult(
-                    &col("l_extendedprice"),
-                    &subtract(&lit_f64(1_f64), &col("l_discount")),
-                ))
-                .alias("sum_disc_price"),
-                sum(mult(
-                    &mult(
-                        &col("l_extendedprice"),
-                        &subtract(&lit_f64(1_f64), &col("l_discount")),
-                    ),
-                    &add(&lit_f64(1_f64), &col("l_tax")),
-                ))
-                .alias("sum_charge"),
-                avg(col("l_quantity")).alias("avg_qty"),
-                avg(col("l_extendedprice")).alias("avg_price"),
-                avg(col("l_discount")).alias("avg_disc"),
-                count(col("l_quantity")).alias("count_order"), // should be count(*) not count(col)
+                // sum(col("l_extendedprice")).alias("sum_base_price"),
+                // sum(mult(
+                //     &col("l_extendedprice"),
+                //     &subtract(&lit_f64(1_f64), &col("l_discount")),
+                // ))
+                // .alias("sum_disc_price"),
+                // sum(mult(
+                //     &mult(
+                //         &col("l_extendedprice"),
+                //         &subtract(&lit_f64(1_f64), &col("l_discount")),
+                //     ),
+                //     &add(&lit_f64(1_f64), &col("l_tax")),
+                // ))
+                // .alias("sum_charge"),
+                // avg(col("l_quantity")).alias("avg_qty"),
+                // avg(col("l_extendedprice")).alias("avg_price"),
+                // avg(col("l_discount")).alias("avg_disc"),
+                // count(col("l_quantity")).alias("count_order"), // should be count(*) not count(col)
             ],
         )?;
     //.sort()?

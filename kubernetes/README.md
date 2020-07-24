@@ -74,7 +74,7 @@ You will need to run [download-nyctaxi-files.sh](download-nyctaxi-files.sh) to d
 First, we need to mount the host path into the Minikube VM.
 
 ```bash
-minikube mount /mnt/nyctaxi/:/mnt/nyctaxi
+minikube mount /mnt/:/mnt/
 ```
 
 You should see output like this:

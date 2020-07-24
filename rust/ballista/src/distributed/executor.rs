@@ -86,7 +86,7 @@ pub trait Executor: Send + Sync {
 pub struct DefaultContext {
     /// map from shuffle id to executor uuid
     pub(crate) shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
-    config: ExecutorConfig,
+    pub(crate) config: ExecutorConfig,
 }
 
 impl DefaultContext {
@@ -109,7 +109,7 @@ impl ExecutionContext for DefaultContext {
         match &self.config.discovery_mode {
             DiscoveryMode::Etcd => etcd_get_executors(&self.config.etcd_urls, "default").await,
             DiscoveryMode::Kubernetes => k8s_get_executors("default", "ballista").await,
-            DiscoveryMode::Standalone => unimplemented!(),
+            DiscoveryMode::Standalone => Err(ballista_error("Standalone mode not implemented yet")),
         }
     }
 
@@ -150,6 +150,10 @@ impl ExecutionContext for DefaultContext {
                 shuffle_id
             ))),
         }
+    }
+
+    fn config(&self) -> ExecutorConfig {
+        self.config.clone()
     }
 }
 

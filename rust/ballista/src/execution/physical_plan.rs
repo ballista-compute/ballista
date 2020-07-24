@@ -45,6 +45,7 @@ use crate::execution::operators::{
     ProjectionExec, ShuffleExchangeExec, ShuffleReaderExec,
 };
 
+use crate::distributed::executor::ExecutorConfig;
 use async_trait::async_trait;
 use uuid::Uuid;
 
@@ -81,6 +82,7 @@ pub trait ExecutionContext: Send + Sync {
         task: ExecutionTask,
     ) -> Result<ShuffleId>;
     async fn read_shuffle(&self, shuffle_id: &ShuffleId) -> Result<Vec<ColumnarBatch>>;
+    fn config(&self) -> ExecutorConfig;
 }
 
 /// Base trait for all operators

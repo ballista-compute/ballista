@@ -26,7 +26,7 @@ use crate::dataframe::{avg, count, max, min, sum};
 use crate::datafusion::execution::physical_plan::csv::CsvReadOptions;
 use crate::datafusion::logicalplan::LogicalPlan;
 use crate::datafusion::logicalplan::{col_index, Expr};
-use crate::distributed::executor::{DefaultContext, DiscoveryMode, ExecutorConfig};
+use crate::distributed::executor::DefaultContext;
 use crate::error::{ballista_error, BallistaError, Result};
 use crate::execution::operators::ProjectionExec;
 use crate::execution::operators::ShuffleExchangeExec;
@@ -305,8 +305,11 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
 
                             let ctx = ctx.clone();
                             let handle = thread::spawn(move || {
+                                println!("in thread");
                                 smol::run(async {
+                                    println!("in smol::run");
                                     Task::blocking(async move {
+                                        println!("in Task::blocking");
                                         ctx.execute_task(executor_id.clone(), task).await
                                     })
                                     .await
@@ -317,9 +320,11 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
 
                         let mut shuffle_ids = vec![];
                         for thread in threads {
+                            println!("Waiting to join thread");
                             let shuffle_id = thread.join().unwrap()?;
                             shuffle_ids.push(shuffle_id);
                         }
+                        println!("Joined all threads");
 
                         for (shuffle_id, executor_id) in shuffle_ids.iter().zip(executors_ids) {
                             shuffle_location_map.insert(*shuffle_id, executor_id);
@@ -328,11 +333,8 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
 
                         if stage.id == job.root_stage_id {
                             println!("reading final results from query!");
-                            //TODO remove hack
-                            let config =
-                                ExecutorConfig::new(DiscoveryMode::Etcd, "", 0, "localhost:2379");
                             let ctx = Arc::new(DefaultContext::new(
-                                &config,
+                                &ctx.config(),
                                 shuffle_location_map.clone(),
                             ));
                             let data = ctx.read_shuffle(&shuffle_ids[0]).await?;

@@ -38,8 +38,8 @@ spec:
             cpu: "1"
             memory: "1024Mi"
           limits:
-            cpu: "1"
-            memory: "1024Mi"
+            cpu: "2"
+            memory: "2048Mi"
         ports:
           - containerPort: 50051
             name: flight

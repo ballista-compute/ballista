@@ -100,13 +100,11 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
         } else if let Some(scan) = &self.scan {
             let schema: Schema = convert_required!(scan.schema)?;
 
-            let projection: Vec<usize> = scan
-                .projection
-                .iter()
-                .map(|name| schema.index_of(name))
-                .collect::<Result<Vec<_>, _>>()?;
-
-            println!("projection: {:?}", projection);
+            // let projection: Vec<usize> = scan
+            //     .projection
+            //     .iter()
+            //     .map(|name| schema.index_of(name))
+            //     .collect::<Result<Vec<_>, _>>()?;
 
             match scan.file_format.as_str() {
                 "csv" => {

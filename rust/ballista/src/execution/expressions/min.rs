@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::arrow::array;
@@ -66,9 +64,9 @@ impl AggregateExpr for Min {
         self.expr.evaluate(batch)
     }
 
-    fn create_accumulator(&self, _mode: &AggregateMode) -> Rc<RefCell<dyn Accumulator>> {
+    fn create_accumulator(&self, _mode: &AggregateMode) -> Box<dyn Accumulator> {
         // the accumulator for MIN is always MIN regardless of the aggregation mode
-        Rc::new(RefCell::new(MinAccumulator { min: None }))
+        Box::new(MinAccumulator { min: None })
     }
 }
 

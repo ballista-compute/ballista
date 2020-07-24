@@ -18,8 +18,6 @@
 //! Ballista Hash Aggregate operator. This is based on the implementation from DataFusion in the
 //! Apache Arrow project.
 
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -37,8 +35,8 @@ use crate::execution::physical_plan::{
 
 use async_trait::async_trait;
 use crossbeam::channel::{unbounded, Receiver, Sender};
-use fnv::FnvHashMap;
 use smol::Task;
+use std::collections::HashMap;
 
 /// HashAggregateExec applies a hash aggregate operation against its input.
 #[allow(dead_code)]
@@ -163,7 +161,7 @@ macro_rules! extract_aggr_value {
     ($BUILDER:ident, $TY:ident, $TY2:ty, $MAP:expr, $COL_INDEX:expr) => {{
         let mut builder = array::$BUILDER::new($MAP.len());
         for v in $MAP.values() {
-            match v[$COL_INDEX].as_ref().borrow().get_value()? {
+            match v[$COL_INDEX].as_ref().get_value()? {
                 None => builder.append_null()?,
                 Some(ScalarValue::$TY(n)) => builder.append_value(n as $TY2)?,
                 Some(other) => {
@@ -219,21 +217,17 @@ macro_rules! extract_group_val {
 // }
 
 macro_rules! update_accumulators {
-    ($ARRAY:ident, $ARRAY_TY:ident, $SCALAR_TY:expr, $COL:expr, $ACCUM:expr) => {{
+    ($ARRAY:ident, $ARRAY_TY:ident, $SCALAR_TY:expr, $ROW:expr, $COL:expr, $ACCUM:expr) => {{
         let primitive_array = cast_array!($ARRAY, $ARRAY_TY)?;
-
-        for row in 0..$ARRAY.len() {
-            if $ARRAY.is_valid(row) {
-                let value = $SCALAR_TY(primitive_array.value(row));
-                let mut accum = $ACCUM[row][$COL].borrow_mut();
-                accum.accumulate(&ColumnarValue::Scalar(Some(value), 1))?;
-            }
+        if $ARRAY.is_valid($ROW) {
+            let value = $SCALAR_TY(primitive_array.value($ROW));
+            $ACCUM[$COL].accumulate(&ColumnarValue::Scalar(Some(value), 1))?;
         }
     }};
 }
 
 /// AccumularSet is the value in the hash map
-type AccumulatorSet = Vec<Rc<RefCell<dyn Accumulator>>>;
+type AccumulatorSet = Vec<Box<dyn Accumulator>>;
 
 #[allow(dead_code)]
 struct HashAggregateIter {
@@ -257,7 +251,7 @@ fn run(
         let mut row_count = 0;
 
         // hash map of grouping values to accumulators
-        let mut map: FnvHashMap<Vec<GroupByScalar>, AccumulatorSet> = FnvHashMap::default();
+        let mut map: HashMap<Vec<GroupByScalar>, AccumulatorSet> = HashMap::new();
 
         // create vector large enough to hold the grouping key that can be re-used per row to
         // avoid the cost of creating a new vector each time
@@ -266,8 +260,8 @@ fn run(
             key.push(GroupByScalar::UInt32(0));
         }
 
-        // iterate over all the input batches .. not that in partial mode it would be valid
-        // to emit batches periodically and reset the accumlator map to reduce memory pressure
+        // iterate over all the input batches .. note that in partial mode it would be valid
+        // to emit batches periodically and reset the accumulator map to reduce memory pressure
         loop {
             let read_batch_start = Instant::now();
             let maybe_batch = input.next().await?;
@@ -286,116 +280,38 @@ fn run(
                         .map(|e| e.evaluate(&batch))
                         .collect::<Result<Vec<_>>>()?;
 
-                    // iterate over each row in the batch and create the accumulators for each grouping key
-                    let mut accumulators: Vec<AccumulatorSet> =
-                        Vec::with_capacity(batch.num_rows());
+                    // evaluate the input expressions to the aggregate functions
+                    let aggr_input_values = aggr_expr
+                        .iter()
+                        .map(|e| e.evaluate_input(&batch))
+                        .collect::<Result<Vec<_>>>()?;
 
+                    // we now need to switch to row-based processing :-(
                     for row in 0..batch.num_rows() {
                         // create grouping key for this row
                         create_key(&group_values, row, &mut key)?;
 
-                        if let Some(accumulator_set) = map.get(&key) {
-                            accumulators.push(accumulator_set.clone());
-                        } else {
-                            let accumulator_set: AccumulatorSet = aggr_expr
+                        // lookup the accumulators for this grouping key
+                        let updated = match map.get_mut(&key) {
+                            Some(mut accumulators) => {
+                                accumulate(&aggr_input_values, &mut accumulators, row)?;
+                                true
+                            }
+                            None => false,
+                        };
+
+                        // create the accumulators for this grouping key if they weren't found
+                        if !updated {
+                            let mut accumulators: AccumulatorSet = aggr_expr
                                 .iter()
                                 .map(|expr| expr.create_accumulator(&mode))
                                 .collect();
 
-                            map.insert(key.clone(), accumulator_set.clone());
-                            accumulators.push(accumulator_set);
+                            accumulate(&aggr_input_values, &mut accumulators, row)?;
+
+                            map.insert(key.clone(), accumulators);
                         }
                     }
-
-                    // iterate over each aggregate expression
-                    for (col, expr) in aggr_expr.iter().enumerate() {
-                        // evaluate the aggregate expression
-                        let value = expr.evaluate_input(&batch)?;
-
-                        match &value {
-                            ColumnarValue::Columnar(array) => match array.data_type() {
-                                DataType::Int8 => update_accumulators!(
-                                    array,
-                                    Int8Array,
-                                    ScalarValue::Int8,
-                                    col,
-                                    accumulators
-                                ),
-                                DataType::Int16 => update_accumulators!(
-                                    array,
-                                    Int16Array,
-                                    ScalarValue::Int16,
-                                    col,
-                                    accumulators
-                                ),
-                                DataType::Int32 => update_accumulators!(
-                                    array,
-                                    Int32Array,
-                                    ScalarValue::Int32,
-                                    col,
-                                    accumulators
-                                ),
-                                DataType::Int64 => update_accumulators!(
-                                    array,
-                                    Int64Array,
-                                    ScalarValue::Int64,
-                                    col,
-                                    accumulators
-                                ),
-                                DataType::UInt8 => update_accumulators!(
-                                    array,
-                                    UInt8Array,
-                                    ScalarValue::UInt8,
-                                    col,
-                                    accumulators
-                                ),
-                                DataType::UInt16 => update_accumulators!(
-                                    array,
-                                    UInt16Array,
-                                    ScalarValue::UInt16,
-                                    col,
-                                    accumulators
-                                ),
-                                DataType::UInt32 => update_accumulators!(
-                                    array,
-                                    UInt32Array,
-                                    ScalarValue::UInt32,
-                                    col,
-                                    accumulators
-                                ),
-                                DataType::UInt64 => update_accumulators!(
-                                    array,
-                                    UInt64Array,
-                                    ScalarValue::UInt64,
-                                    col,
-                                    accumulators
-                                ),
-                                DataType::Float32 => update_accumulators!(
-                                    array,
-                                    Float32Array,
-                                    ScalarValue::Float32,
-                                    col,
-                                    accumulators
-                                ),
-                                DataType::Float64 => update_accumulators!(
-                                    array,
-                                    Float64Array,
-                                    ScalarValue::Float64,
-                                    col,
-                                    accumulators
-                                ),
-                                _other => {
-                                    unimplemented!()
-                                    // return Err(BallistaError::General(format!(
-                                    //     "Unsupported data type {:?} for result of aggregate expression",
-                                    //     other
-                                    // )));
-                                }
-                            },
-                            _ => unimplemented!(),
-                        };
-                    }
-
                     accum_batch_time += accum_start.elapsed().as_millis();
                 }
                 None => break,
@@ -439,6 +355,109 @@ fn run(
 
         Ok(())
     })
+}
+
+#[inline]
+fn accumulate(
+    aggr_input_values: &[ColumnarValue],
+    accumulators: &mut AccumulatorSet,
+    row: usize,
+) -> Result<()> {
+    for (col, value) in aggr_input_values.iter().enumerate() {
+        match &value {
+            ColumnarValue::Columnar(array) => match array.data_type() {
+                DataType::Int8 => update_accumulators!(
+                    array,
+                    Int8Array,
+                    ScalarValue::Int8,
+                    row,
+                    col,
+                    accumulators
+                ),
+                DataType::Int16 => update_accumulators!(
+                    array,
+                    Int16Array,
+                    ScalarValue::Int16,
+                    row,
+                    col,
+                    accumulators
+                ),
+                DataType::Int32 => update_accumulators!(
+                    array,
+                    Int32Array,
+                    ScalarValue::Int32,
+                    row,
+                    col,
+                    accumulators
+                ),
+                DataType::Int64 => update_accumulators!(
+                    array,
+                    Int64Array,
+                    ScalarValue::Int64,
+                    row,
+                    col,
+                    accumulators
+                ),
+                DataType::UInt8 => update_accumulators!(
+                    array,
+                    UInt8Array,
+                    ScalarValue::UInt8,
+                    row,
+                    col,
+                    accumulators
+                ),
+                DataType::UInt16 => update_accumulators!(
+                    array,
+                    UInt16Array,
+                    ScalarValue::UInt16,
+                    row,
+                    col,
+                    accumulators
+                ),
+                DataType::UInt32 => update_accumulators!(
+                    array,
+                    UInt32Array,
+                    ScalarValue::UInt32,
+                    row,
+                    col,
+                    accumulators
+                ),
+                DataType::UInt64 => update_accumulators!(
+                    array,
+                    UInt64Array,
+                    ScalarValue::UInt64,
+                    row,
+                    col,
+                    accumulators
+                ),
+                DataType::Float32 => update_accumulators!(
+                    array,
+                    Float32Array,
+                    ScalarValue::Float32,
+                    row,
+                    col,
+                    accumulators
+                ),
+                DataType::Float64 => update_accumulators!(
+                    array,
+                    Float64Array,
+                    ScalarValue::Float64,
+                    row,
+                    col,
+                    accumulators
+                ),
+                _other => {
+                    unimplemented!()
+                    // return Err(BallistaError::General(format!(
+                    //     "Unsupported data type {:?} for result of aggregate expression",
+                    //     other
+                    // )));
+                }
+            },
+            _ => unimplemented!(),
+        };
+    }
+    Ok(())
 }
 
 impl HashAggregateIter {
@@ -523,7 +542,7 @@ fn create_key(
 
 /// Create a columnar batch from the hash map
 fn create_batch_from_accum_map(
-    map: &FnvHashMap<Vec<GroupByScalar>, AccumulatorSet>,
+    map: &HashMap<Vec<GroupByScalar>, AccumulatorSet>,
     input_schema: &Schema,
     group_expr: &[Arc<dyn Expression>],
     aggr_expr: &[Arc<dyn AggregateExpr>],

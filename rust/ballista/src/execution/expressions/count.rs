@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::arrow::datatypes::{DataType, Schema};
@@ -52,10 +50,10 @@ impl AggregateExpr for Count {
         self.input.evaluate(batch)
     }
 
-    fn create_accumulator(&self, mode: &AggregateMode) -> Rc<RefCell<dyn Accumulator>> {
+    fn create_accumulator(&self, mode: &AggregateMode) -> Box<dyn Accumulator> {
         match mode {
-            AggregateMode::Partial => Rc::new(RefCell::new(CountAccumulator { count: 0 })),
-            _ => Rc::new(RefCell::new(SumAccumulator { sum: None })),
+            AggregateMode::Partial => Box::new(CountAccumulator { count: 0 }),
+            _ => Box::new(SumAccumulator { sum: None }),
         }
     }
 }

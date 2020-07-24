@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::arrow::array;
@@ -67,19 +65,19 @@ impl AggregateExpr for Sum {
         self.input.evaluate(batch)
     }
 
-    fn create_accumulator(&self, _mode: &AggregateMode) -> Rc<RefCell<dyn Accumulator>> {
-        Rc::new(RefCell::new(SumAccumulator { sum: None }))
+    fn create_accumulator(&self, _mode: &AggregateMode) -> Box<dyn Accumulator> {
+        Box::new(SumAccumulator { sum: None })
     }
 }
 
 macro_rules! accumulate {
     ($SELF:ident, $VALUE:expr, $ARRAY_TYPE:ident, $SCALAR_VARIANT:ident, $TY:ty) => {{
-        match $SELF.sum {
+        $SELF.sum = match $SELF.sum {
             Some(ScalarValue::$SCALAR_VARIANT(n)) => {
-                $SELF.sum = Some(ScalarValue::$SCALAR_VARIANT(n + $VALUE as $TY));
+                Some(ScalarValue::$SCALAR_VARIANT(n + $VALUE as $TY))
             }
             Some(_) => return Err(ballista_error("Unexpected ScalarValue variant")),
-            None => {}
+            None => Some(ScalarValue::$SCALAR_VARIANT($VALUE as $TY)),
         };
     }};
 }

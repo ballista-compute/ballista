@@ -226,12 +226,12 @@ impl Executor for BallistaExecutor {
             "{}:{}:{}",
             shuffle_id.job_uuid, shuffle_id.stage_id, shuffle_id.partition_id
         );
-        let shuffle_partitions = self
+        let mut shuffle_partitions = self
             .shuffle_partitions
             .lock()
             .expect("failed to lock mutex");
-        match shuffle_partitions.get(&key) {
-            Some(partition) => Ok(partition.clone()),
+        match shuffle_partitions.remove(&key) {
+            Some(partition) => Ok(partition),
             _ => Err(ballista_error("invalid shuffle partition id")),
         }
     }

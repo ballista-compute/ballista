@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::arrow::datatypes::{DataType, Schema};
@@ -91,7 +89,7 @@ impl AggregateExpr for AliasedAggregate {
         self.expr.evaluate_input(batch)
     }
 
-    fn create_accumulator(&self, mode: &AggregateMode) -> Rc<RefCell<dyn Accumulator>> {
+    fn create_accumulator(&self, mode: &AggregateMode) -> Box<dyn Accumulator> {
         self.expr.create_accumulator(mode)
     }
 }

@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::arrow::array;
@@ -66,9 +64,9 @@ impl AggregateExpr for Max {
         self.expr.evaluate(batch)
     }
 
-    fn create_accumulator(&self, _mode: &AggregateMode) -> Rc<RefCell<dyn Accumulator>> {
+    fn create_accumulator(&self, _mode: &AggregateMode) -> Box<dyn Accumulator> {
         // the accumulator for MAX is always MAX regardless of the aggregation mode
-        Rc::new(RefCell::new(MaxAccumulator { max: None }))
+        Box::new(MaxAccumulator { max: None })
     }
 }
 

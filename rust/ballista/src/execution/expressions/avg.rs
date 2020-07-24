@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::arrow::array;
@@ -66,11 +64,11 @@ impl AggregateExpr for Avg {
         self.input.evaluate(batch)
     }
 
-    fn create_accumulator(&self, _mode: &AggregateMode) -> Rc<RefCell<dyn Accumulator>> {
-        Rc::new(RefCell::new(AvgAccumulator {
+    fn create_accumulator(&self, _mode: &AggregateMode) -> Box<dyn Accumulator> {
+        Box::new(AvgAccumulator {
             sum: None,
             count: None,
-        }))
+        })
     }
 }
 

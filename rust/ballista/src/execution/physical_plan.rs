@@ -22,9 +22,7 @@
 //!
 //! The physical plan also accounts for partitioning and ordering of data between operators.
 
-use std::cell::RefCell;
 use std::fmt::{self, Debug};
-use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::arrow::array::{
@@ -155,7 +153,7 @@ pub trait AggregateExpr: Send + Sync + Debug {
     /// Evaluate the expression being aggregated
     fn evaluate_input(&self, batch: &ColumnarBatch) -> Result<ColumnarValue>;
     /// Create an accumulator for this aggregate expression
-    fn create_accumulator(&self, mode: &AggregateMode) -> Rc<RefCell<dyn Accumulator>>;
+    fn create_accumulator(&self, mode: &AggregateMode) -> Box<dyn Accumulator>;
     /// Generate schema Field type for this expression
     fn to_schema_field(&self, input_schema: &Schema) -> Result<Field> {
         Ok(Field::new(

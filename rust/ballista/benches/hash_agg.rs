@@ -17,26 +17,16 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let array = batch.column(0);
 
     let aggr_expr = sum(col(1, "c1"));
-    let accum = aggr_expr.create_accumulator(&AggregateMode::Partial);
+    let mut accum = aggr_expr.create_accumulator(&AggregateMode::Partial);
 
-    c.bench_function("sum accum array", |b| {
-        b.iter(|| accum.borrow_mut().accumulate(&array))
-    });
+    c.bench_function("sum accum array", |b| b.iter(|| accum.accumulate(&array)));
 
     c.bench_function("sum accum scalar none", |b| {
-        b.iter(|| {
-            accum
-                .borrow_mut()
-                .accumulate(&ColumnarValue::Scalar(Some(ScalarValue::Float64(0_f64)), 1))
-        })
+        b.iter(|| accum.accumulate(&ColumnarValue::Scalar(Some(ScalarValue::Float64(0_f64)), 1)))
     });
 
     c.bench_function("sum accum scalar some", |b| {
-        b.iter(|| {
-            accum
-                .borrow_mut()
-                .accumulate(&ColumnarValue::Scalar(None, 1))
-        })
+        b.iter(|| accum.accumulate(&ColumnarValue::Scalar(None, 1)))
     });
 }
 

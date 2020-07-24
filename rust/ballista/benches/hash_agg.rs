@@ -1,10 +1,10 @@
 use ballista::arrow::datatypes::{DataType, Field, Schema};
+use ballista::datafusion::logicalplan::ScalarValue;
 use ballista::execution::expressions::{col, sum};
 use ballista::execution::physical_plan::{AggregateMode, ColumnarValue};
 use ballista::utils::datagen::DataGen;
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use datafusion::logicalplan::ScalarValue;
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let mut gen = DataGen::default();

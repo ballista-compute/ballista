@@ -17,16 +17,15 @@
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
-use crate::error::{ballista_error, BallistaError};
-use crate::execution::physical_plan::Action;
-use crate::protobuf;
-
 use crate::arrow::datatypes::Schema;
 use crate::arrow::flight::flight_data_to_batch;
-
 use crate::arrow::record_batch::RecordBatch;
-use flight::flight_service_client::FlightServiceClient;
-use flight::Ticket;
+use crate::error::{ballista_error, BallistaError};
+use crate::execution::physical_plan::Action;
+use crate::flight::flight_service_client::FlightServiceClient;
+use crate::flight::Ticket;
+use crate::protobuf;
+
 use prost::Message;
 
 pub async fn execute_action(

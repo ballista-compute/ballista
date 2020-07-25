@@ -14,6 +14,8 @@
 
 package org.ballistacompute.spark.benchmarks
 
+import org.ballistacompute.spark.benchmarks.nyctaxi.Benchmarks
+
 /**
   * This benchmark is designed to be called as a Docker container.
   */

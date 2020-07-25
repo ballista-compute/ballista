@@ -1,4 +1,4 @@
-package org.ballistacompute.spark.benchmarks
+package org.ballistacompute.spark.benchmarks.tpch
 
 import org.apache.spark.sql.types.{DataTypes, StructField, StructType}
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -6,10 +6,13 @@ import org.apache.spark.sql.{SaveMode, SparkSession}
 object Tpch {
 
   def main(arg: Array[String]): Unit = {
-    //convertToParquet("/mnt/tpch/10/lineitem.tbl", "./tmp")
-    q1()
-//    adhoc()
-//    repartition(24)
+
+    val spark: SparkSession = SparkSession.builder
+      .appName(this.getClass.getName)
+      .master("local[*]")
+      .getOrCreate()
+
+    q1(spark)
   }
 
   def repartition(n: Int) {
@@ -53,12 +56,7 @@ object Tpch {
 
   }
 
-  def q1(): Unit = {
-
-    val spark: SparkSession = SparkSession.builder
-      .appName(this.getClass.getName)
-      .master("local[24]")
-      .getOrCreate()
+  def q1(spark: SparkSession): Unit = {
 
     spark.time {
 

@@ -19,8 +19,8 @@ dependencies {
     implementation(project(":protobuf"))
     implementation(project(":execution"))
 
-    implementation("org.apache.arrow:arrow-vector:0.17.0")
+    implementation("org.apache.arrow:arrow-vector:1.0.0")
 
-    implementation("org.apache.arrow:flight-core:0.17.0")
-    implementation("org.apache.arrow:flight-grpc:0.17.0")
+    implementation("org.apache.arrow:flight-core:1.0.0")
+    implementation("org.apache.arrow:flight-grpc:1.0.0")
 }

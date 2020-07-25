@@ -14,5 +14,5 @@ dependencies {
     implementation(project(":sql"))
     implementation(project(":fuzzer"))
 
-    implementation("org.apache.arrow:arrow-vector:0.17.0")
+    implementation("org.apache.arrow:arrow-vector:1.0.0")
 }

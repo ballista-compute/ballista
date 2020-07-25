@@ -36,10 +36,6 @@ impl Avg {
 }
 
 impl AggregateExpr for Avg {
-    fn name(&self) -> String {
-        format!("AVG({:?})", self.input)
-    }
-
     fn data_type(&self, input_schema: &Schema) -> Result<DataType> {
         match self.input.data_type(input_schema)? {
             DataType::Int8

@@ -32,6 +32,7 @@ use crate::{
 use crate::execution::physical_plan::Partitioning;
 use async_trait::async_trait;
 use std::time::Instant;
+use arrow::record_batch::RecordBatch;
 
 /// FilterExec evaluates a boolean expression against each row of input to determine which rows
 /// to include in output batches.
@@ -129,11 +130,10 @@ fn apply_filter(batch: &ColumnarBatch, bitmask: &ColumnarValue) -> Result<Column
     let predicate = cast_array!(predicate, BooleanArray)?;
 
     let mut filtered_arrays = Vec::with_capacity(batch.num_columns());
-    for i in 0..batch.num_columns() {
-        let array = batch.column(i);
+    for column in batch.schema().fields().iter().map(|f| f.name()) {
+        let array = batch.column(column)?;
         let filtered_array = arrow::compute::filter(array.to_arrow()?.as_ref(), predicate)?;
-        filtered_arrays.push(ColumnarValue::Columnar(filtered_array));
+        filtered_arrays.push(filtered_array);
     }
-
-    Ok(ColumnarBatch::from_values(&filtered_arrays))
+    Ok(ColumnarBatch::from_arrow(&RecordBatch::try_new(batch.schema(), filtered_arrays)?))
 }

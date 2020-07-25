@@ -20,40 +20,34 @@ use crate::arrow::datatypes::{DataType, Schema};
 use crate::error::Result;
 use crate::execution::physical_plan::{ColumnarBatch, ColumnarValue, Expression};
 
-/// Reference to a column by index
+/// Reference to a column by name
 #[derive(Debug)]
 pub struct Column {
-    index: usize,
     name: String,
 }
 
 impl Column {
-    pub fn new(index: usize, name: &str) -> Self {
+    pub fn new(name: &str) -> Self {
         Self {
-            index,
             name: name.to_owned(),
         }
     }
 }
 
-pub fn col(index: usize, name: &str) -> Arc<dyn Expression> {
-    Arc::new(Column::new(index, name))
+pub fn col(name: &str) -> Arc<dyn Expression> {
+    Arc::new(Column::new(name))
 }
 
 impl Expression for Column {
-    fn name(&self) -> String {
-        self.name.clone()
-    }
-
     fn data_type(&self, input_schema: &Schema) -> Result<DataType> {
-        Ok(input_schema.field(self.index).data_type().clone())
+        Ok(input_schema.field_with_name(&self.name)?.data_type().clone())
     }
 
     fn nullable(&self, input_schema: &Schema) -> Result<bool> {
-        Ok(input_schema.field(self.index).is_nullable())
+        Ok(input_schema.field_with_name(&self.name)?.is_nullable())
     }
 
     fn evaluate(&self, input: &ColumnarBatch) -> Result<ColumnarValue> {
-        Ok(input.column(self.index).clone())
+        Ok(input.column(&self.name)?.clone())
     }
 }

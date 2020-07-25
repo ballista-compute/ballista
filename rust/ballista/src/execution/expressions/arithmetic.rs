@@ -46,10 +46,6 @@ pub fn add(l: Arc<dyn Expression>, r: Arc<dyn Expression>) -> Arc<dyn Expression
 }
 
 impl Expression for Add {
-    fn name(&self) -> String {
-        format!("{} + {}", self.l.name(), self.r.name())
-    }
-
     fn data_type(&self, input_schema: &Schema) -> Result<DataType> {
         self.l.data_type(input_schema)
     }
@@ -100,10 +96,6 @@ pub fn subtract(l: Arc<dyn Expression>, r: Arc<dyn Expression>) -> Arc<dyn Expre
 }
 
 impl Expression for Subtract {
-    fn name(&self) -> String {
-        format!("{} - {}", self.l.name(), self.r.name())
-    }
-
     fn data_type(&self, input_schema: &Schema) -> Result<DataType> {
         self.l.data_type(input_schema)
     }
@@ -156,10 +148,6 @@ pub fn mult(l: Arc<dyn Expression>, r: Arc<dyn Expression>) -> Arc<dyn Expressio
 }
 
 impl Expression for Multiply {
-    fn name(&self) -> String {
-        format!("{} * {}", self.l.name(), self.r.name())
-    }
-
     fn data_type(&self, input_schema: &Schema) -> Result<DataType> {
         self.l.data_type(input_schema)
     }
@@ -212,10 +200,6 @@ pub fn div(l: Arc<dyn Expression>, r: Arc<dyn Expression>) -> Arc<dyn Expression
 }
 
 impl Expression for Divide {
-    fn name(&self) -> String {
-        format!("{} / {}", self.l.name(), self.r.name())
-    }
-
     fn data_type(&self, input_schema: &Schema) -> Result<DataType> {
         self.l.data_type(input_schema)
     }

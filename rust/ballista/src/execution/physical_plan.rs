@@ -23,13 +23,13 @@
 //! The physical plan also accounts for partitioning and ordering of data between operators.
 
 use std::fmt::{self, Debug};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::arrow::array::{
     ArrayRef, Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder,
     Int8Builder, StringBuilder, UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder,
 };
-use crate::arrow::datatypes::{DataType, Field, Schema};
+use crate::arrow::datatypes::{DataType, Schema};
 use crate::arrow::record_batch::RecordBatch;
 use crate::datafusion::logicalplan::Expr;
 use crate::datafusion::logicalplan::LogicalPlan;
@@ -126,28 +126,16 @@ pub trait ExecutionPlan: Send + Sync {
 }
 
 pub trait Expression: Send + Sync + Debug {
-    /// Get the name to use in a schema to represent the result of this expression
-    fn name(&self) -> String;
     /// Get the data type of this expression, given the schema of the input
     fn data_type(&self, input_schema: &Schema) -> Result<DataType>;
     /// Decide whether this expression is nullable, given the schema of the input
     fn nullable(&self, input_schema: &Schema) -> Result<bool>;
     /// Evaluate an expression against a ColumnarBatch to produce a scalar or columnar result.
     fn evaluate(&self, input: &ColumnarBatch) -> Result<ColumnarValue>;
-    /// Generate schema Field type for this expression
-    fn to_schema_field(&self, input_schema: &Schema) -> Result<Field> {
-        Ok(Field::new(
-            &self.name(),
-            self.data_type(input_schema)?,
-            self.nullable(input_schema)?,
-        ))
-    }
 }
 
 /// Aggregate expression that can be evaluated against a RecordBatch
 pub trait AggregateExpr: Send + Sync + Debug {
-    /// Get the name to use in a schema to represent the result of this expression
-    fn name(&self) -> String;
     /// Get the data type of this expression, given the schema of the input
     fn data_type(&self, input_schema: &Schema) -> Result<DataType>;
     /// Decide whether this expression is nullable, given the schema of the input
@@ -156,14 +144,6 @@ pub trait AggregateExpr: Send + Sync + Debug {
     fn evaluate_input(&self, batch: &ColumnarBatch) -> Result<ColumnarValue>;
     /// Create an accumulator for this aggregate expression
     fn create_accumulator(&self, mode: &AggregateMode) -> Box<dyn Accumulator>;
-    /// Generate schema Field type for this expression
-    fn to_schema_field(&self, input_schema: &Schema) -> Result<Field> {
-        Ok(Field::new(
-            &self.name(),
-            self.data_type(input_schema)?,
-            self.nullable(input_schema)?,
-        ))
-    }
 }
 
 /// Aggregate accumulator
@@ -192,7 +172,7 @@ pub type MaybeColumnarBatch = Result<Option<ColumnarBatch>>;
 #[derive(Debug, Clone)]
 pub struct ColumnarBatch {
     schema: Arc<Schema>,
-    columns: Vec<ColumnarValue>,
+    columns: HashMap<String, ColumnarValue>,
 }
 
 impl ColumnarBatch {
@@ -200,7 +180,9 @@ impl ColumnarBatch {
         let columns = batch
             .columns()
             .iter()
-            .map(|c| ColumnarValue::Columnar(c.clone()))
+            .enumerate()
+            .map(|(i, array)|
+                (batch.schema().field(i).name().clone(), ColumnarValue::Columnar(array.clone())))
             .collect();
         Self {
             schema: batch.schema(),
@@ -208,29 +190,26 @@ impl ColumnarBatch {
         }
     }
 
-    pub fn from_values(values: &[ColumnarValue]) -> Self {
-        let schema = Schema::new(
-            values
-                .iter()
-                .enumerate()
-                .map(|(i, value)| Field::new(&format!("c{}", i), value.data_type().clone(), true))
-                .collect(),
-        );
+    pub fn from_values(values: &[ColumnarValue], schema: &Schema) -> Self {
+        let columns = schema.fields().iter().enumerate().map(
+                |(i, f)| (f.name().clone(), values[i].clone())).collect();
         Self {
-            schema: Arc::new(schema),
-            columns: values.to_vec(),
+            schema: Arc::new(schema.clone()),
+            columns,
         }
     }
 
     pub fn to_arrow(&self) -> Result<RecordBatch> {
         let arrays = self
-            .columns
+            .schema().fields()
             .iter()
-            .map(|c| match c {
-                ColumnarValue::Columnar(array) => Ok(array.clone()),
-                ColumnarValue::Scalar(_, _) => {
-                    // note that this can be implemented easily if needed
-                    Err(ballista_error("Cannot convert scalar value to Arrow array"))
+            .map(|c| {
+                match self.column(c.name())? {
+                    ColumnarValue::Columnar(array) => Ok(array.clone()),
+                    ColumnarValue::Scalar(_, _) => {
+                        // note that this can be implemented easily if needed
+                        Err(ballista_error("Cannot convert scalar value to Arrow array"))
+                    }
                 }
             })
             .collect::<Result<Vec<_>>>()?;
@@ -246,11 +225,11 @@ impl ColumnarBatch {
     }
 
     pub fn num_rows(&self) -> usize {
-        self.columns[0].len()
+        self.columns[self.schema().field(0).name()].len()
     }
 
-    pub fn column(&self, index: usize) -> &ColumnarValue {
-        &self.columns[index]
+    pub fn column(&self, name: &str) -> Result<&ColumnarValue> {
+        Ok(&self.columns[name])
     }
 }
 
@@ -524,8 +503,7 @@ pub struct ShuffleLocation {}
 pub fn compile_expression(expr: &Expr, input: &Schema) -> Result<Arc<dyn Expression>> {
     match expr {
         Expr::Alias(expr, name) => Ok(alias(compile_expression(expr, input)?, name)),
-        Expr::Column(n) => Ok(col(*n, input.field(*n).name())),
-        Expr::UnresolvedColumn(name) => Ok(col(input.index_of(name)?, name)),
+        Expr::Column(name) => Ok(col(name)),
         Expr::Literal(value) => Ok(lit(value.to_owned())),
         Expr::BinaryExpr { left, op, right } => {
             let l = compile_expression(left, input)?;

@@ -34,10 +34,6 @@ impl Count {
 }
 
 impl AggregateExpr for Count {
-    fn name(&self) -> String {
-        format!("COUNT({:?})", self.input)
-    }
-
     fn data_type(&self, _input_schema: &Schema) -> Result<DataType> {
         Ok(DataType::UInt64)
     }

@@ -20,11 +20,12 @@ use crate::arrow::datatypes::Schema;
 use crate::datafusion::logicalplan::Expr;
 use crate::error::Result;
 use crate::execution::physical_plan::{
-    compile_expressions, ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ColumnarValue,
-    ExecutionContext, ExecutionPlan, Expression, Partitioning, PhysicalPlan,
+    ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream,
+    ExecutionContext, ExecutionPlan, Expression, Partitioning, PhysicalPlan, compile_expression,
 };
 
 use async_trait::async_trait;
+use arrow::datatypes::Field;
 
 /// Projection operator evaluates expressions against an input.
 #[derive(Debug, Clone)]
@@ -39,19 +40,27 @@ pub struct ProjectionExec {
 
 impl ProjectionExec {
     pub fn try_new(expr: &[Expr], child: Arc<PhysicalPlan>) -> Result<Self> {
-        let exprs = compile_expressions(&expr, &child.as_execution_plan().schema())?;
-
         let input_schema = child.as_execution_plan().schema();
+
+        let exprs: Vec<(Arc<dyn Expression>, String)> = expr.iter().map(|expr| {
+            Ok((compile_expression(expr, &child.as_execution_plan().schema())?, expr.name(&input_schema)?.clone()))
+        }).collect::<Result<Vec<_>>>()?;
 
         let fields: Result<Vec<_>> = exprs
             .iter()
-            .map(|e| e.to_schema_field(&input_schema))
+            .map(|(expr, name)| {
+                Ok(Field::new(
+                    name,
+                    expr.data_type(&input_schema)?,
+                    expr.nullable(&input_schema)?,
+                ))
+            })
             .collect();
 
         let schema = Arc::new(Schema::new(fields?));
 
         Ok(Self {
-            exprs,
+            exprs: exprs.iter().map(|e| e.0.clone()).collect(),
             child,
             schema,
         })
@@ -84,6 +93,7 @@ impl ExecutionPlan for ProjectionExec {
                 .execute(ctx.clone(), partition_index)
                 .await?,
             projection: self.exprs.clone(),
+            schema: self.schema.clone(),
         }))
     }
 }
@@ -92,23 +102,24 @@ impl ExecutionPlan for ProjectionExec {
 struct ProjectionIter {
     input: ColumnarBatchStream,
     projection: Vec<Arc<dyn Expression>>,
+    schema: Arc<Schema>,
 }
 
 #[async_trait]
 impl ColumnarBatchIter for ProjectionIter {
     fn schema(&self) -> Arc<Schema> {
-        unimplemented!()
+        self.schema.clone()
     }
 
     async fn next(&self) -> Result<Option<ColumnarBatch>> {
         match self.input.next().await? {
             Some(batch) => {
-                let projected_values: Vec<ColumnarValue> = self
+                let projected_values = self
                     .projection
                     .iter()
                     .map(|e| e.evaluate(&batch))
                     .collect::<Result<Vec<_>>>()?;
-                Ok(Some(ColumnarBatch::from_values(&projected_values)))
+                Ok(Some(ColumnarBatch::from_values(&projected_values, self.schema().as_ref())))
             }
             None => Ok(None),
         }

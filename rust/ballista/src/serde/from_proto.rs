@@ -144,10 +144,8 @@ impl TryInto<Expr> for &protobuf::LogicalExprNode {
                 op: from_proto_binary_op(&binary_expr.op)?,
                 right: Box::new(parse_required_expr(&binary_expr.r)?),
             })
-        } else if self.has_column_index {
-            Ok(Expr::Column(self.column_index as usize))
         } else if self.has_column_name {
-            Ok(Expr::UnresolvedColumn(self.column_name.clone()))
+            Ok(Expr::Column(self.column_name.clone()))
         } else if self.has_literal_string {
             Ok(Expr::Literal(ScalarValue::Utf8(
                 self.literal_string.clone(),

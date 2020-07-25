@@ -36,10 +36,6 @@ impl Alias {
 }
 
 impl Expression for Alias {
-    fn name(&self) -> String {
-        self.alias.clone()
-    }
-
     fn data_type(&self, input_schema: &Schema) -> Result<DataType> {
         self.expr.data_type(input_schema)
     }
@@ -73,10 +69,6 @@ impl AliasedAggregate {
 }
 
 impl AggregateExpr for AliasedAggregate {
-    fn name(&self) -> String {
-        self.alias.clone()
-    }
-
     fn data_type(&self, input_schema: &Schema) -> Result<DataType> {
         self.expr.data_type(input_schema)
     }

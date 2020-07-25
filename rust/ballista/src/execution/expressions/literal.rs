@@ -31,10 +31,6 @@ impl Literal {
 }
 
 impl Expression for Literal {
-    fn name(&self) -> String {
-        format!("{:?}", self.value)
-    }
-
     fn data_type(&self, _input_schema: &Schema) -> Result<DataType> {
         match &self.value {
             ScalarValue::UInt8(_) => Ok(DataType::UInt8),

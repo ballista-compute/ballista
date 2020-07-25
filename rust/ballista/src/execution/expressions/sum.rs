@@ -36,10 +36,6 @@ impl Sum {
 }
 
 impl AggregateExpr for Sum {
-    fn name(&self) -> String {
-        format!("SUM({:?})", self.input)
-    }
-
     fn data_type(&self, input_schema: &Schema) -> Result<DataType> {
         match self.input.data_type(input_schema)? {
             DataType::Int8 | DataType::Int16 | DataType::Int32 | DataType::Int64 => {

@@ -14,9 +14,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         Field::new("c1", DataType::Int32, false),
     ]);
     let batch = gen.create_batch(&schema, 1024).unwrap();
-    let array = batch.column(0);
+    let array = batch.column("c1");
 
-    let aggr_expr = sum(col(1, "c1"));
+    let aggr_expr = sum(col("c1"));
     let mut accum = aggr_expr.create_accumulator(&AggregateMode::Partial);
 
     c.bench_function("sum accum array", |b| b.iter(|| accum.accumulate(&array)));

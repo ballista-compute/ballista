@@ -39,7 +39,7 @@ pub fn decode_protobuf(bytes: &[u8]) -> Result<Action, BallistaError> {
 mod tests {
     use crate::arrow::datatypes::{DataType, Field, Schema};
     use crate::datafusion::execution::physical_plan::csv::CsvReadOptions;
-    use crate::datafusion::logicalplan::{col, lit_str, Expr, LogicalPlanBuilder};
+    use crate::datafusion::logicalplan::{col, lit, Expr, LogicalPlanBuilder};
     use crate::error::Result;
     use crate::execution::physical_plan::Action;
     use crate::protobuf;
@@ -60,7 +60,7 @@ mod tests {
             CsvReadOptions::new().schema(&schema).has_header(true),
             None,
         )
-        .and_then(|plan| plan.filter(col("state").eq(&lit_str("CO"))))
+        .and_then(|plan| plan.filter(col("state").eq(&lit("CO"))))
         .and_then(|plan| plan.project(vec![col("id")]))
         .and_then(|plan| plan.build())
         .unwrap();

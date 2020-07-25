@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use ballista::arrow::datatypes::{DataType, Field, Schema};
 use ballista::dataframe::{avg, count, max, min, sum};
-use ballista::datafusion::logicalplan::col_index;
+use ballista::datafusion::logicalplan::col;
 use ballista::distributed::executor::{DefaultContext, DiscoveryMode, ExecutorConfig};
 use ballista::execution::operators::FilterExec;
 use ballista::execution::operators::HashAggregateExec;
@@ -34,20 +34,20 @@ async fn execute(use_filter: bool) {
         // WHERE col(0) >= col(0), which must not affect the final result
         child = PhysicalPlan::Filter(Arc::new(FilterExec::new(
             &child,
-            &col_index(0).gt_eq(&col_index(0)),
+            &col("c0").gt_eq(&col("c0")),
         )));
     }
 
     let hash_agg = PhysicalPlan::HashAggregate(Arc::new(
         HashAggregateExec::try_new(
             AggregateMode::Partial,
-            vec![col_index(0)],
+            vec![col("c0")],
             vec![
-                min(col_index(1)).alias("max_c1"),
-                max(col_index(1)),
-                avg(col_index(1)),
-                sum(col_index(1)),
-                count(col_index(1)),
+                min(col("c1")).alias("max_c1"),
+                max(col("c1")),
+                avg(col("c1")),
+                sum(col("c1")),
+                count(col("c1")),
             ],
             Arc::new(child),
         )
@@ -75,12 +75,12 @@ async fn execute(use_filter: bool) {
     assert_eq!(251, batch.num_rows());
     assert_eq!(6, batch.num_columns());
 
-    assert_eq!(batch.column(0).data_type(), &DataType::Int8);
-    assert_eq!(batch.column(1).data_type(), &DataType::Int64);
-    assert_eq!(batch.column(2).data_type(), &DataType::Int64);
-    assert_eq!(batch.column(3).data_type(), &DataType::Float64);
-    assert_eq!(batch.column(4).data_type(), &DataType::Int64);
-    assert_eq!(batch.column(5).data_type(), &DataType::UInt64);
+    assert_eq!(batch.column("c0").unwrap().data_type(), &DataType::Int8);
+    assert_eq!(batch.column("max_c1").unwrap().data_type(), &DataType::Int64);
+    assert_eq!(batch.column("MAX(c1)").unwrap().data_type(), &DataType::Int64);
+    assert_eq!(batch.column("AVG(c1)").unwrap().data_type(), &DataType::Float64);
+    assert_eq!(batch.column("SUM(c1)").unwrap().data_type(), &DataType::Int64);
+    assert_eq!(batch.column("COUNT(c1)").unwrap().data_type(), &DataType::UInt64);
 }
 
 #[test]

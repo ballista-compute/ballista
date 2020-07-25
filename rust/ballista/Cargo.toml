@@ -32,17 +32,10 @@ random-fast-rng = "0.1.1"
 structopt = "0.3"
 etcd-client = "0.5"
 
-# Ballista 0.3.x releases depend on the officla Arrow 1.0.0 release
-arrow = "1.0.0"
-arrow-flight = "1.0.0"
-datafusion = "1.0.0"
-parquet = "1.0.0"
-
-# Ballista 0.4.0-SNAPSHOT depends on latest Arrow
-#arrow = { git = "https://github.com/apache/arrow" }
-#arrow-flight = { git = "https://github.com/apache/arrow" }
-#datafusion = { git = "https://github.com/apache/arrow" }
-#parquet = { git = "https://github.com/apache/arrow" }
+arrow = { git = "https://github.com/apache/arrow" }
+arrow-flight = { git = "https://github.com/apache/arrow" }
+datafusion = { git = "https://github.com/apache/arrow" }
+parquet = { git = "https://github.com/apache/arrow" }
 
 [[bin]]
 name = "executor"

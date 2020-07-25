@@ -64,10 +64,6 @@ macro_rules! compare_op {
 }
 
 impl Expression for Comparison {
-    fn name(&self) -> String {
-        format!("{:?} {:?} {:?}", self.l, self.op, self.r)
-    }
-
     fn data_type(&self, _input_schema: &Schema) -> Result<DataType> {
         Ok(DataType::Boolean)
     }

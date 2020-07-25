@@ -22,10 +22,8 @@ use std::sync::Arc;
 use std::thread;
 use uuid::Uuid;
 
-use crate::dataframe::{avg, count, max, min, sum};
 use crate::datafusion::execution::physical_plan::csv::CsvReadOptions;
 use crate::datafusion::logicalplan::LogicalPlan;
-use crate::datafusion::logicalplan::{col_index, Expr};
 use crate::distributed::executor::DefaultContext;
 use crate::error::{ballista_error, BallistaError, Result};
 use crate::execution::operators::ProjectionExec;
@@ -397,52 +395,11 @@ pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Arc<PhysicalPlan>> {
                 let partial = Arc::new(PhysicalPlan::HashAggregate(Arc::new(partial_hash_exec)));
 
                 // Create final hash aggregate to run on the coalesced partition of the results
-                // from the partial hash aggregate
-
-                let mut final_group = vec![];
-                for i in 0..group_expr.len() {
-                    final_group.push(col_index(i as usize));
-                }
-
-                //TODO this is ugly and shows that the design needs revisiting here
-
-                let mut final_aggr = vec![];
-                for (i, expr) in aggr_expr.iter().enumerate() {
-                    let j = group_expr.len() + i;
-                    match expr {
-                        Expr::AggregateFunction { name, .. } => {
-                            let expr = match name.as_str() {
-                                "SUM" => sum(col_index(j)),
-                                "MIN" => min(col_index(j)),
-                                "MAX" => max(col_index(j)),
-                                "AVG" => avg(col_index(j)),
-                                "COUNT" => count(col_index(j)),
-                                _ => panic!(),
-                            };
-                            final_aggr.push(expr);
-                        }
-                        Expr::Alias(expr, alias) => match expr.as_ref() {
-                            Expr::AggregateFunction { name, .. } => {
-                                let expr = match name.as_str() {
-                                    "SUM" => sum(col_index(j)).alias(alias),
-                                    "MIN" => min(col_index(j)).alias(alias),
-                                    "MAX" => max(col_index(j)).alias(alias),
-                                    "AVG" => avg(col_index(j)).alias(alias),
-                                    "COUNT" => count(col_index(j)).alias(alias),
-                                    _ => panic!(),
-                                };
-                                final_aggr.push(expr);
-                            }
-                            _ => panic!(),
-                        },
-                        _ => panic!(),
-                    }
-                }
 
                 let final_hash_exec = HashAggregateExec::try_new(
                     AggregateMode::Final,
-                    final_group,
-                    final_aggr,
+                    group_expr.clone(),
+                    aggr_expr.clone(),
                     partial,
                 )?;
                 Ok(Arc::new(PhysicalPlan::HashAggregate(Arc::new(

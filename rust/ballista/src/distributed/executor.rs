@@ -344,7 +344,6 @@ fn rewrite_expr_list(expr: &[Expr], schema: &Schema) -> datafusion::error::Resul
 fn rewrite_expr(expr: &Expr, schema: &Schema) -> datafusion::error::Result<Expr> {
     match expr {
         Expr::Alias(expr, alias) => Ok(rewrite_expr(&expr, schema)?.alias(&alias)),
-        Expr::UnresolvedColumn(name) => Ok(Expr::Column(schema.index_of(&name)?)),
         Expr::BinaryExpr { left, op, right } => Ok(Expr::BinaryExpr {
             left: Box::new(rewrite_expr(&left, schema)?),
             op: op.clone(),

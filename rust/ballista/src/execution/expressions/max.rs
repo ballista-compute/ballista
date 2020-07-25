@@ -38,10 +38,6 @@ impl Max {
 }
 
 impl AggregateExpr for Max {
-    fn name(&self) -> String {
-        format!("MAX({:?})", self.expr)
-    }
-
     fn data_type(&self, input_schema: &Schema) -> Result<DataType> {
         match self.expr.data_type(input_schema)? {
             DataType::Int8 | DataType::Int16 | DataType::Int32 | DataType::Int64 => {

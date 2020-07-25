@@ -22,10 +22,9 @@ use crate::arrow::record_batch::RecordBatch;
 pub use crate::datafusion::datasource::csv::CsvReadOptions;
 use crate::datafusion::datasource::parquet::ParquetTable;
 use crate::datafusion::datasource::TableProvider;
-use crate::datafusion::logicalplan::Operator;
+use crate::datafusion::logicalplan::{Operator, exprlist_to_fields};
 use crate::datafusion::logicalplan::ScalarValue;
 use crate::datafusion::logicalplan::{Expr, FunctionMeta, LogicalPlan, LogicalPlanBuilder};
-use crate::datafusion::optimizer::utils::exprlist_to_fields;
 use crate::datafusion::sql::parser::{DFASTNode, DFParser};
 use crate::datafusion::sql::planner::{SchemaProvider, SqlToRel};
 use crate::distributed::client;
@@ -323,7 +322,7 @@ impl DataFrame {
             let mut expr_vec = vec![];
             (0..expr.len()).for_each(|i| match &expr[i] {
                 Expr::Wildcard => {
-                    (0..input_schema.fields().len()).for_each(|i| expr_vec.push(Expr::Column(i)));
+                    input_schema.fields().iter().for_each(|f| expr_vec.push(Expr::Column(f.name().clone())));
                 }
                 _ => expr_vec.push(expr[i].clone()),
             });
@@ -473,7 +472,7 @@ pub fn count(expr: Expr) -> Expr {
 
 /// Create a column expression based on a column name
 pub fn col(name: &str) -> Expr {
-    Expr::UnresolvedColumn(name.to_owned())
+    Expr::Column(name.to_owned())
 }
 
 pub fn alias(expr: &Expr, name: &str) -> Expr {

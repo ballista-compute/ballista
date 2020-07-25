@@ -3,12 +3,12 @@ spec:
     - name: spark
       image: ballistacompute/spark:3.0.0
       resources:
-#        requests:
-#          cpu: "1"
-#          memory: "1024Mi"
-#        limits:
-#          cpu: "2"
-#          memory: "2048Mi"
+        requests:
+          cpu: "1"
+          memory: "1024Mi"
+        limits:
+          cpu: "2"
+          memory: "2048Mi"
       volumeMounts:
         - mountPath: /mnt
           name: data

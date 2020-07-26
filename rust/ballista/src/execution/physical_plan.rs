@@ -201,7 +201,7 @@ impl ColumnarBatch {
 
     pub fn to_arrow(&self) -> Result<RecordBatch> {
         let arrays = self
-            .schema().fields()
+            .schema.fields()
             .iter()
             .map(|c| {
                 match self.column(c.name())? {
@@ -225,7 +225,7 @@ impl ColumnarBatch {
     }
 
     pub fn num_rows(&self) -> usize {
-        self.columns[self.schema().field(0).name()].len()
+        self.columns[self.schema.field(0).name()].len()
     }
 
     pub fn column(&self, name: &str) -> Result<&ColumnarValue> {

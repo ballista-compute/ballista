@@ -9,29 +9,52 @@ use ballista::distributed::executor::{DefaultContext, DiscoveryMode, ExecutorCon
 use ballista::execution::operators::FilterExec;
 use ballista::execution::operators::HashAggregateExec;
 use ballista::execution::operators::InMemoryTableScanExec;
-use ballista::execution::physical_plan::{AggregateMode, ColumnarBatchStream, PhysicalPlan};
-use ballista::utils::datagen::DataGen;
+use ballista::execution::physical_plan::{AggregateMode, ColumnarBatchStream, PhysicalPlan, ColumnarBatch};
+use ballista::error::Result;
+use ballista::utils::pretty::result_str;
 use std::collections::HashMap;
 use std::time::Instant;
+use arrow::{array::Int32Array, record_batch::RecordBatch};
+
+
+pub fn build_table_i32(
+    a: (&str, &Vec<i32>),
+    b: (&str, &Vec<i32>),
+    c: (&str, &Vec<i32>),
+) -> Result<(RecordBatch, Schema)> {
+    let schema = Schema::new(vec![
+        Field::new(a.0, DataType::Int32, false),
+        Field::new(b.0, DataType::Int32, false),
+        Field::new(c.0, DataType::Int32, false),
+    ]);
+
+    let batch = RecordBatch::try_new(
+        Arc::new(schema.clone()),
+        vec![
+            Arc::new(Int32Array::from(a.1.clone())),
+            Arc::new(Int32Array::from(b.1.clone())),
+            Arc::new(Int32Array::from(c.1.clone())),
+        ],
+    )?;
+    Ok((batch, schema))
+}
+
 
 async fn execute(use_filter: bool) {
     //TODO remove unwraps
+    let (batch, _) = build_table_i32(
+        ("c0", &vec![1, 1, 3]),
+        ("c1", &vec![1, 2, 3]),
+        ("c2", &vec![1, 2, 3]),
+    ).unwrap();
+    let batch = ColumnarBatch::from_arrow(&batch);
 
-    let mut gen = DataGen::default();
+    let batches = vec![batch.clone(), batch];
 
-    let schema = Schema::new(vec![
-        Field::new("c0", DataType::Int8, true),
-        Field::new("c1", DataType::Int32, false),
-    ]);
-    let batch = gen.create_batch(&schema, 1024).unwrap();
-
-    let mut child = PhysicalPlan::InMemoryTableScan(Arc::new(InMemoryTableScanExec::new(vec![
-        batch.clone(),
-        batch,
-    ])));
+    let mut child = PhysicalPlan::InMemoryTableScan(Arc::new(InMemoryTableScanExec::new(batches)));
 
     if use_filter {
-        // WHERE col(0) >= col(0), which must not affect the final result
+        // WHERE col(c0) >= col(c0), which must not affect the final result
         child = PhysicalPlan::Filter(Arc::new(FilterExec::new(
             &child,
             &col("c0").gt_eq(&col("c0")),
@@ -72,15 +95,24 @@ async fn execute(use_filter: bool) {
 
     let batch = &results[0];
 
-    assert_eq!(251, batch.num_rows());
+    assert_eq!(2, batch.num_rows());
     assert_eq!(6, batch.num_columns());
 
-    assert_eq!(batch.column("c0").unwrap().data_type(), &DataType::Int8);
+    assert_eq!(batch.column("c0").unwrap().data_type(), &DataType::Int32);
     assert_eq!(batch.column("max_c1").unwrap().data_type(), &DataType::Int64);
     assert_eq!(batch.column("MAX(c1)").unwrap().data_type(), &DataType::Int64);
     assert_eq!(batch.column("AVG(c1)").unwrap().data_type(), &DataType::Float64);
     assert_eq!(batch.column("SUM(c1)").unwrap().data_type(), &DataType::Int64);
     assert_eq!(batch.column("COUNT(c1)").unwrap().data_type(), &DataType::UInt64);
+
+    let result = batch.to_arrow().unwrap();
+
+    let r = result_str(&vec![result]).unwrap();
+
+    // there are two batches => sum and count double
+    let expected = vec!["1\t1\t2\t1.5\t6\t4", "3\t3\t3\t3.0\t6\t2"];
+
+    assert_eq!(r, expected);
 }
 
 #[test]

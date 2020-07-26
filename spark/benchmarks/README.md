@@ -15,7 +15,7 @@ Relies on rbac and pv from top-level kubernetes dir in this repo
 ## Build Docker Image
 
 ```bash
-docker build -t ballistacompute/spark-benchmarks:0.3.0-SNAPSHOT .
+docker build -t ballistacompute/spark-benchmarks:0.3.0-alpha-1 .
 ```
 
 ## Deploy

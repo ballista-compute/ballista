@@ -8,5 +8,5 @@ $SPARK_HOME/bin/spark-submit \
     --conf spark.kubernetes.driver.podTemplateFile=pod-template.yaml \
     --conf spark.kubernetes.executor.podTemplateFile=pod-template.yaml \
     --conf spark.executor.instances=12 \
-    --conf spark.kubernetes.container.image=ballistacompute/spark-benchmarks:0.3.0-SNAPSHOT \
+    --conf spark.kubernetes.container.image=ballistacompute/spark-benchmarks:0.3.0-alpha-1 \
     local:////opt/ballista/jars/benchmarks.jar

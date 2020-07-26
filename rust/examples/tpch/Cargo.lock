@@ -224,7 +224,7 @@ dependencies = [
 
 [[package]]
 name = "ballista"
-version = "0.3.0-SNAPSHOT"
+version = "0.3.0-alpha-1"
 dependencies = [
  "arrow",
  "arrow-flight",
@@ -3238,7 +3238,7 @@ dependencies = [
 
 [[package]]
 name = "tpch"
-version = "0.3.0-SNAPSHOT"
+version = "0.3.0-alpha-1"
 dependencies = [
  "ballista",
  "tokio 0.2.21",

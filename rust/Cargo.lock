@@ -209,7 +209,7 @@ dependencies = [
 
 [[package]]
 name = "ballista"
-version = "0.3.0-SNAPSHOT"
+version = "0.3.0-alpha-1"
 dependencies = [
  "arrow",
  "arrow-flight",
@@ -700,7 +700,7 @@ checksum = "212d0f5754cb6769937f4501cc0e67f4f4483c8d2c3e1e922ee9edbe4ab4c7c0"
 
 [[package]]
 name = "distributed-query"
-version = "0.3.0-SNAPSHOT"
+version = "0.3.0-alpha-1"
 dependencies = [
  "ballista",
  "structopt",
@@ -2624,7 +2624,7 @@ dependencies = [
 
 [[package]]
 name = "spark-rust-bindings"
-version = "0.3.0-SNAPSHOT"
+version = "0.3.0-alpha-1"
 dependencies = [
  "ballista",
  "tokio 0.2.21",
@@ -3335,7 +3335,7 @@ dependencies = [
 
 [[package]]
 name = "tpch"
-version = "0.3.0-SNAPSHOT"
+version = "0.3.0-alpha-1"
 dependencies = [
  "ballista",
  "tokio 0.2.21",

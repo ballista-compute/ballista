@@ -303,6 +303,7 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                         // build queue of tasks per executor
                         let mut next_executor_id = 0;
                         let mut executor_tasks = HashMap::new();
+                        #[allow(clippy::needless_range_loop)]
                         for i in 0..executors.len() {
                             executor_tasks.insert(executors[i].id.clone(), vec![]);
                         }
@@ -330,6 +331,8 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                         }
 
                         let mut threads = vec![];
+
+                        #[allow(clippy::needless_range_loop)]
                         for i in 0..executors.len() {
                             let executor = executors[i].clone();
                             let queue = executor_tasks
@@ -400,7 +403,7 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                                                     {
                                                         Ok(shuffle_id) => {
                                                             println!("Task {} completed", task_key);
-                                                            shuffle_ids.push(shuffle_id.clone());
+                                                            shuffle_ids.push(shuffle_id);
                                                             task_status[i] = TaskStatus::Completed(shuffle_id)
                                                         }
                                                         Err(e) => {
@@ -448,7 +451,7 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                                     .iter()
                                     .find(|e| e.id == executor_shuffle_ids.executor_id)
                                     .unwrap();
-                                shuffle_location_map.insert(shuffle_id.clone(), executor.clone());
+                                shuffle_location_map.insert(*shuffle_id, executor.clone());
                             }
                         }
                         stage_status_map.insert(stage.id, StageStatus::Completed);
@@ -462,7 +465,7 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
 
                             println!("stage final shuffle ids: {:?}", stage_shuffle_ids);
 
-                            if stage_shuffle_ids.len() > 0 {
+                            if !stage_shuffle_ids.is_empty() {
                                 let final_shuffle_ids = &stage_shuffle_ids[0]; //TODO Can't assume first one
                                 let final_shuffle_ids = &final_shuffle_ids.shuffle_ids;
                                 if final_shuffle_ids.len() == 1 {

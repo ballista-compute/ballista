@@ -18,7 +18,7 @@ metadata:
   name: ballista
 spec:
   serviceName: "ballista"
-  replicas: 6
+  replicas: 12
   selector:
     matchLabels:
       app: ballista
@@ -36,10 +36,10 @@ spec:
         resources:
           requests:
             cpu: "1"
-            memory: "2024Mi"
+            memory: "1024Mi"
           limits:
             cpu: "2"
-            memory: "4048Mi"
+            memory: "2048Mi"
         ports:
           - containerPort: 50051
             name: flight

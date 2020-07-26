@@ -122,7 +122,6 @@ impl ExecutionPlan for CsvScanExec {
             self.has_header,
             self.delimiter,
             &self.projection,
-            self.projected_schema.clone(),
             self.batch_size,
         )?))
     }
@@ -131,8 +130,6 @@ impl ExecutionPlan for CsvScanExec {
 struct CsvBatchIter {
     /// Arrow CSV reader
     reader: Arc<Mutex<csv::Reader<File>>>,
-    /// Schema after the projection has been applied
-    schema: SchemaRef,
 }
 
 impl CsvBatchIter {
@@ -143,7 +140,6 @@ impl CsvBatchIter {
         has_header: bool,
         delimiter: Option<u8>,
         projection: &Option<Vec<usize>>,
-        projected_schema: SchemaRef,
         batch_size: usize,
     ) -> Result<Self> {
         let file = File::open(filename)?;
@@ -158,17 +154,12 @@ impl CsvBatchIter {
 
         Ok(Self {
             reader: Arc::new(Mutex::new(reader)),
-            schema: projected_schema,
         })
     }
 }
 
 #[async_trait]
 impl ColumnarBatchIter for CsvBatchIter {
-    fn schema(&self) -> Arc<Schema> {
-        self.schema.clone()
-    }
-
     async fn next(&self) -> Result<Option<ColumnarBatch>> {
         let mut reader = self.reader.lock().expect("failed to lock mutex");
         match reader.next() {

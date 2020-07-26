@@ -144,14 +144,15 @@ impl ExecutionPlan for HashAggregateExec {
         for (i, expr) in aggr_expr.iter().enumerate() {
             fields.push(Field::new(&self.aggr_expr[i].name(&input_schema)?, expr.data_type(&input_schema)?, expr.nullable(&input_schema)?))
         }
-        let schema = Arc::new(Schema::new(fields));
+        let output_schema = Arc::new(Schema::new(fields));
 
         Ok(Arc::new(HashAggregateIter::new(
             &self.mode,
             input,
             group_expr,
             aggr_expr,
-            schema,
+            input_schema,
+            output_schema,
         )))
     }
 }
@@ -242,7 +243,8 @@ fn run(
     input: ColumnarBatchStream,
     group_expr: Vec<Arc<dyn Expression>>,
     aggr_expr: Vec<Arc<dyn AggregateExpr>>,
-    schema: &Schema,
+    input_schema: &Schema,
+    output_schema: &Schema,
 ) -> Result<()> {
     smol::run(async {
         // metrics
@@ -324,10 +326,10 @@ fn run(
         let prepare_final_batch_start = Instant::now();
         let batch = create_batch_from_accum_map(
             &map,
-            input.as_ref().schema().as_ref(),
             &group_expr,
             &aggr_expr,
-            schema,
+            &input_schema,
+            &output_schema,
         )?;
         let create_final_batch_time = prepare_final_batch_start.elapsed().as_millis();
 
@@ -469,14 +471,16 @@ impl HashAggregateIter {
         input: ColumnarBatchStream,
         group_expr: Vec<Arc<dyn Expression>>,
         aggr_expr: Vec<Arc<dyn AggregateExpr>>,
+        input_schema: Arc<Schema>,
         output_schema: Arc<Schema>,
     ) -> Self {
         let (tx, rx): (Sender<MaybeColumnarBatch>, Receiver<MaybeColumnarBatch>) = unbounded();
 
-        let a = output_schema.clone();
+        let move_input_schema = input_schema.clone();
+        let move_output_schema = output_schema.clone();
         let mode = mode.clone();
         let _ = std::thread::spawn(move || {
-            run(tx, &mode, input, group_expr, aggr_expr, &a).unwrap();
+            run(tx, &mode, input, group_expr, aggr_expr, &move_input_schema, &move_output_schema).unwrap();
         });
 
         Self {
@@ -547,10 +551,10 @@ fn create_key(
 /// Create a columnar batch from the hash map
 fn create_batch_from_accum_map(
     map: &HashMap<Vec<GroupByScalar>, AccumulatorSet>,
-    input_schema: &Schema,
     group_expr: &[Arc<dyn Expression>],
     aggr_expr: &[Arc<dyn AggregateExpr>],
-    schema: &Schema,
+    input_schema: &Schema,
+    output_schema: &Schema,
 ) -> Result<ColumnarBatch> {
     // build the result arrays
     let mut arrays: Vec<ArrayRef> = Vec::with_capacity(group_expr.len() + aggr_expr.len());
@@ -609,15 +613,11 @@ fn create_batch_from_accum_map(
         arrays.push(array?);
     }
 
-    Ok(ColumnarBatch::from_arrow(&RecordBatch::try_new(Arc::new(schema.clone()), arrays)?))
+    Ok(ColumnarBatch::from_arrow(&RecordBatch::try_new(Arc::new(output_schema.clone()), arrays)?))
 }
 
 #[async_trait]
 impl ColumnarBatchIter for HashAggregateIter {
-    fn schema(&self) -> Arc<Schema> {
-        self.schema.clone()
-    }
-
     async fn next(&self) -> Result<Option<ColumnarBatch>> {
         let channel = self.rx.clone();
         Task::blocking(async move {

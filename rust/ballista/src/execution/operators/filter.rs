@@ -101,10 +101,6 @@ struct FilterIter {
 
 #[async_trait]
 impl ColumnarBatchIter for FilterIter {
-    fn schema(&self) -> Arc<Schema> {
-        self.input.schema()
-    }
-
     async fn next(&self) -> Result<Option<ColumnarBatch>> {
         match self.input.next().await? {
             Some(input) => {

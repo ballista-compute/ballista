@@ -102,15 +102,12 @@ impl ExecutionPlan for ProjectionExec {
 struct ProjectionIter {
     input: ColumnarBatchStream,
     projection: Vec<Arc<dyn Expression>>,
+    /// The output schema of this projection
     schema: Arc<Schema>,
 }
 
 #[async_trait]
 impl ColumnarBatchIter for ProjectionIter {
-    fn schema(&self) -> Arc<Schema> {
-        self.schema.clone()
-    }
-
     async fn next(&self) -> Result<Option<ColumnarBatch>> {
         match self.input.next().await? {
             Some(batch) => {
@@ -119,7 +116,7 @@ impl ColumnarBatchIter for ProjectionIter {
                     .iter()
                     .map(|e| e.evaluate(&batch))
                     .collect::<Result<Vec<_>>>()?;
-                Ok(Some(ColumnarBatch::from_values(&projected_values, self.schema().as_ref())))
+                Ok(Some(ColumnarBatch::from_values(&projected_values, &self.schema)))
             }
             None => Ok(None),
         }

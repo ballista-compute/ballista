@@ -109,7 +109,6 @@ impl ExecutionPlan for ParquetScanExec {
 }
 
 pub struct ParquetBatchIter {
-    schema: Arc<Schema>,
     pub response_rx: Receiver<MaybeColumnarBatch>,
 }
 
@@ -129,13 +128,6 @@ impl ParquetBatchIter {
             Some(p) => p,
             None => (0..schema.fields().len()).collect(),
         };
-
-        let projected_schema = Schema::new(
-            projection
-                .iter()
-                .map(|i| schema.field(*i).clone())
-                .collect(),
-        );
 
         let (response_tx, response_rx): (Sender<MaybeColumnarBatch>, Receiver<MaybeColumnarBatch>) =
             unbounded();
@@ -208,7 +200,6 @@ impl ParquetBatchIter {
         });
 
         Ok(Self {
-            schema: Arc::new(projected_schema),
             response_rx,
         })
     }
@@ -216,10 +207,6 @@ impl ParquetBatchIter {
 
 #[async_trait]
 impl ColumnarBatchIter for ParquetBatchIter {
-    fn schema(&self) -> Arc<Schema> {
-        self.schema.clone()
-    }
-
     async fn next(&self) -> Result<Option<ColumnarBatch>> {
         let channel = self.response_rx.clone();
         Task::blocking(async move { channel.recv().unwrap() }).await

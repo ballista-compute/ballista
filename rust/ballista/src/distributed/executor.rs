@@ -217,7 +217,7 @@ impl Executor for BallistaExecutor {
         shuffle_partitions.insert(
             key,
             ShufflePartition {
-                schema: stream.schema().as_ref().clone(),
+                schema: exec_plan.schema().as_ref().clone(),
                 data: batches,
             },
         );

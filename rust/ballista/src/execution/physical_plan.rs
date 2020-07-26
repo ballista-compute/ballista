@@ -62,9 +62,6 @@ pub struct ExecutorMeta {
 /// Async iterator over a stream of columnar batches
 #[async_trait]
 pub trait ColumnarBatchIter: Sync + Send {
-    /// Get the schema for the batches produced by this iterator.
-    fn schema(&self) -> Arc<Schema>;
-
     /// Get the next batch from the stream, or None if the stream has ended
     async fn next(&self) -> Result<Option<ColumnarBatch>>;
 

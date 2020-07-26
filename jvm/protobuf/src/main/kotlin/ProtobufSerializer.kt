@@ -14,8 +14,6 @@
 
 package org.ballistacompute.protobuf
 
-import java.lang.IllegalStateException
-import java.lang.UnsupportedOperationException
 import org.ballistacompute.datasource.CsvDataSource
 import org.ballistacompute.logical.*
 

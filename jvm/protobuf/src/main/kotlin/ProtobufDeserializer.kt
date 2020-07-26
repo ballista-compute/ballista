@@ -14,9 +14,9 @@
 
 package org.ballistacompute.protobuf
 
-import java.lang.RuntimeException
 import org.ballistacompute.datasource.CsvDataSource
 import org.ballistacompute.datatypes.ArrowTypes
+import org.ballistacompute.datatypes.QueryAction
 import org.ballistacompute.logical.*
 
 class ProtobufDeserializer {
@@ -123,5 +123,22 @@ class ProtobufDeserializer {
 
     return org.ballistacompute.datatypes.SchemaConverter
         .fromArrow(org.apache.arrow.vector.types.pojo.Schema(arrowFields))
+  }
+
+  fun fromProto(action: Action): org.ballistacompute.datatypes.Action {
+    return when {
+      action.hasQuery() -> {
+        QueryAction(fromProto(action.query))
+      }
+      action.hasFetchShuffle() -> {
+        throw NotImplementedError("Shuffle not found")
+      }
+      action.hasTask() -> {
+        throw NotImplementedError("Kotlin executor doesn't yet support any physical plans")
+      }
+      else -> {
+        throw NotImplementedError("Action is not implemented $action")
+      }
+    }
   }
 }

@@ -236,7 +236,10 @@ impl Executor for BallistaExecutor {
             .expect("failed to lock mutex");
         match shuffle_partitions.remove(&key) {
             Some(partition) => Ok(partition),
-            _ => Err(ballista_error("invalid shuffle partition id")),
+            _ => Err(ballista_error(&format!(
+                "invalid shuffle partition id {}",
+                key
+            ))),
         }
     }
 

@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::dataframe::{avg, count, max, min, sum};
 use crate::datafusion::execution::physical_plan::csv::CsvReadOptions;
@@ -236,6 +236,13 @@ enum StageStatus {
     Completed,
 }
 
+enum TaskStatus {
+    Pending(ExecutionTask),
+    Running(Instant),
+    Completed(ShuffleId),
+    Failed(String),
+}
+
 #[derive(Debug, Clone)]
 struct ExecutorShuffleIds {
     executor_id: String,
@@ -288,6 +295,8 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                             .as_ref()
                             .expect("all stages should have plans at execution time");
 
+                        let stage_start = Instant::now();
+
                         let exec = plan.as_execution_plan();
                         let parts = exec.output_partitioning().partition_count();
 
@@ -333,48 +342,80 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                             let handle = thread::spawn(move || {
                                 smol::run(async {
                                     Task::blocking(async move {
-                                        let mut shuffle_ids: Vec<ShuffleId> = vec![];
-                                        let mut completed_tasks = vec![];
-                                        while shuffle_ids.len() < queue.len() {
+                                        let mut task_status = vec![];
+                                        for task in &queue {
+                                            task_status.push(TaskStatus::Pending(task.clone()));
+                                        }
+
+                                        let mut shuffle_ids = vec![];
+                                        loop {
+
+                                            let mut pending = 0;
+                                            let mut running = 0;
+                                            let mut completed = 0;
+                                            let mut failed = 0;
+
+                                            for status in &task_status {
+                                                match status {
+                                                    TaskStatus::Pending(_) => pending += 1,
+                                                    TaskStatus::Running(_) => running += 1,
+                                                    TaskStatus::Completed(_) => completed += 1,
+                                                    TaskStatus::Failed(_) => failed += 1,
+                                                }
+                                            }
+
                                             println!(
-                                                "Sending {} tasks to executor {}",
-                                                queue.len() - completed_tasks.len(),
-                                                executor.id
+                                                "Executor {} task stats: {} pending, {} running, {} completed, {} failed",
+                                                executor.id,
+                                                pending,running,completed,failed
                                             );
 
+                                            if failed > 0  {
+
+                                            }
+
+                                            if pending ==0 && running==0 {
+                                                break;
+                                            }
+
                                             //TODO need to send multiple tasks per network call - this is really inefficient
-                                            for task in &queue {
-                                                let task_key = task.key();
-                                                if completed_tasks.contains(&task_key) {
-                                                    continue;
-                                                }
-                                                match ctx
-                                                    .execute_task(executor.clone(), task.clone())
-                                                    .await
-                                                {
-                                                    Ok(shuffle_id) => {
-                                                        println!("Task {} completed", task_key);
-                                                        shuffle_ids.push(shuffle_id);
-                                                        completed_tasks.push(task_key.clone());
-                                                    }
-                                                    Err(e) => {
-                                                        let msg = format!("{:?}", e);
-                                                        //TODO would be nice to be able to extract status code here
-                                                        if msg.contains("ResourceExhausted") {
-                                                            // no need to report this
-                                                        } else if msg.contains("AlreadyExists") {
-                                                            // no need to report this
-                                                        } else {
-                                                            // real error
-                                                            println!(
-                                                                "Task submission failed: {:?}",
-                                                                e
-                                                            );
+                                            for i in 0..task_status.len() {
+
+                                                let should_submit = match &task_status[i] {
+                                                    TaskStatus::Pending(_) => true,
+                                                    TaskStatus::Running(last_check) => last_check.elapsed().as_millis() > 500,
+                                                    TaskStatus::Completed(_) => false,
+                                                    TaskStatus::Failed(_) => false,
+                                                };
+
+                                                if should_submit {
+                                                    let task = queue[i].clone();
+                                                    let task_key = task.key();
+                                                    match ctx
+                                                        .execute_task(executor.clone(), task)
+                                                        .await
+                                                    {
+                                                        Ok(shuffle_id) => {
+                                                            println!("Task {} completed", task_key);
+                                                            shuffle_ids.push(shuffle_id.clone());
+                                                            task_status[i] = TaskStatus::Completed(shuffle_id)
+                                                        }
+                                                        Err(e) => {
+                                                            let msg = format!("{:?}", e);
+                                                            //TODO would be nice to be able to extract status code here
+                                                            if msg.contains("ResourceExhausted") {
+                                                                // ignore
+                                                            } else if msg.contains("AlreadyExists") {
+                                                                task_status[i] = TaskStatus::Running(Instant::now())
+                                                            } else {
+                                                                task_status[i] = TaskStatus::Failed(msg)
+                                                            }
                                                         }
                                                     }
                                                 }
                                             }
-                                            thread::sleep(Duration::from_millis(1000));
+                                            // try not to overwhelm network or executors
+                                            thread::sleep(Duration::from_millis(100));
                                         }
                                         ExecutorShuffleIds {
                                             executor_id: executor.id,
@@ -389,10 +430,14 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
 
                         let mut stage_shuffle_ids: Vec<ExecutorShuffleIds> = vec![];
                         for thread in threads {
-                            println!("Waiting to join thread");
                             stage_shuffle_ids.push(thread.join().unwrap());
                         }
-                        println!("Joined all threads");
+                        println!(
+                            "Stage {} completed in {} ms and produced {} shuffles",
+                            stage.id,
+                            stage_start.elapsed().as_millis(),
+                            stage_shuffle_ids.len()
+                        );
 
                         for executor_shuffle_ids in &stage_shuffle_ids {
                             for shuffle_id in &executor_shuffle_ids.shuffle_ids {
@@ -412,10 +457,26 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                                 shuffle_location_map.clone(),
                             ));
 
-                            let final_shuffle_ids = &stage_shuffle_ids[0];
-                            let final_shuffle_ids = &final_shuffle_ids.shuffle_ids;
-                            let data = ctx.read_shuffle(&final_shuffle_ids[0]).await?;
-                            return Ok(data);
+                            println!("stage final shuffle ids: {:?}", stage_shuffle_ids);
+
+                            if stage_shuffle_ids.len() == 1 {
+                                let final_shuffle_ids = &stage_shuffle_ids[0];
+                                let final_shuffle_ids = &final_shuffle_ids.shuffle_ids;
+                                if final_shuffle_ids.len() == 1 {
+                                    let data = ctx.read_shuffle(&final_shuffle_ids[0]).await?;
+                                    return Ok(data);
+                                } else {
+                                    return Err(ballista_error(&format!(
+                                        "final shuffle_ids len = {}",
+                                        final_shuffle_ids.len()
+                                    )));
+                                }
+                            } else {
+                                return Err(ballista_error(&format!(
+                                    "stage shuffle_ids len = {}",
+                                    stage_shuffle_ids.len()
+                                )));
+                            }
                         }
                     } else {
                         println!("Cannot run stage {} yet", stage.id);
@@ -428,6 +489,7 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
         }
     }
 
+    // unreachable?
     Err(ballista_error("oops"))
 }
 

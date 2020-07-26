@@ -18,6 +18,7 @@ use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Instant;
 
 use crate::arrow::datatypes::{DataType, Field, Schema};
 use crate::distributed::executor::{Executor, ShufflePartition};
@@ -70,8 +71,8 @@ pub struct BallistaFlightService {
     /// Results cache
     results_cache: Arc<Mutex<HashMap<String, ShufflePartition>>>,
     task_status_map: Arc<Mutex<HashMap<String, TaskStatus>>>,
+    /// Concurrency guard to prevent executor from being overwhelmed
     concurrent_tasks: Arc<Mutex<ConcurrencyGuard>>,
-    // threads: Vec<JoinHandle<Task<()>>>
 }
 
 impl BallistaFlightService {
@@ -82,9 +83,8 @@ impl BallistaFlightService {
             task_status_map: Arc::new(Mutex::new(HashMap::new())),
             concurrent_tasks: Arc::new(Mutex::new(ConcurrencyGuard {
                 concurrency_level: 0,
-                max_concurrency: 4, // TODO get from config
+                max_concurrency: 6, // TODO get from config
             })),
-            // threads: vec![]
         }
     }
 }
@@ -122,35 +122,39 @@ impl FlightService for BallistaFlightService {
                             counter.inc()?;
                         }
 
-                        println!("Accepted task {}:\n{:?}", task.key(), task.plan);
+                        println!("Accepted task {}", task.key());
 
                         map.insert(key.clone(), TaskStatus::Running);
 
                         let task = task.clone();
                         let map = self.task_status_map.clone();
                         let key = key.clone();
+                        let key2 = key.clone();
                         let concurrent_tasks = self.concurrent_tasks.clone();
                         let executor = self.executor.clone();
 
-                        println!(
-                            "Spawning thread to run task {}:\n{:?}",
-                            task.key(),
-                            task.plan
-                        );
                         thread::spawn(move || {
-                            println!("In thread::spawn {}", task.key());
                             smol::run(async {
-                                println!("In smol::run {}", task.key());
+                                let start = Instant::now();
                                 match executor.do_task(&task).await {
                                     Ok(shuffle_id) => {
-                                        println!("Task {} completed", task.key());
+                                        println!(
+                                            "Task {} completed in {} ms",
+                                            task.key(),
+                                            start.elapsed().as_millis()
+                                        );
                                         let mut map = map.lock().unwrap();
                                         map.insert(key, TaskStatus::Completed(shuffle_id));
                                         let mut counter = concurrent_tasks.lock().unwrap();
                                         counter.dec();
                                     }
                                     Err(e) => {
-                                        println!("Task {} failed: {:?}", task.key(), e);
+                                        println!(
+                                            "Task {} failed after {} ms: {:?}",
+                                            task.key(),
+                                            start.elapsed().as_millis(),
+                                            e
+                                        );
                                         let mut map = map.lock().unwrap();
                                         map.insert(key, TaskStatus::Failed(format!("{:?}", e)));
                                         let mut counter = concurrent_tasks.lock().unwrap();
@@ -159,12 +163,23 @@ impl FlightService for BallistaFlightService {
                                 }
                             })
                         });
+                        println!("Telling scheduler that task {} has started running", key2);
                         Err(Status::already_exists("task is now running"))
                     }
                     Some(status) => match status {
-                        TaskStatus::Failed(reason) => Err(Status::aborted(reason.as_str())),
-                        TaskStatus::Running => Err(Status::already_exists("task is still running")),
+                        TaskStatus::Failed(reason) => {
+                            println!("Telling scheduler that task {} has failed", task.key());
+                            Err(Status::aborted(reason.as_str()))
+                        }
+                        TaskStatus::Running => {
+                            println!(
+                                "Telling scheduler that task {} is still running",
+                                task.key()
+                            );
+                            Err(Status::already_exists("task is still running"))
+                        }
                         TaskStatus::Completed(_) => {
+                            println!("Telling scheduler that task {} has completed", task.key());
                             let results = ShufflePartition {
                                 schema: Schema::new(vec![Field::new(
                                     "shuffle_id",

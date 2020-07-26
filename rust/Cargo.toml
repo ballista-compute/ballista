@@ -6,3 +6,9 @@ members = [
     "examples/distributed-query",
     "examples/tpch",
 ]
+
+[patch.crates-io]
+arrow = { version = "1.0.0", path = "../../arrow/rust/arrow" }
+arrow-flight = { version = "1.0.0", path = "../../arrow/rust/arrow-flight" }
+datafusion = { version = "1.0.0", path = "../../arrow/rust/datafusion" }
+parquet = { version = "1.0.0", path = "../../arrow/rust/parquet" }

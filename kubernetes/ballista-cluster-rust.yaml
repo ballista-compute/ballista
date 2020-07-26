@@ -32,14 +32,14 @@ spec:
       - name: ballista
         image: ballistacompute/ballista-rust:0.3.0-SNAPSHOT
         command: ["/executor"]
-        args: ["--mode=k8s", "--external-host=0.0.0.0", "--port=50051"]
+        args: ["--mode=k8s", "--external-host=0.0.0.0", "--port=50051", "--concurrent-tasks=2"]
         resources:
           requests:
             cpu: "1"
-            memory: "1024Mi"
+            memory: "2024Mi"
           limits:
             cpu: "2"
-            memory: "2048Mi"
+            memory: "4048Mi"
         ports:
           - containerPort: 50051
             name: flight

@@ -76,14 +76,14 @@ pub struct BallistaFlightService {
 }
 
 impl BallistaFlightService {
-    pub fn new(executor: Arc<dyn Executor>) -> Self {
+    pub fn new(executor: Arc<dyn Executor>, max_concurrency: usize) -> Self {
         Self {
             executor,
             results_cache: Arc::new(Mutex::new(HashMap::new())),
             task_status_map: Arc::new(Mutex::new(HashMap::new())),
             concurrent_tasks: Arc::new(Mutex::new(ConcurrencyGuard {
                 concurrency_level: 0,
-                max_concurrency: 6, // TODO get from config
+                max_concurrency,
             })),
         }
     }

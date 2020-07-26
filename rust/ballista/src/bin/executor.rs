@@ -45,6 +45,10 @@ struct Opt {
     /// bind port
     #[structopt(short, long)]
     port: usize,
+
+    /// max concurrent tasks
+    #[structopt(short, long)]
+    concurrent_tasks: usize,
 }
 
 #[tokio::main]
@@ -72,7 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = format!("{}:{}", bind_host, port);
     let addr = addr.parse()?;
     let executor: Arc<dyn Executor> = Arc::new(BallistaExecutor::new(config));
-    let service = BallistaFlightService::new(executor);
+    let service = BallistaFlightService::new(executor, opt.concurrent_tasks);
     let server = FlightServiceServer::new(service);
     println!(
         "Ballista v{} Rust Executor listening on {:?}",

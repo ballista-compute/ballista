@@ -371,7 +371,7 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                                             );
 
                                             if failed > 0  {
-
+                                                return Err(ballista_error("At least one task failed and there is no retry capability yet"))
                                             }
 
                                             if pending ==0 && running==0 {
@@ -385,7 +385,10 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                                                     TaskStatus::Pending(_) => true,
                                                     TaskStatus::Running(last_check) => last_check.elapsed().as_millis() > 500,
                                                     TaskStatus::Completed(_) => false,
-                                                    TaskStatus::Failed(_) => false,
+                                                    TaskStatus::Failed(_) => {
+                                                        //TODO retry logic
+                                                        false
+                                                    },
                                                 };
 
                                                 if should_submit {
@@ -417,10 +420,10 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                                             // try not to overwhelm network or executors
                                             thread::sleep(Duration::from_millis(100));
                                         }
-                                        ExecutorShuffleIds {
+                                        Ok(ExecutorShuffleIds {
                                             executor_id: executor.id,
                                             shuffle_ids,
-                                        }
+                                        })
                                     })
                                     .await
                                 })
@@ -430,7 +433,7 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
 
                         let mut stage_shuffle_ids: Vec<ExecutorShuffleIds> = vec![];
                         for thread in threads {
-                            stage_shuffle_ids.push(thread.join().unwrap());
+                            stage_shuffle_ids.push(thread.join().unwrap()?);
                         }
                         println!(
                             "Stage {} completed in {} ms and produced {} shuffles",
@@ -459,8 +462,8 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
 
                             println!("stage final shuffle ids: {:?}", stage_shuffle_ids);
 
-                            if stage_shuffle_ids.len() == 1 {
-                                let final_shuffle_ids = &stage_shuffle_ids[0];
+                            if stage_shuffle_ids.len() > 0 {
+                                let final_shuffle_ids = &stage_shuffle_ids[0]; //TODO Can't assume first one
                                 let final_shuffle_ids = &final_shuffle_ids.shuffle_ids;
                                 if final_shuffle_ids.len() == 1 {
                                     let data = ctx.read_shuffle(&final_shuffle_ids[0]).await?;

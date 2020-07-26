@@ -4,7 +4,7 @@
 
 Please read my article [How to build a modern distributed compute platform](https://andygrove.io/how_to_build_a_modern_distributed_compute_platform/) since it is a good introduction to how I think Ballista (and other distributed compute platforms) should work. This article is a work in progress that I update from time to time, as I learn more about this subject, or when I feel motivated to write.
 
-There is also a [wiki](https://github.com/andygrove/ballista/wiki) with a list of interesting reading material.
+There is also a [wiki](https://github.com/ballista-compute/ballista/wiki) with a list of interesting reading material.
 
 This project depends on some existing technologies, so it is a good idea to learn a little about those too:
 

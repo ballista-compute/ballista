@@ -18,7 +18,7 @@ metadata:
   name: ballista
 spec:
   serviceName: "ballista"
-  replicas: 12
+  replicas: 6
   selector:
     matchLabels:
       app: ballista

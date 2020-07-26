@@ -19,8 +19,8 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::time::Duration;
 use std::thread;
+use std::time::Duration;
 
 use crate::dataframe::{avg, count, max, min, sum};
 use crate::datafusion::execution::physical_plan::csv::CsvReadOptions;
@@ -126,6 +126,10 @@ impl ExecutionTask {
             plan,
             shuffle_locations,
         }
+    }
+
+    pub fn key(&self) -> String {
+        format!("{}.{}.{}", self.job_uuid, self.stage_id, self.partition_id)
     }
 }
 
@@ -235,7 +239,7 @@ enum StageStatus {
 #[derive(Debug, Clone)]
 struct ExecutorShuffleIds {
     executor_id: String,
-    shuffle_ids: Vec<ShuffleId>
+    shuffle_ids: Vec<ShuffleId>,
 }
 
 /// Execute a job directly against executors as starting point
@@ -309,7 +313,8 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                                 next_executor_id = 0;
                             }
 
-                            let queue = executor_tasks.get_mut(&executor_meta.id)
+                            let queue = executor_tasks
+                                .get_mut(&executor_meta.id)
                                 .expect("executor queue should exist");
 
                             queue.push(task);
@@ -318,7 +323,9 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                         let mut threads = vec![];
                         for i in 0..executors.len() {
                             let executor = executors[i].clone();
-                            let queue = executor_tasks.get(&executor.id).expect("executor queue should exist");
+                            let queue = executor_tasks
+                                .get(&executor.id)
+                                .expect("executor queue should exist");
                             let queue = queue.clone();
                             let ctx = ctx.clone();
 
@@ -327,26 +334,51 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                                 smol::run(async {
                                     Task::blocking(async move {
                                         let mut shuffle_ids: Vec<ShuffleId> = vec![];
-                                        for task in queue {
-                                            loop {
-                                                println!("Sending task to executor {}", executor.id);
-                                                match ctx.execute_task(executor.clone(), task.clone()).await {
+                                        let mut completed_tasks = vec![];
+                                        while shuffle_ids.len() < queue.len() {
+                                            println!(
+                                                "Sending {} tasks to executor {}",
+                                                queue.len() - completed_tasks.len(),
+                                                executor.id
+                                            );
+
+                                            //TODO need to send multiple tasks per network call - this is really inefficient
+                                            for task in &queue {
+                                                let task_key = task.key();
+                                                if completed_tasks.contains(&task_key) {
+                                                    continue;
+                                                }
+                                                match ctx
+                                                    .execute_task(executor.clone(), task.clone())
+                                                    .await
+                                                {
                                                     Ok(shuffle_id) => {
-                                                        println!("Task finished");
+                                                        println!("Task {} completed", task_key);
                                                         shuffle_ids.push(shuffle_id);
-                                                        break;
-                                                    },
+                                                        completed_tasks.push(task_key.clone());
+                                                    }
                                                     Err(e) => {
-                                                        println!("Retrying after error {:?}", e);
-                                                        thread::sleep(Duration::from_millis(100));
+                                                        let msg = format!("{:?}", e);
+                                                        //TODO would be nice to be able to extract status code here
+                                                        if msg.contains("ResourceExhausted") {
+                                                            // no need to report this
+                                                        } else if msg.contains("AlreadyExists") {
+                                                            // no need to report this
+                                                        } else {
+                                                            // real error
+                                                            println!(
+                                                                "Task submission failed: {:?}",
+                                                                e
+                                                            );
+                                                        }
                                                     }
                                                 }
                                             }
-
+                                            thread::sleep(Duration::from_millis(1000));
                                         }
                                         ExecutorShuffleIds {
                                             executor_id: executor.id,
-                                            shuffle_ids
+                                            shuffle_ids,
                                         }
                                     })
                                     .await
@@ -364,7 +396,10 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
 
                         for executor_shuffle_ids in &stage_shuffle_ids {
                             for shuffle_id in &executor_shuffle_ids.shuffle_ids {
-                                let executor = executors.iter().find(|e| e.id == executor_shuffle_ids.executor_id).unwrap();
+                                let executor = executors
+                                    .iter()
+                                    .find(|e| e.id == executor_shuffle_ids.executor_id)
+                                    .unwrap();
                                 shuffle_location_map.insert(shuffle_id.clone(), executor.clone());
                             }
                         }

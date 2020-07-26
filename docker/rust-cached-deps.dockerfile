@@ -1,5 +1,5 @@
 # Base image extends rust:nightly which extends debian:buster-slim
-FROM ballistacompute/rust-base:0.3.0-alpha-0 as build
+FROM ballistacompute/rust-base:0.3.0-alpha-1 as build
 
 # Fetch Ballista dependencies
 WORKDIR /tmp

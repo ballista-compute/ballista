@@ -176,7 +176,7 @@ spec:
     spec:
       containers:
       - name: ballista
-        image: ballistacompute/ballista-rust:0.3.0-alpha-1
+        image: ballistacompute/ballista-rust:0.3.0-SNAPSHOT
         resources:
           requests:
             cpu: "1"

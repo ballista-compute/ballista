@@ -33,9 +33,9 @@ use crate::execution::physical_plan::{
     ExecutionContext, ExecutionPlan, Expression, MaybeColumnarBatch, Partitioning, PhysicalPlan,
 };
 
+use async_executor::{LocalExecutor, Task};
 use async_trait::async_trait;
 use crossbeam::channel::{unbounded, Receiver, Sender};
-use smol::Task;
 use std::collections::HashMap;
 
 /// HashAggregateExec applies a hash aggregate operation against its input.
@@ -242,7 +242,8 @@ fn run(
     group_expr: Vec<Arc<dyn Expression>>,
     aggr_expr: Vec<Arc<dyn AggregateExpr>>,
 ) -> Result<()> {
-    smol::run(async {
+    let local_ex = LocalExecutor::new();
+    local_ex.run(async {
         // metrics
         let start = Instant::now();
         let mut read_batch_time = 0;
@@ -622,7 +623,7 @@ impl ColumnarBatchIter for HashAggregateIter {
 
     async fn next(&self) -> Result<Option<ColumnarBatch>> {
         let channel = self.rx.clone();
-        Task::blocking(async move {
+        Task::spawn(async move {
             channel
                 .recv()
                 .map_err(|e| BallistaError::General(format!("{:?}", e.to_string())))?

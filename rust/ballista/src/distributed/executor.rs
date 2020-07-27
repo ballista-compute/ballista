@@ -36,6 +36,7 @@ use crate::execution::physical_plan::{
     Action, ColumnarBatch, ExecutionContext, ExecutorMeta, PhysicalPlan, ShuffleId,
 };
 
+use async_executor::{LocalExecutor, Task};
 use async_trait::async_trait;
 use uuid::Uuid;
 
@@ -169,13 +170,17 @@ impl BallistaExecutor {
         match &config.discovery_mode {
             DiscoveryMode::Etcd => {
                 println!("Running in etcd mode");
-                start_etcd_thread(
-                    &config.etcd_urls,
-                    "default",
-                    &uuid,
-                    &config.host,
-                    config.port,
-                );
+                let config = config.clone();
+                Task::local(async move {
+                    start_etcd_thread(
+                        &config.etcd_urls,
+                        "default",
+                        &uuid,
+                        &config.host,
+                        config.port,
+                    ).await
+                })
+                .detach();
             }
             DiscoveryMode::Kubernetes => println!("Running in k8s mode"),
             DiscoveryMode::Standalone => println!("Running in standalone mode"),
@@ -256,7 +261,22 @@ impl Executor for BallistaExecutor {
 
         let config = self.config.clone();
         let handle = thread::spawn(move || {
-            smol::run(async {
+            // temp fn to get the tokio context
+            use futures::Future;
+            fn run_async<T>(future: impl Future<Output=T>) -> T {
+                let tokio_rt = tokio::runtime::Builder::new()
+                    .enable_all()
+                    .basic_scheduler()
+                    .build()
+                    .expect("cannot start tokio rt");
+                let tokio_handle = tokio_rt.handle();
+
+                let local_ex = LocalExecutor::new();
+                tokio_handle.enter(|| local_ex.run(future))
+            }
+
+            // the future being run here is not send. how to fix?
+            run_async(async {
                 let plan: Arc<PhysicalPlan> = create_physical_plan(&logical_plan)?;
                 println!("Physical plan:\n{:?}", plan);
 

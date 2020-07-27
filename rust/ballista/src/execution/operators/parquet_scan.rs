@@ -31,9 +31,9 @@ use crate::parquet::arrow::arrow_reader::ArrowReader;
 use crate::parquet::arrow::ParquetFileArrowReader;
 use crate::parquet::file::reader::SerializedFileReader;
 
+use async_executor::Task;
 use async_trait::async_trait;
 use crossbeam::channel::{unbounded, Receiver, Sender};
-use smol::Task;
 use std::time::Instant;
 
 /// ParquetScanExec reads Parquet files and applies an optional projection so that only necessary
@@ -222,6 +222,6 @@ impl ColumnarBatchIter for ParquetBatchIter {
 
     async fn next(&self) -> Result<Option<ColumnarBatch>> {
         let channel = self.response_rx.clone();
-        Task::blocking(async move { channel.recv().unwrap() }).await
+        Task::spawn(async move { channel.recv().unwrap() }).await
     }
 }

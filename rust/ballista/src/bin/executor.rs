@@ -21,6 +21,8 @@ use ballista::distributed::flight_service::BallistaFlightService;
 use ballista::flight::flight_service_server::FlightServiceServer;
 use ballista::BALLISTA_VERSION;
 
+use async_executor::LocalExecutor;
+use futures::Future;
 use structopt::StructOpt;
 use tonic::transport::Server;
 
@@ -66,6 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let external_host = opt.external_host.unwrap_or_else(|| "localhost".to_owned());
     let bind_host = opt.bind_host.unwrap_or_else(|| "0.0.0.0".to_owned());
+    let concurrent_tasks = opt.concurrent_tasks;
     let etcd_urls = opt.etcd_urls.unwrap_or_else(|| "localhost:2379".to_owned());
     let port = opt.port;
 
@@ -75,13 +78,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let addr = format!("{}:{}", bind_host, port);
     let addr = addr.parse()?;
-    let executor: Arc<dyn Executor> = Arc::new(BallistaExecutor::new(config));
-    let service = BallistaFlightService::new(executor, opt.concurrent_tasks);
-    let server = FlightServiceServer::new(service);
-    println!(
-        "Ballista v{} Rust Executor listening on {:?}",
-        BALLISTA_VERSION, addr
-    );
-    Server::builder().add_service(server).serve(addr).await?;
-    Ok(())
+    run_async(async {
+        let executor: Arc<dyn Executor> = Arc::new(BallistaExecutor::new(config));
+        let service = BallistaFlightService::new(executor, concurrent_tasks);
+        let server = FlightServiceServer::new(service);
+        println!(
+            "Ballista v{} Rust Executor listening on {:?}",
+            BALLISTA_VERSION, addr
+        );
+        Server::builder().add_service(server).serve(addr).await?;
+        Ok(())
+    })
+}
+
+fn run_async<T>(future: impl Future<Output=T>) -> T {
+    let (trigger, shutdown) = async_channel::unbounded::<()>();
+    let future = async move {
+        let _trigger = trigger;
+        future.await
+    };
+
+    let mut tokio_rt = tokio::runtime::Builder::new()
+        .enable_all()
+        .basic_scheduler()
+        .build()
+        .expect("cannot start tokio rt");
+    let tokio_handle = tokio_rt.handle().clone();
+
+    let local_ex = LocalExecutor::new();
+
+    easy_parallel::Parallel::new()
+        .add(|| tokio_rt.block_on(shutdown.recv()))
+        .finish(|| tokio_handle.enter(|| local_ex.run(future)))
+        .1
 }

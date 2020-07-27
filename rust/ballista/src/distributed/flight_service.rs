@@ -32,6 +32,7 @@ use crate::flight::{
 };
 use crate::serde::decode_protobuf;
 
+use async_executor::LocalExecutor;
 use futures::{Stream, StreamExt};
 use tonic::{Request, Response, Status, Streaming};
 
@@ -134,7 +135,22 @@ impl FlightService for BallistaFlightService {
                         let executor = self.executor.clone();
 
                         thread::spawn(move || {
-                            smol::run(async {
+                            // temp fn to get the tokio context
+                            use futures::Future;
+                            fn run_async<T>(future: impl Future<Output=T>) -> T {
+                                let tokio_rt = tokio::runtime::Builder::new()
+                                    .enable_all()
+                                    .basic_scheduler()
+                                    .build()
+                                    .expect("cannot start tokio rt");
+                                let tokio_handle = tokio_rt.handle();
+
+                                let local_ex = LocalExecutor::new();
+                                tokio_handle.enter(|| local_ex.run(future))
+                            }
+
+                            // the future being run here is not send. how to fix?
+                            run_async(async {
                                 let start = Instant::now();
                                 match executor.do_task(&task).await {
                                     Ok(shuffle_id) => {

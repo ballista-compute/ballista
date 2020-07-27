@@ -110,9 +110,20 @@ dependencies = [
  "futures 0.3.5",
  "prost",
  "prost-derive",
- "tokio 0.2.21",
+ "tokio 0.2.22",
  "tonic",
  "tonic-build",
+]
+
+[[package]]
+name = "async-channel"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee81ba99bee79f3c8ae114ae4baa7eaa326f63447cf2ec65e4393618b63f8770"
+dependencies = [
+ "concurrent-queue",
+ "event-listener",
+ "futures-core",
 ]
 
 [[package]]
@@ -126,6 +137,38 @@ dependencies = [
  "futures-core",
  "memchr",
  "pin-project-lite",
+]
+
+[[package]]
+name = "async-executor"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90f47c78ea98277cb1f5e6f60ba4fc762f5eafe9f6511bc2f7dfd8b75c225650"
+dependencies = [
+ "async-io",
+ "futures-lite",
+ "multitask",
+ "parking",
+ "scoped-tls",
+ "waker-fn",
+]
+
+[[package]]
+name = "async-io"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4c982708a0344bfc72ea3de28719cb307336b5dd06a094263658d2154b83c24"
+dependencies = [
+ "cfg-if",
+ "concurrent-queue",
+ "futures-lite",
+ "libc",
+ "once_cell",
+ "parking",
+ "socket2",
+ "vec-arena",
+ "wepoll-sys-stjepang",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -209,10 +252,14 @@ version = "0.3.0-alpha-1"
 dependencies = [
  "arrow",
  "arrow-flight",
+ "async-channel",
+ "async-executor",
+ "async-io",
  "async-trait",
  "criterion",
  "crossbeam",
  "datafusion",
+ "easy-parallel",
  "env_logger",
  "etcd-client",
  "flatbuffers",
@@ -227,10 +274,9 @@ dependencies = [
  "prost-types",
  "random-fast-rng",
  "reqwest 0.9.24",
- "smol",
  "sqlparser",
  "structopt",
- "tokio 0.2.21",
+ "tokio 0.2.22",
  "tonic",
  "uuid 0.8.1",
 ]
@@ -277,19 +323,6 @@ dependencies = [
  "arrayref",
  "arrayvec",
  "constant_time_eq",
-]
-
-[[package]]
-name = "blocking"
-version = "0.4.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d17efb70ce4421e351d61aafd90c16a20fb5bfe339fcdc32a86816280e62ce0"
-dependencies = [
- "futures-channel",
- "futures-util",
- "once_cell",
- "parking",
- "waker-fn",
 ]
 
 [[package]]
@@ -698,7 +731,7 @@ version = "0.3.0-alpha-1"
 dependencies = [
  "ballista",
  "structopt",
- "tokio 0.2.21",
+ "tokio 0.2.22",
 ]
 
 [[package]]
@@ -706,6 +739,12 @@ name = "dtoa"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "134951f4028bdadb9b84baf4232681efbf277da25144b9b0ad65df75946c422b"
+
+[[package]]
+name = "easy-parallel"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1dd4afd79212583ff429b913ad6605242ed7eec277e950b1438f300748f948f4"
 
 [[package]]
 name = "either"
@@ -754,10 +793,16 @@ checksum = "3a3c728188af8a1baf5c24ae9bbdec07d847c0343910f06e045c2b9c84ad3fdf"
 dependencies = [
  "http 0.2.1",
  "prost",
- "tokio 0.2.21",
+ "tokio 0.2.22",
  "tonic",
  "tonic-build",
 ]
+
+[[package]]
+name = "event-listener"
+version = "2.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "829694371bd7bbc6aee17c4ff624aad8bf9f4dc06c6f9f6071eaa08c89530d10"
 
 [[package]]
 name = "failure"
@@ -922,6 +967,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "de27142b013a8e869c14957e6d2edeef89e97c289e69d042ee3a49acd8b51789"
 
 [[package]]
+name = "futures-lite"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8cc8771bd1bb4c7be3c5f072a1d5e18086ef220f100a0a4efece41076e87b9f2"
+dependencies = [
+ "fastrand",
+ "futures-core",
+ "futures-io",
+ "memchr",
+ "parking",
+ "pin-project-lite",
+ "waker-fn",
+]
+
+[[package]]
 name = "futures-macro"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1023,7 +1083,7 @@ dependencies = [
  "http 0.2.1",
  "indexmap",
  "slab",
- "tokio 0.2.21",
+ "tokio 0.2.22",
  "tokio-util",
  "tracing",
 ]
@@ -1156,7 +1216,7 @@ dependencies = [
  "pin-project",
  "socket2",
  "time 0.1.43",
- "tokio 0.2.21",
+ "tokio 0.2.22",
  "tower-service",
  "tracing",
  "want 0.3.0",
@@ -1184,7 +1244,7 @@ dependencies = [
  "bytes 0.5.6",
  "hyper 0.13.7",
  "native-tls",
- "tokio 0.2.21",
+ "tokio 0.2.22",
  "tokio-tls",
 ]
 
@@ -1328,7 +1388,7 @@ dependencies = [
  "serde_yaml",
  "thiserror",
  "time 0.2.16",
- "tokio 0.2.21",
+ "tokio 0.2.22",
  "url 2.1.1",
 ]
 
@@ -1340,9 +1400,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.72"
+version = "0.2.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9f8082297d534141b30c8d39e9b1773713ab50fdbe4ff30f750d063b3bfd701"
+checksum = "bd7d4bd64732af4bf3a67f367c27df8520ad7e230c5817b8ff485864d80242b9"
 
 [[package]]
 name = "linked-hash-map"
@@ -1509,6 +1569,17 @@ name = "multimap"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d8883adfde9756c1d30b0f519c9b8c502a94b41ac62f696453c37c7fc0a958ce"
+
+[[package]]
+name = "multitask"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c09c35271e7dcdb5f709779111f2c8e8ab8e06c1b587c1c6a9e179d865aaa5b4"
+dependencies = [
+ "async-task",
+ "concurrent-queue",
+ "fastrand",
+]
 
 [[package]]
 name = "native-tls"
@@ -1700,9 +1771,9 @@ dependencies = [
 
 [[package]]
 name = "parking"
-version = "1.0.4"
+version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1efcee3c6d23b94012e240525f131c6abaa9e5eeb8f211002d93beec3b7be350"
+checksum = "6cb300f271742d4a2a66c01b6b2fa0c83dfebd2e0bf11addb879a3547b4ed87c"
 
 [[package]]
 name = "parking_lot"
@@ -2319,7 +2390,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_urlencoded 0.6.1",
- "tokio 0.2.21",
+ "tokio 0.2.22",
  "tokio-tls",
  "url 2.1.1",
  "wasm-bindgen",
@@ -2575,28 +2646,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3757cb9d89161a2f24e1cf78efa0c1fcff485d18e3f55e0aa3480824ddaa0f3f"
 
 [[package]]
-name = "smol"
-version = "0.1.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "620cbb3c6e34da57d3a248cda0cd01cd5848164dc062e764e65d06fe3ea7aed5"
-dependencies = [
- "async-task",
- "blocking",
- "concurrent-queue",
- "fastrand",
- "futures-io",
- "futures-util",
- "libc",
- "once_cell",
- "scoped-tls",
- "slab",
- "socket2",
- "tokio 0.2.21",
- "wepoll-sys-stjepang",
- "winapi 0.3.9",
-]
-
-[[package]]
 name = "snap"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2619,7 +2668,7 @@ name = "spark-rust-bindings"
 version = "0.3.0-alpha-1"
 dependencies = [
  "ballista",
- "tokio 0.2.21",
+ "tokio 0.2.22",
 ]
 
 [[package]]
@@ -2934,9 +2983,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "0.2.21"
+version = "0.2.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d099fa27b9702bed751524694adbe393e18b36b204da91eb1cbbbbb4a5ee2d58"
+checksum = "5d34ca54d84bf2b5b4d7d31e901a8464f7b60ac145a284fba25ceb801f2ddccd"
 dependencies = [
  "bytes 0.5.6",
  "fnv",
@@ -3088,7 +3137,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a70f4fcd7b3b24fb194f837560168208f669ca8cb70d0c4b862944452396343"
 dependencies = [
  "native-tls",
- "tokio 0.2.21",
+ "tokio 0.2.22",
 ]
 
 [[package]]
@@ -3102,7 +3151,7 @@ dependencies = [
  "futures-sink",
  "log",
  "pin-project-lite",
- "tokio 0.2.21",
+ "tokio 0.2.22",
 ]
 
 [[package]]
@@ -3124,7 +3173,7 @@ dependencies = [
  "pin-project",
  "prost",
  "prost-derive",
- "tokio 0.2.21",
+ "tokio 0.2.22",
  "tokio-util",
  "tower",
  "tower-balance",
@@ -3177,7 +3226,7 @@ dependencies = [
  "pin-project",
  "rand 0.7.3",
  "slab",
- "tokio 0.2.21",
+ "tokio 0.2.22",
  "tower-discover",
  "tower-layer",
  "tower-load",
@@ -3195,7 +3244,7 @@ checksum = "c4887dc2a65d464c8b9b66e0e4d51c2fd6cf5b3373afc72805b0a60bce00446a"
 dependencies = [
  "futures-core",
  "pin-project",
- "tokio 0.2.21",
+ "tokio 0.2.22",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -3226,7 +3275,7 @@ checksum = "92c3040c5dbed68abffaa0d4517ac1a454cd741044f33ab0eefab6b8d1361404"
 dependencies = [
  "futures-core",
  "pin-project",
- "tokio 0.2.21",
+ "tokio 0.2.22",
  "tower-layer",
  "tower-load",
  "tower-service",
@@ -3241,7 +3290,7 @@ dependencies = [
  "futures-core",
  "log",
  "pin-project",
- "tokio 0.2.21",
+ "tokio 0.2.22",
  "tower-discover",
  "tower-service",
 ]
@@ -3264,7 +3313,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce50370d644a0364bf4877ffd4f76404156a248d104e2cc234cd391ea5cdc965"
 dependencies = [
- "tokio 0.2.21",
+ "tokio 0.2.22",
  "tower-service",
 ]
 
@@ -3278,7 +3327,7 @@ dependencies = [
  "futures-util",
  "indexmap",
  "log",
- "tokio 0.2.21",
+ "tokio 0.2.22",
  "tower-service",
 ]
 
@@ -3290,7 +3339,7 @@ checksum = "e6727956aaa2f8957d4d9232b308fe8e4e65d99db30f42b225646e86c9b6a952"
 dependencies = [
  "futures-core",
  "pin-project",
- "tokio 0.2.21",
+ "tokio 0.2.22",
  "tower-layer",
  "tower-service",
 ]
@@ -3308,7 +3357,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "127b8924b357be938823eaaec0608c482d40add25609481027b96198b2e4b31e"
 dependencies = [
  "pin-project",
- "tokio 0.2.21",
+ "tokio 0.2.22",
  "tower-layer",
  "tower-service",
 ]
@@ -3330,7 +3379,7 @@ name = "tpch"
 version = "0.3.0-alpha-1"
 dependencies = [
  "ballista",
- "tokio 0.2.21",
+ "tokio 0.2.22",
 ]
 
 [[package]]
@@ -3487,6 +3536,12 @@ name = "vcpkg"
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6454029bf181f092ad1b853286f23e2c507d8e8194d01d92da4a55c274a5508c"
+
+[[package]]
+name = "vec-arena"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17dfb54bf57c9043f4616cb03dab30eff012cc26631b797d8354b916708db919"
 
 [[package]]
 name = "vec_map"

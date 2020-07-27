@@ -17,9 +17,6 @@ message LogicalExprNode {
   string column_name = 10;
   bool has_column_name = 11;
 
-  uint32 column_index = 12;
-  bool has_column_index = 13;
-
   // alias
   AliasNode alias = 14;
 

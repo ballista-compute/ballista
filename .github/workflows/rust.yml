@@ -86,3 +86,19 @@ jobs:
     - name: Run tests
       run: |
         cd rust && cargo test
+
+  Docker:
+    env:
+      BALLISTA_VERSION: 0.3.0-SNAPSHOT
+      IMAGE_NAME: ballistacompute/ballista-rust
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build image
+      run: docker build -f docker/rust.dockerfile --build-arg RELEASE_FLAG= -t $IMAGE_NAME:$BALLISTA_VERSION .
+# I commented this because this I am not sure where this is being pushed to
+#      - name: Push image
+#        run: |
+#          docker tag $IMAGE_NAME:$BALLISTA_VERSION $IMAGE_NAME:latest
+#          docker push $IMAGE_NAME:$BALLISTA_VERSION
+#          docker push $IMAGE_NAME:latest

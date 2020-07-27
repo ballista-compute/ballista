@@ -99,7 +99,31 @@ along with the [blog](https://ballistacompute.org/) where news and release notes
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for information on contributing to this project.
 
+### How to build rust's docker image
 
+To build the docker image in development, use
 
+```
+docker build -f docker/rust.dockerfile --build-arg RELEASE_FLAG= -t ballista:latest
+```
 
+or remove ```--build-arg RELEASE_FLAG=``` to compile the optimized (`--release`) version
+of the code.
 
+Once built, you can interact with the executor. E.g. for help, run
+
+```
+docker run -t ballista:latest /executor --help
+```
+
+To run the image against etcd, please check [this docker-compose](integration-tests/docker-compose.yml)
+that we use to run the integration tests
+
+### Getting the binary
+
+This image is a debian-based. However, the binary is statically linked and thus
+runs on any linux-based machine. You can extract the binary using
+
+```
+id=$(docker create t) && docker cp $id:/executor executor && docker rm -v $id
+```

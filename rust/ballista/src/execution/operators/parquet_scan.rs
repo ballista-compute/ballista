@@ -31,7 +31,6 @@ use crate::parquet::arrow::arrow_reader::ArrowReader;
 use crate::parquet::arrow::ParquetFileArrowReader;
 use crate::parquet::file::reader::SerializedFileReader;
 
-use async_executor::Task;
 use async_trait::async_trait;
 use crossbeam::channel::{unbounded, Receiver, Sender};
 use std::time::Instant;

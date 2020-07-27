@@ -33,7 +33,7 @@ use crate::execution::physical_plan::{
     ExecutionContext, ExecutionPlan, Expression, MaybeColumnarBatch, Partitioning, PhysicalPlan,
 };
 
-use async_executor::{LocalExecutor, Task};
+use async_executor::LocalExecutor;
 use async_trait::async_trait;
 use crossbeam::channel::{unbounded, Receiver, Sender};
 use std::collections::HashMap;

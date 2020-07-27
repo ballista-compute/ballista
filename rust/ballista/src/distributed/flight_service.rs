@@ -17,7 +17,6 @@
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::thread;
 use std::time::Instant;
 
 use crate::arrow::datatypes::{DataType, Field, Schema};
@@ -33,7 +32,6 @@ use crate::flight::{
 use crate::serde::decode_protobuf;
 
 use async_dup::Mutex;
-use async_executor::LocalExecutor;
 use futures::{Stream, StreamExt};
 use tonic::{Request, Response, Status, Streaming};
 

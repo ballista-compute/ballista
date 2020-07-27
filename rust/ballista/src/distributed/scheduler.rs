@@ -19,7 +19,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::dataframe::{avg, count, max, min, sum};
@@ -39,6 +38,7 @@ use crate::execution::physical_plan::{
 };
 
 use async_executor::Task;
+use async_io::Timer;
 use futures::future::join_all;
 use uuid::Uuid;
 
@@ -343,7 +343,7 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                             let ctx = ctx.clone();
 
                             // spawn task per executor
-                            let thread = Task::spawn(async move {
+                            let thread = Task::local(async move {
                                 let mut task_status = vec![];
                                 for task in &queue {
                                     task_status.push(TaskStatus::Pending(task.clone()));
@@ -420,7 +420,7 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                                         }
                                     }
                                     // try not to overwhelm network or executors
-                                    thread::sleep(Duration::from_millis(100));
+                                    Timer::new(Duration::from_millis(100)).await;
                                 }
                                 Ok(ExecutorShuffleIds {
                                     executor_id: executor.id,

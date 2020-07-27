@@ -14,7 +14,6 @@
 
 //! Support for etcd discovery mechanism.
 
-use std::thread;
 use std::time::Duration;
 
 use crate::error::{ballista_error, Result};

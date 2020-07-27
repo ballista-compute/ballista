@@ -16,7 +16,7 @@
 
 use std::collections::HashMap;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::thread;
 use std::time::Instant;
 
@@ -32,6 +32,7 @@ use crate::flight::{
 };
 use crate::serde::decode_protobuf;
 
+use async_dup::Mutex;
 use async_executor::LocalExecutor;
 use futures::{Stream, StreamExt};
 use tonic::{Request, Response, Status, Streaming};
@@ -115,11 +116,11 @@ impl FlightService for BallistaFlightService {
         match &action {
             physical_plan::Action::Execute(task) => {
                 let key = task.key();
-                let mut map = self.task_status_map.lock().unwrap();
+                let mut map = self.task_status_map.lock();
                 match map.get(&key) {
                     None => {
                         {
-                            let mut counter = self.concurrent_tasks.lock().unwrap();
+                            let mut counter = self.concurrent_tasks.lock();
                             counter.inc()?;
                         }
 
@@ -134,51 +135,35 @@ impl FlightService for BallistaFlightService {
                         let concurrent_tasks = self.concurrent_tasks.clone();
                         let executor = self.executor.clone();
 
-                        thread::spawn(move || {
-                            // temp fn to get the tokio context
-                            use futures::Future;
-                            fn run_async<T>(future: impl Future<Output=T>) -> T {
-                                let tokio_rt = tokio::runtime::Builder::new()
-                                    .enable_all()
-                                    .basic_scheduler()
-                                    .build()
-                                    .expect("cannot start tokio rt");
-                                let tokio_handle = tokio_rt.handle();
-
-                                let local_ex = LocalExecutor::new();
-                                tokio_handle.enter(|| local_ex.run(future))
+                        // start task
+                        let start = Instant::now();
+                        match executor.do_task(&task).await {
+                            Ok(shuffle_id) => {
+                                println!(
+                                    "Task {} completed in {} ms",
+                                    task.key(),
+                                    start.elapsed().as_millis()
+                                );
+                                let mut map = map.lock();
+                                map.insert(key, TaskStatus::Completed(shuffle_id));
+                                let mut counter = concurrent_tasks.lock();
+                                counter.dec();
                             }
+                            Err(e) => {
+                                println!(
+                                    "Task {} failed after {} ms: {:?}",
+                                    task.key(),
+                                    start.elapsed().as_millis(),
+                                    e
+                                );
+                                let mut map = map.lock();
+                                map.insert(key, TaskStatus::Failed(format!("{:?}", e)));
+                                let mut counter = concurrent_tasks.lock();
+                                counter.dec();
+                            }
+                        }
+                        // end task
 
-                            // the future being run here is not send. how to fix?
-                            run_async(async {
-                                let start = Instant::now();
-                                match executor.do_task(&task).await {
-                                    Ok(shuffle_id) => {
-                                        println!(
-                                            "Task {} completed in {} ms",
-                                            task.key(),
-                                            start.elapsed().as_millis()
-                                        );
-                                        let mut map = map.lock().unwrap();
-                                        map.insert(key, TaskStatus::Completed(shuffle_id));
-                                        let mut counter = concurrent_tasks.lock().unwrap();
-                                        counter.dec();
-                                    }
-                                    Err(e) => {
-                                        println!(
-                                            "Task {} failed after {} ms: {:?}",
-                                            task.key(),
-                                            start.elapsed().as_millis(),
-                                            e
-                                        );
-                                        let mut map = map.lock().unwrap();
-                                        map.insert(key, TaskStatus::Failed(format!("{:?}", e)));
-                                        let mut counter = concurrent_tasks.lock().unwrap();
-                                        counter.dec();
-                                    }
-                                }
-                            })
-                        });
                         println!("Telling scheduler that task {} has started running", key2);
                         Err(Status::already_exists("task is now running"))
                     }
@@ -281,7 +266,6 @@ impl FlightService for BallistaFlightService {
         match self
             .results_cache
             .lock()
-            .expect("failed to lock mutex")
             .get(uuid)
         {
             Some(results) => Ok(Response::new(SchemaResult::from(&results.schema))),

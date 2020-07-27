@@ -36,7 +36,7 @@ use crate::execution::physical_plan::{
     Action, ColumnarBatch, ExecutionContext, ExecutorMeta, PhysicalPlan, ShuffleId,
 };
 
-use async_executor::{LocalExecutor, Task};
+use async_executor::Task;
 use async_trait::async_trait;
 use uuid::Uuid;
 
@@ -260,7 +260,9 @@ impl Executor for BallistaExecutor {
         println!("Optimized logical plan:\n{:?}", logical_plan);
 
         let config = self.config.clone();
+
         let handle = thread::spawn(move || {
+            // TODO how can I get to tokio context without spawning another thread?
             // temp fn to get the tokio context
             use futures::Future;
             fn run_async<T>(future: impl Future<Output=T>) -> T {
@@ -271,7 +273,7 @@ impl Executor for BallistaExecutor {
                     .expect("cannot start tokio rt");
                 let tokio_handle = tokio_rt.handle();
 
-                let local_ex = LocalExecutor::new();
+                let local_ex = async_executor::LocalExecutor::new();
                 tokio_handle.enter(|| local_ex.run(future))
             }
 
@@ -300,6 +302,7 @@ impl Executor for BallistaExecutor {
                 })
             })
         });
+
         match handle.join() {
             Ok(handle) => handle,
             Err(e) => Err(ballista_error(&format!("Executor thread failed: {:?}", e))),

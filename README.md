@@ -45,7 +45,7 @@ GC pauses.
 - Ballista is designed from the ground up to use columnar data, enabling a number of efficiencies such as vectorized 
 processing (SIMD and GPU) and efficient compression. Although Spark does have some columnar support, it is still 
 largely row-based today.
-- The combination of Rust and Arrow provides excellent memory efficiency and memory usage can be 50x - 100x lower than 
+- The combination of Rust and Arrow provides excellent memory efficiency and memory usage can be 5x - 10x lower than 
 Apache Spark in some cases, which means that more processing can fit on a single node, reducing the overhead of 
 distributed compute.
 - The use of Apache Arrow as the memory model and network protocol means that data can be exchanged between executors 
@@ -94,6 +94,8 @@ The following examples should help illustrate the current capabilities of Ballis
 
 The [user guide](https://ballistacompute.org/docs/) is hosted at [https://ballistacompute.org](https://ballistacompute.org/), 
 along with the [blog](https://ballistacompute.org/) where news and release notes are posted.
+
+Developer documentation can be found in the [docs](docs/README.md) directory.
 
 ## Contributing
 

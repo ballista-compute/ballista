@@ -95,7 +95,7 @@ jobs:
     # github does not provide a clean ref name. We build it here, see https://stackoverflow.com/a/58035262/931303
     - name: Extract git reference name
       shell: bash
-      run: echo "##[set-output name=ref;]$(echo ${GITHUB_REF#refs/heads/})"
+      run: echo "##[set-output name=ref;]echo $(A=${A#refs/heads/}; A=${A#refs/pulls/}; echo ${A////.})"
       id: extract_ref
     # login to docker so that we can pull images from it.
     - name: Docker login
@@ -111,6 +111,7 @@ jobs:
         docker pull "$BUILDER_IMAGE_NAME:${{ steps.extract_ref.outputs.ref }}" ||
         docker pull "docker.pkg.github.com/$BASE_REPOSITORY/ballista-rust-builder:main" ||
         true
+    # build the builder image and push it so that it is available for caching
     - name: Build builder image
       run: >
         docker build -f docker/rust.dockerfile
@@ -119,8 +120,9 @@ jobs:
         -t $BUILDER_IMAGE_NAME:${{ steps.extract_ref.outputs.ref }}
         --target builder
         .
-    # build the builder image and push it so that it is available for caching
     - name: Push builder image
+      # we can't push images on pull requests, as tokens only allow read access (for security reasons)
+      if: github.event_name != 'pull_request'
       run: docker push $BUILDER_IMAGE_NAME:${{ steps.extract_ref.outputs.ref }}
     - name: Build image
       run: >
@@ -129,4 +131,6 @@ jobs:
         -t $IMAGE_NAME:${{ steps.extract_ref.outputs.ref }}
         .
     - name: Push image
+      # we can't push images on pull requests, as tokens only allow read access (for security reasons)
+      if: github.event_name != 'pull_request'
       run: docker push $IMAGE_NAME:${{ steps.extract_ref.outputs.ref }}

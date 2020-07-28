@@ -5,7 +5,8 @@ end-user documentation for a published release, please start with the [user guid
 
 ## Contents
 
-- Setting up a [development environment](development-environment.md)
-- [Integration testing](integration-testing.md)
-- Where to find [NYC Taxi](nyctaxi.md)
-- How to generate [TPCH data](tpch.md)
+- Setting up a [development environment](development-environment.md).
+- [How to test the Rust executor](testing-rust-executor.md).
+- [Running the integration test](integration-testing.md).
+- Where to find [NYC Taxi](nyctaxi.md) data.
+- How to generate [TPCH](tpch.md) data.

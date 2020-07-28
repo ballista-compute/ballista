@@ -26,7 +26,7 @@ use ballista::error::Result;
 #[tokio::main]
 async fn main() -> Result<()> {
     //TODO use command-line args
-    let path = "/mnt/tpch/parquet/100-240/lineitem";
+    let path = "/mnt/tpch/parquet/10-24/lineitem";
     let executor_host = "localhost";
     let executor_port = 50051;
     let query_no = 1;

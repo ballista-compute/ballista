@@ -1,5 +1,5 @@
 # Base image extends debian:buster-slim
-FROM rust:1.45.0-buster AS build
+FROM rust:1.45.0-buster AS builder
 
 RUN apt update && apt -y install musl musl-dev musl-tools libssl-dev openssl
 
@@ -110,7 +110,7 @@ RUN if [ -z "$RELEASE_FLAG" ]; then mv /tmp/ballista/target/debug/executor /exec
 # Copy the binary into a new container for a smaller docker image
 FROM debian:buster-slim
 
-COPY --from=build /executor /
+COPY --from=builder /executor /
 
 ENV RUST_LOG=info
 ENV RUST_BACKTRACE=full

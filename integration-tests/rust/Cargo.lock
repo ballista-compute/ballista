@@ -209,7 +209,7 @@ dependencies = [
 
 [[package]]
 name = "ballista"
-version = "0.3.0-alpha-1"
+version = "0.3.0-SNAPSHOT"
 dependencies = [
  "arrow",
  "arrow-flight",
@@ -240,7 +240,7 @@ dependencies = [
 
 [[package]]
 name = "ballista-integration-tests"
-version = "0.3.0-alpha-1"
+version = "0.3.0-SNAPSHOT"
 dependencies = [
  "ballista",
  "tokio 0.2.21",

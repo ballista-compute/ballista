@@ -608,7 +608,7 @@ pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Arc<PhysicalPlan>> {
             path, projection, ..
         } => {
             //TODO make batch size configurable from the context
-            let batch_size = 1024 * 1024;
+            let batch_size = 64 * 1024;
             let exec = ParquetScanExec::try_new(&path, projection.clone(), batch_size)?;
             Ok(Arc::new(PhysicalPlan::ParquetScan(Arc::new(exec))))
         }

@@ -145,6 +145,7 @@ impl ParquetBatchIter {
         std::thread::spawn(move || {
             let start = Instant::now();
             let mut batch_read_time = 0;
+            let mut total_bytes_read = 0;
             let mut output_batches = 0;
             let mut output_rows = 0;
 
@@ -166,9 +167,14 @@ impl ParquetBatchIter {
                                     output_batches += 1;
                                     output_rows += batch.num_rows();
 
-                                    response_tx
-                                        .send(Ok(Some(ColumnarBatch::from_arrow(&batch))))
-                                        .unwrap();
+                                    let columnar_batch = ColumnarBatch::from_arrow(&batch);
+                                    println!(
+                                        "ParquetScanExec read batch containing {} bytes",
+                                        columnar_batch.memory_size()
+                                    );
+                                    total_bytes_read += columnar_batch.memory_size();
+
+                                    response_tx.send(Ok(Some(columnar_batch))).unwrap();
                                 }
                                 Ok(None) => {
                                     response_tx.send(Ok(None)).unwrap();
@@ -199,9 +205,10 @@ impl ParquetBatchIter {
             }
 
             println!(
-                "ParquetScan scanned {} batches and {} rows in {} ms. Total duration {} ms.",
+                "ParquetScan scanned {} batches and {} rows containing {} bytes in {} ms. Total duration {} ms.",
                 output_batches,
                 output_rows,
+                total_bytes_read,
                 batch_read_time,
                 start.elapsed().as_millis()
             );

@@ -34,7 +34,6 @@ pub enum BallistaError {
     DataFusionError(ExecutionError),
     SqlError(sqlparser::ParserError),
     IoError(io::Error),
-    ReqwestError(reqwest::Error),
     HttpError(http::Error),
     KubeAPIError(kube::error::Error),
     KubeAPIRequestError(k8s_openapi::RequestError),
@@ -73,12 +72,6 @@ impl From<ExecutionError> for BallistaError {
 impl From<io::Error> for BallistaError {
     fn from(e: io::Error) -> Self {
         BallistaError::IoError(e)
-    }
-}
-
-impl From<reqwest::Error> for BallistaError {
-    fn from(e: reqwest::Error) -> Self {
-        BallistaError::ReqwestError(e)
     }
 }
 
@@ -121,7 +114,6 @@ impl Display for BallistaError {
             BallistaError::DataFusionError(ref desc) => write!(f, "DataFusion error: {:?}", desc),
             BallistaError::SqlError(ref desc) => write!(f, "SQL error: {:?}", desc),
             BallistaError::IoError(ref desc) => write!(f, "IO error: {}", desc),
-            BallistaError::ReqwestError(ref desc) => write!(f, "Reqwest error: {}", desc),
             BallistaError::HttpError(ref desc) => write!(f, "HTTP error: {}", desc),
             BallistaError::KubeAPIError(ref desc) => write!(f, "Kube API error: {}", desc),
             BallistaError::KubeAPIRequestError(ref desc) => {

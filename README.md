@@ -100,8 +100,3 @@ Developer documentation can be found in the [docs](docs/README.md) directory.
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for information on contributing to this project.
-
-
-
-
-

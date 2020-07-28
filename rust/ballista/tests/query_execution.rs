@@ -85,7 +85,7 @@ async fn execute(use_filter: bool) {
 
 #[test]
 fn hash_aggregate() -> std::io::Result<()> {
-    smol::run(async {
+    async_executor::LocalExecutor::new().run(async {
         execute(false).await;
         std::io::Result::Ok(())
     })
@@ -93,7 +93,7 @@ fn hash_aggregate() -> std::io::Result<()> {
 
 #[test]
 fn hash_aggregate_with_filter() -> std::io::Result<()> {
-    smol::run(async {
+    async_executor::LocalExecutor::new().run(async {
         execute(true).await;
         std::io::Result::Ok(())
     })

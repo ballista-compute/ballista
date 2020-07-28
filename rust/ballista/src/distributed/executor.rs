@@ -261,52 +261,27 @@ impl Executor for BallistaExecutor {
 
         let config = self.config.clone();
 
-        let handle = thread::spawn(move || {
-            // TODO how can I get to tokio context without spawning another thread?
-            // temp fn to get the tokio context
-            use futures::Future;
-            fn run_async<T>(future: impl Future<Output=T>) -> T {
-                let tokio_rt = tokio::runtime::Builder::new()
-                    .enable_all()
-                    .basic_scheduler()
-                    .build()
-                    .expect("cannot start tokio rt");
-                let tokio_handle = tokio_rt.handle();
+        let plan: Arc<PhysicalPlan> = create_physical_plan(&logical_plan)?;
+        println!("Physical plan:\n{:?}", plan);
 
-                let local_ex = async_executor::LocalExecutor::new();
-                tokio_handle.enter(|| local_ex.run(future))
-            }
+        let plan = ensure_requirements(plan.as_ref())?;
+        println!("Optimized physical plan:\n{:?}", plan);
 
-            // the future being run here is not send. how to fix?
-            run_async(async {
-                let plan: Arc<PhysicalPlan> = create_physical_plan(&logical_plan)?;
-                println!("Physical plan:\n{:?}", plan);
+        let job = create_job(plan)?;
+        job.explain();
 
-                let plan = ensure_requirements(plan.as_ref())?;
-                println!("Optimized physical plan:\n{:?}", plan);
+        // create new execution contrext specifically for this query
+        let ctx = Arc::new(DefaultContext::new(&config, HashMap::new()));
 
-                let job = create_job(plan)?;
-                job.explain();
+        let batches = execute_job(&job, ctx.clone()).await?;
 
-                // create new execution contrext specifically for this query
-                let ctx = Arc::new(DefaultContext::new(&config, HashMap::new()));
-
-                let batches = execute_job(&job, ctx.clone()).await?;
-
-                Ok(ShufflePartition {
-                    schema: batches[0].schema().as_ref().clone(),
-                    data: batches
-                        .iter()
-                        .map(|b| b.to_arrow())
-                        .collect::<Result<Vec<_>>>()?,
-                })
-            })
-        });
-
-        match handle.join() {
-            Ok(handle) => handle,
-            Err(e) => Err(ballista_error(&format!("Executor thread failed: {:?}", e))),
-        }
+        Ok(ShufflePartition {
+            schema: batches[0].schema().as_ref().clone(),
+            data: batches
+                .iter()
+                .map(|b| b.to_arrow())
+                .collect::<Result<Vec<_>>>()?,
+        })
     }
 }
 

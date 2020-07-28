@@ -37,6 +37,7 @@ use crate::execution::physical_plan::{
     Partitioning, PhysicalPlan, ShuffleId,
 };
 
+use async_dup::Mutex;
 use async_executor::Task;
 use async_io::Timer;
 use futures::future::join_all;
@@ -50,7 +51,7 @@ pub struct Job {
     pub id: Uuid,
     /// A list of stages within this job. There can be dependencies between stages to form
     /// a directed acyclic graph (DAG).
-    pub stages: Vec<Rc<RefCell<Stage>>>,
+    pub stages: Vec<Arc<Mutex<Stage>>>,
     /// The root stage id that produces the final results
     pub root_stage_id: usize,
 }
@@ -59,7 +60,7 @@ impl Job {
     pub fn explain(&self) {
         println!("Job {} has {} stages:\n", self.id, self.stages.len());
         self.stages.iter().for_each(|stage| {
-            let stage = stage.as_ref().borrow();
+            let stage = stage.lock();
             println!("Stage {}:\n", stage.id);
             if stage.prior_stages.is_empty() {
                 println!("Stage {} has no dependencies.", stage.id);
@@ -162,17 +163,17 @@ impl Scheduler {
     fn create_job(&mut self, plan: Arc<PhysicalPlan>) -> Result<()> {
         let new_stage_id = self.next_stage_id;
         self.next_stage_id += 1;
-        let new_stage = Rc::new(RefCell::new(Stage::new(new_stage_id)));
+        let new_stage = Arc::new(Mutex::new(Stage::new(new_stage_id)));
         self.job.stages.push(new_stage.clone());
         let plan = self.visit_plan(plan, new_stage.clone())?;
-        new_stage.as_ref().borrow_mut().plan = Some(plan);
+        new_stage.lock().plan = Some(plan);
         Ok(())
     }
 
     fn visit_plan(
         &mut self,
         plan: Arc<PhysicalPlan>,
-        current_stage: Rc<RefCell<Stage>>,
+        current_stage: Arc<Mutex<Stage>>,
     ) -> Result<Arc<PhysicalPlan>> {
         //
         match plan.as_ref() {
@@ -180,18 +181,17 @@ impl Scheduler {
                 // shuffle indicates that we need a new stage
                 let new_stage_id = self.next_stage_id;
                 self.next_stage_id += 1;
-                let new_stage = Rc::new(RefCell::new(Stage::new(new_stage_id)));
+                let new_stage = Arc::new(Mutex::new(Stage::new(new_stage_id)));
                 self.job.stages.push(new_stage.clone());
 
                 // the children need to be part of this new stage
                 let shuffle_input = self.visit_plan(exec.child.clone(), new_stage.clone())?;
 
-                new_stage.as_ref().borrow_mut().plan = Some(shuffle_input);
+                new_stage.lock().plan = Some(shuffle_input);
 
                 // the current stage depends on this new stage
                 current_stage
-                    .as_ref()
-                    .borrow_mut()
+                    .lock()
                     .prior_stages
                     .push(new_stage_id);
 
@@ -266,7 +266,7 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
     let mut stage_status_map = HashMap::new();
 
     for stage in &job.stages {
-        let stage = stage.borrow_mut();
+        let stage = stage.lock();
         stage_status_map.insert(stage.id, StageStatus::Pending);
     }
 
@@ -277,7 +277,7 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
 
         //TODO do stages in parallel when possible
         for stage in &job.stages {
-            let stage = stage.borrow_mut();
+            let stage = stage.lock();
             let status = stage_status_map.get(&stage.id).unwrap();
             match status {
                 StageStatus::Pending => {

@@ -116,7 +116,7 @@ export BUILDER_IMAGE=docker.pkg.github.com/ballista-compute/ballista/ballista-ru
 docker login docker.pkg.github.com -u ... -p ...  # a personal access token to read from the read:packages
 docker pull $BUILDER_IMAGE
 
-docker build --cache-from $BUILDER_IMAGE -f docker/rust.dockerfile ballista:latest .
+docker build --cache-from $BUILDER_IMAGE -f docker/rust.dockerfile -t ballista:latest .
 ```
 
 will build the image by re-using a cached image.
@@ -126,7 +126,7 @@ will build the image by re-using a cached image.
 This project often requires testing on kubernetes. For this reason, we have a github workflow to push images to 
 github's registry, both from this repo and its forks.
 
-The basic principle is that every push to a git reference builds and publishs a docker image.
+The basic principle is that every push to a git reference builds and publishes a docker image.
 Specifically, given a branch or tag `${REF}`,
 
 * `docker.pkg.github.com/ballista-compute/ballista/ballista-rust:${REF}` is the latest image from $REF

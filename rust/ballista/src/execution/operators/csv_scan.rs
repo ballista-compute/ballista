@@ -41,7 +41,7 @@ pub struct CsvScanExec {
     /// Schema representing the CSV file
     schema: SchemaRef,
     /// Does the CSV file have a header?
-    has_header: bool,
+    pub(crate) has_header: bool,
     /// An optional column delimiter. Defaults to `b','`
     delimiter: Option<u8>,
     /// Optional projection for which columns to load
@@ -97,6 +97,10 @@ impl CsvScanExec {
             Some(options.schema_infer_max_records),
             options.has_header,
         )?)
+    }
+
+    pub fn original_schema(&self) -> SchemaRef {
+        self.schema.clone()
     }
 }
 

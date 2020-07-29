@@ -393,8 +393,8 @@ impl TryInto<protobuf::PhysicalPlanNode> for &PhysicalPlan {
                         .map(|n| *n as u32)
                         .collect(),
                     file_format: "csv".to_owned(),
-                    schema: Some(exec.schema().as_ref().try_into()?),
-                    has_header: false,
+                    schema: Some(exec.original_schema().as_ref().try_into()?),
+                    has_header: exec.has_header,
                     batch_size: exec.batch_size as u32,
                 });
                 Ok(node)

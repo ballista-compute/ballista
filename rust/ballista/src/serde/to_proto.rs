@@ -122,7 +122,7 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
 
                 node.scan = Some(protobuf::ScanNode {
                     path: path.to_owned(),
-                    projection: projection,
+                    projection,
                     schema: Some(schema),
                     has_header: *has_header,
                     file_format: "csv".to_owned(),
@@ -150,7 +150,7 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
 
                 node.scan = Some(protobuf::ScanNode {
                     path: path.to_owned(),
-                    projection: projection,
+                    projection,
                     schema: Some(schema),
                     has_header: false,
                     file_format: "parquet".to_owned(),

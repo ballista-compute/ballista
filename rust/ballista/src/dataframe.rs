@@ -29,7 +29,7 @@ use crate::datafusion::optimizer::utils::exprlist_to_fields;
 use crate::datafusion::sql::parser::{DFASTNode, DFParser};
 use crate::datafusion::sql::planner::{SchemaProvider, SqlToRel};
 use crate::distributed::client;
-use crate::error::{BallistaError, Result};
+use crate::error::{ballista_error, BallistaError, Result};
 use crate::execution::physical_plan::Action;
 
 pub const CSV_READER_BATCH_SIZE: &str = "ballista.csv.reader.batchSize";
@@ -41,20 +41,23 @@ pub const PARQUET_READER_QUEUE_SIZE: &str = "ballista.parquet.reader.queueSize";
 struct ConfigSetting {
     key: String,
     description: String,
+    data_type: DataType,
     default_value: Option<String>,
 }
 
 impl ConfigSetting {
-    pub fn new(key: &str, description: &str, default_value: Option<&str>) -> Self {
+    pub fn new(
+        key: &str,
+        description: &str,
+        data_type: DataType,
+        default_value: Option<&str>,
+    ) -> Self {
         Self {
             key: key.to_owned(),
             description: description.to_owned(),
+            data_type,
             default_value: default_value.map(|s| s.to_owned()),
         }
-    }
-
-    pub fn default_value(&self) -> Option<String> {
-        self.default_value.clone()
     }
 }
 
@@ -69,12 +72,14 @@ impl BallistaConfigs {
         configs.push(ConfigSetting::new(
             CSV_READER_BATCH_SIZE,
             "Number of rows to read per batch",
+            DataType::UInt64,
             Some("65536"),
         ));
 
         configs.push(ConfigSetting::new(
             PARQUET_READER_BATCH_SIZE,
             "Number of rows to read per batch",
+            DataType::UInt64,
             Some("65536"),
         ));
 
@@ -82,6 +87,7 @@ impl BallistaConfigs {
             PARQUET_READER_QUEUE_SIZE,
             "Size of the bounded queue that sends batches from the Parquet reader thread to the\
             next upstream operator.",
+            DataType::UInt64,
             Some("2"),
         ));
 
@@ -93,6 +99,43 @@ impl BallistaConfigs {
         Self {
             configs: config_map,
         }
+    }
+
+    pub fn validate(&self, settings: &HashMap<String, String>) -> Result<HashMap<String, String>> {
+        let mut checked_settings = settings.clone();
+
+        for config in &self.configs {
+            if !checked_settings.contains_key(config.0) {
+                match &config.1.default_value {
+                    Some(default_value) => {
+                        checked_settings.insert(config.0.to_string(), default_value.to_string());
+                    }
+                    None => {
+                        return Err(ballista_error(&format!(
+                            "Settings missing required config '{}'",
+                            config.0
+                        )))
+                    }
+                }
+            }
+
+            // validate that any values are of the expected type
+            if let Some(value) = checked_settings.get(config.0) {
+                match config.1.data_type {
+                    DataType::UInt64 => {
+                        let _ = value.parse::<u64>().map_err(|e| {
+                            ballista_error(&format!(
+                                "Error parsing value {} for setting '{}' {:?}",
+                                value, config.0, e
+                            ))
+                        })?;
+                    }
+                    _ => return Err(ballista_error("unsupported data type for configs")),
+                }
+            }
+        }
+
+        Ok(checked_settings)
     }
 }
 
@@ -423,9 +466,12 @@ impl DataFrame {
                 port,
                 settings,
             } => {
+                let configs = BallistaConfigs::new();
+                let settings = configs.validate(settings)?;
+
                 let action = Action::InteractiveQuery {
                     plan: self.plan.clone(),
-                    settings: settings.clone(),
+                    settings,
                 };
 
                 Context::from(self.ctx_state.clone())
@@ -577,5 +623,44 @@ pub fn aggregate_expr(name: &str, expr: &Expr) -> Expr {
         name: name.to_string(),
         args: vec![expr.clone()],
         return_type,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_settings() -> Result<()> {
+        let my_settings = HashMap::new();
+        let configs = BallistaConfigs::new();
+        let my_settings = configs.validate(&my_settings)?;
+        assert_eq!(my_settings[PARQUET_READER_BATCH_SIZE], "65536");
+        Ok(())
+    }
+
+    #[test]
+    fn custom_setting() -> Result<()> {
+        let mut my_settings: HashMap<String, String> = HashMap::new();
+        my_settings.insert(PARQUET_READER_BATCH_SIZE.to_owned(), "1234".to_owned());
+        let configs = BallistaConfigs::new();
+        let my_settings = configs.validate(&my_settings)?;
+        assert_eq!(my_settings[PARQUET_READER_BATCH_SIZE], "1234");
+        Ok(())
+    }
+
+    #[test]
+    fn invalid_setting() -> Result<()> {
+        let mut my_settings: HashMap<String, String> = HashMap::new();
+        my_settings.insert(
+            PARQUET_READER_BATCH_SIZE.to_owned(),
+            "twenty gigs".to_owned(),
+        );
+        let configs = BallistaConfigs::new();
+        match configs.validate(&my_settings) {
+            Err(e) => assert_eq!("General error: Error parsing value twenty gigs for setting 'ballista.parquet.reader.batchSize' ParseIntError { kind: InvalidDigit }", e.to_string()),
+            _ => return Err(ballista_error("validation failed"))
+        }
+        Ok(())
     }
 }

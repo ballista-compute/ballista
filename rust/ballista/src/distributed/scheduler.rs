@@ -605,7 +605,8 @@ pub fn create_physical_plan(
             path, projection, ..
         } => {
             //TODO get other csv options from the settings
-            let batch_size: usize = settings[CSV_READER_BATCH_SIZE].parse().unwrap(); //TODO remove unwrap
+            // TODO this needs more work to re-use the config defaults defined in datafranme.rs
+            let batch_size: usize = settings[CSV_READER_BATCH_SIZE].parse().unwrap_or(64 * 1024);
             let options = CsvReadOptions::new();
             let exec = CsvScanExec::try_new(&path, options, projection.clone(), batch_size)?;
             Ok(Arc::new(PhysicalPlan::CsvScan(Arc::new(exec))))
@@ -613,8 +614,11 @@ pub fn create_physical_plan(
         LogicalPlan::ParquetScan {
             path, projection, ..
         } => {
-            let batch_size: usize = settings[PARQUET_READER_BATCH_SIZE].parse().unwrap(); //TODO remove unwrap
-            let queue_size: usize = settings[PARQUET_READER_QUEUE_SIZE].parse().unwrap(); //TODO remove unwrap
+            // TODO this needs more work to re-use the config defaults defined in datafranme.rs
+            let batch_size: usize = settings[PARQUET_READER_BATCH_SIZE]
+                .parse()
+                .unwrap_or(64 * 1024);
+            let queue_size: usize = settings[PARQUET_READER_QUEUE_SIZE].parse().unwrap_or(2);
             let exec = ParquetScanExec::try_new(&path, projection.clone(), batch_size, queue_size)?;
             Ok(Arc::new(PhysicalPlan::ParquetScan(Arc::new(exec))))
         }

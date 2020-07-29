@@ -43,6 +43,7 @@ mod tests {
     use crate::error::Result;
     use crate::execution::physical_plan::Action;
     use crate::protobuf;
+    use std::collections::HashMap;
     use std::convert::TryInto;
 
     #[test]
@@ -67,6 +68,7 @@ mod tests {
 
         let action = &Action::InteractiveQuery {
             plan: plan.clone(),
+            settings: HashMap::new(),
             // tables: vec![TableMeta::Csv {
             //     table_name: "employee".to_owned(),
             //     has_header: true,
@@ -105,6 +107,7 @@ mod tests {
 
         let action = &Action::InteractiveQuery {
             plan: plan.clone(),
+            settings: HashMap::new(),
             // tables: vec![TableMeta::Csv {
             //     table_name: "employee".to_owned(),
             //     has_header: true,

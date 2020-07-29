@@ -22,6 +22,7 @@
 //!
 //! The physical plan also accounts for partitioning and ordering of data between operators.
 
+use std::collections::HashMap;
 use std::fmt::{self, Debug};
 use std::sync::Arc;
 
@@ -178,7 +179,10 @@ pub trait Accumulator: Send + Sync {
 #[derive(Debug, Clone)]
 pub enum Action {
     /// Execute the query with DataFusion and return the results
-    InteractiveQuery { plan: LogicalPlan },
+    InteractiveQuery {
+        plan: LogicalPlan,
+        settings: HashMap<String, String>,
+    },
     /// Execute a query and store the results in memory
     Execute(ExecutionTask),
     /// Collect a shuffle

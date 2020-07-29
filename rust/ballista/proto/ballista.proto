@@ -140,6 +140,7 @@ message ScanExecNode {
   string file_format = 4; // parquet or csv
   bool has_header = 5; // csv specific
   uint32 batch_size = 6;
+  uint32 queue_size = 7; // parquet specific
 }
 
 message ProjectionExecNode {
@@ -179,6 +180,11 @@ message LocalLimitExecNode {
 // Ballista Scheduling
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+message KeyValuePair {
+    string key = 1;
+    string value = 2;
+}
+
 message Action {
   // interactive query
   LogicalPlanNode query = 1;
@@ -189,6 +195,8 @@ message Action {
   // Fetch a shuffle partition from an executor
   ShuffleId fetch_shuffle = 3;
 
+  // configuration settings
+  repeated KeyValuePair settings = 100;
 }
 
 message Task {

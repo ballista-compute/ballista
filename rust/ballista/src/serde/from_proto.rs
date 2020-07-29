@@ -210,7 +210,11 @@ impl TryInto<Action> for &protobuf::Action {
     fn try_into(self) -> Result<Action, Self::Error> {
         if self.query.is_some() {
             let plan: LogicalPlan = convert_required!(self.query)?;
-            Ok(Action::InteractiveQuery { plan })
+            let mut settings = HashMap::new();
+            for setting in &self.settings {
+                settings.insert(setting.key.to_owned(), setting.value.to_owned());
+            }
+            Ok(Action::InteractiveQuery { plan, settings })
         } else if self.task.is_some() {
             let task: ExecutionTask = convert_required!(self.task)?;
             Ok(Action::Execute(task))
@@ -392,6 +396,7 @@ impl TryInto<PhysicalPlan> for &protobuf::PhysicalPlanNode {
                         &scan.path,
                         Some(scan.projection.iter().map(|n| *n as usize).collect()),
                         scan.batch_size as usize,
+                        scan.queue_size as usize,
                     )?,
                 ))),
                 other => Err(ballista_error(&format!(

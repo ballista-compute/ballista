@@ -228,10 +228,10 @@ impl FlightService for BallistaFlightService {
                 let output = futures::stream::iter(flights);
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
-            physical_plan::Action::InteractiveQuery { plan } => {
+            physical_plan::Action::InteractiveQuery { plan, settings } => {
                 let results = self
                     .executor
-                    .execute_query(plan)
+                    .execute_query(plan, settings)
                     .await
                     .map_err(|e| to_tonic_err(&e))?;
 
@@ -284,10 +284,14 @@ impl FlightService for BallistaFlightService {
         let action = decode_protobuf(&request.cmd.to_vec()).map_err(|e| to_tonic_err(&e))?;
 
         match &action {
-            physical_plan::Action::InteractiveQuery { plan: logical_plan } => {
+            physical_plan::Action::InteractiveQuery {
+                plan: logical_plan,
+                settings,
+            } => {
                 println!("Logical plan: {:?}", logical_plan);
 
-                let plan = create_physical_plan(&logical_plan).map_err(|e| to_tonic_err(&e))?;
+                let plan =
+                    create_physical_plan(&logical_plan, settings).map_err(|e| to_tonic_err(&e))?;
                 println!("Physical plan: {:?}", plan);
 
                 let plan = ensure_requirements(&plan).map_err(|e| to_tonic_err(&e))?;

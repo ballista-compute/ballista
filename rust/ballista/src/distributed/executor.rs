@@ -80,7 +80,11 @@ pub trait Executor: Send + Sync {
     fn collect(&self, shuffle_id: &ShuffleId) -> Result<ShufflePartition>;
 
     /// Execute a query and return results
-    async fn execute_query(&self, plan: &LogicalPlan) -> Result<ShufflePartition>;
+    async fn execute_query(
+        &self,
+        plan: &LogicalPlan,
+        settings: &HashMap<String, String>,
+    ) -> Result<ShufflePartition>;
 }
 
 pub struct DefaultContext {
@@ -243,7 +247,13 @@ impl Executor for BallistaExecutor {
         }
     }
 
-    async fn execute_query(&self, logical_plan: &LogicalPlan) -> Result<ShufflePartition> {
+    async fn execute_query(
+        &self,
+        logical_plan: &LogicalPlan,
+        settings: &HashMap<String, String>,
+    ) -> Result<ShufflePartition> {
+        let settings = settings.to_owned();
+
         println!("Logical plan:\n{:?}", logical_plan);
         let ctx = DFContext::new();
 
@@ -257,11 +267,13 @@ impl Executor for BallistaExecutor {
         let config = self.config.clone();
         let handle = thread::spawn(move || {
             smol::run(async {
-                let plan: Arc<PhysicalPlan> = create_physical_plan(&logical_plan)?;
+                let plan: Arc<PhysicalPlan> = create_physical_plan(&logical_plan, &settings)?;
                 println!("Physical plan:\n{:?}", plan);
 
                 let plan = ensure_requirements(plan.as_ref())?;
                 println!("Optimized physical plan:\n{:?}", plan);
+
+                println!("Settings: {:?}", settings);
 
                 let job = create_job(plan)?;
                 job.explain();

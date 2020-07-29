@@ -32,69 +32,69 @@ use crate::distributed::client;
 use crate::error::{BallistaError, Result};
 use crate::execution::physical_plan::Action;
 
-pub const CSV_BATCH_SIZE: &str = "ballista.csv.batchSize";
+pub const CSV_READER_BATCH_SIZE: &str = "ballista.csv.reader.batchSize";
+pub const PARQUET_READER_BATCH_SIZE: &str = "ballista.parquet.reader.batchSize";
+pub const PARQUET_READER_QUEUE_SIZE: &str = "ballista.parquet.reader.queueSize";
 
 /// Configuration setting
-// struct ConfigSetting {
-//     key: String,
-//     _description: String,
-//     default_value: Option<String>,
-// }
-//
-// impl ConfigSetting {
-//     pub fn new(key: &str, description: &str, default_value: Option<&str>) -> Self {
-//         Self {
-//             key: key.to_owned(),
-//             _description: description.to_owned(),
-//             default_value: default_value.map(|s| s.to_owned()),
-//         }
-//     }
-//
-//     pub fn default_value(&self) -> Option<String> {
-//         self.default_value.clone()
-//     }
-// }
+#[derive(Debug, Clone)]
+struct ConfigSetting {
+    key: String,
+    description: String,
+    default_value: Option<String>,
+}
 
-// struct Configs {
-//     configs: HashMap<String, ConfigSetting>,
-//     settings: HashMap<String, String>,
-// }
+impl ConfigSetting {
+    pub fn new(key: &str, description: &str, default_value: Option<&str>) -> Self {
+        Self {
+            key: key.to_owned(),
+            description: description.to_owned(),
+            default_value: default_value.map(|s| s.to_owned()),
+        }
+    }
 
-// impl Configs {
-//     pub fn new(settings: HashMap<String, String>) -> Self {
-//         let csv_batch_size: ConfigSetting = ConfigSetting::new(
-//             CSV_BATCH_SIZE,
-//             "Number of rows to read per batch",
-//             Some("1024"),
-//         );
-//
-//         let configs = vec![csv_batch_size];
-//
-//         let mut m = HashMap::new();
-//         for config in configs {
-//             m.insert(config.key.clone(), config);
-//         }
-//
-//         Self {
-//             configs: m,
-//             settings,
-//         }
-//     }
-//
-//     pub fn get_setting(&self, name: &str) -> Option<String> {
-//         match self.settings.get(name) {
-//             Some(value) => Some(value.clone()),
-//             None => match self.configs.get(name) {
-//                 Some(value) => value.default_value(),
-//                 None => None,
-//             },
-//         }
-//     }
-//
-//     pub fn csv_batch_size(&self) -> Option<String> {
-//         self.get_setting(CSV_BATCH_SIZE)
-//     }
-// }
+    pub fn default_value(&self) -> Option<String> {
+        self.default_value.clone()
+    }
+}
+
+struct BallistaConfigs {
+    configs: HashMap<String, ConfigSetting>,
+}
+
+impl BallistaConfigs {
+    pub fn new() -> Self {
+        let mut configs = vec![];
+
+        configs.push(ConfigSetting::new(
+            CSV_READER_BATCH_SIZE,
+            "Number of rows to read per batch",
+            Some("65536"),
+        ));
+
+        configs.push(ConfigSetting::new(
+            PARQUET_READER_BATCH_SIZE,
+            "Number of rows to read per batch",
+            Some("65536"),
+        ));
+
+        configs.push(ConfigSetting::new(
+            PARQUET_READER_QUEUE_SIZE,
+            "Size of the bounded queue that sends batches from the Parquet reader thread to the\
+            next upstream operator.",
+            Some("2"),
+        ));
+
+        let mut config_map: HashMap<String, ConfigSetting> = HashMap::new();
+        for config in &configs {
+            config_map.insert(config.key.to_owned(), config.to_owned());
+        }
+
+        Self {
+            configs: config_map,
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct ContextSchemaProvider {
@@ -404,19 +404,30 @@ impl DataFrame {
     }
 
     pub async fn collect(&self) -> Result<Vec<RecordBatch>> {
-        let action = Action::InteractiveQuery {
-            plan: self.plan.clone(),
-        };
-
         match &self.ctx_state.backend {
             ContextBackend::Spark { spark_settings, .. } => {
                 let host = &spark_settings["spark.ballista.host"];
                 let port = &spark_settings["spark.ballista.port"];
+
+                let action = Action::InteractiveQuery {
+                    plan: self.plan.clone(),
+                    settings: spark_settings.clone(),
+                };
+
                 Context::from(self.ctx_state.clone())
                     .execute_action(host, port.parse::<usize>().unwrap(), action)
                     .await
             }
-            ContextBackend::Remote { host, port, .. } => {
+            ContextBackend::Remote {
+                host,
+                port,
+                settings,
+            } => {
+                let action = Action::InteractiveQuery {
+                    plan: self.plan.clone(),
+                    settings: settings.clone(),
+                };
+
                 Context::from(self.ctx_state.clone())
                     .execute_action(host, *port, action)
                     .await

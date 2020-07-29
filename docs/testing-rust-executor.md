@@ -31,7 +31,11 @@ or direct from your IDE.
 
 ## Docker Compose
 
-To test with docker-compose, it will first be necessary to first build a Docker image containing the executor.
+The main benefit of testing with docker-compose is that you can run the executor with CPU and memory constraints in 
+order to test performance and reliability.  
+
+To test with docker-compose, it will first be necessary to first build a Docker image containing the executor. You can 
+run the following command from the root of the project to build the Rust docker image.
 
 ```bash
 ./dev/build-rust.sh

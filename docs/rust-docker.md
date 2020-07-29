@@ -3,7 +3,7 @@
 To build the docker image in development, use
 
 ```
-docker build -f docker/rust.dockerfile ballista:latest .
+docker build -f docker/rust.dockerfile -t ballistacompute/ballista-rust:latest .
 ```
 
 This uses a multi-stage build, on which the build stage is called `builder`.

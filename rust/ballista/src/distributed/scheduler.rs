@@ -596,11 +596,13 @@ pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Arc<PhysicalPlan>> {
             }
         }
         LogicalPlan::CsvScan {
-            path, projection, ..
+            path, schema, has_header, projection, ..
         } => {
             //TODO make batch size and other csv options configurable from the context
             let batch_size = 64 * 1024;
-            let options = CsvReadOptions::new();
+            let options = CsvReadOptions::new()
+                .schema(schema)
+                .has_header(*has_header);
             let exec = CsvScanExec::try_new(&path, options, projection.clone(), batch_size)?;
             Ok(Arc::new(PhysicalPlan::CsvScan(Arc::new(exec))))
         }

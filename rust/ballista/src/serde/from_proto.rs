@@ -53,6 +53,7 @@ macro_rules! convert_box_required {
         }
     }};
 }
+
 impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
     type Error = BallistaError;
 
@@ -98,24 +99,26 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
                 .build()
                 .map_err(|e| e.into())
         } else if let Some(scan) = &self.scan {
-            let schema: Schema = convert_required!(scan.schema)?;
-
-            // let projection: Vec<usize> = scan
-            //     .projection
-            //     .iter()
-            //     .map(|name| schema.index_of(name))
-            //     .collect::<Result<Vec<_>, _>>()?;
-
             match scan.file_format.as_str() {
                 "csv" => {
+                    let schema: Schema = convert_required!(scan.schema)?;
                     let options = CsvReadOptions::new()
                         .schema(&schema)
                         .has_header(scan.has_header);
-                    LogicalPlanBuilder::scan_csv(
-                        &scan.path, options, None, //TODO projection
-                    )?
-                    .build()
-                    .map_err(|e| e.into())
+
+                    let mut projection = None;
+                    if let Some(column_names) = &scan.projection {
+                        let column_indices = column_names
+                            .columns
+                            .iter()
+                            .map(|name| schema.index_of(name))
+                            .collect::<Result<Vec<usize>, _>>()?;
+                        projection = Some(column_indices);
+                    }
+
+                    LogicalPlanBuilder::scan_csv(&scan.path, options, projection)?
+                        .build()
+                        .map_err(|e| e.into())
                 }
                 "parquet" => LogicalPlanBuilder::scan_parquet(&scan.path, None)? //TODO projection
                     .build()
@@ -382,12 +385,16 @@ impl TryInto<PhysicalPlan> for &protobuf::PhysicalPlanNode {
         } else if let Some(scan) = &self.scan {
             match scan.file_format.as_str() {
                 "csv" => {
-                    //TODO read options from proto
-                    let options = CsvReadOptions::new();
+                    let schema: Schema = convert_required!(scan.schema)?;
+                    let options = CsvReadOptions::new()
+                        .schema(&schema)
+                        .has_header(scan.has_header);
+                    let projection = scan.projection.iter().map(|n| *n as usize).collect();
+
                     Ok(PhysicalPlan::CsvScan(Arc::new(CsvScanExec::try_new(
                         &scan.path,
                         options,
-                        Some(scan.projection.iter().map(|n| *n as usize).collect()),
+                        Some(projection),
                         scan.batch_size as usize,
                     )?)))
                 }

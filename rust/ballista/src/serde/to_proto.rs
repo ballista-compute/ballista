@@ -121,16 +121,19 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
             } => {
                 let mut node = empty_logical_plan_node();
 
-                let projected_field_names = match projection {
-                    Some(p) => p.iter().map(|i| schema.field(*i).name().clone()).collect(),
-                    _ => vec![],
-                };
+                let projection = projection.as_ref().map(|column_indices| {
+                    let columns: Vec<String> = column_indices
+                        .iter()
+                        .map(|i| schema.field(*i).name().clone())
+                        .collect();
+                    protobuf::ProjectionColumns { columns }
+                });
 
                 let schema: protobuf::Schema = schema.as_ref().try_into()?;
 
                 node.scan = Some(protobuf::ScanNode {
                     path: path.to_owned(),
-                    projection: projected_field_names,
+                    projection,
                     schema: Some(schema),
                     has_header: *has_header,
                     file_format: "csv".to_owned(),
@@ -145,16 +148,19 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
             } => {
                 let mut node = empty_logical_plan_node();
 
-                let projected_field_names = match projection {
-                    Some(p) => p.iter().map(|i| schema.field(*i).name().clone()).collect(),
-                    _ => vec![],
-                };
+                let projection = projection.as_ref().map(|column_indices| {
+                    let columns: Vec<String> = column_indices
+                        .iter()
+                        .map(|i| schema.field(*i).name().clone())
+                        .collect();
+                    protobuf::ProjectionColumns { columns }
+                });
 
                 let schema: protobuf::Schema = schema.as_ref().try_into()?;
 
                 node.scan = Some(protobuf::ScanNode {
                     path: path.to_owned(),
-                    projection: projected_field_names,
+                    projection,
                     schema: Some(schema),
                     has_header: false,
                     file_format: "parquet".to_owned(),
@@ -397,8 +403,8 @@ impl TryInto<protobuf::PhysicalPlanNode> for &PhysicalPlan {
                         .map(|n| *n as u32)
                         .collect(),
                     file_format: "csv".to_owned(),
-                    schema: Some(exec.schema().as_ref().try_into()?),
-                    has_header: false,
+                    schema: Some(exec.original_schema().as_ref().try_into()?),
+                    has_header: exec.has_header,
                     batch_size: exec.batch_size as u32,
                     queue_size: 0,
                 });

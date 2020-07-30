@@ -29,11 +29,14 @@ class ProtobufSerializer {
         val ds = plan.dataSource
         when (ds) {
           is CsvDataSource -> {
+            val projectionColumns = ProjectionColumns.newBuilder()
+              .addAllColumns(plan.projection)
+              .build()
             LogicalPlanNode.newBuilder()
                 .setScan(
                     ScanNode.newBuilder()
                         .setPath(plan.path)
-                        .addAllProjection(plan.projection)
+                        .setProjection(projectionColumns)
                         .build())
                 .build()
           }

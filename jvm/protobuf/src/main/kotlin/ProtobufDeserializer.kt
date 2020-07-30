@@ -25,7 +25,7 @@ class ProtobufDeserializer {
     return if (node.hasScan()) {
       val schema = fromProto(node.scan.schema)
       val ds = CsvDataSource(node.scan.path, schema, true, 1024)
-      Scan(node.scan.path, ds, node.scan.projectionList.asByteStringList().map { it.toString() })
+      Scan(node.scan.path, ds, node.scan.projection.columnsList.asByteStringList().map { it.toString() })
     } else if (node.hasSelection()) {
       Selection(fromProto(node.input), fromProto(node.selection.expr))
     } else if (node.hasProjection()) {

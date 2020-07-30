@@ -602,12 +602,15 @@ pub fn create_physical_plan(
             }
         }
         LogicalPlan::CsvScan {
-            path, projection, ..
+            path,
+            schema,
+            has_header,
+            projection,
+            ..
         } => {
-            //TODO get other csv options from the settings
             // TODO this needs more work to re-use the config defaults defined in dataframe.rs
             let batch_size: usize = settings[CSV_READER_BATCH_SIZE].parse().unwrap_or(64 * 1024);
-            let options = CsvReadOptions::new();
+            let options = CsvReadOptions::new().schema(schema).has_header(*has_header);
             let exec = CsvScanExec::try_new(&path, options, projection.clone(), batch_size)?;
             Ok(Arc::new(PhysicalPlan::CsvScan(Arc::new(exec))))
         }

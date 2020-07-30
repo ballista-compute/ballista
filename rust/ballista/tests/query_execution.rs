@@ -5,7 +5,8 @@ use std::sync::Arc;
 use ballista::arrow::datatypes::{DataType, Field, Schema};
 use ballista::dataframe::{avg, count, max, min, sum};
 use ballista::datafusion::logicalplan::col_index;
-use ballista::distributed::executor::{DefaultContext, DiscoveryMode, ExecutorConfig};
+use ballista::distributed::context::BallistaContext;
+use ballista::distributed::executor::{DiscoveryMode, ExecutorConfig};
 use ballista::execution::operators::FilterExec;
 use ballista::execution::operators::HashAggregateExec;
 use ballista::execution::operators::InMemoryTableScanExec;
@@ -54,9 +55,9 @@ async fn execute(use_filter: bool) {
         .unwrap(),
     ));
 
-    let config = ExecutorConfig::new(DiscoveryMode::Standalone, "", 0, "");
+    let config = ExecutorConfig::new(DiscoveryMode::Standalone, "", 0, "", 2);
 
-    let ctx = Arc::new(DefaultContext::new(&config, HashMap::new()));
+    let ctx = Arc::new(BallistaContext::new(&config, HashMap::new()));
 
     let start = Instant::now();
     let stream: ColumnarBatchStream = hash_agg.as_execution_plan().execute(ctx, 0).await.unwrap();

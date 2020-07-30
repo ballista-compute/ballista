@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 use ballista::distributed::executor::{BallistaExecutor, DiscoveryMode, Executor, ExecutorConfig};
 use ballista::distributed::flight_service::BallistaFlightService;
+use ballista::distributed::scheduler::{BallistaScheduler, Scheduler};
 use ballista::flight::flight_service_server::FlightServiceServer;
 use ballista::BALLISTA_VERSION;
 
@@ -69,14 +70,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let etcd_urls = opt.etcd_urls.unwrap_or_else(|| "localhost:2379".to_owned());
     let port = opt.port;
 
-    let config = ExecutorConfig::new(mode, &external_host, port, &etcd_urls);
+    let config = ExecutorConfig::new(mode, &external_host, port, &etcd_urls, opt.concurrent_tasks);
 
     println!("Running with config: {:?}", config);
 
     let addr = format!("{}:{}", bind_host, port);
     let addr = addr.parse()?;
+
+    // TODO split scheduler and executor into separate processes soon
+    let scheduler: Arc<dyn Scheduler> = Arc::new(BallistaScheduler::new(config.clone()));
     let executor: Arc<dyn Executor> = Arc::new(BallistaExecutor::new(config));
-    let service = BallistaFlightService::new(executor, opt.concurrent_tasks);
+
+    let service = BallistaFlightService::new(scheduler, executor, opt.concurrent_tasks);
     let server = FlightServiceServer::new(service);
     println!(
         "Ballista v{} Rust Executor listening on {:?}",

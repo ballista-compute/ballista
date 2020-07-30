@@ -22,14 +22,18 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use crate::arrow::datatypes::Schema;
 use crate::dataframe::{
     avg, count, max, min, sum, CSV_READER_BATCH_SIZE, PARQUET_READER_BATCH_SIZE,
     PARQUET_READER_QUEUE_SIZE,
 };
+use crate::datafusion::execution::context::ExecutionContext as DFContext;
 use crate::datafusion::execution::physical_plan::csv::CsvReadOptions;
 use crate::datafusion::logicalplan::LogicalPlan;
-use crate::datafusion::logicalplan::{col_index, Expr};
-use crate::distributed::executor::DefaultContext;
+use crate::datafusion::logicalplan::{col_index, Expr, LogicalPlanBuilder};
+use crate::datafusion::optimizer::optimizer::OptimizerRule;
+use crate::distributed::context::BallistaContext;
+use crate::distributed::executor::{ExecutorConfig, ShufflePartition};
 use crate::error::{ballista_error, BallistaError, Result};
 use crate::execution::operators::ProjectionExec;
 use crate::execution::operators::ShuffleExchangeExec;
@@ -41,8 +45,83 @@ use crate::execution::physical_plan::{
     Partitioning, PhysicalPlan, ShuffleId,
 };
 
+use async_trait::async_trait;
 use smol::Task;
 use uuid::Uuid;
+
+#[async_trait]
+pub trait Scheduler: Send + Sync {
+    /// Execute a query and return results
+    async fn execute_query(
+        &self,
+        plan: &LogicalPlan,
+        settings: &HashMap<String, String>,
+    ) -> Result<ShufflePartition>;
+}
+
+pub struct BallistaScheduler {
+    config: ExecutorConfig,
+}
+
+impl BallistaScheduler {
+    pub fn new(config: ExecutorConfig) -> Self {
+        Self { config }
+    }
+}
+
+#[async_trait]
+impl Scheduler for BallistaScheduler {
+    async fn execute_query(
+        &self,
+        logical_plan: &LogicalPlan,
+        settings: &HashMap<String, String>,
+    ) -> Result<ShufflePartition> {
+        let settings = settings.to_owned();
+
+        println!("Logical plan:\n{:?}", logical_plan);
+        let ctx = DFContext::new();
+
+        // workaround for https://issues.apache.org/jira/browse/ARROW-9542
+        let mut rule = ResolveColumnsRule::new();
+        let logical_plan = rule.optimize(logical_plan)?;
+
+        let logical_plan = ctx.optimize(&logical_plan)?;
+        println!("Optimized logical plan:\n{:?}", logical_plan);
+
+        let config = self.config.clone();
+        let handle = thread::spawn(move || {
+            smol::run(async {
+                let plan: Arc<PhysicalPlan> = create_physical_plan(&logical_plan, &settings)?;
+                println!("Physical plan:\n{:?}", plan);
+
+                let plan = ensure_requirements(plan.as_ref())?;
+                println!("Optimized physical plan:\n{:?}", plan);
+
+                println!("Settings: {:?}", settings);
+
+                let job = create_job(plan)?;
+                job.explain();
+
+                // create new execution contrext specifically for this query
+                let ctx = Arc::new(BallistaContext::new(&config, HashMap::new()));
+
+                let batches = execute_job(&job, ctx.clone()).await?;
+
+                Ok(ShufflePartition {
+                    schema: batches[0].schema().as_ref().clone(),
+                    data: batches
+                        .iter()
+                        .map(|b| b.to_arrow())
+                        .collect::<Result<Vec<_>>>()?,
+                })
+            })
+        });
+        match handle.join() {
+            Ok(handle) => handle,
+            Err(e) => Err(ballista_error(&format!("Executor thread failed: {:?}", e))),
+        }
+    }
+}
 
 /// A Job typically represents a single query and the query is executed in stages. Stages are
 /// separated by map operations (shuffles) to re-partition data before the next stage starts.
@@ -138,17 +217,17 @@ impl ExecutionTask {
 
 /// Create a Job (DAG of stages) from a physical execution plan.
 pub fn create_job(plan: Arc<PhysicalPlan>) -> Result<Job> {
-    let mut scheduler = Scheduler::new();
+    let mut scheduler = JobScheduler::new();
     scheduler.create_job(plan)?;
     Ok(scheduler.job)
 }
 
-pub struct Scheduler {
+pub struct JobScheduler {
     job: Job,
     next_stage_id: usize,
 }
 
-impl Scheduler {
+impl JobScheduler {
     fn new() -> Self {
         let job = Job {
             id: Uuid::new_v4(),
@@ -461,7 +540,7 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
 
                         if stage.id == job.root_stage_id {
                             println!("reading final results from query!");
-                            let ctx = Arc::new(DefaultContext::new(
+                            let ctx = Arc::new(BallistaContext::new(
                                 &ctx.config(),
                                 shuffle_location_map.clone(),
                             ));
@@ -671,6 +750,112 @@ pub fn ensure_requirements(plan: &PhysicalPlan) -> Result<Arc<PhysicalPlan>> {
             Ok(Arc::new(plan.with_new_children(new_children)))
         }
         _ => Ok(Arc::new(plan.clone())),
+    }
+}
+
+//TODO the following code is copied from DataFusion and can be removed in the 0.4.0 release
+
+/// Replace UnresolvedColumns with Columns
+pub struct ResolveColumnsRule {}
+
+impl ResolveColumnsRule {
+    #[allow(missing_docs)]
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Default for ResolveColumnsRule {
+    fn default() -> Self {
+        ResolveColumnsRule::new()
+    }
+}
+
+impl OptimizerRule for ResolveColumnsRule {
+    fn optimize(&mut self, plan: &LogicalPlan) -> datafusion::error::Result<LogicalPlan> {
+        match plan {
+            LogicalPlan::Projection { input, expr, .. } => {
+                Ok(LogicalPlanBuilder::from(&self.optimize(input)?)
+                    .project(rewrite_expr_list(expr, &input.schema())?)?
+                    .build()?)
+            }
+            LogicalPlan::Selection { expr, input } => {
+                Ok(LogicalPlanBuilder::from(&self.optimize(input)?)
+                    .filter(rewrite_expr(expr, &input.schema())?)?
+                    .build()?)
+            }
+            LogicalPlan::Aggregate {
+                input,
+                group_expr,
+                aggr_expr,
+                ..
+            } => Ok(LogicalPlanBuilder::from(&self.optimize(input)?)
+                .aggregate(
+                    rewrite_expr_list(group_expr, &input.schema())?,
+                    rewrite_expr_list(aggr_expr, &input.schema())?,
+                )?
+                .build()?),
+            LogicalPlan::Sort { input, expr, .. } => {
+                Ok(LogicalPlanBuilder::from(&self.optimize(input)?)
+                    .sort(rewrite_expr_list(expr, &input.schema())?)?
+                    .build()?)
+            }
+            _ => Ok(plan.clone()),
+        }
+    }
+}
+
+fn rewrite_expr_list(expr: &[Expr], schema: &Schema) -> datafusion::error::Result<Vec<Expr>> {
+    Ok(expr
+        .iter()
+        .map(|e| rewrite_expr(e, schema))
+        .collect::<datafusion::error::Result<Vec<_>>>()?)
+}
+
+fn rewrite_expr(expr: &Expr, schema: &Schema) -> datafusion::error::Result<Expr> {
+    match expr {
+        Expr::Alias(expr, alias) => Ok(rewrite_expr(&expr, schema)?.alias(&alias)),
+        Expr::UnresolvedColumn(name) => Ok(Expr::Column(schema.index_of(&name)?)),
+        Expr::BinaryExpr { left, op, right } => Ok(Expr::BinaryExpr {
+            left: Box::new(rewrite_expr(&left, schema)?),
+            op: op.clone(),
+            right: Box::new(rewrite_expr(&right, schema)?),
+        }),
+        Expr::Not(expr) => Ok(Expr::Not(Box::new(rewrite_expr(&expr, schema)?))),
+        Expr::IsNotNull(expr) => Ok(Expr::IsNotNull(Box::new(rewrite_expr(&expr, schema)?))),
+        Expr::IsNull(expr) => Ok(Expr::IsNull(Box::new(rewrite_expr(&expr, schema)?))),
+        Expr::Cast { expr, data_type } => Ok(Expr::Cast {
+            expr: Box::new(rewrite_expr(&expr, schema)?),
+            data_type: data_type.clone(),
+        }),
+        Expr::Sort {
+            expr,
+            asc,
+            nulls_first,
+        } => Ok(Expr::Sort {
+            expr: Box::new(rewrite_expr(&expr, schema)?),
+            asc: *asc,
+            nulls_first: *nulls_first,
+        }),
+        Expr::ScalarFunction {
+            name,
+            args,
+            return_type,
+        } => Ok(Expr::ScalarFunction {
+            name: name.clone(),
+            args: rewrite_expr_list(args, schema)?,
+            return_type: return_type.clone(),
+        }),
+        Expr::AggregateFunction {
+            name,
+            args,
+            return_type,
+        } => Ok(Expr::AggregateFunction {
+            name: name.clone(),
+            args: rewrite_expr_list(args, schema)?,
+            return_type: return_type.clone(),
+        }),
+        _ => Ok(expr.clone()),
     }
 }
 

@@ -21,10 +21,11 @@ use std::thread;
 use std::time::Instant;
 
 use crate::arrow::datatypes::{DataType, Field, Schema};
-use crate::distributed::executor::{Executor, ShufflePartition};
-use crate::distributed::scheduler::{create_job, create_physical_plan, ensure_requirements};
+use crate::distributed::executor::{Executor, ShufflePartition, TaskStatus};
+use crate::distributed::scheduler::{
+    create_job, create_physical_plan, ensure_requirements, Scheduler,
+};
 use crate::execution::physical_plan;
-use crate::execution::physical_plan::ShuffleId;
 use crate::flight::{
     flight_service_server::FlightService, Action, ActionType, Criteria, Empty, FlightData,
     FlightDescriptor, FlightInfo, HandshakeRequest, HandshakeResponse, PutResult, SchemaResult,
@@ -34,12 +35,6 @@ use crate::serde::decode_protobuf;
 
 use futures::{Stream, StreamExt};
 use tonic::{Request, Response, Status, Streaming};
-
-enum TaskStatus {
-    Running,
-    Completed(ShuffleId),
-    Failed(String),
-}
 
 struct ConcurrencyGuard {
     concurrency_level: usize,
@@ -66,6 +61,8 @@ impl ConcurrencyGuard {
 /// Service implementing the Apache Arrow Flight Protocol
 #[derive(Clone)]
 pub struct BallistaFlightService {
+    /// Scheduler
+    scheduler: Arc<dyn Scheduler>,
     /// Ballista executor implementation
     executor: Arc<dyn Executor>,
     /// Results cache
@@ -76,8 +73,13 @@ pub struct BallistaFlightService {
 }
 
 impl BallistaFlightService {
-    pub fn new(executor: Arc<dyn Executor>, max_concurrency: usize) -> Self {
+    pub fn new(
+        scheduler: Arc<dyn Scheduler>,
+        executor: Arc<dyn Executor>,
+        max_concurrency: usize,
+    ) -> Self {
         Self {
+            scheduler,
             executor,
             results_cache: Arc::new(Mutex::new(HashMap::new())),
             task_status_map: Arc::new(Mutex::new(HashMap::new())),
@@ -137,14 +139,14 @@ impl FlightService for BallistaFlightService {
                             smol::run(async {
                                 let start = Instant::now();
                                 match executor.do_task(&task).await {
-                                    Ok(shuffle_id) => {
+                                    Ok(_) => {
                                         println!(
                                             "Task {} completed in {} ms",
                                             task.key(),
                                             start.elapsed().as_millis()
                                         );
                                         let mut map = map.lock().unwrap();
-                                        map.insert(key, TaskStatus::Completed(shuffle_id));
+                                        map.insert(key, TaskStatus::Completed);
                                         let mut counter = concurrent_tasks.lock().unwrap();
                                         counter.dec();
                                     }
@@ -171,6 +173,13 @@ impl FlightService for BallistaFlightService {
                             println!("Telling scheduler that task {} has failed", task.key());
                             Err(Status::aborted(reason.as_str()))
                         }
+                        TaskStatus::Pending => {
+                            println!(
+                                "Telling scheduler that task {} is still pending",
+                                task.key()
+                            );
+                            Err(Status::already_exists("task is still pending"))
+                        }
                         TaskStatus::Running => {
                             println!(
                                 "Telling scheduler that task {} is still running",
@@ -178,7 +187,7 @@ impl FlightService for BallistaFlightService {
                             );
                             Err(Status::already_exists("task is still running"))
                         }
-                        TaskStatus::Completed(_) => {
+                        TaskStatus::Completed => {
                             println!("Telling scheduler that task {} has completed", task.key());
                             let results = ShufflePartition {
                                 schema: Schema::new(vec![Field::new(
@@ -230,7 +239,7 @@ impl FlightService for BallistaFlightService {
             }
             physical_plan::Action::InteractiveQuery { plan, settings } => {
                 let results = self
-                    .executor
+                    .scheduler
                     .execute_query(plan, settings)
                     .await
                     .map_err(|e| to_tonic_err(&e))?;

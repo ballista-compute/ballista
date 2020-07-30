@@ -15,6 +15,7 @@
 //! Distributed compute orchestration.
 
 pub mod client;
+pub mod context;
 pub mod etcd;
 pub mod executor;
 pub mod flight_service;

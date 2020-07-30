@@ -19,11 +19,11 @@ extern crate ballista;
 
 use ballista::arrow::datatypes::{DataType, Field, Schema};
 use ballista::arrow::util::pretty;
-use ballista::dataframe::{max, min, Context, CSV_BATCH_SIZE};
+use ballista::dataframe::{max, min, Context, CSV_READER_BATCH_SIZE};
 pub use ballista::datafusion::datasource::csv::CsvReadOptions;
 use ballista::datafusion::logicalplan::*;
-use ballista::error::{Result};
 use ballista::error::BallistaError::General;
+use ballista::error::Result;
 use ballista::BALLISTA_VERSION;
 
 #[tokio::main]
@@ -56,7 +56,7 @@ async fn main() -> Result<()> {
 async fn execute(path: &str, host: &str, name: &&str, port: &usize) -> Result<String> {
     let start = Instant::now();
     let mut settings = HashMap::new();
-    settings.insert(CSV_BATCH_SIZE, "1024");
+    settings.insert(CSV_READER_BATCH_SIZE, "1024");
     let ctx = Context::remote(host, *port, settings);
     let response = ctx
         .read_csv(path, CsvReadOptions::new().schema(&nyctaxi_schema()), None)?
@@ -78,7 +78,11 @@ async fn execute(path: &str, host: &str, name: &&str, port: &usize) -> Result<St
     pretty::print_batches(&response)?;
 
     fn check(x: usize, y: usize, label: &str) -> Result<String> {
-        if x == y { Ok(format!("{} has correct count", label)) } else { Err(General(format!("{:?} not equal to {:?}", x, y)))}
+        if x == y {
+            Ok(format!("{} has correct count", label))
+        } else {
+            Err(General(format!("{:?} not equal to {:?}", x, y)))
+        }
     }
 
     let mut tests = Vec::new();
@@ -94,7 +98,6 @@ async fn execute(path: &str, host: &str, name: &&str, port: &usize) -> Result<St
     let min_fare_amt = batch.column(1);
     let max_fare_amt = batch.column(2);
 
-
     fn check_type(x: &DataType, y: DataType, label: &str) -> Result<String> {
         if x == &y {
             Ok(format!("Column {} has correct data type", label))
@@ -103,9 +106,21 @@ async fn execute(path: &str, host: &str, name: &&str, port: &usize) -> Result<St
         }
     }
 
-    tests.push(check_type(passenger_count.data_type(), DataType::Int32, "passenger_count"));
-    tests.push(check_type(min_fare_amt.data_type(), DataType::Float64, "min_fare_amt"));
-    tests.push(check_type(max_fare_amt.data_type(), DataType::Float64, "max_fare_amt"));
+    tests.push(check_type(
+        passenger_count.data_type(),
+        DataType::Int32,
+        "passenger_count",
+    ));
+    tests.push(check_type(
+        min_fare_amt.data_type(),
+        DataType::Float64,
+        "min_fare_amt",
+    ));
+    tests.push(check_type(
+        max_fare_amt.data_type(),
+        DataType::Float64,
+        "max_fare_amt",
+    ));
 
     tests.into_iter().collect()
 }

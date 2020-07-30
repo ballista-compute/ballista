@@ -605,7 +605,7 @@ pub fn create_physical_plan(
             path, projection, ..
         } => {
             //TODO get other csv options from the settings
-            // TODO this needs more work to re-use the config defaults defined in datafranme.rs
+            // TODO this needs more work to re-use the config defaults defined in dataframe.rs
             let batch_size: usize = settings[CSV_READER_BATCH_SIZE].parse().unwrap_or(64 * 1024);
             let options = CsvReadOptions::new();
             let exec = CsvScanExec::try_new(&path, options, projection.clone(), batch_size)?;
@@ -614,7 +614,7 @@ pub fn create_physical_plan(
         LogicalPlan::ParquetScan {
             path, projection, ..
         } => {
-            // TODO this needs more work to re-use the config defaults defined in datafranme.rs
+            // TODO this needs more work to re-use the config defaults defined in dataframe.rs
             let batch_size: usize = settings[PARQUET_READER_BATCH_SIZE]
                 .parse()
                 .unwrap_or(64 * 1024);

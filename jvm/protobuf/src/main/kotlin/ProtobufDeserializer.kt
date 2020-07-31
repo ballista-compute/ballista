@@ -16,8 +16,8 @@ package org.ballistacompute.protobuf
 
 import org.ballistacompute.datasource.CsvDataSource
 import org.ballistacompute.datatypes.ArrowTypes
-import org.ballistacompute.logical.QueryAction
 import org.ballistacompute.logical.*
+import org.ballistacompute.physical.QueryAction
 
 class ProtobufDeserializer {
 
@@ -125,7 +125,7 @@ class ProtobufDeserializer {
         .fromArrow(org.apache.arrow.vector.types.pojo.Schema(arrowFields))
   }
 
-  fun fromProto(action: Action): org.ballistacompute.datatypes.Action {
+  fun fromProto(action: Action): org.ballistacompute.physical.Action {
     return when {
       action.hasQuery() -> {
         QueryAction(fromProto(action.query))

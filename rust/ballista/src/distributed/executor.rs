@@ -16,6 +16,7 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::thread;
 
 use crate::arrow::datatypes::Schema;
 use crate::arrow::record_batch::RecordBatch;
@@ -23,9 +24,11 @@ use crate::distributed::context::BallistaContext;
 use crate::distributed::etcd::start_etcd_thread;
 use crate::distributed::scheduler::ExecutionTask;
 use crate::error::{ballista_error, Result};
+use crate::execution::physical_plan::{ColumnarBatch, ShuffleId};
 
-use crate::execution::physical_plan::ShuffleId;
 use async_trait::async_trait;
+use crossbeam::crossbeam_channel::{unbounded, Receiver, Sender};
+use smol::Task;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -87,8 +90,12 @@ pub enum TaskStatus {
 
 pub struct BallistaExecutor {
     config: ExecutorConfig,
+    /// Task status
+    task_status_map: Arc<Mutex<HashMap<String, TaskStatus>>>,
     /// Results from executing a task
     shuffle_partitions: Arc<Mutex<HashMap<String, ShufflePartition>>>,
+    /// Channel for submitting tasks to workers
+    tx: Sender<ExecutionTask>,
 }
 
 impl BallistaExecutor {
@@ -110,48 +117,107 @@ impl BallistaExecutor {
             DiscoveryMode::Standalone => println!("Running in standalone mode"),
         }
 
+        let task_status_map = Arc::new(Mutex::new(HashMap::new()));
         let shuffle_partitions = Arc::new(Mutex::new(HashMap::new()));
+
+        let (tx, rx): (Sender<ExecutionTask>, Receiver<ExecutionTask>) = unbounded();
+
+        // launch worker threads
+        for _ in 0..config.concurrent_tasks {
+            let rx = rx.clone();
+            let config = config.clone();
+            let task_status_map = task_status_map.clone();
+            let shuffle_partitions = shuffle_partitions.clone();
+            thread::spawn(move || {
+                smol::run(async {
+                    Task::blocking(async move {
+                        loop {
+                            match rx.recv() {
+                                Ok(task) => {
+                                    let shuffle_id = ShuffleId::new(
+                                        task.job_uuid,
+                                        task.stage_id,
+                                        task.partition_id,
+                                    );
+
+                                    {
+                                        let mut task_status = task_status_map.lock().unwrap();
+                                        task_status.insert(task.key(), TaskStatus::Running);
+                                    }
+
+                                    let (schema, batches) = execute_task(&config, &task).await?;
+                                    let key = format!(
+                                        "{}:{}:{}",
+                                        shuffle_id.job_uuid,
+                                        shuffle_id.stage_id,
+                                        shuffle_id.partition_id
+                                    );
+                                    let mut shuffle_partitions =
+                                        shuffle_partitions.lock().expect("failed to lock mutex");
+
+                                    shuffle_partitions.insert(
+                                        key,
+                                        ShufflePartition {
+                                            schema: schema,
+                                            data: batches,
+                                        },
+                                    );
+
+                                    {
+                                        let mut task_status = task_status_map.lock().unwrap();
+                                        task_status.insert(task.key(), TaskStatus::Completed);
+                                    }
+                                }
+                                Err(e) => {
+                                    return Err(ballista_error("tbd"));
+                                    // println!("uh oh: {:?}", e);
+                                    // break;
+                                }
+                            }
+                        }
+                        Ok(())
+                    })
+                    .await
+                })
+            });
+        }
+
         Self {
             config,
+            task_status_map,
             shuffle_partitions,
+            tx,
         }
     }
+}
+
+async fn execute_task(
+    config: &ExecutorConfig,
+    task: &ExecutionTask,
+) -> Result<(Schema, Vec<RecordBatch>)> {
+    // create new execution context specifically for this query
+    let ctx = Arc::new(BallistaContext::new(
+        &config,
+        task.shuffle_locations.clone(),
+    ));
+
+    let exec_plan = task.plan.as_execution_plan();
+    let stream = exec_plan.execute(ctx, task.partition_id).await?;
+    let mut batches = vec![];
+    while let Some(batch) = stream.next().await? {
+        batches.push(batch.to_arrow()?);
+    }
+
+    Ok((stream.schema().as_ref().to_owned(), batches))
 }
 
 #[async_trait]
 impl Executor for BallistaExecutor {
     async fn do_task(&self, task: &ExecutionTask) -> Result<()> {
-        // create new execution context specifically for this query
-        let ctx = Arc::new(BallistaContext::new(
-            &self.config,
-            task.shuffle_locations.clone(),
-        ));
+        self.tx.send(task.to_owned()).unwrap(); //TODO remove unwrap
 
-        let shuffle_id = ShuffleId::new(task.job_uuid, task.stage_id, task.partition_id);
-
-        let exec_plan = task.plan.as_execution_plan();
-        let stream = exec_plan.execute(ctx, task.partition_id).await?;
-        let mut batches = vec![];
-        while let Some(batch) = stream.next().await? {
-            batches.push(batch.to_arrow()?);
-        }
-
-        let key = format!(
-            "{}:{}:{}",
-            shuffle_id.job_uuid, shuffle_id.stage_id, shuffle_id.partition_id
-        );
-        let mut shuffle_partitions = self
-            .shuffle_partitions
-            .lock()
-            .expect("failed to lock mutex");
-        shuffle_partitions.insert(
-            key,
-            ShufflePartition {
-                schema: stream.schema().as_ref().clone(),
-                data: batches,
-            },
-        );
-
+        let mut task_status = self.task_status_map.lock().unwrap();
+        task_status.insert(task.key(), TaskStatus::Pending);
         Ok(())
     }
 

@@ -472,7 +472,9 @@ impl HashAggregateIter {
 
         let mode = mode.clone();
         let _ = std::thread::spawn(move || {
-            run(tx, &mode, input, group_expr, aggr_expr).unwrap();
+            if let Err(e) = run(tx, &mode, input, group_expr, aggr_expr) {
+                println!("HashAggregateExec thread terminated with error: {:?}", e);
+            }
         });
 
         Self {

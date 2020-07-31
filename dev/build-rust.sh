@@ -6,4 +6,4 @@ set -e
 
 cp -f proto/ballista.proto rust/ballista/proto/
 
-docker build -t ballistacompute/ballista-rust:$BALLISTA_VERSION -f docker/rust-executor.dockerfile .
+docker build -t ballistacompute/ballista-rust:$BALLISTA_VERSION -f docker/rust.dockerfile .

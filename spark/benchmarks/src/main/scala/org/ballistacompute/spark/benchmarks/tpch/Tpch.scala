@@ -60,7 +60,7 @@ object Tpch {
 
     spark.time {
 
-      spark.read.parquet("/mnt/tpch/parquet/10-24/lineitem").createOrReplaceTempView("lineitem")
+      spark.read.parquet("/mnt/tpch/parquet/100-240/lineitem").createOrReplaceTempView("lineitem")
 
       val df = spark.sql(
         """

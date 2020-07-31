@@ -29,23 +29,35 @@ impl TryInto<protobuf::Action> for &Action {
 
     fn try_into(self) -> Result<protobuf::Action, Self::Error> {
         match self {
-            Action::InteractiveQuery { ref plan } => {
+            Action::InteractiveQuery { ref plan, settings } => {
                 let plan_proto: protobuf::LogicalPlanNode = plan.try_into()?;
+
+                let settings = settings
+                    .iter()
+                    .map(|e| protobuf::KeyValuePair {
+                        key: e.0.to_string(),
+                        value: e.1.to_string(),
+                    })
+                    .collect();
+
                 Ok(protobuf::Action {
                     query: Some(plan_proto),
                     task: None,
                     fetch_shuffle: None,
+                    settings,
                 })
             }
             Action::Execute(task) => Ok(protobuf::Action {
                 query: None,
                 task: Some(task.try_into()?),
                 fetch_shuffle: None,
+                settings: vec![],
             }),
             Action::FetchShuffle(shuffle_id) => Ok(protobuf::Action {
                 query: None,
                 task: None,
                 fetch_shuffle: Some(shuffle_id.try_into()?),
+                settings: vec![],
             }),
         }
     }
@@ -109,16 +121,19 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
             } => {
                 let mut node = empty_logical_plan_node();
 
-                let projected_field_names = match projection {
-                    Some(p) => p.iter().map(|i| schema.field(*i).name().clone()).collect(),
-                    _ => vec![],
-                };
+                let projection = projection.as_ref().map(|column_indices| {
+                    let columns: Vec<String> = column_indices
+                        .iter()
+                        .map(|i| schema.field(*i).name().clone())
+                        .collect();
+                    protobuf::ProjectionColumns { columns }
+                });
 
                 let schema: protobuf::Schema = schema.as_ref().try_into()?;
 
                 node.scan = Some(protobuf::ScanNode {
                     path: path.to_owned(),
-                    projection: projected_field_names,
+                    projection,
                     schema: Some(schema),
                     has_header: *has_header,
                     file_format: "csv".to_owned(),
@@ -133,16 +148,19 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
             } => {
                 let mut node = empty_logical_plan_node();
 
-                let projected_field_names = match projection {
-                    Some(p) => p.iter().map(|i| schema.field(*i).name().clone()).collect(),
-                    _ => vec![],
-                };
+                let projection = projection.as_ref().map(|column_indices| {
+                    let columns: Vec<String> = column_indices
+                        .iter()
+                        .map(|i| schema.field(*i).name().clone())
+                        .collect();
+                    protobuf::ProjectionColumns { columns }
+                });
 
                 let schema: protobuf::Schema = schema.as_ref().try_into()?;
 
                 node.scan = Some(protobuf::ScanNode {
                     path: path.to_owned(),
-                    projection: projected_field_names,
+                    projection,
                     schema: Some(schema),
                     has_header: false,
                     file_format: "parquet".to_owned(),
@@ -385,9 +403,10 @@ impl TryInto<protobuf::PhysicalPlanNode> for &PhysicalPlan {
                         .map(|n| *n as u32)
                         .collect(),
                     file_format: "csv".to_owned(),
-                    schema: Some(exec.schema().as_ref().try_into()?),
-                    has_header: false,
+                    schema: Some(exec.original_schema().as_ref().try_into()?),
+                    has_header: exec.has_header,
                     batch_size: exec.batch_size as u32,
+                    queue_size: 0,
                 });
                 Ok(node)
             }
@@ -411,6 +430,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for &PhysicalPlan {
                     schema: None,
                     has_header: false,
                     batch_size: exec.batch_size as u32,
+                    queue_size: exec.queue_size as u32,
                 });
                 Ok(node)
             }

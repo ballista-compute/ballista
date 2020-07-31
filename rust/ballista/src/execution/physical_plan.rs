@@ -22,6 +22,7 @@
 //!
 //! The physical plan also accounts for partitioning and ordering of data between operators.
 
+use std::collections::HashMap;
 use std::fmt::{self, Debug};
 use std::sync::Arc;
 
@@ -178,7 +179,10 @@ pub trait Accumulator: Send + Sync {
 #[derive(Debug, Clone)]
 pub enum Action {
     /// Execute the query with DataFusion and return the results
-    InteractiveQuery { plan: LogicalPlan },
+    InteractiveQuery {
+        plan: LogicalPlan,
+        settings: HashMap<String, String>,
+    },
     /// Execute a query and store the results in memory
     Execute(ExecutionTask),
     /// Collect a shuffle
@@ -252,6 +256,10 @@ impl ColumnarBatch {
     pub fn column(&self, index: usize) -> &ColumnarValue {
         &self.columns[index]
     }
+
+    pub fn memory_size(&self) -> usize {
+        self.columns.iter().map(|c| c.memory_size()).sum()
+    }
 }
 
 macro_rules! build_literal_array {
@@ -324,6 +332,21 @@ impl ColumnarValue {
                 ))),
             },
             _ => unimplemented!(),
+        }
+    }
+
+    pub fn memory_size(&self) -> usize {
+        //TODO delegate to Arrow once https://issues.apache.org/jira/browse/ARROW-9582 is
+        // implemented
+        match self {
+            ColumnarValue::Columnar(array) => {
+                let mut size = 0;
+                for buffer in array.data().buffers() {
+                    size += buffer.capacity();
+                }
+                size
+            }
+            _ => 0,
         }
     }
 }

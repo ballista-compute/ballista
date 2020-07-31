@@ -1,13 +1,8 @@
 # Base image extends debian:buster-slim
-FROM rustlang/rust:nightly AS build
-
-USER root
+FROM rust:1.45.0-buster AS builder
 
 RUN apt update && apt -y install musl musl-dev musl-tools libssl-dev openssl
 
-## Download the target for static linking.
-RUN rustup target add x86_64-unknown-linux-musl
-RUN cargo install cargo-build-deps
 #NOTE: the following was copied from https://github.com/emk/rust-musl-builder/blob/master/Dockerfile under Apache 2.0 license
 
 # The OpenSSL version to use. We parameterize this because many Rust
@@ -69,3 +64,55 @@ ENV OPENSSL_DIR=/usr/local/musl/ \
     LIBZ_SYS_STATIC=1 \
     TARGET=musl
 
+# The content copied mentioned in the NOTE above ends here.
+
+## Download the target for static linking.
+RUN rustup target add x86_64-unknown-linux-musl
+RUN cargo install cargo-build-deps
+
+# prepare toolchain
+COPY rust/rust-toolchain /tmp/ballista/
+WORKDIR /tmp/ballista
+RUN rustup update $(cat rust-toolchain) && \
+    rustup component add rustfmt --toolchain $(cat rust-toolchain)-x86_64-unknown-linux-gnu
+
+# Fetch Ballista dependencies
+COPY rust/ballista/Cargo.toml /tmp/ballista/
+WORKDIR /tmp/ballista
+RUN cargo fetch
+
+# Compile Ballista dependencies
+RUN mkdir -p /tmp/ballista/src/bin/ && echo 'fn main() {}' >> /tmp/ballista/src/bin/executor.rs
+RUN mkdir -p /tmp/ballista/proto
+COPY proto/ballista.proto /tmp/ballista/proto/
+COPY rust/ballista/build.rs /tmp/ballista/
+COPY rust/rust-toolchain /tmp/ballista/
+
+ARG RELEASE_FLAG=--release
+RUN cargo build $RELEASE_FLAG
+
+#TODO relly need to copy whole project in, not just ballista crate, so we pick up the correct Cargo.lock
+RUN rm -rf /tmp/ballista/Cargo.lock /tmp/ballista/src
+
+COPY rust/ballista/Cargo.toml /tmp/ballista/
+COPY rust/ballista/build.rs /tmp/ballista/
+# for some reason, on some versions of docker, we hit this: https://github.com/moby/moby/issues/37965
+# The suggested fix is to use this hack
+RUN true
+COPY rust/ballista/src/ /tmp/ballista/src/
+
+RUN cargo build $RELEASE_FLAG
+
+# put the executor on /executor (need to be copied from different places depending on FLAG)
+ENV RELEASE_FLAG=${RELEASE_FLAG}
+RUN if [ -z "$RELEASE_FLAG" ]; then mv /tmp/ballista/target/debug/executor /executor; else mv /tmp/ballista/target/release/executor /executor; fi
+
+# Copy the binary into a new container for a smaller docker image
+FROM debian:buster-slim
+
+COPY --from=builder /executor /
+
+ENV RUST_LOG=info
+ENV RUST_BACKTRACE=full
+
+CMD ["/executor"]

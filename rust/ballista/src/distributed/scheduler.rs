@@ -20,13 +20,20 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::thread;
-use uuid::Uuid;
+use std::time::{Duration, Instant};
 
-use crate::dataframe::{avg, count, max, min, sum};
+use crate::arrow::datatypes::Schema;
+use crate::dataframe::{
+    avg, count, max, min, sum, CSV_READER_BATCH_SIZE, PARQUET_READER_BATCH_SIZE,
+    PARQUET_READER_QUEUE_SIZE,
+};
+use crate::datafusion::execution::context::ExecutionContext as DFContext;
 use crate::datafusion::execution::physical_plan::csv::CsvReadOptions;
 use crate::datafusion::logicalplan::LogicalPlan;
-use crate::datafusion::logicalplan::{col_index, Expr};
-use crate::distributed::executor::DefaultContext;
+use crate::datafusion::logicalplan::{col_index, Expr, LogicalPlanBuilder};
+use crate::datafusion::optimizer::optimizer::OptimizerRule;
+use crate::distributed::context::BallistaContext;
+use crate::distributed::executor::{ExecutorConfig, ShufflePartition};
 use crate::error::{ballista_error, BallistaError, Result};
 use crate::execution::operators::ProjectionExec;
 use crate::execution::operators::ShuffleExchangeExec;
@@ -38,7 +45,83 @@ use crate::execution::physical_plan::{
     Partitioning, PhysicalPlan, ShuffleId,
 };
 
+use async_trait::async_trait;
 use smol::Task;
+use uuid::Uuid;
+
+#[async_trait]
+pub trait Scheduler: Send + Sync {
+    /// Execute a query and return results
+    async fn execute_query(
+        &self,
+        plan: &LogicalPlan,
+        settings: &HashMap<String, String>,
+    ) -> Result<ShufflePartition>;
+}
+
+pub struct BallistaScheduler {
+    config: ExecutorConfig,
+}
+
+impl BallistaScheduler {
+    pub fn new(config: ExecutorConfig) -> Self {
+        Self { config }
+    }
+}
+
+#[async_trait]
+impl Scheduler for BallistaScheduler {
+    async fn execute_query(
+        &self,
+        logical_plan: &LogicalPlan,
+        settings: &HashMap<String, String>,
+    ) -> Result<ShufflePartition> {
+        let settings = settings.to_owned();
+
+        println!("Logical plan:\n{:?}", logical_plan);
+        let ctx = DFContext::new();
+
+        // workaround for https://issues.apache.org/jira/browse/ARROW-9542
+        let mut rule = ResolveColumnsRule::new();
+        let logical_plan = rule.optimize(logical_plan)?;
+
+        let logical_plan = ctx.optimize(&logical_plan)?;
+        println!("Optimized logical plan:\n{:?}", logical_plan);
+
+        let config = self.config.clone();
+        let handle = thread::spawn(move || {
+            smol::run(async {
+                let plan: Arc<PhysicalPlan> = create_physical_plan(&logical_plan, &settings)?;
+                println!("Physical plan:\n{:?}", plan);
+
+                let plan = ensure_requirements(plan.as_ref())?;
+                println!("Optimized physical plan:\n{:?}", plan);
+
+                println!("Settings: {:?}", settings);
+
+                let job = create_job(plan)?;
+                job.explain();
+
+                // create new execution contrext specifically for this query
+                let ctx = Arc::new(BallistaContext::new(&config, HashMap::new()));
+
+                let batches = execute_job(&job, ctx.clone()).await?;
+
+                Ok(ShufflePartition {
+                    schema: batches[0].schema().as_ref().clone(),
+                    data: batches
+                        .iter()
+                        .map(|b| b.to_arrow())
+                        .collect::<Result<Vec<_>>>()?,
+                })
+            })
+        });
+        match handle.join() {
+            Ok(handle) => handle,
+            Err(e) => Err(ballista_error(&format!("Executor thread failed: {:?}", e))),
+        }
+    }
+}
 
 /// A Job typically represents a single query and the query is executed in stages. Stages are
 /// separated by map operations (shuffles) to re-partition data before the next stage starts.
@@ -126,21 +209,25 @@ impl ExecutionTask {
             shuffle_locations,
         }
     }
+
+    pub fn key(&self) -> String {
+        format!("{}.{}.{}", self.job_uuid, self.stage_id, self.partition_id)
+    }
 }
 
 /// Create a Job (DAG of stages) from a physical execution plan.
 pub fn create_job(plan: Arc<PhysicalPlan>) -> Result<Job> {
-    let mut scheduler = Scheduler::new();
+    let mut scheduler = JobScheduler::new();
     scheduler.create_job(plan)?;
     Ok(scheduler.job)
 }
 
-pub struct Scheduler {
+pub struct JobScheduler {
     job: Job,
     next_stage_id: usize,
 }
 
-impl Scheduler {
+impl JobScheduler {
     fn new() -> Self {
         let job = Job {
             id: Uuid::new_v4(),
@@ -231,6 +318,19 @@ enum StageStatus {
     Completed,
 }
 
+enum TaskStatus {
+    Pending(ExecutionTask),
+    Running(Instant),
+    Completed(ShuffleId),
+    Failed(String),
+}
+
+#[derive(Debug, Clone)]
+struct ExecutorShuffleIds {
+    executor_id: String,
+    shuffle_ids: Vec<ShuffleId>,
+}
+
 /// Execute a job directly against executors as starting point
 pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Vec<ColumnarBatch>> {
     let executors = ctx.get_executor_ids().await?;
@@ -277,14 +377,19 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                             .as_ref()
                             .expect("all stages should have plans at execution time");
 
+                        let stage_start = Instant::now();
+
                         let exec = plan.as_execution_plan();
                         let parts = exec.output_partitioning().partition_count();
 
-                        let mut threads = vec![];
-                        let mut executors_ids = vec![];
-                        let mut executor_index = 0;
+                        // build queue of tasks per executor
+                        let mut next_executor_id = 0;
+                        let mut executor_tasks = HashMap::new();
+                        #[allow(clippy::needless_range_loop)]
+                        for i in 0..executors.len() {
+                            executor_tasks.insert(executors[i].id.clone(), vec![]);
+                        }
                         for partition in 0..parts {
-                            println!("Running stage {} partition {}", stage.id, partition);
                             let task = ExecutionTask::new(
                                 job.id,
                                 stage.id,
@@ -294,23 +399,116 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                             );
 
                             // load balance across the executors
-                            let executor_id = &executors[executor_index];
-                            executor_index += 1;
-                            if executor_index == executors.len() {
-                                executor_index = 0;
+                            let executor_meta = &executors[next_executor_id];
+                            next_executor_id += 1;
+                            if next_executor_id == executors.len() {
+                                next_executor_id = 0;
                             }
 
-                            let executor_id = executor_id.clone();
-                            executors_ids.push(executor_id.clone());
+                            let queue = executor_tasks
+                                .get_mut(&executor_meta.id)
+                                .expect("executor queue should exist");
 
+                            queue.push(task);
+                        }
+
+                        let mut threads = vec![];
+
+                        #[allow(clippy::needless_range_loop)]
+                        for i in 0..executors.len() {
+                            let executor = executors[i].clone();
+                            let queue = executor_tasks
+                                .get(&executor.id)
+                                .expect("executor queue should exist");
+                            let queue = queue.clone();
                             let ctx = ctx.clone();
+
+                            // start thread per executor
                             let handle = thread::spawn(move || {
-                                println!("in thread");
                                 smol::run(async {
-                                    println!("in smol::run");
                                     Task::blocking(async move {
-                                        println!("in Task::blocking");
-                                        ctx.execute_task(executor_id.clone(), task).await
+                                        let mut task_status = vec![];
+                                        for task in &queue {
+                                            task_status.push(TaskStatus::Pending(task.clone()));
+                                        }
+
+                                        let mut shuffle_ids = vec![];
+                                        loop {
+
+                                            let mut pending = 0;
+                                            let mut running = 0;
+                                            let mut completed = 0;
+                                            let mut failed = 0;
+
+                                            for status in &task_status {
+                                                match status {
+                                                    TaskStatus::Pending(_) => pending += 1,
+                                                    TaskStatus::Running(_) => running += 1,
+                                                    TaskStatus::Completed(_) => completed += 1,
+                                                    TaskStatus::Failed(_) => failed += 1,
+                                                }
+                                            }
+
+                                            println!(
+                                                "Executor {} task stats: {} pending, {} running, {} completed, {} failed",
+                                                executor.id,
+                                                pending,running,completed,failed
+                                            );
+
+                                            if failed > 0  {
+                                                return Err(ballista_error("At least one task failed and there is no retry capability yet"))
+                                            }
+
+                                            if pending ==0 && running==0 {
+                                                break;
+                                            }
+
+                                            //TODO need to send multiple tasks per network call - this is really inefficient
+                                            for i in 0..task_status.len() {
+
+                                                let should_submit = match &task_status[i] {
+                                                    TaskStatus::Pending(_) => true,
+                                                    TaskStatus::Running(last_check) => last_check.elapsed().as_millis() > 500,
+                                                    TaskStatus::Completed(_) => false,
+                                                    TaskStatus::Failed(_) => {
+                                                        //TODO retry logic
+                                                        false
+                                                    },
+                                                };
+
+                                                if should_submit {
+                                                    let task = queue[i].clone();
+                                                    let task_key = task.key();
+                                                    match ctx
+                                                        .execute_task(executor.clone(), task)
+                                                        .await
+                                                    {
+                                                        Ok(shuffle_id) => {
+                                                            println!("Task {} completed", task_key);
+                                                            shuffle_ids.push(shuffle_id);
+                                                            task_status[i] = TaskStatus::Completed(shuffle_id)
+                                                        }
+                                                        Err(e) => {
+                                                            let msg = format!("{:?}", e);
+                                                            //TODO would be nice to be able to extract status code here
+                                                            if msg.contains("ResourceExhausted") {
+                                                                // ignore
+                                                            } else if msg.contains("AlreadyExists") {
+                                                                task_status[i] = TaskStatus::Running(Instant::now())
+                                                            } else {
+                                                                task_status[i] = TaskStatus::Failed(msg)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            // try not to overwhelm network or executors
+                                            thread::sleep(Duration::from_millis(100));
+                                        }
+                                        Ok(ExecutorShuffleIds {
+                                            executor_id: executor.id,
+                                            shuffle_ids,
+                                        })
                                     })
                                     .await
                                 })
@@ -318,27 +516,55 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                             threads.push(handle);
                         }
 
-                        let mut shuffle_ids = vec![];
+                        let mut stage_shuffle_ids: Vec<ExecutorShuffleIds> = vec![];
                         for thread in threads {
-                            println!("Waiting to join thread");
-                            let shuffle_id = thread.join().unwrap()?;
-                            shuffle_ids.push(shuffle_id);
+                            stage_shuffle_ids.push(thread.join().unwrap()?);
                         }
-                        println!("Joined all threads");
+                        println!(
+                            "Stage {} completed in {} ms and produced {} shuffles",
+                            stage.id,
+                            stage_start.elapsed().as_millis(),
+                            stage_shuffle_ids.len()
+                        );
 
-                        for (shuffle_id, executor_id) in shuffle_ids.iter().zip(executors_ids) {
-                            shuffle_location_map.insert(*shuffle_id, executor_id);
+                        for executor_shuffle_ids in &stage_shuffle_ids {
+                            for shuffle_id in &executor_shuffle_ids.shuffle_ids {
+                                let executor = executors
+                                    .iter()
+                                    .find(|e| e.id == executor_shuffle_ids.executor_id)
+                                    .unwrap();
+                                shuffle_location_map.insert(*shuffle_id, executor.clone());
+                            }
                         }
                         stage_status_map.insert(stage.id, StageStatus::Completed);
 
                         if stage.id == job.root_stage_id {
                             println!("reading final results from query!");
-                            let ctx = Arc::new(DefaultContext::new(
+                            let ctx = Arc::new(BallistaContext::new(
                                 &ctx.config(),
                                 shuffle_location_map.clone(),
                             ));
-                            let data = ctx.read_shuffle(&shuffle_ids[0]).await?;
-                            return Ok(data);
+
+                            println!("stage final shuffle ids: {:?}", stage_shuffle_ids);
+
+                            if !stage_shuffle_ids.is_empty() {
+                                let final_shuffle_ids = &stage_shuffle_ids[0]; //TODO Can't assume first one
+                                let final_shuffle_ids = &final_shuffle_ids.shuffle_ids;
+                                if final_shuffle_ids.len() == 1 {
+                                    let data = ctx.read_shuffle(&final_shuffle_ids[0]).await?;
+                                    return Ok(data);
+                                } else {
+                                    return Err(ballista_error(&format!(
+                                        "final shuffle_ids len = {}",
+                                        final_shuffle_ids.len()
+                                    )));
+                                }
+                            } else {
+                                return Err(ballista_error(&format!(
+                                    "stage shuffle_ids len = {}",
+                                    stage_shuffle_ids.len()
+                                )));
+                            }
                         }
                     } else {
                         println!("Cannot run stage {} yet", stage.id);
@@ -351,18 +577,22 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
         }
     }
 
+    // unreachable?
     Err(ballista_error("oops"))
 }
 
 /// Convert a logical plan into a physical plan
-pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Arc<PhysicalPlan>> {
+pub fn create_physical_plan(
+    plan: &LogicalPlan,
+    settings: &HashMap<String, String>,
+) -> Result<Arc<PhysicalPlan>> {
     match plan {
         LogicalPlan::Projection { input, expr, .. } => {
-            let exec = ProjectionExec::try_new(expr, create_physical_plan(input)?)?;
+            let exec = ProjectionExec::try_new(expr, create_physical_plan(input, settings)?)?;
             Ok(Arc::new(PhysicalPlan::Projection(Arc::new(exec))))
         }
         LogicalPlan::Selection { input, expr, .. } => {
-            let input = create_physical_plan(input)?;
+            let input = create_physical_plan(input, settings)?;
             let exec = FilterExec::new(&input, expr);
             Ok(Arc::new(PhysicalPlan::Filter(Arc::new(exec))))
         }
@@ -372,7 +602,7 @@ pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Arc<PhysicalPlan>> {
             aggr_expr,
             ..
         } => {
-            let input = create_physical_plan(input)?;
+            let input = create_physical_plan(input, settings)?;
             if input
                 .as_execution_plan()
                 .output_partitioning()
@@ -451,20 +681,27 @@ pub fn create_physical_plan(plan: &LogicalPlan) -> Result<Arc<PhysicalPlan>> {
             }
         }
         LogicalPlan::CsvScan {
-            path, projection, ..
+            path,
+            schema,
+            has_header,
+            projection,
+            ..
         } => {
-            //TODO make batch size and other csv options configurable from the context
-            let batch_size = 64 * 1024;
-            let options = CsvReadOptions::new();
+            // TODO this needs more work to re-use the config defaults defined in dataframe.rs
+            let batch_size: usize = settings[CSV_READER_BATCH_SIZE].parse().unwrap_or(64 * 1024);
+            let options = CsvReadOptions::new().schema(schema).has_header(*has_header);
             let exec = CsvScanExec::try_new(&path, options, projection.clone(), batch_size)?;
             Ok(Arc::new(PhysicalPlan::CsvScan(Arc::new(exec))))
         }
         LogicalPlan::ParquetScan {
             path, projection, ..
         } => {
-            //TODO make batch size configurable from the context
-            let batch_size = 1024 * 1024;
-            let exec = ParquetScanExec::try_new(&path, projection.clone(), batch_size)?;
+            // TODO this needs more work to re-use the config defaults defined in dataframe.rs
+            let batch_size: usize = settings[PARQUET_READER_BATCH_SIZE]
+                .parse()
+                .unwrap_or(64 * 1024);
+            let queue_size: usize = settings[PARQUET_READER_QUEUE_SIZE].parse().unwrap_or(2);
+            let exec = ParquetScanExec::try_new(&path, projection.clone(), batch_size, queue_size)?;
             Ok(Arc::new(PhysicalPlan::ParquetScan(Arc::new(exec))))
         }
         other => Err(BallistaError::General(format!(
@@ -513,6 +750,112 @@ pub fn ensure_requirements(plan: &PhysicalPlan) -> Result<Arc<PhysicalPlan>> {
             Ok(Arc::new(plan.with_new_children(new_children)))
         }
         _ => Ok(Arc::new(plan.clone())),
+    }
+}
+
+//TODO the following code is copied from DataFusion and can be removed in the 0.4.0 release
+
+/// Replace UnresolvedColumns with Columns
+pub struct ResolveColumnsRule {}
+
+impl ResolveColumnsRule {
+    #[allow(missing_docs)]
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Default for ResolveColumnsRule {
+    fn default() -> Self {
+        ResolveColumnsRule::new()
+    }
+}
+
+impl OptimizerRule for ResolveColumnsRule {
+    fn optimize(&mut self, plan: &LogicalPlan) -> datafusion::error::Result<LogicalPlan> {
+        match plan {
+            LogicalPlan::Projection { input, expr, .. } => {
+                Ok(LogicalPlanBuilder::from(&self.optimize(input)?)
+                    .project(rewrite_expr_list(expr, &input.schema())?)?
+                    .build()?)
+            }
+            LogicalPlan::Selection { expr, input } => {
+                Ok(LogicalPlanBuilder::from(&self.optimize(input)?)
+                    .filter(rewrite_expr(expr, &input.schema())?)?
+                    .build()?)
+            }
+            LogicalPlan::Aggregate {
+                input,
+                group_expr,
+                aggr_expr,
+                ..
+            } => Ok(LogicalPlanBuilder::from(&self.optimize(input)?)
+                .aggregate(
+                    rewrite_expr_list(group_expr, &input.schema())?,
+                    rewrite_expr_list(aggr_expr, &input.schema())?,
+                )?
+                .build()?),
+            LogicalPlan::Sort { input, expr, .. } => {
+                Ok(LogicalPlanBuilder::from(&self.optimize(input)?)
+                    .sort(rewrite_expr_list(expr, &input.schema())?)?
+                    .build()?)
+            }
+            _ => Ok(plan.clone()),
+        }
+    }
+}
+
+fn rewrite_expr_list(expr: &[Expr], schema: &Schema) -> datafusion::error::Result<Vec<Expr>> {
+    Ok(expr
+        .iter()
+        .map(|e| rewrite_expr(e, schema))
+        .collect::<datafusion::error::Result<Vec<_>>>()?)
+}
+
+fn rewrite_expr(expr: &Expr, schema: &Schema) -> datafusion::error::Result<Expr> {
+    match expr {
+        Expr::Alias(expr, alias) => Ok(rewrite_expr(&expr, schema)?.alias(&alias)),
+        Expr::UnresolvedColumn(name) => Ok(Expr::Column(schema.index_of(&name)?)),
+        Expr::BinaryExpr { left, op, right } => Ok(Expr::BinaryExpr {
+            left: Box::new(rewrite_expr(&left, schema)?),
+            op: op.clone(),
+            right: Box::new(rewrite_expr(&right, schema)?),
+        }),
+        Expr::Not(expr) => Ok(Expr::Not(Box::new(rewrite_expr(&expr, schema)?))),
+        Expr::IsNotNull(expr) => Ok(Expr::IsNotNull(Box::new(rewrite_expr(&expr, schema)?))),
+        Expr::IsNull(expr) => Ok(Expr::IsNull(Box::new(rewrite_expr(&expr, schema)?))),
+        Expr::Cast { expr, data_type } => Ok(Expr::Cast {
+            expr: Box::new(rewrite_expr(&expr, schema)?),
+            data_type: data_type.clone(),
+        }),
+        Expr::Sort {
+            expr,
+            asc,
+            nulls_first,
+        } => Ok(Expr::Sort {
+            expr: Box::new(rewrite_expr(&expr, schema)?),
+            asc: *asc,
+            nulls_first: *nulls_first,
+        }),
+        Expr::ScalarFunction {
+            name,
+            args,
+            return_type,
+        } => Ok(Expr::ScalarFunction {
+            name: name.clone(),
+            args: rewrite_expr_list(args, schema)?,
+            return_type: return_type.clone(),
+        }),
+        Expr::AggregateFunction {
+            name,
+            args,
+            return_type,
+        } => Ok(Expr::AggregateFunction {
+            name: name.clone(),
+            args: rewrite_expr_list(args, schema)?,
+            return_type: return_type.clone(),
+        }),
+        _ => Ok(expr.clone()),
     }
 }
 

@@ -32,7 +32,7 @@ use crate::parquet::arrow::ParquetFileArrowReader;
 use crate::parquet::file::reader::SerializedFileReader;
 
 use async_trait::async_trait;
-use crossbeam::channel::{unbounded, Receiver, Sender};
+use crossbeam::channel::{bounded, Receiver, Sender};
 use smol::Task;
 use std::time::Instant;
 
@@ -48,10 +48,16 @@ pub struct ParquetScanExec {
     pub(crate) parquet_schema: Arc<Schema>,
     pub(crate) output_schema: Arc<Schema>,
     pub(crate) batch_size: usize,
+    pub(crate) queue_size: usize,
 }
 
 impl ParquetScanExec {
-    pub fn try_new(path: &str, projection: Option<Vec<usize>>, batch_size: usize) -> Result<Self> {
+    pub fn try_new(
+        path: &str,
+        projection: Option<Vec<usize>>,
+        batch_size: usize,
+        queue_size: usize,
+    ) -> Result<Self> {
         let mut filenames: Vec<String> = vec![];
         common::build_file_list(path, &mut filenames, ".parquet")?;
         let filename = &filenames[0];
@@ -79,6 +85,7 @@ impl ParquetScanExec {
             parquet_schema: Arc::new(schema),
             output_schema: Arc::new(projected_schema),
             batch_size,
+            queue_size,
         })
     }
 }
@@ -104,6 +111,7 @@ impl ExecutionPlan for ParquetScanExec {
             &self.filenames[partition_index],
             self.projection.clone(),
             self.batch_size,
+            self.queue_size,
         )?))
     }
 }
@@ -119,6 +127,7 @@ impl ParquetBatchIter {
         filename: &str,
         projection: Option<Vec<usize>>,
         batch_size: usize,
+        queue_size: usize,
     ) -> Result<Self> {
         let file = File::open(filename)?;
         let file_reader = Rc::new(SerializedFileReader::new(file).unwrap()); //TODO error handling
@@ -138,13 +147,14 @@ impl ParquetBatchIter {
         );
 
         let (response_tx, response_rx): (Sender<MaybeColumnarBatch>, Receiver<MaybeColumnarBatch>) =
-            unbounded();
+            bounded(queue_size);
 
         let filename = filename.to_string();
 
         std::thread::spawn(move || {
             let start = Instant::now();
             let mut batch_read_time = 0;
+            let mut total_bytes_read = 0;
             let mut output_batches = 0;
             let mut output_rows = 0;
 
@@ -166,9 +176,14 @@ impl ParquetBatchIter {
                                     output_batches += 1;
                                     output_rows += batch.num_rows();
 
-                                    response_tx
-                                        .send(Ok(Some(ColumnarBatch::from_arrow(&batch))))
-                                        .unwrap();
+                                    let columnar_batch = ColumnarBatch::from_arrow(&batch);
+                                    println!(
+                                        "ParquetScanExec read batch containing {} bytes",
+                                        columnar_batch.memory_size()
+                                    );
+                                    total_bytes_read += columnar_batch.memory_size();
+
+                                    response_tx.send(Ok(Some(columnar_batch))).unwrap();
                                 }
                                 Ok(None) => {
                                     response_tx.send(Ok(None)).unwrap();
@@ -199,9 +214,10 @@ impl ParquetBatchIter {
             }
 
             println!(
-                "ParquetScan scanned {} batches and {} rows in {} ms. Total duration {} ms.",
+                "ParquetScan scanned {} batches and {} rows containing {} bytes in {} ms. Total duration {} ms.",
                 output_batches,
                 output_rows,
+                total_bytes_read,
                 batch_read_time,
                 start.elapsed().as_millis()
             );

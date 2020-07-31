@@ -29,7 +29,7 @@ The foundational technologies in Ballista are:
 
 Ballista can be deployed in [Kubernetes](https://kubernetes.io/), or as a standalone cluster using [etcd](https://etcd.io/) for discovery.
 
-## Architecture Diagram
+## Architecture
 
 The following diagram highlights some of the integrations that will be possible with this unique architecture. Note 
 that not all components shown here are available yet.
@@ -38,31 +38,29 @@ that not all components shown here are available yet.
 
 ## How does this compare to Apache Spark?
 
-Ballista differs from Apache Spark in many ways.
+Although Ballista is largely inspired by Apache Spark, there are some key differences.
 
-- Due to the use of Rust, memory usage can be up to 100x lower than Apache Spark which means that more processing can 
-fit on a single node, reducing the overhead of distributed compute.
-- Also due to the use of Rust, there are no "cold start" overheads. The first run of a query can be up to 10x faster 
-than Apache Spark.
-- The use of Apache Arrow as the memory model and network protocol means that data can be exchanged between executors in
-any programming language with minimal serialization overhead.
-- Ballista is columnar rather than row-based, meaning that it can take advantage of vectorized processing both on the
-CPU (using SIMD) and on the GPU. GPU support isn't available yet but will be available in a future release.
+- The choice of Rust as the main execution language means that memory usage is deterministic and avoids the overhead of 
+GC pauses.
+- Ballista is designed from the ground up to use columnar data, enabling a number of efficiencies such as vectorized 
+processing (SIMD and GPU) and efficient compression. Although Spark does have some columnar support, it is still 
+largely row-based today.
+- The combination of Rust and Arrow provides excellent memory efficiency and memory usage can be 5x - 10x lower than 
+Apache Spark in some cases, which means that more processing can fit on a single node, reducing the overhead of 
+distributed compute.
+- The use of Apache Arrow as the memory model and network protocol means that data can be exchanged between executors 
+in any programming language with minimal serialization overhead.
 
 ## Example Rust Client
 
 ```rust
 #[tokio::main]
 async fn main() -> Result<()> {
-
-    let nyc_taxi_path = "/mnt/nyctaxi/parquet/year=2019";
-    let executor_host = "localhost";
-    let executor_port = 50051;
-
-    let ctx = Context::remote(executor_host, executor_port, HashMap::new());
+    
+    let ctx = Context::remote("localhost", 50051, HashMap::new());
 
     let results = ctx
-        .read_parquet(nyc_taxi_path, None)?
+        .read_parquet("/path/to/data", None)?
         .aggregate(vec![col("passenger_count")], vec![max(col("fare_amount"))])?
         .collect()
         .await?;
@@ -76,52 +74,29 @@ async fn main() -> Result<()> {
 
 ## Status
 
-Distributed execution using async Rust has now been proven and we are working towards a 0.3.0 release in August 2020 
-that will support the following capabilities.
-
-### Operators:
-
-- Projection
-- Selection
-- Hash Aggregate
-- Limit
-
-### Expressions:
-
-- Basic aggregate expressions (`MIN`, `MAX`, `SUM`, `COUNT`, `AVG`)
-- Boolean expressions (`AND`, `OR`, `NOT`)
-- Comparison expressions (`==`, `!=`, `<=`, `<`, `>`, `>=`)
-- Basic math expressions (`+`, `-`, `*`, `/`, `%`)
-- Rust user-defined functions (UDFs)
-- Java user-defined functions (UDFs)
-
-### File Formats:
-
-- CSV
-- Parquet
+An alpha release of Ballista is now available, and we are working towards the full 0.3.0 release in August 2020. Please 
+refer to the [user guide](https://ballistacompute.org/docs/) for instructions on using a released versions of Ballista. 
 
 ## Roadmap
 
-After the 0.3.0 release we will start working on more complex operators, particularly joins, using the TPCH
+We are now working on support for more complex operators, particularly joins, using the TPCH
 benchmarks to drive requirements. The full roadmap is available [here](https://github.com/ballista-compute/ballista/milestones?direction=asc&sort=title&state=open).
 
 ## More Examples
 
 The following examples should help illustrate the current capabilities of Ballista
 
-- [Distributed query execution in Rust](https://github.com/ballista-compute/ballista/tree/main/rust/examples/distributed-query)
 - [TPC-H Benchmark](https://github.com/ballista-compute/ballista/tree/main/rust/examples/tpch)
+- [Distributed query execution in Rust](https://github.com/ballista-compute/ballista/tree/main/rust/examples/distributed-query)
 - [Rust bindings for Apache Spark](https://github.com/ballista-compute/ballista/tree/main/rust/examples/apache-spark-rust-bindings)
 
 ## Documentation
 
-The [user guide](https://ballistacompute.org/docs/) is hosted at [https://ballistacompute.org](https://ballistacompute.org/), along with the [blog](https://ballistacompute.org/) where 
-news and release notes are posted.
+The [user guide](https://ballistacompute.org/docs/) is hosted at [https://ballistacompute.org](https://ballistacompute.org/), 
+along with the [blog](https://ballistacompute.org/) where news and release notes are posted.
+
+Developer documentation can be found in the [docs](docs/README.md) directory.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for information on contributing to this project.
-
-
-
-
-

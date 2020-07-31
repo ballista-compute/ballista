@@ -32,7 +32,12 @@ async fn main() -> Result<()> {
     let query_no = 1;
 
     let start = Instant::now();
-    let ctx = Context::remote(executor_host, executor_port, HashMap::new());
+
+    let mut settings = HashMap::new();
+    settings.insert(PARQUET_READER_BATCH_SIZE, "65536");
+    settings.insert(PARQUET_READER_QUEUE_SIZE, "2");
+
+    let ctx = Context::remote(executor_host, executor_port, settings);
 
     let results = match query_no {
         1 => q1(&ctx, path).await?,

@@ -1,6 +1,4 @@
-package org.ballistacompute.datatypes
-
-import org.ballistacompute.physical.PhysicalPlan
+package org.ballistacompute.physical
 
 /*
   message Task {

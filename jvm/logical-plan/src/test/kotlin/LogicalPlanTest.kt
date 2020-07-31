@@ -38,8 +38,7 @@ class LogicalPlanTest {
     val filterExpr = Eq(col("state"), LiteralString("CO"))
     val selection = Selection(scan, filterExpr)
     // create a plan to represent the projection (SELECT)
-    val projectionList = listOf(col("id"), col("first_name"), col("last_name"))
-    val plan = Projection(selection, projectionList)
+    val plan = Projection(selection, listOf(col("id"), col("first_name"), col("last_name")))
 
     assertEquals(
         "Projection: #id, #first_name, #last_name\n" +

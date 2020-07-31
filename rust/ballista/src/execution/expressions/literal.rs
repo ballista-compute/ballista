@@ -36,19 +36,7 @@ impl Expression for Literal {
     }
 
     fn data_type(&self, _input_schema: &Schema) -> Result<DataType> {
-        match &self.value {
-            ScalarValue::UInt8(_) => Ok(DataType::UInt8),
-            ScalarValue::UInt16(_) => Ok(DataType::UInt16),
-            ScalarValue::UInt32(_) => Ok(DataType::UInt32),
-            ScalarValue::UInt64(_) => Ok(DataType::UInt64),
-            ScalarValue::Int8(_) => Ok(DataType::Int8),
-            ScalarValue::Int16(_) => Ok(DataType::Int16),
-            ScalarValue::Int32(_) => Ok(DataType::Int32),
-            ScalarValue::Int64(_) => Ok(DataType::Int64),
-            ScalarValue::Float32(_) => Ok(DataType::Float32),
-            ScalarValue::Float64(_) => Ok(DataType::Float64),
-            _ => unimplemented!(),
-        }
+        Ok(self.value.get_datatype())
     }
 
     fn nullable(&self, _input_schema: &Schema) -> Result<bool> {

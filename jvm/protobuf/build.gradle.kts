@@ -21,8 +21,8 @@ dependencies {
     implementation(project(":datasource"))
     implementation(project(":logical-plan"))
 
-    implementation("org.apache.arrow:arrow-memory:1.0.0")
-    implementation("org.apache.arrow:arrow-vector:1.0.0")
+    implementation("org.apache.arrow:arrow-memory:0.17.0")
+    implementation("org.apache.arrow:arrow-vector:0.17.0")
     implementation("com.google.protobuf:protobuf-java:3.11.4")
     testImplementation("junit:junit:4.13")
 }

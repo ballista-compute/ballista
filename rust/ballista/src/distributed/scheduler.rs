@@ -320,7 +320,7 @@ enum StageStatus {
 }
 
 enum TaskStatus {
-    Pending(ExecutionTask),
+    Pending(Instant),
     Running(Instant),
     Completed(ShuffleId),
     Failed(String),
@@ -431,9 +431,9 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                                         // create stateful client
                                         let mut client = BallistaClient::try_new(&executor.host, executor.port).await?;
 
-                                        let mut task_status = vec![];
-                                        for task in &queue {
-                                            task_status.push(TaskStatus::Pending(task.clone()));
+                                        let mut task_status = Vec::with_capacity(queue.len());
+                                        for _ in &queue {
+                                            task_status.push(TaskStatus::Pending(Instant::now()));
                                         }
 
                                         let mut shuffle_ids = vec![];
@@ -468,19 +468,19 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                                             }
 
                                             //TODO need to send multiple tasks per network call - this is really inefficient
+                                            let mut count = 0;
+                                            let start = Instant::now();
                                             for i in 0..task_status.len() {
-
+                                                let min_time_between_checks = 500;
                                                 let should_submit = match &task_status[i] {
-                                                    TaskStatus::Pending(_) => true,
-                                                    TaskStatus::Running(last_check) => last_check.elapsed().as_millis() > 500,
+                                                    TaskStatus::Pending(last_check) => last_check.elapsed().as_millis() > min_time_between_checks,
+                                                    TaskStatus::Running(last_check) => last_check.elapsed().as_millis() > min_time_between_checks,
                                                     TaskStatus::Completed(_) => false,
-                                                    TaskStatus::Failed(_) => {
-                                                        //TODO retry logic
-                                                        false
-                                                    },
+                                                    TaskStatus::Failed(_) => false,
                                                 };
 
                                                 if should_submit {
+                                                    count += 1;
                                                     let task = queue[i].clone();
                                                     let task_key = task.key();
                                                     match client.execute_action(&Action::Execute(task.clone())).await
@@ -503,6 +503,10 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                                                     }
                                                 }
                                             }
+                                            if count > 0 {
+                                                println!("Checked status of {} tasks in {} ms", count, start.elapsed().as_millis());
+                                            }
+
                                             // try not to overwhelm network or executors
                                             thread::sleep(Duration::from_millis(100));
                                         }

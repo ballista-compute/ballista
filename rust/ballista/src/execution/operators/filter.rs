@@ -107,7 +107,7 @@ impl ColumnarBatchIter for FilterIter {
         match self.input.next().await? {
             Some(input) => {
                 let bools = self.filter_expr.evaluate(&input)?;
-                let batch = apply_filter(&input, &bools)?;
+                let batch = apply_filter(&input, &bools, self.input.schema().clone())?;
                 Ok(Some(batch))
             }
             None => Ok(None),
@@ -116,7 +116,7 @@ impl ColumnarBatchIter for FilterIter {
 }
 
 /// Filter the provided batch based on the bitmask
-fn apply_filter(batch: &ColumnarBatch, bitmask: &ColumnarValue) -> Result<ColumnarBatch> {
+fn apply_filter(batch: &ColumnarBatch, bitmask: &ColumnarValue, schema: Arc<Schema>) -> Result<ColumnarBatch> {
     let predicate = bitmask.to_arrow()?;
     let predicate = cast_array!(predicate, BooleanArray)?;
 
@@ -127,5 +127,5 @@ fn apply_filter(batch: &ColumnarBatch, bitmask: &ColumnarValue) -> Result<Column
         filtered_arrays.push(ColumnarValue::Columnar(filtered_array));
     }
 
-    Ok(ColumnarBatch::from_values(&filtered_arrays))
+    Ok(ColumnarBatch::from_values_and_schema(&filtered_arrays, schema))
 }

@@ -93,7 +93,7 @@ impl DataGen {
             .map(|c| ColumnarValue::Columnar(c.clone()))
             .collect();
 
-        Ok(ColumnarBatch::from_values(&columns))
+        Ok(ColumnarBatch::from_values_infer_schema(&columns))
     }
 }
 

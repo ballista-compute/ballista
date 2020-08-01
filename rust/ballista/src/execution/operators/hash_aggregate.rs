@@ -611,7 +611,7 @@ fn create_batch_from_accum_map(
         .map(|a| ColumnarValue::Columnar(a.clone()))
         .collect();
 
-    Ok(ColumnarBatch::from_values(&values))
+    Ok(ColumnarBatch::from_values_infer_schema(&values))
 }
 
 #[async_trait]

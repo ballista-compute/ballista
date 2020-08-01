@@ -115,7 +115,7 @@ impl ColumnarBatchIter for ProjectionIter {
                     .iter()
                     .map(|e| e.evaluate(&batch))
                     .collect::<Result<Vec<_>>>()?;
-                Ok(Some(ColumnarBatch::from_values(&projected_values)))
+                Ok(Some(ColumnarBatch::from_values_and_schema(&projected_values, self.schema.clone())))
             }
             None => Ok(None),
         }

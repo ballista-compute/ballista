@@ -212,7 +212,14 @@ impl ColumnarBatch {
         }
     }
 
-    pub fn from_values(values: &[ColumnarValue]) -> Self {
+    pub fn from_values_and_schema(values: &[ColumnarValue], schema: Arc<Schema>) -> Self {
+        Self {
+            schema,
+            columns: values.to_vec(),
+        }
+    }
+
+    pub fn from_values_infer_schema(values: &[ColumnarValue]) -> Self {
         let schema = Schema::new(
             values
                 .iter()

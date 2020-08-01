@@ -301,6 +301,12 @@ impl JobScheduler {
                     exec.with_new_children(vec![child]),
                 ))))
             }
+            PhysicalPlan::Projection(exec) => {
+                let child = self.visit_plan(exec.child.clone(), current_stage)?;
+                Ok(Arc::new(PhysicalPlan::Projection(Arc::new(
+                    exec.with_new_children(vec![child]),
+                ))))
+            }
             PhysicalPlan::Filter(exec) => {
                 let child = self.visit_plan(exec.child.clone(), current_stage)?;
                 Ok(Arc::new(PhysicalPlan::Filter(Arc::new(
@@ -482,12 +488,10 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                                                 if should_submit {
                                                     count += 1;
                                                     let task = queue[i].clone();
-                                                    let task_key = task.key();
                                                     match client.execute_action(&Action::Execute(task.clone())).await
                                                     {
                                                         Ok(_) => {
                                                             let shuffle_id = ShuffleId::new(task.job_uuid, task.stage_id, task.partition_id);
-                                                            println!("Task {} completed", task_key);
                                                             shuffle_ids.push(shuffle_id);
                                                             task_status[i] = TaskStatus::Completed(shuffle_id)
                                                         }
@@ -497,6 +501,7 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                                                             if msg.contains("AlreadyExists") {
                                                                 task_status[i] = TaskStatus::Running(Instant::now())
                                                             } else {
+                                                                println!("Task {} failed: {:?}", task.key(), msg);
                                                                 task_status[i] = TaskStatus::Failed(msg)
                                                             }
                                                         }

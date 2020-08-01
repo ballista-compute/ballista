@@ -26,7 +26,7 @@ use crate::datafusion::logicalplan::{
 use crate::distributed::scheduler::ExecutionTask;
 use crate::error::{ballista_error, BallistaError};
 use crate::execution::operators::{
-    CsvScanExec, FilterExec, HashAggregateExec, ParquetScanExec, ShuffleReaderExec,
+    CsvScanExec, FilterExec, HashAggregateExec, ParquetScanExec, ProjectionExec, ShuffleReaderExec,
 };
 use crate::execution::physical_plan::{Action, ExecutorMeta, ShuffleId, ShuffleLocation};
 use crate::execution::physical_plan::{AggregateMode, PhysicalPlan};
@@ -354,6 +354,17 @@ impl TryInto<PhysicalPlan> for &protobuf::PhysicalPlanNode {
                 }
                 _ => Err(ballista_error("from_proto: Selection expr missing")),
             }
+        } else if let Some(projection) = &self.projection {
+            let input: PhysicalPlan = convert_box_required!(self.input)?;
+            let exprs = projection
+                .expr
+                .iter()
+                .map(|expr| expr.try_into())
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(PhysicalPlan::Projection(Arc::new(ProjectionExec::try_new(
+                &exprs,
+                Arc::new(input),
+            )?)))
         } else if let Some(aggregate) = &self.hash_aggregate {
             let input: PhysicalPlan = convert_box_required!(self.input)?;
             let mode = match aggregate.mode {

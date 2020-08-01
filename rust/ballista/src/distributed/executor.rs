@@ -175,6 +175,7 @@ impl BallistaExecutor {
                                             );
                                         }
                                         Err(e) => {
+                                            println!("Task failed: {:?}", e);
                                             set_task_status(
                                                 &task_status_map,
                                                 &task.key(),

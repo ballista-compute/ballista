@@ -30,20 +30,18 @@ use async_trait::async_trait;
 #[derive(Debug, Clone)]
 pub struct ProjectionExec {
     /// Logical expressions for the projection.
-    exprs: Vec<Arc<dyn Expression>>,
+    pub(crate) exprs: Vec<Expr>,
     /// The input operator to apply the projection to.
     pub(crate) child: Arc<PhysicalPlan>,
     /// The resulting schema of the projection.
-    schema: Arc<Schema>,
+    pub(crate) schema: Arc<Schema>,
 }
 
 impl ProjectionExec {
-    pub fn try_new(expr: &[Expr], child: Arc<PhysicalPlan>) -> Result<Self> {
-        let exprs = compile_expressions(&expr, &child.as_execution_plan().schema())?;
-
+    pub fn try_new(exprs: &[Expr], child: Arc<PhysicalPlan>) -> Result<Self> {
         let input_schema = child.as_execution_plan().schema();
-
-        let fields: Result<Vec<_>> = exprs
+        let pexprs = compile_expressions(&exprs, &child.as_execution_plan().schema())?;
+        let fields: Result<Vec<_>> = pexprs
             .iter()
             .map(|e| e.to_schema_field(&input_schema))
             .collect();
@@ -51,10 +49,19 @@ impl ProjectionExec {
         let schema = Arc::new(Schema::new(fields?));
 
         Ok(Self {
-            exprs,
+            exprs: exprs.to_vec(),
             child,
             schema,
         })
+    }
+
+    pub fn with_new_children(&self, new_children: Vec<Arc<PhysicalPlan>>) -> ProjectionExec {
+        assert!(new_children.len() == 1);
+        ProjectionExec {
+            exprs: self.exprs.clone(),
+            child: new_children[0].clone(),
+            schema: self.schema.clone(),
+        }
     }
 }
 
@@ -77,13 +84,12 @@ impl ExecutionPlan for ProjectionExec {
         ctx: Arc<dyn ExecutionContext>,
         partition_index: usize,
     ) -> Result<ColumnarBatchStream> {
+        let input = &self.child.as_execution_plan();
+        let projection = compile_expressions(&self.exprs, &input.schema())?;
         Ok(Arc::new(ProjectionIter {
-            input: self
-                .child
-                .as_execution_plan()
-                .execute(ctx.clone(), partition_index)
-                .await?,
-            projection: self.exprs.clone(),
+            input: input.execute(ctx.clone(), partition_index).await?,
+            projection,
+            schema: self.schema.clone(),
         }))
     }
 }
@@ -92,12 +98,13 @@ impl ExecutionPlan for ProjectionExec {
 struct ProjectionIter {
     input: ColumnarBatchStream,
     projection: Vec<Arc<dyn Expression>>,
+    schema: Arc<Schema>,
 }
 
 #[async_trait]
 impl ColumnarBatchIter for ProjectionIter {
     fn schema(&self) -> Arc<Schema> {
-        unimplemented!()
+        self.schema.clone()
     }
 
     async fn next(&self) -> Result<Option<ColumnarBatch>> {

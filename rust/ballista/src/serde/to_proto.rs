@@ -358,6 +358,19 @@ impl TryInto<protobuf::PhysicalPlanNode> for &PhysicalPlan {
 
     fn try_into(self) -> Result<protobuf::PhysicalPlanNode, Self::Error> {
         match self {
+            PhysicalPlan::Projection(exec) => {
+                let input: protobuf::PhysicalPlanNode = exec.child.as_ref().try_into()?;
+                let mut node = empty_physical_plan_node();
+                node.input = Some(Box::new(input));
+                node.projection = Some(protobuf::ProjectionExecNode {
+                    expr: exec
+                        .exprs
+                        .iter()
+                        .map(|expr| expr.try_into())
+                        .collect::<Result<Vec<_>, BallistaError>>()?,
+                });
+                Ok(node)
+            }
             PhysicalPlan::Filter(exec) => {
                 let input: protobuf::PhysicalPlanNode = exec.child.as_ref().try_into()?;
                 let mut node = empty_physical_plan_node();

@@ -41,10 +41,11 @@ use crate::execution::operators::ShuffleReaderExec;
 use crate::execution::operators::{CsvScanExec, HashAggregateExec};
 use crate::execution::operators::{FilterExec, ParquetScanExec};
 use crate::execution::physical_plan::{
-    AggregateMode, ColumnarBatch, Distribution, ExecutionContext, ExecutionPlan, ExecutorMeta,
-    Partitioning, PhysicalPlan, ShuffleId,
+    Action, AggregateMode, ColumnarBatch, Distribution, ExecutionContext, ExecutionPlan,
+    ExecutorMeta, Partitioning, PhysicalPlan, ShuffleId,
 };
 
+use crate::distributed::client::BallistaClient;
 use async_trait::async_trait;
 use smol::Task;
 use uuid::Uuid;
@@ -421,12 +422,15 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                                 .get(&executor.id)
                                 .expect("executor queue should exist");
                             let queue = queue.clone();
-                            let ctx = ctx.clone();
 
                             // start thread per executor
                             let handle = thread::spawn(move || {
                                 smol::run(async {
                                     Task::blocking(async move {
+
+                                        // create stateful client
+                                        let mut client = BallistaClient::try_new(&executor.host, executor.port).await?;
+
                                         let mut task_status = vec![];
                                         for task in &queue {
                                             task_status.push(TaskStatus::Pending(task.clone()));
@@ -479,11 +483,10 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                                                 if should_submit {
                                                     let task = queue[i].clone();
                                                     let task_key = task.key();
-                                                    match ctx
-                                                        .execute_task(executor.clone(), task)
-                                                        .await
+                                                    match client.execute_action(&Action::Execute(task.clone())).await
                                                     {
-                                                        Ok(shuffle_id) => {
+                                                        Ok(_) => {
+                                                            let shuffle_id = ShuffleId::new(task.job_uuid, task.stage_id, task.partition_id);
                                                             println!("Task {} completed", task_key);
                                                             shuffle_ids.push(shuffle_id);
                                                             task_status[i] = TaskStatus::Completed(shuffle_id)
@@ -491,9 +494,7 @@ pub async fn execute_job(job: &Job, ctx: Arc<dyn ExecutionContext>) -> Result<Ve
                                                         Err(e) => {
                                                             let msg = format!("{:?}", e);
                                                             //TODO would be nice to be able to extract status code here
-                                                            if msg.contains("ResourceExhausted") {
-                                                                // ignore
-                                                            } else if msg.contains("AlreadyExists") {
+                                                            if msg.contains("AlreadyExists") {
                                                                 task_status[i] = TaskStatus::Running(Instant::now())
                                                             } else {
                                                                 task_status[i] = TaskStatus::Failed(msg)

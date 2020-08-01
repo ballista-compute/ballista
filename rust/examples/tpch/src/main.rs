@@ -23,19 +23,35 @@ use ballista::arrow::util::pretty;
 use ballista::dataframe::*;
 use ballista::error::Result;
 
+use structopt::StructOpt;
+
+#[derive(StructOpt, Debug)]
+#[structopt(name = "tpch")]
+struct Opt {
+    #[structopt()]
+    path: String,
+
+    #[structopt(short = "h", long = "host", default_value = "localhost")]
+    executor_host: String,
+
+    #[structopt(short = "p", long = "port", default_value = "50051")]
+    executor_port: usize,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    //TODO use command-line args
-    let path = "/mnt/tpch/parquet/10-24/lineitem";
-    let executor_host = "localhost";
-    let executor_port = 50051;
+    let opt: Opt = Opt::from_args();
+    let path = opt.path.as_str();
+    let executor_host = opt.executor_host.as_str();
+    let executor_port = opt.executor_port;
+
     let query_no = 1;
 
     let start = Instant::now();
 
     let mut settings = HashMap::new();
-    settings.insert(PARQUET_READER_BATCH_SIZE, "655360");
-    settings.insert(PARQUET_READER_QUEUE_SIZE, "1");
+    settings.insert(PARQUET_READER_BATCH_SIZE, "65536");
+    settings.insert(PARQUET_READER_QUEUE_SIZE, "2");
 
     let ctx = Context::remote(executor_host, executor_port, settings);
 
@@ -47,7 +63,11 @@ async fn main() -> Result<()> {
     // print the results
     pretty::print_batches(&results)?;
 
-    println!("Distributed query took {} ms", start.elapsed().as_millis());
+    println!(
+        "TPC-H query {} took {} ms",
+        query_no,
+        start.elapsed().as_millis()
+    );
 
     Ok(())
 }

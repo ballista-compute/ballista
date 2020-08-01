@@ -1,3 +1,9 @@
 # TPC-H Example
 
-This work-in-progress example provides a Rust client for the TPC-H benchmark. 
+Rust TPC-H benchmark client.
+
+Example usage:
+
+```bash
+cargo run -- /mnt/tpch/parquet/100-240/lineitem/ --host localhost --port 50051
+``` 

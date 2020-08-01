@@ -7,3 +7,4 @@ edition = "2018"
 [dependencies]
 ballista = { path="../../ballista" }
 tokio = { version = "0.2", features = ["full"] }
+structopt = "0.3"

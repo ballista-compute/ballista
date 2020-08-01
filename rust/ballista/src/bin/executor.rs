@@ -81,7 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let scheduler: Arc<dyn Scheduler> = Arc::new(BallistaScheduler::new(config.clone()));
     let executor: Arc<dyn Executor> = Arc::new(BallistaExecutor::new(config));
 
-    let service = BallistaFlightService::new(scheduler, executor, opt.concurrent_tasks);
+    let service = BallistaFlightService::new(scheduler, executor);
     let server = FlightServiceServer::new(service);
     println!(
         "Ballista v{} Rust Executor listening on {:?}",

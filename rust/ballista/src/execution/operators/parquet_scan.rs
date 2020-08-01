@@ -175,14 +175,8 @@ impl ParquetBatchIter {
                                 Ok(Some(batch)) => {
                                     output_batches += 1;
                                     output_rows += batch.num_rows();
-
                                     let columnar_batch = ColumnarBatch::from_arrow(&batch);
-                                    println!(
-                                        "ParquetScanExec read batch containing {} bytes",
-                                        columnar_batch.memory_size()
-                                    );
                                     total_bytes_read += columnar_batch.memory_size();
-
                                     response_tx.send(Ok(Some(columnar_batch))).unwrap();
                                 }
                                 Ok(None) => {

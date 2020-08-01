@@ -31,7 +31,6 @@ use crate::{
 
 use crate::execution::physical_plan::Partitioning;
 use async_trait::async_trait;
-use std::time::Instant;
 
 /// FilterExec evaluates a boolean expression against each row of input to determine which rows
 /// to include in output batches.
@@ -107,15 +106,8 @@ impl ColumnarBatchIter for FilterIter {
     async fn next(&self) -> Result<Option<ColumnarBatch>> {
         match self.input.next().await? {
             Some(input) => {
-                let start = Instant::now();
                 let bools = self.filter_expr.evaluate(&input)?;
                 let batch = apply_filter(&input, &bools)?;
-                let elapsed = start.elapsed().as_millis();
-                println!(
-                    "Filtered batch of {} rows in {} ms.",
-                    input.num_rows(),
-                    elapsed
-                );
                 Ok(Some(batch))
             }
             None => Ok(None),

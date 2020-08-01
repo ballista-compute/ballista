@@ -34,8 +34,8 @@ async fn main() -> Result<()> {
     let start = Instant::now();
 
     let mut settings = HashMap::new();
-    settings.insert(PARQUET_READER_BATCH_SIZE, "65536");
-    settings.insert(PARQUET_READER_QUEUE_SIZE, "2");
+    settings.insert(PARQUET_READER_BATCH_SIZE, "655360");
+    settings.insert(PARQUET_READER_QUEUE_SIZE, "1");
 
     let ctx = Context::remote(executor_host, executor_port, settings);
 

@@ -164,7 +164,7 @@ async fn q6(ctx: &Context, path: &str) -> Result<Vec<RecordBatch>> {
     .filter(col("l_shipdate").lt(&lit_str("1995-01-01")))?
     .filter(col("l_discount").gt_eq(&lit_f64(0.05)))?
     .filter(col("l_discount").lt_eq(&lit_f64(0.07)))?
-    .filter(col("l_quantity").lt(&lit_f64(24)))?
+    .filter(col("l_quantity").lt(&lit_f64(24.0)))?
     .project(vec![
         mult(
             &col("l_extendedprice"),

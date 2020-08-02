@@ -48,7 +48,6 @@ prost-build = { version = "0.6.1" }
 [dev-dependencies]
 criterion = "0.3"
 
-# benches commented out for now because docker images need updating to work with them
-#[[bench]]
-#name = "hash_agg"
-#harness = false
+[[bench]]
+name = "hash_agg"
+harness = false

@@ -151,6 +151,7 @@ impl ExecutionPlan for HashAggregateExec {
             group_expr,
             aggr_expr,
             Arc::new(Schema::new(fields)),
+            false,
         )))
     }
 }
@@ -241,6 +242,7 @@ fn run(
     input: ColumnarBatchStream,
     group_expr: Vec<Arc<dyn Expression>>,
     aggr_expr: Vec<Arc<dyn AggregateExpr>>,
+    debug: bool,
 ) -> Result<()> {
     smol::run(async {
         // metrics
@@ -341,17 +343,21 @@ fn run(
             ))
         })?;
 
-        println!(
-            "HashAggregate processed {} batches and {} rows. \
-            Reading: {} ms; Accumulating: {} ms; Create result: {} ms. \
-            Total duration {} ms.",
-            batch_count,
-            row_count,
-            read_batch_time,
-            accum_batch_time,
-            create_final_batch_time,
-            start.elapsed().as_millis()
-        );
+        // temporary measure to be able to toggle showing metrics until we have a metrics
+        // reporting framework
+        if debug {
+            println!(
+                "HashAggregate processed {} batches and {} rows. \
+                Reading: {} ms; Accumulating: {} ms; Create result: {} ms. \
+                Total duration {} ms.",
+                batch_count,
+                row_count,
+                read_batch_time,
+                accum_batch_time,
+                create_final_batch_time,
+                start.elapsed().as_millis()
+            );
+        }
 
         Ok(())
     })
@@ -467,12 +473,13 @@ impl HashAggregateIter {
         group_expr: Vec<Arc<dyn Expression>>,
         aggr_expr: Vec<Arc<dyn AggregateExpr>>,
         output_schema: Arc<Schema>,
+        debug: bool,
     ) -> Self {
         let (tx, rx): (Sender<MaybeColumnarBatch>, Receiver<MaybeColumnarBatch>) = unbounded();
 
         let mode = mode.clone();
         let _ = std::thread::spawn(move || {
-            if let Err(e) = run(tx, &mode, input, group_expr, aggr_expr) {
+            if let Err(e) = run(tx, &mode, input, group_expr, aggr_expr, debug) {
                 println!("HashAggregateExec thread terminated with error: {:?}", e);
             }
         });

@@ -18,7 +18,8 @@
 //! Ballista Hash Aggregate operator. This is based on the implementation from DataFusion in the
 //! Apache Arrow project.
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use crate::arrow::array::StringBuilder;
@@ -30,13 +31,10 @@ use crate::error::{ballista_error, BallistaError, Result};
 use crate::execution::physical_plan::{
     compile_aggregate_expressions, compile_expressions, Accumulator, AggregateExpr, AggregateMode,
     ColumnarBatch, ColumnarBatchIter, ColumnarBatchStream, ColumnarValue, Distribution,
-    ExecutionContext, ExecutionPlan, Expression, MaybeColumnarBatch, Partitioning, PhysicalPlan,
+    ExecutionContext, ExecutionPlan, Expression, Partitioning, PhysicalPlan,
 };
 
 use async_trait::async_trait;
-use crossbeam::channel::{unbounded, Receiver, Sender};
-use smol::Task;
-use std::collections::HashMap;
 
 /// HashAggregateExec applies a hash aggregate operation against its input.
 #[allow(dead_code)]
@@ -230,140 +228,6 @@ macro_rules! update_accumulators {
 /// AccumularSet is the value in the hash map
 type AccumulatorSet = Vec<Box<dyn Accumulator>>;
 
-#[allow(dead_code)]
-struct HashAggregateIter {
-    schema: Arc<Schema>,
-    rx: Receiver<MaybeColumnarBatch>,
-}
-
-fn run(
-    tx: Sender<MaybeColumnarBatch>,
-    mode: &AggregateMode,
-    input: ColumnarBatchStream,
-    group_expr: Vec<Arc<dyn Expression>>,
-    aggr_expr: Vec<Arc<dyn AggregateExpr>>,
-    debug: bool,
-) -> Result<()> {
-    smol::run(async {
-        // metrics
-        let start = Instant::now();
-        let mut read_batch_time = 0;
-        let mut accum_batch_time = 0;
-        let mut batch_count = 0;
-        let mut row_count = 0;
-
-        // hash map of grouping values to accumulators
-        let mut map: HashMap<Vec<GroupByScalar>, AccumulatorSet> = HashMap::new();
-
-        // create vector large enough to hold the grouping key that can be re-used per row to
-        // avoid the cost of creating a new vector each time
-        let mut key = Vec::with_capacity(group_expr.len());
-        for _ in 0..group_expr.len() {
-            key.push(GroupByScalar::UInt32(0));
-        }
-
-        // iterate over all the input batches .. note that in partial mode it would be valid
-        // to emit batches periodically and reset the accumulator map to reduce memory pressure
-        loop {
-            let read_batch_start = Instant::now();
-            let maybe_batch = input.next().await?;
-            read_batch_time += read_batch_start.elapsed().as_millis();
-
-            match maybe_batch {
-                Some(batch) => {
-                    batch_count += 1;
-                    row_count += batch.num_rows();
-
-                    let accum_start = Instant::now();
-
-                    // evaluate the grouping expressions against this batch
-                    let group_values = group_expr
-                        .iter()
-                        .map(|e| e.evaluate(&batch))
-                        .collect::<Result<Vec<_>>>()?;
-
-                    // evaluate the input expressions to the aggregate functions
-                    let aggr_input_values = aggr_expr
-                        .iter()
-                        .map(|e| e.evaluate_input(&batch))
-                        .collect::<Result<Vec<_>>>()?;
-
-                    // we now need to switch to row-based processing :-(
-                    for row in 0..batch.num_rows() {
-                        // create grouping key for this row
-                        create_key(&group_values, row, &mut key)?;
-
-                        // lookup the accumulators for this grouping key
-                        let updated = match map.get_mut(&key) {
-                            Some(mut accumulators) => {
-                                accumulate(&aggr_input_values, &mut accumulators, row)?;
-                                true
-                            }
-                            None => false,
-                        };
-
-                        // create the accumulators for this grouping key if they weren't found
-                        if !updated {
-                            let mut accumulators: AccumulatorSet = aggr_expr
-                                .iter()
-                                .map(|expr| expr.create_accumulator(&mode))
-                                .collect();
-
-                            accumulate(&aggr_input_values, &mut accumulators, row)?;
-
-                            map.insert(key.clone(), accumulators);
-                        }
-                    }
-                    accum_batch_time += accum_start.elapsed().as_millis();
-                }
-                None => break,
-            }
-        }
-
-        // prepare results
-        let prepare_final_batch_start = Instant::now();
-        let batch = create_batch_from_accum_map(
-            &map,
-            input.as_ref().schema().as_ref(),
-            &group_expr,
-            &aggr_expr,
-        )?;
-        let create_final_batch_time = prepare_final_batch_start.elapsed().as_millis();
-
-        // send the result batch over the channel
-        tx.send(Ok(Some(batch))).map_err(|e| {
-            ballista_error(&format!("Error sending hash aggregate result: {:?}", e))
-        })?;
-
-        // send EOF marker
-        tx.send(Ok(None)).map_err(|e| {
-            ballista_error(&format!(
-                "Error sending hash aggregate end-of-stream: {:?}",
-                e
-            ))
-        })?;
-
-        // temporary measure to be able to toggle showing metrics until we have a metrics
-        // reporting framework
-        if debug {
-            println!(
-                "HashAggregate processed {} batches and {} rows. \
-                Reading: {} ms; Accumulating: {} ms; Create result: {} ms. \
-                Total duration {} ms.",
-                batch_count,
-                row_count,
-                read_batch_time,
-                accum_batch_time,
-                create_final_batch_time,
-                start.elapsed().as_millis()
-            );
-        }
-
-        Ok(())
-    })
-}
-
-#[inline]
 fn accumulate(
     aggr_input_values: &[ColumnarValue],
     accumulators: &mut AccumulatorSet,
@@ -466,6 +330,18 @@ fn accumulate(
     Ok(())
 }
 
+#[allow(dead_code)]
+struct HashAggregateIter {
+    mode: AggregateMode,
+    input: ColumnarBatchStream,
+    group_expr: Vec<Arc<dyn Expression>>,
+    aggr_expr: Vec<Arc<dyn AggregateExpr>>,
+    schema: Arc<Schema>,
+    eof: Arc<Mutex<bool>>,
+    debug: bool,
+}
+
+
 impl HashAggregateIter {
     fn new(
         mode: &AggregateMode,
@@ -474,19 +350,16 @@ impl HashAggregateIter {
         aggr_expr: Vec<Arc<dyn AggregateExpr>>,
         output_schema: Arc<Schema>,
         debug: bool,
+
     ) -> Self {
-        let (tx, rx): (Sender<MaybeColumnarBatch>, Receiver<MaybeColumnarBatch>) = unbounded();
-
-        let mode = mode.clone();
-        let _ = std::thread::spawn(move || {
-            if let Err(e) = run(tx, &mode, input, group_expr, aggr_expr, debug) {
-                println!("HashAggregateExec thread terminated with error: {:?}", e);
-            }
-        });
-
         Self {
+            mode: mode.to_owned(),
+            input,
+            group_expr,
+            aggr_expr,
             schema: output_schema,
-            rx,
+            eof: Arc::new(Mutex::new(false)),
+            debug,
         }
     }
 }
@@ -628,13 +501,122 @@ impl ColumnarBatchIter for HashAggregateIter {
     }
 
     async fn next(&self) -> Result<Option<ColumnarBatch>> {
-        let channel = self.rx.clone();
-        Task::blocking(async move {
-            channel
-                .recv()
-                .map_err(|e| BallistaError::General(format!("{:?}", e.to_string())))?
-        })
-        .await
+        
+        {
+            let mut eof = self.eof.lock().expect("failed to lock mutex");
+            if *eof {
+                return Ok(None);
+            }
+            *eof = true;
+        }
+
+        let start = Instant::now();
+        let mut read_batch_time = 0;
+        let mut accum_batch_time = 0;
+        let mut batch_count = 0;
+        let mut row_count = 0;
+
+        // hash map of grouping keys to accumulators
+        let mut map: HashMap<Vec<GroupByScalar>, AccumulatorSet> = HashMap::new();
+
+        // create vector large enough to hold the grouping key that can be re-used per row to
+        // avoid the cost of creating a new vector each time
+        let mut key = Vec::with_capacity(self.group_expr.len());
+        for _ in 0..self.group_expr.len() {
+            key.push(GroupByScalar::UInt32(0));
+        }
+
+        // iterate over all the input batches .. note that in partial mode it would be valid
+        // to emit batches periodically and reset the accumulator map to reduce memory pressure
+        loop {
+            let read_batch_start = Instant::now();
+            let maybe_batch = self.input.next().await?;
+            read_batch_time += read_batch_start.elapsed().as_millis();
+
+            match maybe_batch {
+                Some(batch) => {
+                    batch_count += 1;
+                    row_count += batch.num_rows();
+
+                    let accum_start = Instant::now();
+
+                    // evaluate the grouping expressions against this batch
+                    let group_values = self.group_expr
+                        .iter()
+                        .map(|e| e.evaluate(&batch))
+                        .collect::<Result<Vec<_>>>()?;
+
+                    // evaluate the input expressions to the aggregate functions
+                    let aggr_input_values = self.aggr_expr
+                        .iter()
+                        .map(|e| e.evaluate_input(&batch))
+                        .collect::<Result<Vec<_>>>()?;
+
+                    // we now need to switch to row-based processing :-(
+                    for row in 0..batch.num_rows() {
+                        // create grouping key for this row
+                        create_key(&group_values, row, &mut key)?;
+
+                        // lookup the accumulators for this grouping key
+                        let updated = match map.get_mut(&key) {
+                            Some(mut accumulators) => {
+                                accumulate(&aggr_input_values, &mut accumulators, row)?;
+                                true
+                            }
+                            None => false,
+                        };
+
+                        // create the accumulators for this grouping key if they weren't found
+                        if !updated {
+                            let mut accumulators: AccumulatorSet = self.aggr_expr
+                                .iter()
+                                .map(|expr| expr.create_accumulator(&self.mode))
+                                .collect();
+
+                            accumulate(&aggr_input_values, &mut accumulators, row)?;
+
+                            map.insert(key.clone(), accumulators);
+                        }
+                    }
+                    accum_batch_time += accum_start.elapsed().as_millis();
+                }
+                None => break,
+            }
+        }
+
+        if map.is_empty() {
+            Ok(None)
+        } else {
+
+            // prepare results
+            let prepare_final_batch_start = Instant::now();
+            let batch = create_batch_from_accum_map(
+                &map,
+                self.input.as_ref().schema().as_ref(),
+                &self.group_expr,
+                &self.aggr_expr,
+            )?;
+            let create_final_batch_time = prepare_final_batch_start.elapsed().as_millis();
+
+            // temporary measure to be able to toggle showing metrics until we have a metrics
+            // reporting framework
+            if self.debug {
+                println!(
+                    "HashAggregate processed {} batches and {} rows. \
+                    Reading: {} ms; Accumulating: {} ms; Create result: {} ms. \
+                    Total duration {} ms.",
+                    batch_count,
+                    row_count,
+                    read_batch_time,
+                    accum_batch_time,
+                    create_final_batch_time,
+                    start.elapsed().as_millis()
+                );
+            }
+
+            // send the result batch over the channel
+            Ok(Some(batch))
+        }
     }
 }
 

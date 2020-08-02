@@ -19,7 +19,8 @@
 //! Apache Arrow project.
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Instant;
 
 use crate::arrow::array::StringBuilder;
@@ -337,10 +338,9 @@ struct HashAggregateIter {
     group_expr: Vec<Arc<dyn Expression>>,
     aggr_expr: Vec<Arc<dyn AggregateExpr>>,
     schema: Arc<Schema>,
-    eof: Arc<Mutex<bool>>,
+    eof: Arc<AtomicBool>,
     debug: bool,
 }
-
 
 impl HashAggregateIter {
     fn new(
@@ -350,7 +350,6 @@ impl HashAggregateIter {
         aggr_expr: Vec<Arc<dyn AggregateExpr>>,
         output_schema: Arc<Schema>,
         debug: bool,
-
     ) -> Self {
         Self {
             mode: mode.to_owned(),
@@ -358,7 +357,7 @@ impl HashAggregateIter {
             group_expr,
             aggr_expr,
             schema: output_schema,
-            eof: Arc::new(Mutex::new(false)),
+            eof: Arc::new(AtomicBool::new(false)),
             debug,
         }
     }
@@ -501,13 +500,11 @@ impl ColumnarBatchIter for HashAggregateIter {
     }
 
     async fn next(&self) -> Result<Option<ColumnarBatch>> {
-        
         {
-            let mut eof = self.eof.lock().expect("failed to lock mutex");
-            if *eof {
+            if self.eof.load(Ordering::Relaxed) {
                 return Ok(None);
             }
-            *eof = true;
+            self.eof.store(true, Ordering::Relaxed);
         }
 
         let start = Instant::now();
@@ -541,13 +538,15 @@ impl ColumnarBatchIter for HashAggregateIter {
                     let accum_start = Instant::now();
 
                     // evaluate the grouping expressions against this batch
-                    let group_values = self.group_expr
+                    let group_values = self
+                        .group_expr
                         .iter()
                         .map(|e| e.evaluate(&batch))
                         .collect::<Result<Vec<_>>>()?;
 
                     // evaluate the input expressions to the aggregate functions
-                    let aggr_input_values = self.aggr_expr
+                    let aggr_input_values = self
+                        .aggr_expr
                         .iter()
                         .map(|e| e.evaluate_input(&batch))
                         .collect::<Result<Vec<_>>>()?;
@@ -568,7 +567,8 @@ impl ColumnarBatchIter for HashAggregateIter {
 
                         // create the accumulators for this grouping key if they weren't found
                         if !updated {
-                            let mut accumulators: AccumulatorSet = self.aggr_expr
+                            let mut accumulators: AccumulatorSet = self
+                                .aggr_expr
                                 .iter()
                                 .map(|expr| expr.create_accumulator(&self.mode))
                                 .collect();
@@ -587,7 +587,6 @@ impl ColumnarBatchIter for HashAggregateIter {
         if map.is_empty() {
             Ok(None)
         } else {
-
             // prepare results
             let prepare_final_batch_start = Instant::now();
             let batch = create_batch_from_accum_map(

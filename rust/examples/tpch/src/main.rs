@@ -144,42 +144,34 @@ async fn q1(ctx: &Context, path: &str) -> Result<Vec<RecordBatch>> {
 }
 
 /// TPCH Query 6.
-/// 
+///
 /// The Full SQL is:
-/// 
+///
 /// select
-/// 	sum(l_extendedprice * l_discount) as revenue
+///     sum(l_extendedprice * l_discount) as revenue
 /// from
-/// 	lineitem
+///     lineitem
 /// where
-/// 	l_shipdate >= date ':1'
-/// 	and l_shipdate < date ':1' + interval '1' year
-/// 	and l_discount between :2 - 0.01 and :2 + 0.01
-/// 	and l_quantity < :3;
-/// 
+///     l_shipdate >= date ':1'
+///     and l_shipdate < date ':1' + interval '1' year
+///     and l_discount between :2 - 0.01 and :2 + 0.01
+///     and l_quantity < :3;
+///
 async fn q6(ctx: &Context, path: &str) -> Result<Vec<RecordBatch>> {
     let df = ctx
-    .read_parquet(path, None)?
-    .filter(col("l_shipdate").gt_eq(&lit_str("1994-01-01")))?
-    .filter(col("l_shipdate").lt(&lit_str("1995-01-01")))?
-    .filter(col("l_discount").gt_eq(&lit_f64(0.05)))?
-    .filter(col("l_discount").lt_eq(&lit_f64(0.07)))?
-    .filter(col("l_quantity").lt(&lit_f64(24.0)))?
-    .project(vec![
-        mult(
-            &col("l_extendedprice"),
-            &col("l_discount")
-        )
-        .alias("disc_price")
-    ])?
-    .aggregate(
-        vec![], 
-        vec![sum(col("disc_price"))]
-    )?;
+        .read_parquet(path, None)?
+        .filter(col("l_shipdate").gt_eq(&lit_str("1994-01-01")))?
+        .filter(col("l_shipdate").lt(&lit_str("1995-01-01")))?
+        .filter(col("l_discount").gt_eq(&lit_f64(0.05)))?
+        .filter(col("l_discount").lt_eq(&lit_f64(0.07)))?
+        .filter(col("l_quantity").lt(&lit_f64(24.0)))?
+        .project(vec![
+            mult(&col("l_extendedprice"), &col("l_discount")).alias("disc_price")
+        ])?
+        .aggregate(vec![], vec![sum(col("disc_price"))])?;
     df.explain();
     df.collect().await
-} 
-
+}
 
 #[allow(dead_code)]
 fn lineitem_schema() -> Schema {

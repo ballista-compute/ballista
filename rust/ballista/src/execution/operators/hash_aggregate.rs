@@ -500,12 +500,10 @@ impl ColumnarBatchIter for HashAggregateIter {
     }
 
     async fn next(&self) -> Result<Option<ColumnarBatch>> {
-        {
-            if self.eof.load(Ordering::Relaxed) {
-                return Ok(None);
-            }
-            self.eof.store(true, Ordering::Relaxed);
+        if self.eof.load(Ordering::Relaxed) {
+            return Ok(None);
         }
+        self.eof.store(true, Ordering::Relaxed);
 
         let start = Instant::now();
         let mut read_batch_time = 0;
@@ -557,26 +555,20 @@ impl ColumnarBatchIter for HashAggregateIter {
                         create_key(&group_values, row, &mut key)?;
 
                         // lookup the accumulators for this grouping key
-                        let updated = match map.get_mut(&key) {
+                        match map.get_mut(&key) {
                             Some(mut accumulators) => {
                                 accumulate(&aggr_input_values, &mut accumulators, row)?;
-                                true
                             }
-                            None => false,
+                            None => {
+                                let mut accumulators: AccumulatorSet = self
+                                    .aggr_expr
+                                    .iter()
+                                    .map(|expr| expr.create_accumulator(&self.mode))
+                                    .collect();
+                                accumulate(&aggr_input_values, &mut accumulators, row)?;
+                                map.insert(key.clone(), accumulators);
+                            }
                         };
-
-                        // create the accumulators for this grouping key if they weren't found
-                        if !updated {
-                            let mut accumulators: AccumulatorSet = self
-                                .aggr_expr
-                                .iter()
-                                .map(|expr| expr.create_accumulator(&self.mode))
-                                .collect();
-
-                            accumulate(&aggr_input_values, &mut accumulators, row)?;
-
-                            map.insert(key.clone(), accumulators);
-                        }
                     }
                     accum_batch_time += accum_start.elapsed().as_millis();
                 }

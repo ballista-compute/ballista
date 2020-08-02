@@ -48,6 +48,7 @@ prost-build = { version = "0.6.1" }
 [dev-dependencies]
 criterion = "0.3"
 
-[[bench]]
-name = "hash_agg"
-harness = false
+#TODO update docker packaging to support this
+#[[bench]]
+#name = "hash_agg"
+#harness = false

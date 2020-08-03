@@ -57,7 +57,7 @@ async fn main() -> Result<()> {
 
     let results = match query_no {
         1 => q1(&ctx, path).await?,
-        2 => q6(&ctx, path).await?,
+        6 => q6(&ctx, path).await?,
         _ => unimplemented!(),
     };
 
@@ -168,7 +168,7 @@ async fn q6(ctx: &Context, path: &str) -> Result<Vec<RecordBatch>> {
         .project(vec![
             mult(&col("l_extendedprice"), &col("l_discount")).alias("disc_price")
         ])?
-        .aggregate(vec![], vec![sum(col("disc_price"))])?;
+        .aggregate(vec![], vec![sum(col("disc_price")).alias("revenue")])?;
     df.explain();
     df.collect().await
 }

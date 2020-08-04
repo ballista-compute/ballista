@@ -18,4 +18,5 @@ do
     mv -f tmp_file "$3/$file.csv"
     rm "$file"
 done
+ls -l "$3/"
 echo "splitting completed."

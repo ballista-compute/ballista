@@ -10,7 +10,7 @@ spec:
     # download file; split it in ~10 parts; rm file
     args:
       - wget https://s3.amazonaws.com/nyc-tlc/trip+data/yellow_tripdata_2019-01.csv -P /mnt &&
-        wget -O - https://raw.githubusercontent.com/ballista-compute/ballista/main/dev/split-csv.sh | /bin/sh -s /mnt/yellow_tripdata_2019-01.csv 766779 /mnt/nztaxi.csv &&
+        wget -O - https://raw.githubusercontent.com/ballista-compute/ballista/main/dev/split-csv.sh | /bin/sh -s /mnt/yellow_tripdata_2019-01.csv 766779 /mnt/nyctaxi/csv &&
         rm -rf /mnt/yellow_tripdata_2019-01.csv
     volumeMounts:
     - mountPath: /mnt

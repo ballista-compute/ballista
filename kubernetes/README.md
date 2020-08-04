@@ -37,22 +37,28 @@ kubectl apply -f kubernetes/populate-data.yaml
 
 This operation takes some time as we have some data to download. This is done when the pod `populate-data` on `kubectl get pods`
 shows status `Completed`. We can't deploy the cluster before this step is completed, as the volume can only be claimed by
-a single pod at the time. Feel free to change [populate-data.yaml](./populate-data.yaml) do dump a smaller CSV.
+a single pod at the time. Feel free to change [populate-data.yaml](./populate-data.yaml) to dump a smaller CSV.
 
 ### Setup credentials for pulling images
 
-We offer docker images on github that we can use to run the cluster.
-They require authentication to be pulled. For this, we will create a secret in k8s:
+Development builds of the Ballista docker images are hosted on Github. It is necessary to set up authentication to be
+able to use these images. Use the following command to create a Kuberneted secret containing your github credentials.  
+
+_Note that we also have publicly available Docker images hosted on [Dockerhub](https://hub.docker.com/u/ballistacompute) 
+for released versions of Ballista and these do not require authentication._
+
 
 ```bash
 kubectl create secret docker-registry github \
     --docker-server=docker.pkg.github.com \
     --docker-username=$GITHUB_USERNAME \
     --docker-password=$GITHUB_TOKEN \
-    --docker-email=jorgecarleitao@gmail.com
+    --docker-email=$GITHUB_EMAIL
 ```
 
-where `$GITHUB_TOKEN` is an [OAuth token](https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token) for your `$USERNAME`.
+The value provided for `$GITHUB_TOKEN` must be an OAuth token associated with the Github account that belongs 
+to `$GITHUB_USERNAME`. To generate a Github token, visit [https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token](https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token) 
+and create a token that has the `read:registry` permission.
 
 ### Give the cluster permissions to list pods
 
@@ -81,8 +87,20 @@ A simple method to connect to it is to port-forward to our local machine:
 kubectl port-forward service/ballista 50051:50051
 ```
 
-and connect to this port to run queries against the cluster. In particular, 
-we can use [this example](../rust/examples/distributed-query) to query the cluster.
+It is now possible to run clients that use the DataFrame API to build queries and submit them to the cluster. The clients
+should connect to `localhost:50051` to take advantage of the port forwarding to the cluster.
+
+For example, it is now possible to run [this example](../rust/examples/distributed-query) to query the cluster, using
+the following commands: 
+
+```bash
+cd $BALLISTA_HOME/rust/examples/distributed-query
+cargo run /mnt/nyctaxi/csv --host localhost --port 50051
+```
+
+_Note that when querying Parquet files, it is currently required that the client also has access to the same 
+data files with the same path because the DataFrame API will actually open the files to inspect the schema. This 
+restriction will be removed in a future release._
 
 ### Customization
 

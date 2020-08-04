@@ -42,7 +42,7 @@ a single pod at the time. Feel free to change [populate-data.yaml](./populate-da
 ### Setup credentials for pulling images
 
 Development builds of the Ballista docker images are hosted on Github. It is necessary to set up authentication to be
-able to use these images. Use the following command to create a Kuberneted secret containing your github credentials.  
+able to use these images. Use the following command to create a Kubernetes secret containing your github credentials.  
 
 _Note that we also have publicly available Docker images hosted on [Dockerhub](https://hub.docker.com/u/ballistacompute) 
 for released versions of Ballista and these do not require authentication._

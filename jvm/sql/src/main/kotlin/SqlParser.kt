@@ -138,7 +138,13 @@ class SqlParser(val tokens: TokenStream) : PrattParser {
         groupBy = parseExprList()
       }
 
-      return SqlSelect(projection, filterExpr, groupBy, table.id)
+      // parse optional ORDER BY clause
+      var orderBy: List<SqlExpr> = listOf()
+      if (tokens.consumeKeywords(listOf("ORDER", "BY"))) {
+        orderBy = parseExprList()
+      }
+
+      return SqlSelect(projection, filterExpr, groupBy, orderBy, table.id)
     } else {
       throw IllegalStateException("Expected FROM keyword, found ${tokens.peek()}")
     }

@@ -73,6 +73,13 @@ class SqlParserTest {
   }
 
   @Test
+  fun `parse Select With Order`() {
+    val select = parseSelect("SELECT state, salary FROM employee ORDER BY salary")
+    assertEquals(listOf(SqlIdentifier("state"),SqlIdentifier("salary")), select.projection)
+    assertEquals(listOf(SqlIdentifier("salary")), select.orderBy)
+  }
+
+  @Test
   fun `parse SELECT with aggregates`() {
     val select = parseSelect("SELECT state, MAX(salary) FROM employee GROUP BY state")
     assertEquals(

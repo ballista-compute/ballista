@@ -25,7 +25,7 @@ class SqlTokenizer(val sql: String) {
   // place to start contributing!)
 
   val keywords =
-      listOf("SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "GROUP", "ORDER", "BY", "AS", "CAST")
+      listOf("SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "GROUP", "ORDER", "BY", "ASC", "DESC", "AS", "CAST")
 
   var i = 0
 

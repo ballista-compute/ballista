@@ -27,7 +27,7 @@ class SqlParser(val tokens: TokenStream) : PrattParser {
         when (token) {
           is KeywordToken -> {
             when (token.text) {
-              "AS" -> 10
+              "AS", "ASC", "DESC" -> 10
               "OR" -> 20
               "AND" -> 30
               else -> 0
@@ -93,6 +93,10 @@ class SqlParser(val tokens: TokenStream) : PrattParser {
                     token.text,
                     parse(precedence) ?: throw SQLException("Error parsing infix"))
               }
+              "ASC", "DESC" -> {
+                tokens.next()
+                SqlSort(left, token.text)
+              }
               else -> throw IllegalStateException("Unexpected infix token $token")
             }
           }
@@ -110,6 +114,27 @@ class SqlParser(val tokens: TokenStream) : PrattParser {
         }
     logger.fine("parseInfix() returning $expr")
     return expr
+  }
+
+  private fun parseOrder(): List<SqlSort> {
+    val sortList = mutableListOf<SqlSort>()
+    var sort = parseExpr()
+    while (sort != null) {
+      sort = when(sort) {
+        is SqlIdentifier -> SqlSort(sort, "ASC")
+        is SqlSort -> sort
+        else -> throw java.lang.IllegalStateException("Unexpected expression $sort after order by.")
+      }
+      sortList.add(sort)
+
+      if (tokens.peek() == CommaToken()) {
+        tokens.next()
+      } else {
+        break
+      }
+      sort = parseExpr()
+    }
+    return sortList
   }
 
   private fun parseCast(): SqlCast {
@@ -141,7 +166,7 @@ class SqlParser(val tokens: TokenStream) : PrattParser {
       // parse optional ORDER BY clause
       var orderBy: List<SqlExpr> = listOf()
       if (tokens.consumeKeywords(listOf("ORDER", "BY"))) {
-        orderBy = parseExprList()
+        orderBy = parseOrder()
       }
 
       return SqlSelect(projection, filterExpr, groupBy, orderBy, table.id)

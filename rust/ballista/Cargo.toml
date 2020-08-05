@@ -33,7 +33,7 @@ structopt = "0.3"
 etcd-client = "0.5"
 
 # Ballista 0.3.x releases depend on the officla Arrow 1.0.0 release
-arrow = "1.0.0"
+arrow = { version = "1.0.0", features = ["simd"] }
 arrow-flight = "1.0.0"
 datafusion = "1.0.0"
 parquet = "1.0.0"

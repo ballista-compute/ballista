@@ -77,7 +77,7 @@ class SqlParserTest {
     val select = parseSelect("SELECT state, salary FROM employee ORDER BY salary desc, state")
     assertEquals(listOf(SqlIdentifier("state"),SqlIdentifier("salary")), select.projection)
     assertEquals(
-            listOf(SqlSort(SqlIdentifier("salary"), "DESC"), SqlSort(SqlIdentifier("state"), "ASC")),
+            listOf(SqlSort(SqlIdentifier("salary"), false), SqlSort(SqlIdentifier("state"), true)),
             select.orderBy)
   }
 

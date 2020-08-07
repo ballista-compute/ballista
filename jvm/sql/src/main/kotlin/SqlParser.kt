@@ -95,7 +95,7 @@ class SqlParser(val tokens: TokenStream) : PrattParser {
               }
               "ASC", "DESC" -> {
                 tokens.next()
-                SqlSort(left, token.text)
+                SqlSort(left, token.text == "ASC")
               }
               else -> throw IllegalStateException("Unexpected infix token $token")
             }
@@ -121,7 +121,7 @@ class SqlParser(val tokens: TokenStream) : PrattParser {
     var sort = parseExpr()
     while (sort != null) {
       sort = when(sort) {
-        is SqlIdentifier -> SqlSort(sort, "ASC")
+        is SqlIdentifier -> SqlSort(sort, true)
         is SqlSort -> sort
         else -> throw java.lang.IllegalStateException("Unexpected expression $sort after order by.")
       }

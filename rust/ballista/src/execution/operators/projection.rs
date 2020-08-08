@@ -107,8 +107,8 @@ impl ColumnarBatchIter for ProjectionIter {
         self.schema.clone()
     }
 
-    async fn next(&self) -> Result<Option<ColumnarBatch>> {
-        match self.input.next().await? {
+    fn next(&self) -> Result<Option<ColumnarBatch>> {
+        match self.input.next()? {
             Some(batch) => {
                 let projected_values: Vec<ColumnarValue> = self
                     .projection

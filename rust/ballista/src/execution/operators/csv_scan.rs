@@ -166,7 +166,7 @@ impl ColumnarBatchIter for CsvBatchIter {
         self.schema.clone()
     }
 
-    async fn next(&self) -> Result<Option<ColumnarBatch>> {
+    fn next(&self) -> Result<Option<ColumnarBatch>> {
         let mut reader = self.reader.lock().expect("failed to lock mutex");
         match reader.next() {
             Ok(Some(batch)) => Ok(Some(ColumnarBatch::from_arrow(&batch))),

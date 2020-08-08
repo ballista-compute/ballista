@@ -226,7 +226,7 @@ async fn execute_task(
     let exec_plan = task.plan.as_execution_plan();
     let stream = exec_plan.execute(ctx, task.partition_id).await?;
     let mut batches = vec![];
-    while let Some(batch) = stream.next().await? {
+    while let Some(batch) = stream.next()? {
         batches.push(batch.to_arrow()?);
     }
 

@@ -76,7 +76,7 @@ impl ColumnarBatchIter for InMemoryTableScanIter {
         self.data[0].schema()
     }
 
-    async fn next(&self) -> Result<Option<ColumnarBatch>> {
+    fn next(&self) -> Result<Option<ColumnarBatch>> {
         let index = self.index.load(Ordering::SeqCst);
         if index < self.data.len() {
             self.index.store(index + 1, Ordering::SeqCst);

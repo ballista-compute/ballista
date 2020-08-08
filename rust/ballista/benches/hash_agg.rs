@@ -76,7 +76,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     .unwrap(),
                 );
                 let stream = hash_agg_exec.execute(ctx, 0).await.unwrap();
-                while let Some(_) = stream.next().await.unwrap() {}
+                while let Some(_) = stream.next().unwrap() {}
             })
         })
     });

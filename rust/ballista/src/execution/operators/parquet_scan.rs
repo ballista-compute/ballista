@@ -14,6 +14,7 @@
 
 //! Parquet scan operator.
 
+use std::cell::RefCell;
 use std::fs::File;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -33,6 +34,7 @@ use crate::parquet::file::reader::SerializedFileReader;
 
 use async_channel::{bounded, Receiver, Sender};
 use async_trait::async_trait;
+use parquet::arrow::arrow_reader::ParquetRecordBatchReader;
 
 /// ParquetScanExec reads Parquet files and applies an optional projection so that only necessary
 /// columns are loaded into memory. The partitioning scheme is currently rather simplistic with a
@@ -233,13 +235,15 @@ async fn read_parquet_batches(
         start.elapsed().as_millis()
     );
 }
+
 #[async_trait]
 impl ColumnarBatchIter for ParquetBatchIter {
     fn schema(&self) -> Arc<Schema> {
         self.schema.clone()
     }
 
-    async fn next(&self) -> Result<Option<ColumnarBatch>> {
-        self.response_rx.recv().await.unwrap()
+    fn next(&self) -> Result<Option<ColumnarBatch>> {
+        let x = self.response_rx.clone();
+        smol::run(async { x.recv().await.unwrap() })
     }
 }

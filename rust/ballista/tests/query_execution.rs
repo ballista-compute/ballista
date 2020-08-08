@@ -76,7 +76,7 @@ async fn execute(use_filter: bool) {
     let start = Instant::now();
     let stream: ColumnarBatchStream = hash_agg.as_execution_plan().execute(ctx, 0).await.unwrap();
     let mut results = vec![];
-    while let Some(batch) = stream.next().await.unwrap() {
+    while let Some(batch) = stream.next().unwrap() {
         results.push(batch);
     }
 

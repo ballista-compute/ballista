@@ -38,7 +38,7 @@ async fn main() -> Result<()> {
     let path = "/mnt/nyctaxi/csv/yellow/2019/yellow_tripdata_2019-01.csv";
 
     let df = ctx
-        .read_csv(path, CsvReadOptions::new().schema(&nyctaxi_schema()), None)?
+        .read_csv(path, CsvReadOptions::new().schema(&nyctaxi_schema()))?
         //.filter(col("passenger_count").gt(&lit))?
         .aggregate(
             vec![col("passenger_count")],

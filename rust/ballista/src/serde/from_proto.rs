@@ -404,6 +404,7 @@ impl TryInto<PhysicalPlan> for &protobuf::PhysicalPlanNode {
 
                     Ok(PhysicalPlan::CsvScan(Arc::new(CsvScanExec::try_new(
                         &scan.path,
+                        scan.filename.clone(),
                         options,
                         Some(projection),
                         scan.batch_size as usize,
@@ -412,6 +413,7 @@ impl TryInto<PhysicalPlan> for &protobuf::PhysicalPlanNode {
                 "parquet" => Ok(PhysicalPlan::ParquetScan(Arc::new(
                     ParquetScanExec::try_new(
                         &scan.path,
+                        scan.filename.clone(),
                         Some(scan.projection.iter().map(|n| *n as usize).collect()),
                         scan.batch_size as usize,
                         scan.queue_size as usize,

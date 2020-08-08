@@ -408,6 +408,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for &PhysicalPlan {
                 let mut node = empty_physical_plan_node();
                 node.scan = Some(protobuf::ScanExecNode {
                     path: exec.path.clone(),
+                    filename: exec.filenames.clone(),
                     projection: exec
                         .projection
                         .as_ref()
@@ -432,6 +433,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for &PhysicalPlan {
                 // };
                 node.scan = Some(protobuf::ScanExecNode {
                     path: exec.path.clone(),
+                    filename: exec.filenames.clone(),
                     projection: exec
                         .projection
                         .as_ref()

@@ -23,11 +23,16 @@ use ballista::arrow::util::pretty;
 use ballista::dataframe::*;
 use ballista::error::Result;
 
+use ballista::datafusion::execution::physical_plan::csv::CsvReadOptions;
+use std::process::exit;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "tpch")]
 struct Opt {
+    #[structopt()]
+    format: String,
+
     #[structopt()]
     path: String,
 
@@ -38,12 +43,27 @@ struct Opt {
     executor_port: usize,
 }
 
+enum FileFormat {
+    Csv,
+    Parquet,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let opt: Opt = Opt::from_args();
+    let format = opt.format.as_str();
     let path = opt.path.as_str();
     let executor_host = opt.executor_host.as_str();
     let executor_port = opt.executor_port;
+
+    let format = match format {
+        "csv" => FileFormat::Csv,
+        "parquet" => FileFormat::Parquet,
+        _ => {
+            println!("Invalid file format");
+            exit(-1);
+        }
+    };
 
     let query_no = 1;
 
@@ -56,8 +76,8 @@ async fn main() -> Result<()> {
     let ctx = Context::remote(executor_host, executor_port, settings);
 
     let results = match query_no {
-        1 => q1(&ctx, path).await?,
-        6 => q6(&ctx, path).await?,
+        1 => q1(&ctx, path, &format).await?,
+        6 => q6(&ctx, path, &format).await?,
         _ => unimplemented!(),
     };
 
@@ -99,12 +119,19 @@ async fn main() -> Result<()> {
 ///     l_returnflag,
 ///     l_linestatus;
 ///
-async fn q1(ctx: &Context, path: &str) -> Result<Vec<RecordBatch>> {
+async fn q1(ctx: &Context, path: &str, format: &FileFormat) -> Result<Vec<RecordBatch>> {
     // TODO this is WIP and not the real query yet
 
-    // ctx.read_csv(path, options, None)?
-    let df = ctx
-        .read_parquet(path, None)?
+    let input = match format {
+        FileFormat::Csv => {
+            let schema = lineitem_schema();
+            let options = CsvReadOptions::new().schema(&schema).has_header(true);
+            ctx.read_csv(path, options)?
+        }
+        FileFormat::Parquet => ctx.read_parquet(path)?,
+    };
+
+    let df = input
         .filter(col("l_shipdate").lt(&lit_str("1998-09-01")))? // should be l_shipdate <= date '1998-12-01' - interval ':1' day (3)
         .project(vec![
             col("l_returnflag"),
@@ -157,9 +184,17 @@ async fn q1(ctx: &Context, path: &str) -> Result<Vec<RecordBatch>> {
 ///     and l_discount between :2 - 0.01 and :2 + 0.01
 ///     and l_quantity < :3;
 ///
-async fn q6(ctx: &Context, path: &str) -> Result<Vec<RecordBatch>> {
-    let df = ctx
-        .read_parquet(path, None)?
+async fn q6(ctx: &Context, path: &str, format: &FileFormat) -> Result<Vec<RecordBatch>> {
+    let input = match format {
+        FileFormat::Csv => {
+            let schema = lineitem_schema();
+            let options = CsvReadOptions::new().schema(&schema).has_header(true);
+            ctx.read_csv(path, options)?
+        }
+        FileFormat::Parquet => ctx.read_parquet(path)?,
+    };
+
+    let df = input
         .filter(col("l_shipdate").gt_eq(&lit_str("1994-01-01")))?
         .filter(col("l_shipdate").lt(&lit_str("1995-01-01")))?
         .filter(col("l_discount").gt_eq(&lit_f64(0.05)))?

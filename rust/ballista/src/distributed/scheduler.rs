@@ -28,6 +28,7 @@ use crate::dataframe::{
     PARQUET_READER_QUEUE_SIZE,
 };
 use crate::datafusion::execution::context::ExecutionContext as DFContext;
+use crate::datafusion::execution::physical_plan::common;
 use crate::datafusion::execution::physical_plan::csv::CsvReadOptions;
 use crate::datafusion::logicalplan::LogicalPlan;
 use crate::datafusion::logicalplan::{col_index, Expr, LogicalPlanBuilder};
@@ -697,21 +698,44 @@ pub fn create_physical_plan(
             projection,
             ..
         } => {
+            // build list of partition files
+            let mut filenames: Vec<String> = vec![];
+            common::build_file_list(path, &mut filenames, ".csv")?;
+            if filenames.is_empty() {
+                return Err(ballista_error(&format!("No CSV files found in {}", path)));
+            }
+
             // TODO this needs more work to re-use the config defaults defined in dataframe.rs
             let batch_size: usize = settings[CSV_READER_BATCH_SIZE].parse().unwrap_or(64 * 1024);
             let options = CsvReadOptions::new().schema(schema).has_header(*has_header);
-            let exec = CsvScanExec::try_new(&path, options, projection.clone(), batch_size)?;
+            let exec =
+                CsvScanExec::try_new(&path, filenames, options, projection.clone(), batch_size)?;
             Ok(Arc::new(PhysicalPlan::CsvScan(Arc::new(exec))))
         }
         LogicalPlan::ParquetScan {
             path, projection, ..
         } => {
+            let mut filenames = vec![];
+            common::build_file_list(path, &mut filenames, ".parquet")?;
+            if filenames.is_empty() {
+                return Err(ballista_error(&format!(
+                    "No Parquet files found in {}",
+                    path
+                )));
+            }
+
             // TODO this needs more work to re-use the config defaults defined in dataframe.rs
             let batch_size: usize = settings[PARQUET_READER_BATCH_SIZE]
                 .parse()
                 .unwrap_or(64 * 1024);
             let queue_size: usize = settings[PARQUET_READER_QUEUE_SIZE].parse().unwrap_or(2);
-            let exec = ParquetScanExec::try_new(&path, projection.clone(), batch_size, queue_size)?;
+            let exec = ParquetScanExec::try_new(
+                path,
+                filenames,
+                projection.clone(),
+                batch_size,
+                queue_size,
+            )?;
             Ok(Arc::new(PhysicalPlan::ParquetScan(Arc::new(exec))))
         }
         other => Err(BallistaError::General(format!(

@@ -240,26 +240,17 @@ impl Context {
         Ok(DataFrame::from(self.state.clone(), plan))
     }
 
-    pub fn read_csv(
-        &self,
-        path: &str,
-        options: CsvReadOptions,
-        projection: Option<Vec<usize>>,
-    ) -> Result<DataFrame> {
+    pub fn read_csv(&self, path: &str, options: CsvReadOptions) -> Result<DataFrame> {
         Ok(DataFrame::scan_csv(
             self.state.clone(),
             path,
             options,
-            projection,
+            None,
         )?)
     }
 
-    pub fn read_parquet(&self, path: &str, projection: Option<Vec<usize>>) -> Result<DataFrame> {
-        Ok(DataFrame::scan_parquet(
-            self.state.clone(),
-            path,
-            projection,
-        )?)
+    pub fn read_parquet(&self, path: &str) -> Result<DataFrame> {
+        Ok(DataFrame::scan_parquet(self.state.clone(), path, None)?)
     }
 
     pub fn sql(&self, sql: &str) -> Result<DataFrame> {

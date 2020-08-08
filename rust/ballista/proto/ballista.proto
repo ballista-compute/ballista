@@ -145,6 +145,9 @@ message ScanExecNode {
   bool has_header = 5; // csv specific
   uint32 batch_size = 6;
   uint32 queue_size = 7; // parquet specific
+
+  // partition filenames
+  repeated string filename = 8;
 }
 
 message ProjectionExecNode {

@@ -52,7 +52,7 @@ async fn main() -> Result<()> {
     let ctx = Context::remote(executor_host, executor_port, HashMap::new());
 
     let results = ctx
-        .read_parquet(path, None)?
+        .read_parquet(path)?
         .aggregate(vec![col("passenger_count")], vec![max(col("fare_amount"))])?
         .collect()
         .await?;

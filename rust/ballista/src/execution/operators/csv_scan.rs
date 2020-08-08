@@ -22,7 +22,6 @@ use std::sync::{Arc, Mutex};
 
 use crate::arrow::csv;
 use crate::arrow::datatypes::{Schema, SchemaRef};
-use crate::datafusion::execution::physical_plan::common::build_file_list;
 use crate::datafusion::execution::physical_plan::csv::CsvReadOptions;
 use crate::error::{ballista_error, Result};
 
@@ -56,17 +55,11 @@ impl CsvScanExec {
     /// Create a new execution plan for reading a set of CSV files
     pub fn try_new(
         path: &str,
+        filenames: Vec<String>,
         options: CsvReadOptions,
         projection: Option<Vec<usize>>,
         batch_size: usize,
     ) -> Result<Self> {
-        // build list of partition files
-        let mut filenames: Vec<String> = vec![];
-        build_file_list(path, &mut filenames, ".csv")?;
-        if filenames.is_empty() {
-            return Err(ballista_error("No files found"));
-        }
-
         let schema = match options.schema {
             Some(s) => s.clone(),
             None => CsvScanExec::try_infer_schema(&filenames, &options)?,

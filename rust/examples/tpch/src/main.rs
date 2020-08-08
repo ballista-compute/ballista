@@ -138,27 +138,35 @@ async fn q1(ctx: &Context, path: &str, format: &FileFormat) -> Result<Vec<Record
 
     let df = input
         .filter(col("l_shipdate").lt(&lit_str("1998-09-01")))? // should be l_shipdate <= date '1998-12-01' - interval ':1' day (3)
-        .project(vec![
-            col("l_returnflag"),
-            col("l_linestatus"),
-            col("l_quantity"),
-            col("l_extendedprice"),
-            col("l_tax"),
-            col("l_discount"),
-            mult(
-                &col("l_extendedprice"),
-                &subtract(&lit_f64(1_f64), &col("l_discount")),
-            )
-            .alias("disc_price"),
-        ])?
+        // explicit projection makes the query slower due to https://github.com/ballista-compute/ballista/issues/320
+        // .project(vec![
+        //     col("l_returnflag"),
+        //     col("l_linestatus"),
+        //     col("l_quantity"),
+        //     col("l_extendedprice"),
+        //     col("l_tax"),
+        //     col("l_discount"),
+        //     mult(
+        //         &col("l_extendedprice"),
+        //         &subtract(&lit_f64(1_f64), &col("l_discount")),
+        //     )
+        //     .alias("disc_price"),
+        // ])?
         .aggregate(
             vec![col("l_returnflag"), col("l_linestatus")],
             vec![
                 sum(col("l_quantity")).alias("sum_qty"),
                 sum(col("l_extendedprice")).alias("sum_base_price"),
-                sum(col("disc_price")).alias("sum_disc_price"),
                 sum(mult(
-                    &col("disc_price"),
+                    &col("l_extendedprice"),
+                    &subtract(&lit_f64(1_f64), &col("l_discount")),
+                ))
+                .alias("sum_disc_price"),
+                sum(mult(
+                    &mult(
+                        &col("l_extendedprice"),
+                        &subtract(&lit_f64(1_f64), &col("l_discount")),
+                    ),
                     &add(&lit_f64(1_f64), &col("l_tax")),
                 ))
                 .alias("sum_charge"),
@@ -200,15 +208,16 @@ async fn q6(ctx: &Context, path: &str, format: &FileFormat) -> Result<Vec<Record
     };
 
     let df = input
+        //TODO implement AND expression so we can do all of this in a single filter operation
         .filter(col("l_shipdate").gt_eq(&lit_str("1994-01-01")))?
         .filter(col("l_shipdate").lt(&lit_str("1995-01-01")))?
         .filter(col("l_discount").gt_eq(&lit_f64(0.05)))?
         .filter(col("l_discount").lt_eq(&lit_f64(0.07)))?
         .filter(col("l_quantity").lt(&lit_f64(24.0)))?
-        .project(vec![
-            mult(&col("l_extendedprice"), &col("l_discount")).alias("disc_price")
-        ])?
-        .aggregate(vec![], vec![sum(col("disc_price")).alias("revenue")])?;
+        .aggregate(
+            vec![],
+            vec![sum(mult(&col("l_extendedprice"), &col("l_discount"))).alias("revenue")],
+        )?;
     df.explain();
     df.collect().await
 }

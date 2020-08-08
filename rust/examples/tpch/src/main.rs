@@ -73,7 +73,6 @@ async fn main() -> Result<()> {
 
     let mut settings = HashMap::new();
     settings.insert(PARQUET_READER_BATCH_SIZE, "65536");
-    settings.insert(PARQUET_READER_QUEUE_SIZE, "2");
 
     let ctx = Context::remote(executor_host, executor_port, settings);
 

@@ -97,7 +97,6 @@ struct FilterIter {
     filter_expr: Arc<dyn Expression>,
 }
 
-#[async_trait]
 impl ColumnarBatchIter for FilterIter {
     fn schema(&self) -> Arc<Schema> {
         self.input.schema()

@@ -34,7 +34,6 @@ use crate::execution::physical_plan::Action;
 
 pub const CSV_READER_BATCH_SIZE: &str = "ballista.csv.reader.batchSize";
 pub const PARQUET_READER_BATCH_SIZE: &str = "ballista.parquet.reader.batchSize";
-pub const PARQUET_READER_QUEUE_SIZE: &str = "ballista.parquet.reader.queueSize";
 
 /// Configuration setting
 #[derive(Debug, Clone)]
@@ -81,14 +80,6 @@ impl BallistaConfigs {
             "Number of rows to read per batch",
             DataType::UInt64,
             Some("65536"),
-        ));
-
-        configs.push(ConfigSetting::new(
-            PARQUET_READER_QUEUE_SIZE,
-            "Size of the bounded queue that sends batches from the Parquet reader thread to the\
-            next upstream operator.",
-            DataType::UInt64,
-            Some("2"),
         ));
 
         let mut config_map: HashMap<String, ConfigSetting> = HashMap::new();

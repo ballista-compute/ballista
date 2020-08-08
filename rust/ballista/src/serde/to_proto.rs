@@ -420,7 +420,6 @@ impl TryInto<protobuf::PhysicalPlanNode> for &PhysicalPlan {
                     schema: Some(exec.original_schema().as_ref().try_into()?),
                     has_header: exec.has_header,
                     batch_size: exec.batch_size as u32,
-                    queue_size: 0,
                 });
                 Ok(node)
             }
@@ -445,7 +444,6 @@ impl TryInto<protobuf::PhysicalPlanNode> for &PhysicalPlan {
                     schema: None,
                     has_header: false,
                     batch_size: exec.batch_size as u32,
-                    queue_size: exec.queue_size as u32,
                 });
                 Ok(node)
             }

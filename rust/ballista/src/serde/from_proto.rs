@@ -416,7 +416,6 @@ impl TryInto<PhysicalPlan> for &protobuf::PhysicalPlanNode {
                         scan.filename.clone(),
                         Some(scan.projection.iter().map(|n| *n as usize).collect()),
                         scan.batch_size as usize,
-                        scan.queue_size as usize,
                     )?,
                 ))),
                 other => Err(ballista_error(&format!(

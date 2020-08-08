@@ -101,7 +101,6 @@ struct ProjectionIter {
     schema: Arc<Schema>,
 }
 
-#[async_trait]
 impl ColumnarBatchIter for ProjectionIter {
     fn schema(&self) -> Arc<Schema> {
         self.schema.clone()

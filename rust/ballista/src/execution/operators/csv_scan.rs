@@ -160,7 +160,6 @@ impl CsvBatchIter {
     }
 }
 
-#[async_trait]
 impl ColumnarBatchIter for CsvBatchIter {
     fn schema(&self) -> Arc<Schema> {
         self.schema.clone()

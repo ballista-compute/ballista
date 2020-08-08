@@ -70,7 +70,6 @@ impl InMemoryTableScanIter {
     }
 }
 
-#[async_trait]
 impl ColumnarBatchIter for InMemoryTableScanIter {
     fn schema(&self) -> Arc<Schema> {
         self.data[0].schema()

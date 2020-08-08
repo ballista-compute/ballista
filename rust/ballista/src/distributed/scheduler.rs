@@ -25,7 +25,6 @@ use std::time::{Duration, Instant};
 use crate::arrow::datatypes::Schema;
 use crate::dataframe::{
     avg, count, max, min, sum, CSV_READER_BATCH_SIZE, PARQUET_READER_BATCH_SIZE,
-    PARQUET_READER_QUEUE_SIZE,
 };
 use crate::datafusion::execution::context::ExecutionContext as DFContext;
 use crate::datafusion::execution::physical_plan::common;
@@ -728,14 +727,7 @@ pub fn create_physical_plan(
             let batch_size: usize = settings[PARQUET_READER_BATCH_SIZE]
                 .parse()
                 .unwrap_or(64 * 1024);
-            let queue_size: usize = settings[PARQUET_READER_QUEUE_SIZE].parse().unwrap_or(2);
-            let exec = ParquetScanExec::try_new(
-                path,
-                filenames,
-                projection.clone(),
-                batch_size,
-                queue_size,
-            )?;
+            let exec = ParquetScanExec::try_new(path, filenames, projection.clone(), batch_size)?;
             Ok(Arc::new(PhysicalPlan::ParquetScan(Arc::new(exec))))
         }
         other => Err(BallistaError::General(format!(

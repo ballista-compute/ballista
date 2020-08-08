@@ -493,7 +493,6 @@ fn create_batch_from_accum_map(
     Ok(ColumnarBatch::from_values_infer_schema(&values))
 }
 
-#[async_trait]
 impl ColumnarBatchIter for HashAggregateIter {
     fn schema(&self) -> Arc<Schema> {
         self.schema.clone()

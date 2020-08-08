@@ -42,7 +42,8 @@ use async_trait::async_trait;
 pub struct ParquetScanExec {
     pub(crate) path: String,
     pub(crate) filenames: Vec<String>,
-    pub(crate) projection: Vec<usize>,
+    pub(crate) projection: Option<Vec<usize>>,
+    pub(crate) projected_fields: Vec<usize>,
     pub(crate) parquet_schema: Arc<Schema>,
     pub(crate) output_schema: Arc<Schema>,
     pub(crate) batch_size: usize,
@@ -55,19 +56,21 @@ impl ParquetScanExec {
         projection: Option<Vec<usize>>,
         batch_size: usize,
     ) -> Result<Self> {
+        println!("ParquetScanExec created with projection {:?}", projection);
+
         let filename = &filenames[0];
         let file = File::open(filename)?;
         let file_reader = Rc::new(SerializedFileReader::new(file).unwrap()); //TODO error handling
         let mut arrow_reader = ParquetFileArrowReader::new(file_reader);
         let schema = arrow_reader.get_schema().unwrap(); //TODO error handling
 
-        let projection = match &projection {
+        let projected_fields = match &projection {
             Some(p) => p.clone(),
             None => (0..schema.fields().len()).collect(),
         };
 
         let projected_schema = Schema::new(
-            projection
+            projected_fields
                 .iter()
                 .map(|i| schema.field(*i).clone())
                 .collect(),
@@ -77,6 +80,7 @@ impl ParquetScanExec {
             path: path.to_owned(),
             filenames,
             projection,
+            projected_fields,
             parquet_schema: Arc::new(schema),
             output_schema: Arc::new(projected_schema),
             batch_size,
@@ -103,7 +107,7 @@ impl ExecutionPlan for ParquetScanExec {
     ) -> Result<ColumnarBatchStream> {
         Ok(Arc::new(ParquetBatchIter::try_new(
             &self.filenames[partition_index],
-            self.projection.clone(),
+            self.projected_fields.clone(),
             self.output_schema.clone(),
             self.batch_size,
         )?))
@@ -122,6 +126,8 @@ impl ParquetBatchIter {
         projected_schema: Arc<Schema>,
         batch_size: usize,
     ) -> Result<Self> {
+        println!("Reading {} with projection {:?}", filename, projection);
+
         let file = File::open(filename)?;
         let file_reader = Rc::new(SerializedFileReader::new(file).unwrap()); //TODO error handling
         let mut arrow_reader = ParquetFileArrowReader::new(file_reader);

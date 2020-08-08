@@ -137,27 +137,34 @@ async fn q1(ctx: &Context, path: &str, format: &FileFormat) -> Result<Vec<Record
 
     let df = input
         .filter(col("l_shipdate").lt(&lit_str("1998-09-01")))? // should be l_shipdate <= date '1998-12-01' - interval ':1' day (3)
-        .project(vec![
-            col("l_returnflag"),
-            col("l_linestatus"),
-            col("l_quantity"),
-            col("l_extendedprice"),
-            col("l_tax"),
-            col("l_discount"),
-            mult(
-                &col("l_extendedprice"),
-                &subtract(&lit_f64(1_f64), &col("l_discount")),
-            )
-            .alias("disc_price"),
-        ])?
+        // .project(vec![
+        //     col("l_returnflag"),
+        //     col("l_linestatus"),
+        //     col("l_quantity"),
+        //     col("l_extendedprice"),
+        //     col("l_tax"),
+        //     col("l_discount"),
+        //     mult(
+        //         &col("l_extendedprice"),
+        //         &subtract(&lit_f64(1_f64), &col("l_discount")),
+        //     )
+        //     .alias("disc_price"),
+        // ])?
         .aggregate(
             vec![col("l_returnflag"), col("l_linestatus")],
             vec![
                 sum(col("l_quantity")).alias("sum_qty"),
                 sum(col("l_extendedprice")).alias("sum_base_price"),
-                sum(col("disc_price")).alias("sum_disc_price"),
                 sum(mult(
-                    &col("disc_price"),
+                    &col("l_extendedprice"),
+                    &subtract(&lit_f64(1_f64), &col("l_discount")),
+                ))
+                .alias("sum_disc_price"),
+                sum(mult(
+                    &mult(
+                        &col("l_extendedprice"),
+                        &subtract(&lit_f64(1_f64), &col("l_discount")),
+                    ),
                     &add(&lit_f64(1_f64), &col("l_tax")),
                 ))
                 .alias("sum_charge"),

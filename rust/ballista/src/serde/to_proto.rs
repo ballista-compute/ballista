@@ -435,6 +435,8 @@ impl TryInto<protobuf::PhysicalPlanNode> for &PhysicalPlan {
                     filename: exec.filenames.clone(),
                     projection: exec
                         .projection
+                        .as_ref()
+                        .unwrap()
                         .iter()
                         .map(|n| *n as u32)
                         .collect(),

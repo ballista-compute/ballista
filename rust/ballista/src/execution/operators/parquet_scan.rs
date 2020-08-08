@@ -42,7 +42,7 @@ use async_trait::async_trait;
 pub struct ParquetScanExec {
     pub(crate) path: String,
     pub(crate) filenames: Vec<String>,
-    pub(crate) projection: Option<Vec<usize>>,
+    pub(crate) projection: Vec<usize>,
     pub(crate) parquet_schema: Arc<Schema>,
     pub(crate) output_schema: Arc<Schema>,
     pub(crate) batch_size: usize,
@@ -61,13 +61,13 @@ impl ParquetScanExec {
         let mut arrow_reader = ParquetFileArrowReader::new(file_reader);
         let schema = arrow_reader.get_schema().unwrap(); //TODO error handling
 
-        let projected_fields = match &projection {
+        let projection = match &projection {
             Some(p) => p.clone(),
             None => (0..schema.fields().len()).collect(),
         };
 
         let projected_schema = Schema::new(
-            projected_fields
+            projection
                 .iter()
                 .map(|i| schema.field(*i).clone())
                 .collect(),
@@ -104,6 +104,7 @@ impl ExecutionPlan for ParquetScanExec {
         Ok(Arc::new(ParquetBatchIter::try_new(
             &self.filenames[partition_index],
             self.projection.clone(),
+            self.output_schema.clone(),
             self.batch_size,
         )?))
     }
@@ -117,32 +118,19 @@ pub struct ParquetBatchIter {
 impl ParquetBatchIter {
     pub fn try_new(
         filename: &str,
-        projection: Option<Vec<usize>>,
+        projection: Vec<usize>,
+        projected_schema: Arc<Schema>,
         batch_size: usize,
     ) -> Result<Self> {
         let file = File::open(filename)?;
         let file_reader = Rc::new(SerializedFileReader::new(file).unwrap()); //TODO error handling
         let mut arrow_reader = ParquetFileArrowReader::new(file_reader);
-
-        let schema = arrow_reader.get_schema().unwrap(); //TODO error handling
-
-        let projection = match projection {
-            Some(p) => p,
-            None => (0..schema.fields().len()).collect(),
-        };
         let batch_reader = arrow_reader
             .get_record_reader_by_columns(projection.clone(), batch_size)
             .unwrap();
 
-        let projected_schema = Schema::new(
-            projection
-                .iter()
-                .map(|i| schema.field(*i).clone())
-                .collect(),
-        );
-
         Ok(Self {
-            schema: Arc::new(projected_schema),
+            schema: projected_schema,
             batch_reader: Rc::new(RefCell::new(batch_reader)),
         })
     }

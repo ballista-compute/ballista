@@ -132,7 +132,7 @@ impl ParquetBatchIter {
         let file_reader = Rc::new(SerializedFileReader::new(file).unwrap()); //TODO error handling
         let mut arrow_reader = ParquetFileArrowReader::new(file_reader);
         let batch_reader = arrow_reader
-            .get_record_reader_by_columns(projection.clone(), batch_size)
+            .get_record_reader_by_columns(projection, batch_size)
             .unwrap();
 
         Ok(Self {

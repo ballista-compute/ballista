@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::collections::HashMap;
+use std::process::exit;
 use std::time::Instant;
 
 extern crate ballista;
@@ -21,10 +22,9 @@ use ballista::arrow::datatypes::{DataType, Field, Schema};
 use ballista::arrow::record_batch::RecordBatch;
 use ballista::arrow::util::pretty;
 use ballista::dataframe::*;
+use ballista::datafusion::execution::physical_plan::csv::CsvReadOptions;
 use ballista::error::Result;
 
-use ballista::datafusion::execution::physical_plan::csv::CsvReadOptions;
-use std::process::exit;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -35,6 +35,9 @@ struct Opt {
 
     #[structopt()]
     path: String,
+
+    #[structopt()]
+    query: usize,
 
     #[structopt(short = "h", long = "host", default_value = "localhost")]
     executor_host: String,
@@ -53,6 +56,7 @@ async fn main() -> Result<()> {
     let opt: Opt = Opt::from_args();
     let format = opt.format.as_str();
     let path = opt.path.as_str();
+    let query_no = opt.query;
     let executor_host = opt.executor_host.as_str();
     let executor_port = opt.executor_port;
 
@@ -65,8 +69,6 @@ async fn main() -> Result<()> {
         }
     };
 
-    let query_no = 1;
-
     let start = Instant::now();
 
     let mut settings = HashMap::new();
@@ -78,7 +80,10 @@ async fn main() -> Result<()> {
     let results = match query_no {
         1 => q1(&ctx, path, &format).await?,
         6 => q6(&ctx, path, &format).await?,
-        _ => unimplemented!(),
+        _ => {
+            println!("Invalid query no");
+            exit(-1);
+        }
     };
 
     // print the results

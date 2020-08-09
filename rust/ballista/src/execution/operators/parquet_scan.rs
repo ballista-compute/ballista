@@ -55,21 +55,25 @@ impl ParquetScanExec {
         filenames: Vec<String>,
         projection: Option<Vec<usize>>,
         batch_size: usize,
+        file_schema: Option<Schema>,
     ) -> Result<Self> {
-        println!("ParquetScanExec created with projection {:?}", projection);
-
-        let filename = &filenames[0];
-        let file = File::open(filename)?;
-        let file_reader = Rc::new(SerializedFileReader::new(file).unwrap()); //TODO error handling
-        let mut arrow_reader = ParquetFileArrowReader::new(file_reader);
-        let schema = arrow_reader.get_schema().unwrap(); //TODO error handling
+        let schema = match file_schema {
+            Some(schema) => schema,
+            None => {
+                let filename = &filenames[0];
+                let file = File::open(filename)?;
+                let file_reader = Rc::new(SerializedFileReader::new(file).unwrap()); //TODO error handling
+                let mut arrow_reader = ParquetFileArrowReader::new(file_reader);
+                arrow_reader.get_schema().unwrap() //TODO error handling
+            }
+        };
 
         let projected_fields = match &projection {
             Some(p) => p.clone(),
             None => (0..schema.fields().len()).collect(),
         };
 
-        let projected_schema = Schema::new(
+        let output_schema = Schema::new(
             projected_fields
                 .iter()
                 .map(|i| schema.field(*i).clone())
@@ -82,7 +86,7 @@ impl ParquetScanExec {
             projection,
             projected_fields,
             parquet_schema: Arc::new(schema),
-            output_schema: Arc::new(projected_schema),
+            output_schema: Arc::new(output_schema),
             batch_size,
         })
     }

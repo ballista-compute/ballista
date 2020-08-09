@@ -410,14 +410,18 @@ impl TryInto<PhysicalPlan> for &protobuf::PhysicalPlanNode {
                         scan.batch_size as usize,
                     )?)))
                 }
-                "parquet" => Ok(PhysicalPlan::ParquetScan(Arc::new(
-                    ParquetScanExec::try_new(
-                        &scan.path,
-                        scan.filename.clone(),
-                        Some(scan.projection.iter().map(|n| *n as usize).collect()),
-                        scan.batch_size as usize,
-                    )?,
-                ))),
+                "parquet" => {
+                    let schema: Schema = convert_required!(scan.schema)?;
+                    Ok(PhysicalPlan::ParquetScan(Arc::new(
+                        ParquetScanExec::try_new(
+                            &scan.path,
+                            scan.filename.clone(),
+                            Some(scan.projection.iter().map(|n| *n as usize).collect()),
+                            scan.batch_size as usize,
+                            Some(schema),
+                        )?,
+                    )))
+                }
                 other => Err(ballista_error(&format!(
                     "Unsupported file format '{}' for file scan",
                     other

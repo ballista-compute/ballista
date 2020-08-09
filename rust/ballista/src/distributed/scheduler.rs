@@ -727,7 +727,8 @@ pub fn create_physical_plan(
             let batch_size: usize = settings[PARQUET_READER_BATCH_SIZE]
                 .parse()
                 .unwrap_or(64 * 1024);
-            let exec = ParquetScanExec::try_new(path, filenames, projection.clone(), batch_size)?;
+            let exec =
+                ParquetScanExec::try_new(path, filenames, projection.clone(), batch_size, None)?;
             Ok(Arc::new(PhysicalPlan::ParquetScan(Arc::new(exec))))
         }
         other => Err(BallistaError::General(format!(

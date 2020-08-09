@@ -150,7 +150,7 @@ impl ExecutionPlan for HashAggregateExec {
             group_expr,
             aggr_expr,
             Arc::new(Schema::new(fields)),
-            false,
+            true,
         )))
     }
 }
@@ -511,7 +511,7 @@ impl ColumnarBatchIter for HashAggregateIter {
         let mut row_count = 0;
 
         // hash map of grouping keys to accumulators
-        let mut map = FnvHashMap::with_capacity_and_hasher(8192, Default::default());
+        let mut map = FnvHashMap::with_capacity_and_hasher(32768, Default::default());
 
         // create vector large enough to hold the grouping key that can be re-used per row to
         // avoid the cost of creating a new vector each time

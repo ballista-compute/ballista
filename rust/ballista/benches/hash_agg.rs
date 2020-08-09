@@ -16,14 +16,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use ballista::arrow::datatypes::{DataType, Field, Schema};
-use ballista::datafusion::logicalplan::{self, Expr, ScalarValue};
+use ballista::datafusion::logicalplan::{self, Expr};
 use ballista::distributed::context::BallistaContext;
 use ballista::distributed::executor::{DiscoveryMode, ExecutorConfig};
-use ballista::execution::expressions::{col, sum};
 use ballista::execution::operators::{HashAggregateExec, InMemoryTableScanExec};
-use ballista::execution::physical_plan::{
-    AggregateMode, ColumnarValue, ExecutionPlan, PhysicalPlan,
-};
+use ballista::execution::physical_plan::{AggregateMode, ExecutionPlan, PhysicalPlan};
 use ballista::utils::datagen::DataGen;
 
 use criterion::{criterion_group, criterion_main, Criterion};
@@ -35,7 +32,6 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         Field::new("c1", DataType::Int32, false),
     ]);
     let batch = gen.create_batch(&schema, 1024).unwrap();
-    let aggr_expr = sum(col(1, "c1"));
     let config = ExecutorConfig::new(DiscoveryMode::Standalone, "", 0, "", 2);
     let ctx = Arc::new(BallistaContext::new(&config, HashMap::new()));
     let table = Arc::new(PhysicalPlan::InMemoryTableScan(Arc::new(

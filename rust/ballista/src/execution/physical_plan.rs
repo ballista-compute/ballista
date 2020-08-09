@@ -282,7 +282,7 @@ macro_rules! build_literal_array {
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum ColumnarValue {
-    Scalar(Option<ScalarValue>, usize),
+    Scalar(ScalarValue, usize),
     Columnar(ArrayRef),
 }
 
@@ -300,7 +300,7 @@ impl ColumnarValue {
     pub fn data_type(&self) -> &DataType {
         match self {
             ColumnarValue::Columnar(array) => array.data_type(),
-            ColumnarValue::Scalar(Some(value), _) => match value {
+            ColumnarValue::Scalar(value, _) => match value {
                 ScalarValue::UInt8(_) => &DataType::UInt8,
                 ScalarValue::UInt16(_) => &DataType::UInt16,
                 ScalarValue::UInt32(_) => &DataType::UInt32,
@@ -313,14 +313,13 @@ impl ColumnarValue {
                 ScalarValue::Float64(_) => &DataType::Float64,
                 _ => unimplemented!(),
             },
-            _ => unimplemented!(),
         }
     }
 
     pub fn to_arrow(&self) -> Result<ArrayRef> {
         match self {
             ColumnarValue::Columnar(array) => Ok(array.clone()),
-            ColumnarValue::Scalar(Some(value), n) => match value {
+            ColumnarValue::Scalar(value, n) => match value {
                 ScalarValue::Int8(value) => build_literal_array!(*n, Int8Builder, *value),
                 ScalarValue::Int16(value) => build_literal_array!(*n, Int16Builder, *value),
                 ScalarValue::Int32(value) => build_literal_array!(*n, Int32Builder, *value),
@@ -337,7 +336,6 @@ impl ColumnarValue {
                     other
                 ))),
             },
-            _ => unimplemented!(),
         }
     }
 

@@ -44,10 +44,7 @@ impl Expression for Literal {
     }
 
     fn evaluate(&self, input: &ColumnarBatch) -> Result<ColumnarValue> {
-        Ok(ColumnarValue::Scalar(
-            Some(self.value.clone()),
-            input.num_rows(),
-        ))
+        Ok(ColumnarValue::Scalar(self.value.clone(), input.num_rows()))
     }
 }
 

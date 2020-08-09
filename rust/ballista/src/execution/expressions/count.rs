@@ -68,10 +68,8 @@ impl Accumulator for CountAccumulator {
             ColumnarValue::Columnar(array) => {
                 self.count += array.len() as u64 - array.null_count() as u64;
             }
-            ColumnarValue::Scalar(value, _) => {
-                if value.is_some() {
-                    self.count += 1;
-                }
+            ColumnarValue::Scalar(_, _) => {
+                self.count += 1;
             }
         }
         Ok(())

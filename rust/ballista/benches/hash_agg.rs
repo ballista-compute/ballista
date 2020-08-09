@@ -44,11 +44,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("sum accum array", |b| b.iter(|| accum.accumulate(&array)));
 
     c.bench_function("sum accum scalar some", |b| {
-        b.iter(|| accum.accumulate(&ColumnarValue::Scalar(Some(ScalarValue::Float64(0_f64)), 1)))
-    });
-
-    c.bench_function("sum accum scalar none", |b| {
-        b.iter(|| accum.accumulate(&ColumnarValue::Scalar(None, 1)))
+        b.iter(|| accum.accumulate(&ColumnarValue::Scalar(ScalarValue::Float64(0_f64), 1)))
     });
 
     let config = ExecutorConfig::new(DiscoveryMode::Standalone, "", 0, "", 2);

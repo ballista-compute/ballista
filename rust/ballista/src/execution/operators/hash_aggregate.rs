@@ -221,7 +221,7 @@ macro_rules! update_accumulators {
         let primitive_array = cast_array!($ARRAY, $ARRAY_TY)?;
         if $ARRAY.is_valid($ROW) {
             let value = $SCALAR_TY(primitive_array.value($ROW));
-            $ACCUM[$COL].accumulate(&ColumnarValue::Scalar(Some(value), 1))?;
+            $ACCUM[$COL].accumulate(&ColumnarValue::Scalar(value, 1))?;
         }
     }};
 }

@@ -133,50 +133,43 @@ impl Accumulator for SumAccumulator {
                     },
                     _ => Err(ballista_error("Unsupported data type for SUM")),
                 }?;
-                self.accumulate(&ColumnarValue::Scalar(sum, 1))?;
-            }
-            ColumnarValue::Scalar(value, _) => {
-                if let Some(value) = value {
-                    match value {
-                        ScalarValue::Int8(value) => {
-                            accumulate!(self, *value, Int8Array, Int64, i64);
-                        }
-                        ScalarValue::Int16(value) => {
-                            accumulate!(self, *value, Int16Array, Int64, i64);
-                        }
-                        ScalarValue::Int32(value) => {
-                            accumulate!(self, *value, Int32Array, Int64, i64);
-                        }
-                        ScalarValue::Int64(value) => {
-                            accumulate!(self, *value, Int64Array, Int64, i64);
-                        }
-                        ScalarValue::UInt8(value) => {
-                            accumulate!(self, *value, UInt8Array, UInt64, u64);
-                        }
-                        ScalarValue::UInt16(value) => {
-                            accumulate!(self, *value, UInt16Array, UInt64, u64);
-                        }
-                        ScalarValue::UInt32(value) => {
-                            accumulate!(self, *value, UInt32Array, UInt64, u64);
-                        }
-                        ScalarValue::UInt64(value) => {
-                            accumulate!(self, *value, UInt64Array, UInt64, u64);
-                        }
-                        ScalarValue::Float32(value) => {
-                            accumulate!(self, *value, Float32Array, Float32, f32);
-                        }
-                        ScalarValue::Float64(value) => {
-                            accumulate!(self, *value, Float64Array, Float64, f64);
-                        }
-                        other => {
-                            return Err(ballista_error(&format!(
-                                "SUM does not support {:?}",
-                                other
-                            )))
-                        }
-                    }
+                if sum.is_some() {
+                    self.accumulate(&ColumnarValue::Scalar(sum.unwrap(), 1))?;
                 }
             }
+            ColumnarValue::Scalar(value, _) => match value {
+                ScalarValue::Int8(value) => {
+                    accumulate!(self, *value, Int8Array, Int64, i64);
+                }
+                ScalarValue::Int16(value) => {
+                    accumulate!(self, *value, Int16Array, Int64, i64);
+                }
+                ScalarValue::Int32(value) => {
+                    accumulate!(self, *value, Int32Array, Int64, i64);
+                }
+                ScalarValue::Int64(value) => {
+                    accumulate!(self, *value, Int64Array, Int64, i64);
+                }
+                ScalarValue::UInt8(value) => {
+                    accumulate!(self, *value, UInt8Array, UInt64, u64);
+                }
+                ScalarValue::UInt16(value) => {
+                    accumulate!(self, *value, UInt16Array, UInt64, u64);
+                }
+                ScalarValue::UInt32(value) => {
+                    accumulate!(self, *value, UInt32Array, UInt64, u64);
+                }
+                ScalarValue::UInt64(value) => {
+                    accumulate!(self, *value, UInt64Array, UInt64, u64);
+                }
+                ScalarValue::Float32(value) => {
+                    accumulate!(self, *value, Float32Array, Float32, f32);
+                }
+                ScalarValue::Float64(value) => {
+                    accumulate!(self, *value, Float64Array, Float64, f64);
+                }
+                other => return Err(ballista_error(&format!("SUM does not support {:?}", other))),
+            },
         }
         Ok(())
     }

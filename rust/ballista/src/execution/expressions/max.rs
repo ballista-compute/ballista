@@ -150,47 +150,46 @@ impl Accumulator for MaxAccumulator {
                     }
                     _ => Err(ballista_error("Unsupported data type for MAX")),
                 }?;
-                self.accumulate(&ColumnarValue::Scalar(max, 1))
+                if let Some(max) = max {
+                    self.accumulate(&ColumnarValue::Scalar(max, 1))
+                } else {
+                    Ok(())
+                }
             }
             ColumnarValue::Scalar(value, _n) => {
-                if let Some(value) = value {
-                    match value {
-                        ScalarValue::Int8(value) => {
-                            max_accumulate!(self, value, Int8Array, Int64, i64);
-                        }
-                        ScalarValue::Int16(value) => {
-                            max_accumulate!(self, value, Int16Array, Int64, i64)
-                        }
-                        ScalarValue::Int32(value) => {
-                            max_accumulate!(self, value, Int32Array, Int64, i64)
-                        }
-                        ScalarValue::Int64(value) => {
-                            max_accumulate!(self, value, Int64Array, Int64, i64)
-                        }
-                        ScalarValue::UInt8(value) => {
-                            max_accumulate!(self, value, UInt8Array, UInt64, u64)
-                        }
-                        ScalarValue::UInt16(value) => {
-                            max_accumulate!(self, value, UInt16Array, UInt64, u64)
-                        }
-                        ScalarValue::UInt32(value) => {
-                            max_accumulate!(self, value, UInt32Array, UInt64, u64)
-                        }
-                        ScalarValue::UInt64(value) => {
-                            max_accumulate!(self, value, UInt64Array, UInt64, u64)
-                        }
-                        ScalarValue::Float32(value) => {
-                            max_accumulate!(self, value, Float32Array, Float32, f32)
-                        }
-                        ScalarValue::Float64(value) => {
-                            max_accumulate!(self, value, Float64Array, Float64, f64)
-                        }
-                        other => {
-                            return Err(ballista_error(&format!(
-                                "MAX does not support {:?}",
-                                other
-                            )))
-                        }
+                match value {
+                    ScalarValue::Int8(value) => {
+                        max_accumulate!(self, value, Int8Array, Int64, i64);
+                    }
+                    ScalarValue::Int16(value) => {
+                        max_accumulate!(self, value, Int16Array, Int64, i64)
+                    }
+                    ScalarValue::Int32(value) => {
+                        max_accumulate!(self, value, Int32Array, Int64, i64)
+                    }
+                    ScalarValue::Int64(value) => {
+                        max_accumulate!(self, value, Int64Array, Int64, i64)
+                    }
+                    ScalarValue::UInt8(value) => {
+                        max_accumulate!(self, value, UInt8Array, UInt64, u64)
+                    }
+                    ScalarValue::UInt16(value) => {
+                        max_accumulate!(self, value, UInt16Array, UInt64, u64)
+                    }
+                    ScalarValue::UInt32(value) => {
+                        max_accumulate!(self, value, UInt32Array, UInt64, u64)
+                    }
+                    ScalarValue::UInt64(value) => {
+                        max_accumulate!(self, value, UInt64Array, UInt64, u64)
+                    }
+                    ScalarValue::Float32(value) => {
+                        max_accumulate!(self, value, Float32Array, Float32, f32)
+                    }
+                    ScalarValue::Float64(value) => {
+                        max_accumulate!(self, value, Float64Array, Float64, f64)
+                    }
+                    other => {
+                        return Err(ballista_error(&format!("MAX does not support {:?}", other)))
                     }
                 }
                 Ok(())

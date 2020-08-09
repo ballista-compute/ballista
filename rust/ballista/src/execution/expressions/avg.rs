@@ -142,61 +142,52 @@ impl Accumulator for AvgAccumulator {
                 // calculate average
                 let avg = match sum {
                     Some(ScalarValue::Int8(n)) => {
-                        Ok(Some(ScalarValue::Float64(n as f64 / array.len() as f64)))
+                        Ok(ScalarValue::Float64(n as f64 / array.len() as f64))
                     }
                     Some(ScalarValue::Int16(n)) => {
-                        Ok(Some(ScalarValue::Float64(n as f64 / array.len() as f64)))
+                        Ok(ScalarValue::Float64(n as f64 / array.len() as f64))
                     }
                     Some(ScalarValue::Int32(n)) => {
-                        Ok(Some(ScalarValue::Float64(n as f64 / array.len() as f64)))
+                        Ok(ScalarValue::Float64(n as f64 / array.len() as f64))
                     }
                     Some(ScalarValue::Int64(n)) => {
-                        Ok(Some(ScalarValue::Float64(n as f64 / array.len() as f64)))
+                        Ok(ScalarValue::Float64(n as f64 / array.len() as f64))
                     }
                     Some(ScalarValue::UInt8(n)) => {
-                        Ok(Some(ScalarValue::Float64(n as f64 / array.len() as f64)))
+                        Ok(ScalarValue::Float64(n as f64 / array.len() as f64))
                     }
                     Some(ScalarValue::UInt16(n)) => {
-                        Ok(Some(ScalarValue::Float64(n as f64 / array.len() as f64)))
+                        Ok(ScalarValue::Float64(n as f64 / array.len() as f64))
                     }
                     Some(ScalarValue::UInt32(n)) => {
-                        Ok(Some(ScalarValue::Float64(n as f64 / array.len() as f64)))
+                        Ok(ScalarValue::Float64(n as f64 / array.len() as f64))
                     }
                     Some(ScalarValue::UInt64(n)) => {
-                        Ok(Some(ScalarValue::Float64(n as f64 / array.len() as f64)))
+                        Ok(ScalarValue::Float64(n as f64 / array.len() as f64))
                     }
                     Some(ScalarValue::Float32(n)) => {
-                        Ok(Some(ScalarValue::Float64(n as f64 / array.len() as f64)))
+                        Ok(ScalarValue::Float64(n as f64 / array.len() as f64))
                     }
                     Some(ScalarValue::Float64(n)) => {
-                        Ok(Some(ScalarValue::Float64(n / array.len() as f64)))
+                        Ok(ScalarValue::Float64(n / array.len() as f64))
                     }
                     _ => Err(ballista_error("tbd")),
                 }?;
                 self.accumulate(&ColumnarValue::Scalar(avg, 1))?;
             }
-            ColumnarValue::Scalar(value, _) => {
-                if let Some(value) = value {
-                    match value {
-                        ScalarValue::Int8(value) => avg_accumulate!(self, *value, Int8Array),
-                        ScalarValue::Int16(value) => avg_accumulate!(self, *value, Int16Array),
-                        ScalarValue::Int32(value) => avg_accumulate!(self, *value, Int32Array),
-                        ScalarValue::Int64(value) => avg_accumulate!(self, *value, Int64Array),
-                        ScalarValue::UInt8(value) => avg_accumulate!(self, *value, UInt8Array),
-                        ScalarValue::UInt16(value) => avg_accumulate!(self, *value, UInt16Array),
-                        ScalarValue::UInt32(value) => avg_accumulate!(self, *value, UInt32Array),
-                        ScalarValue::UInt64(value) => avg_accumulate!(self, *value, UInt64Array),
-                        ScalarValue::Float32(value) => avg_accumulate!(self, *value, Float32Array),
-                        ScalarValue::Float64(value) => avg_accumulate!(self, *value, Float64Array),
-                        other => {
-                            return Err(ballista_error(&format!(
-                                "AVG does not support {:?}",
-                                other
-                            )))
-                        }
-                    }
-                }
-            }
+            ColumnarValue::Scalar(value, _) => match value {
+                ScalarValue::Int8(value) => avg_accumulate!(self, *value, Int8Array),
+                ScalarValue::Int16(value) => avg_accumulate!(self, *value, Int16Array),
+                ScalarValue::Int32(value) => avg_accumulate!(self, *value, Int32Array),
+                ScalarValue::Int64(value) => avg_accumulate!(self, *value, Int64Array),
+                ScalarValue::UInt8(value) => avg_accumulate!(self, *value, UInt8Array),
+                ScalarValue::UInt16(value) => avg_accumulate!(self, *value, UInt16Array),
+                ScalarValue::UInt32(value) => avg_accumulate!(self, *value, UInt32Array),
+                ScalarValue::UInt64(value) => avg_accumulate!(self, *value, UInt64Array),
+                ScalarValue::Float32(value) => avg_accumulate!(self, *value, Float32Array),
+                ScalarValue::Float64(value) => avg_accumulate!(self, *value, Float64Array),
+                other => return Err(ballista_error(&format!("AVG does not support {:?}", other))),
+            },
         }
 
         Ok(())

@@ -65,7 +65,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                         vec![Expr::AggregateFunction {
                             name: "sum".to_owned(),
                             args: vec![logicalplan::col("c1")],
-                            return_type: DataType::Float64,
+                            return_type: DataType::Int32,
                         }],
                         table,
                     )

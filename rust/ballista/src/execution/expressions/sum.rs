@@ -133,8 +133,8 @@ impl Accumulator for SumAccumulator {
                     },
                     _ => Err(ballista_error("Unsupported data type for SUM")),
                 }?;
-                if sum.is_some() {
-                    self.accumulate(&ColumnarValue::Scalar(sum.unwrap(), 1))?;
+                if let Some(sum) = sum {
+                    self.accumulate(&ColumnarValue::Scalar(sum, 1))?;
                 }
             }
             ColumnarValue::Scalar(value, _) => match value {

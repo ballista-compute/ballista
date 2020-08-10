@@ -75,7 +75,7 @@ class ExecutionSqlTest {
 
     val df =
         ctx.sql(
-            "SELECT salary AS annual_salary FROM employee WHERE annual_salary > 1000 AND state = 'CO")
+            "SELECT salary AS annual_salary FROM employee WHERE annual_salary > 1000 AND state = 'CO'")
 
     val expected =
         "Projection: #annual_salary\n" +

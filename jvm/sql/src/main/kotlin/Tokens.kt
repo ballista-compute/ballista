@@ -12,42 +12,357 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+@file:Suppress("unused")
+
 package org.ballistacompute.sql
 
-interface Token
+interface TokenType
 
-data class IdentifierToken(val text: String) : Token {
-  override fun toString(): String {
-    return text
-  }
+enum class Literal : TokenType {
+    LONG,
+    DOUBLE,
+    STRING,
+    IDENTIFIER;
+
+    companion object {
+        fun isNumberStart(ch: Char): Boolean {
+            return ch.isDigit() || '.' == ch
+        }
+
+        fun isIdentifierStart(ch: Char): Boolean {
+            return ch.isLetter()
+        }
+
+        fun isIdentifierPart(ch: Char): Boolean {
+            return ch.isLetter() || ch.isDigit() || ch == '_'
+        }
+
+        fun isCharsStart(ch: Char): Boolean {
+            return '\'' == ch || '"' == ch
+        }
+    }
 }
 
-abstract class TokenBase(val text: String) : Token {
-  override fun toString(): String {
-    return text
-  }
+enum class Keyword : TokenType {
 
-  override fun hashCode(): Int {
-    return this.toString().hashCode()
-  }
+    /**
+     * common
+     */
+    SCHEMA,
+    DATABASE,
+    TABLE,
+    COLUMN,
+    VIEW,
+    INDEX,
+    TRIGGER,
+    PROCEDURE,
+    TABLESPACE,
+    FUNCTION,
+    SEQUENCE,
+    CURSOR,
+    FROM,
+    TO,
+    OF,
+    IF,
+    ON,
+    FOR,
+    WHILE,
+    DO,
+    NO,
+    BY,
+    WITH,
+    WITHOUT,
+    TRUE,
+    FALSE,
+    TEMPORARY,
+    TEMP,
+    COMMENT,
 
-  override fun equals(other: Any?): Boolean {
-    return this.toString() == other.toString()
-  }
+    /**
+     * create
+     */
+    CREATE,
+    REPLACE,
+    BEFORE,
+    AFTER,
+    INSTEAD,
+    EACH,
+    ROW,
+    STATEMENT,
+    EXECUTE,
+    BITMAP,
+    NOSORT,
+    REVERSE,
+    COMPILE,
+
+    /**
+     * alter
+     */
+    ALTER,
+    ADD,
+    MODIFY,
+    RENAME,
+    ENABLE,
+    DISABLE,
+    VALIDATE,
+    USER,
+    IDENTIFIED,
+
+    /**
+     * truncate
+     */
+    TRUNCATE,
+
+    /**
+     * drop
+     */
+    DROP,
+    CASCADE,
+
+    /**
+     * insert
+     */
+    INSERT,
+    INTO,
+    VALUES,
+
+    /**
+     * update
+     */
+    UPDATE,
+    SET,
+
+    /**
+     * delete
+     */
+    DELETE,
+
+    /**
+     * select
+     */
+    SELECT,
+    DISTINCT,
+    AS,
+    CASE,
+    WHEN,
+    ELSE,
+    THEN,
+    END,
+    LEFT,
+    RIGHT,
+    FULL,
+    INNER,
+    OUTER,
+    CROSS,
+    JOIN,
+    USE,
+    USING,
+    NATURAL,
+    WHERE,
+    ORDER,
+    ASC,
+    DESC,
+    GROUP,
+    HAVING,
+    UNION,
+
+    /**
+     * others
+     */
+    DECLARE,
+    GRANT,
+    FETCH,
+    REVOKE,
+    CLOSE,
+    CAST,
+    NEW,
+    ESCAPE,
+    LOCK,
+    SOME,
+    LEAVE,
+    ITERATE,
+    REPEAT,
+    UNTIL,
+    OPEN,
+    OUT,
+    INOUT,
+    OVER,
+    ADVISE,
+    SIBLINGS,
+    LOOP,
+    EXPLAIN,
+    DEFAULT,
+    EXCEPT,
+    INTERSECT,
+    MINUS,
+    PASSWORD,
+    LOCAL,
+    GLOBAL,
+    STORAGE,
+    DATA,
+    COALESCE,
+
+    /**
+     * Types
+     */
+    CHAR,
+    CHARACTER,
+    VARYING,
+    VARCHAR,
+    VARCHAR2,
+    INTEGER,
+    INT,
+    SMALLINT,
+    DECIMAL,
+    DEC,
+    NUMERIC,
+    FLOAT,
+    REAL,
+    DOUBLE,
+    PRECISION,
+    DATE,
+    TIME,
+    INTERVAL,
+    BOOLEAN,
+    BLOB,
+
+    /**
+     * Conditionals
+     */
+    AND,
+    OR,
+    XOR,
+    IS,
+    NOT,
+    NULL,
+    IN,
+    BETWEEN,
+    LIKE,
+    ANY,
+    ALL,
+    EXISTS,
+
+    /**
+     * Functions
+     */
+    AVG,
+    MAX,
+    MIN,
+    SUM,
+    COUNT,
+    GREATEST,
+    LEAST,
+    ROUND,
+    TRUNC,
+    POSITION,
+    EXTRACT,
+    LENGTH,
+    CHAR_LENGTH,
+    SUBSTRING,
+    SUBSTR,
+    INSTR,
+    INITCAP,
+    UPPER,
+    LOWER,
+    TRIM,
+    LTRIM,
+    RTRIM,
+    BOTH,
+    LEADING,
+    TRAILING,
+    TRANSLATE,
+    CONVERT,
+    LPAD,
+    RPAD,
+    DECODE,
+    NVL,
+
+    /**
+     * Constraints
+     */
+    CONSTRAINT,
+    UNIQUE,
+    PRIMARY,
+    FOREIGN,
+    KEY,
+    CHECK,
+    REFERENCES;
+
+    companion object {
+        private val keywords = values().associateBy(Keyword::name)
+        fun textOf(text: String) = keywords[text.toUpperCase()]
+    }
 }
 
-class LiteralStringToken(text: String) : TokenBase(text)
+enum class Symbol(val text: String) : TokenType {
 
-class LiteralLongToken(text: String) : TokenBase(text)
+    LEFT_PAREN("("),
+    RIGHT_PAREN(")"),
+    LEFT_BRACE("{"),
+    RIGHT_BRACE("}"),
+    LEFT_BRACKET("["),
+    RIGHT_BRACKET("]"),
+    SEMI(";"),
+    COMMA(","),
+    DOT("."),
+    DOUBLE_DOT(".."),
+    PLUS("+"),
+    SUB("-"),
+    STAR("*"),
+    SLASH("/"),
+    QUESTION("?"),
+    EQ("="),
+    GT(">"),
+    LT("<"),
+    BANG("!"),
+    TILDE("~"),
+    CARET("^"),
+    PERCENT("%"),
+    COLON(":"),
+    DOUBLE_COLON("::"),
+    COLON_EQ(":="),
+    LT_EQ("<="),
+    GT_EQ(">="),
+    LT_EQ_GT("<=>"),
+    LT_GT("<>"),
+    BANG_EQ("!="),
+    BANG_GT("!>"),
+    BANG_LT("!<"),
+    AMP("&"),
+    BAR("|"),
+    DOUBLE_AMP("&&"),
+    DOUBLE_BAR("||"),
+    DOUBLE_LT("<<"),
+    DOUBLE_GT(">>"),
+    AT("@"),
+    POUND("#");
 
-class LiteralDoubleToken(text: String) : TokenBase(text)
+    companion object {
+        private val symbols = values().associateBy(Symbol::text)
+        private val symbolStartSet = values().flatMap { s -> s.text.toList() }.toSet()
+        fun textOf(text: String) = symbols[text]
+        fun isSymbol(ch: Char): Boolean {
+            return symbolStartSet.contains(ch)
+        }
 
-class KeywordToken(text: String) : TokenBase(text)
+        fun isSymbolStart(ch: Char): Boolean {
+            return isSymbol(ch)
+        }
+    }
+}
 
-class OperatorToken(text: String) : TokenBase(text)
+data class Token(
+    val text: String,
+    val type: TokenType,
+    val endOffset: Int) {
 
-class CommaToken() : TokenBase(",")
-
-class LParenToken() : TokenBase("(")
-
-class RParenToken() : TokenBase(")")
+    override fun toString(): String {
+        val typeType = when (type) {
+            is Keyword -> "Keyword"
+            is Symbol -> "Symbol"
+            is Literal -> "Literal"
+            else -> ""
+        }
+        return "Token(\"$text\", $typeType.$type, $endOffset)"
+    }
+}

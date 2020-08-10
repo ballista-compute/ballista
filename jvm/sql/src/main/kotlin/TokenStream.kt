@@ -52,7 +52,7 @@ class TokenStream(val tokens: List<Token>) {
   fun consumeKeyword(s: String): Boolean {
     val peek = peek()
     logger.fine("consumeKeyword('$s') next token is $peek")
-    return if (peek == KeywordToken(s)) {
+    return if (peek?.type is Keyword && peek.text == s) {
       i++
       logger.fine("consumeKeyword() returning true")
       true
@@ -62,9 +62,9 @@ class TokenStream(val tokens: List<Token>) {
     }
   }
 
-  fun consumeToken(t: Token): Boolean {
+  fun consumeTokenType(t: TokenType): Boolean {
     val peek = peek()
-    return if (peek == t) {
+    return if (peek?.type == t) {
       i++
       true
     } else {

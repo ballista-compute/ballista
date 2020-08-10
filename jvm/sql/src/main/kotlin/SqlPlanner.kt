@@ -53,7 +53,6 @@ class SqlPlanner {
       return planNonAggregateQuery(
           select, plan, projectionExpr, columnNamesInSelection, columnNamesInProjection)
     } else {
-
       val projection = mutableListOf<LogicalExpr>()
       val aggrExpr = mutableListOf<AggregateExpr>()
       val numGroupCols = select.groupBy.size

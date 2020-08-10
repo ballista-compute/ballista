@@ -14,111 +14,161 @@
 
 package org.ballistacompute.sql
 
-import java.util.logging.Logger
 
 class SqlTokenizer(val sql: String) {
 
-  private val logger = Logger.getLogger(SqlTokenizer::class.simpleName)
+    // TODO this whole class is pretty crude and needs a lot of attention + unit tests (Hint: this
+    // would be a great
+    // place to start contributing!)
 
-  // TODO this whole class is pretty crude and needs a lot of attention + unit tests (Hint: this
-  // would be a great
-  // place to start contributing!)
+    var offset = 0
 
-  val keywords =
-      listOf("SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "GROUP", "ORDER", "BY", "ASC", "DESC", "AS", "CAST", "HAVING")
-
-  var i = 0
-
-  fun tokenize(): TokenStream {
-    var token = nextToken()
-    val list = mutableListOf<Token>()
-    while (token != null) {
-      list.add(token)
-      token = nextToken()
-    }
-    return TokenStream(list)
-  }
-
-  private fun nextToken(): Token? {
-
-    // skip whitespace
-    while (i < sql.length && sql[i].isWhitespace()) {
-      i++
+    fun tokenize(): TokenStream {
+        var token = nextToken()
+        val list = mutableListOf<Token>()
+        while (token != null) {
+            list.add(token)
+            token = nextToken()
+        }
+        return TokenStream(list)
     }
 
-    // EOF check
-    if (i >= sql.length) {
-      return null
+    private fun nextToken(): Token? {
+        offset = skipWhitespace(offset)
+        var token: Token? = null
+        when {
+            offset >= sql.length -> {
+                return token
+            }
+            Literal.isIdentifierStart(sql[offset]) -> {
+                token = scanIdentifier(offset)
+                offset = token.endOffset
+            }
+            Literal.isNumberStart(sql[offset]) -> {
+                token = scanNumber(offset)
+                offset = token.endOffset
+            }
+            Symbol.isSymbolStart(sql[offset]) -> {
+                token = scanSymbol(offset)
+                offset = token.endOffset
+            }
+            Literal.isCharsStart(sql[offset]) -> {
+                token = scanChars(offset, sql[offset])
+                offset = token.endOffset
+            }
+        }
+        return token
     }
 
-    // look for start of token
-    if (sql[i] == ',') {
-      i++
-      return CommaToken()
-    } else if (sql[i] == '(') {
-      i++
-      return LParenToken()
-    } else if (sql[i] == ')') {
-      i++
-      return RParenToken()
-    } else if (isIdentifierStart(sql[i])) {
-      val start = i
-      while (i < sql.length && isIdentifierPart(sql[i])) {
-        i++
-      }
-      val s = sql.substring(start, i)
-      if (keywords.contains(s.toUpperCase())) {
-        return KeywordToken(s.toUpperCase())
-      } else {
-        return IdentifierToken(s)
-      }
-    } else if (listOf('=', '*', '/', '%', '-', '+', '<', '>', '!').contains(sql[i])) {
-      val start = i
-      i++
-
-      val compoundOperator = sql.substring(start, i + 1)
-      if (listOf("<=", ">=", "<>", "!=").contains(compoundOperator)) {
-        i++
-        return OperatorToken(compoundOperator)
-      }
-
-      if (sql[start] == '!') {
-        throw IllegalStateException(
-            "Invalid character '${sql[start]}' at position $start in '$sql' expected: !=")
-      }
-
-      return OperatorToken(sql.substring(start, i))
-    } else if (sql[i] == '\'') {
-      // TODO handle escaped quotes in string
-      i++
-      val start = i
-      while (i < sql.length && sql[i] != '\'') {
-        i++
-      }
-      i++
-      return LiteralStringToken(sql.substring(start, i - 1))
-    } else if (sql[i].isDigit() || sql[i] == '.') {
-      // TODO support floating point numbers correctly
-      val start = i
-      while (i < sql.length && (sql[i].isDigit() || sql[i] == '.')) {
-        i++
-      }
-      val str = sql.substring(start, i)
-      if (str.contains('.')) {
-        return LiteralDoubleToken(str)
-      } else {
-        return LiteralLongToken(str)
-      }
-    } else {
-      throw IllegalStateException("Invalid character '${sql[i]}' at position $i in '$sql'")
+    /**
+     * skip whitespace.
+     * @return offset after whitespace skipped
+     */
+    private fun skipWhitespace(startOffset: Int): Int {
+        return sql.indexOfFirst(startOffset) { ch -> !ch.isWhitespace() }
     }
-  }
 
-  private fun isIdentifierStart(ch: Char): Boolean {
-    return ch.isLetter()
-  }
+    /**
+     * scan number.
+     *
+     * @return number token
+     */
+    private fun scanNumber(startOffset: Int): Token {
+        var endOffset = if ('-' == sql[startOffset]) {
+            sql.indexOfFirst(startOffset + 1) { ch -> !ch.isDigit() }
+        } else {
+            sql.indexOfFirst(startOffset) { ch -> !ch.isDigit() }
+        }
+        if (endOffset == sql.length) {
+            return Token(sql.substring(startOffset, endOffset), Literal.LONG, endOffset)
+        }
+        val isFloat = '.' == sql[endOffset]
+        if (isFloat) {
+            endOffset = sql.indexOfFirst(endOffset + 1) { ch -> !ch.isDigit() }
+        }
+        return Token(sql.substring(startOffset, endOffset), if (isFloat) Literal.DOUBLE else Literal.LONG, endOffset)
+    }
 
-  private fun isIdentifierPart(ch: Char): Boolean {
-    return ch.isLetter() || ch.isDigit() || ch == '_'
-  }
+    /**
+     * scan identifier.
+     *
+     * @return identifier token
+     */
+    private fun scanIdentifier(startOffset: Int): Token {
+        if ('`' == sql[startOffset]) {
+            val endOffset: Int = getOffsetUntilTerminatedChar('`', startOffset)
+            return Token(sql.substring(offset, endOffset), Literal.IDENTIFIER, endOffset)
+        }
+        val endOffset = sql.indexOfFirst(startOffset) { ch -> !Literal.isIdentifierPart(ch) }
+        val text: String = sql.substring(startOffset, endOffset)
+        return if (isAmbiguousIdentifier(text)) {
+            Token(text, processAmbiguousIdentifier(endOffset, text), endOffset)
+        } else {
+            val tokenType: TokenType = Keyword.textOf(text) ?: Literal.IDENTIFIER
+            Token(text, tokenType, endOffset)
+        }
+    }
+
+    /**
+     * table name: group / order
+     * keyword: group by / order by
+     *
+     * @return
+     */
+    private fun isAmbiguousIdentifier(text: String): Boolean {
+        return Keyword.ORDER.name.equals(text, true) || Keyword.GROUP.name.equals(text, true)
+    }
+
+    /**
+     * process group by | order by
+     */
+    private fun processAmbiguousIdentifier(startOffset: Int, text: String): TokenType {
+        val skipWhitespaceOffset = skipWhitespace(startOffset)
+        return if (skipWhitespaceOffset != sql.length
+            && Keyword.BY.name.equals(sql.substring(skipWhitespaceOffset, skipWhitespaceOffset + 2), true))
+            Keyword.textOf(text)!! else Literal.IDENTIFIER
+    }
+
+    /**
+     *  find another char's offset equals terminatedChar
+     */
+    private fun getOffsetUntilTerminatedChar(terminatedChar: Char, startOffset: Int): Int {
+        val offset = sql.indexOf(terminatedChar, startOffset)
+        return if (offset != -1) offset else
+            throw TokenizeException("Must contain $terminatedChar in remain sql[$startOffset .. end]")
+    }
+
+    /**
+     * scan symbol.
+     *
+     * @return symbol token
+     */
+    private fun scanSymbol(startOffset: Int): Token {
+        var endOffset = sql.indexOfFirst(startOffset) { ch -> !Symbol.isSymbol(ch) }
+        var text = sql.substring(offset, endOffset)
+        var symbol: Symbol?
+        while (null == Symbol.textOf(text).also { symbol = it }) {
+            text = sql.substring(offset, --endOffset)
+        }
+        return Token(text, symbol ?: throw TokenizeException("$text Must be a Symbol!"), endOffset)
+    }
+
+    /**
+     * scan chars like 'abc' or "abc"
+     */
+    private fun scanChars(startOffset: Int, terminatedChar: Char): Token {
+        val endOffset = getOffsetUntilTerminatedChar(terminatedChar, startOffset + 1)
+        return Token(sql.substring(startOffset + 1, endOffset), Literal.STRING, endOffset + 1)
+    }
+
+    private inline fun CharSequence.indexOfFirst(startIndex: Int = 0, predicate: (Char) -> Boolean): Int {
+        for (index in startIndex until this.length) {
+            if (predicate(this[index])) {
+                return index
+            }
+        }
+        return sql.length
+    }
 }
+
+class TokenizeException(val msg: String) : Throwable()

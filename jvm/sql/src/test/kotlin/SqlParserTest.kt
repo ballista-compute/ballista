@@ -136,5 +136,6 @@ class SqlParserTest {
     val parsedQuery = SqlParser(tokens).parse()
     println(parsedQuery)
     return parsedQuery
+    return null
   }
 }

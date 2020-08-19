@@ -179,12 +179,12 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
                 });
                 Ok(node)
             }
-            LogicalPlan::Selection { expr, input } => {
+            LogicalPlan::Filter { predicate, input } => {
                 let input: protobuf::LogicalPlanNode = input.as_ref().try_into()?;
                 let mut node = empty_logical_plan_node();
                 node.input = Some(Box::new(input));
                 node.selection = Some(protobuf::SelectionNode {
-                    expr: Some(expr.try_into()?),
+                    expr: Some(predicate.try_into()?),
                 });
                 Ok(node)
             }

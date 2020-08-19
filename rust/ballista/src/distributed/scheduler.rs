@@ -599,9 +599,11 @@ pub fn create_physical_plan(
             let exec = ProjectionExec::try_new(expr, create_physical_plan(input, settings)?)?;
             Ok(Arc::new(PhysicalPlan::Projection(Arc::new(exec))))
         }
-        LogicalPlan::Selection { input, expr, .. } => {
+        LogicalPlan::Filter {
+            input, predicate, ..
+        } => {
             let input = create_physical_plan(input, settings)?;
-            let exec = FilterExec::new(&input, expr);
+            let exec = FilterExec::new(&input, predicate);
             Ok(Arc::new(PhysicalPlan::Filter(Arc::new(exec))))
         }
         LogicalPlan::Aggregate {

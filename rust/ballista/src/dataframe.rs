@@ -360,11 +360,11 @@ impl DataFrame {
     }
 
     /// Apply a filter
-    pub fn filter(&self, expr: Expr) -> Result<DataFrame> {
+    pub fn filter(&self, predicate: Expr) -> Result<DataFrame> {
         Ok(Self::from(
             self.ctx_state.clone(),
-            LogicalPlan::Selection {
-                expr,
+            LogicalPlan::Filter {
+                predicate,
                 input: Box::new(self.plan.clone()),
             },
         ))

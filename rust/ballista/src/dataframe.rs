@@ -377,7 +377,6 @@ impl DataFrame {
             LogicalPlan::Sort {
                 expr,
                 input: Box::new(self.plan.clone()),
-                schema: self.plan.schema().clone(),
             },
         ))
     }
@@ -389,7 +388,6 @@ impl DataFrame {
             LogicalPlan::Limit {
                 n,
                 input: Box::new(self.plan.clone()),
-                schema: self.plan.schema().clone(),
             },
         ))
     }
@@ -503,27 +501,27 @@ pub fn col(name: &str) -> Expr {
     Expr::Column(name.to_owned())
 }
 
-pub fn alias(expr: &Expr, name: &str) -> Expr {
+pub fn alias(expr: Expr, name: &str) -> Expr {
     Expr::Alias(Box::new(expr.to_owned()), name.to_owned())
 }
 
-pub fn add(l: &Expr, r: &Expr) -> Expr {
+pub fn add(l: Expr, r: Expr) -> Expr {
     binary_expr(l, Operator::Plus, r)
 }
 
-pub fn subtract(l: &Expr, r: &Expr) -> Expr {
+pub fn subtract(l: Expr, r: Expr) -> Expr {
     binary_expr(l, Operator::Minus, r)
 }
 
-pub fn mult(l: &Expr, r: &Expr) -> Expr {
+pub fn mult(l: Expr, r: Expr) -> Expr {
     binary_expr(l, Operator::Multiply, r)
 }
 
-pub fn div(l: &Expr, r: &Expr) -> Expr {
+pub fn div(l: Expr, r: Expr) -> Expr {
     binary_expr(l, Operator::Divide, r)
 }
 
-fn binary_expr(l: &Expr, op: Operator, r: &Expr) -> Expr {
+fn binary_expr(l: Expr, op: Operator, r: Expr) -> Expr {
     Expr::BinaryExpr {
         left: Box::new(l.to_owned()),
         op,
@@ -588,11 +586,9 @@ pub fn lit_f64(n: f64) -> Expr {
 
 /// Create an expression to represent a named aggregate function
 pub fn aggregate_expr(name: &str, expr: &Expr) -> Expr {
-    let return_type = DataType::Float64;
     Expr::AggregateFunction {
         name: name.to_string(),
         args: vec![expr.clone()],
-        return_type,
     }
 }
 

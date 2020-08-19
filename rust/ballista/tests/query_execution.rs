@@ -72,7 +72,7 @@ async fn execute(use_filter: bool) {
         // WHERE col(c0) >= col(c0), which must not affect the final result
         child = PhysicalPlan::Filter(Arc::new(FilterExec::new(
             &child,
-            &col("c0").gt_eq(&col("c0")),
+            &col("c0").gt_eq(col("c0")),
         )));
     }
 

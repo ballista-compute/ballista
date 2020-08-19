@@ -61,7 +61,7 @@ mod tests {
             CsvReadOptions::new().schema(&schema).has_header(true),
             None,
         )
-        .and_then(|plan| plan.filter(col("state").eq(&lit("CO"))))
+        .and_then(|plan| plan.filter(col("state").eq(lit("CO"))))
         .and_then(|plan| plan.project(vec![col("id")]))
         .and_then(|plan| plan.build())
         .unwrap();
@@ -129,7 +129,6 @@ mod tests {
         Expr::AggregateFunction {
             name: "MAX".to_owned(),
             args: vec![expr],
-            return_type: DataType::Float64,
         }
     }
 }

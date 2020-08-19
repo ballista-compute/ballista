@@ -189,7 +189,6 @@ impl TryInto<Expr> for &protobuf::LogicalExprNode {
             Ok(Expr::AggregateFunction {
                 name: name.to_owned(),
                 args: vec![parse_required_expr(&aggregate_expr.expr)?],
-                return_type: DataType::Boolean, //TODO
             })
         } else if let Some(alias) = &self.alias {
             Ok(Expr::Alias(

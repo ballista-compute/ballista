@@ -22,16 +22,14 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::arrow::datatypes::Schema;
 use crate::dataframe::{
     avg, col, count, max, min, sum, CSV_READER_BATCH_SIZE, PARQUET_READER_BATCH_SIZE,
 };
 use crate::datafusion::execution::context::ExecutionContext as DFContext;
 use crate::datafusion::execution::physical_plan::common;
 use crate::datafusion::execution::physical_plan::csv::CsvReadOptions;
+use crate::datafusion::logicalplan::Expr;
 use crate::datafusion::logicalplan::LogicalPlan;
-use crate::datafusion::logicalplan::{Expr, LogicalPlanBuilder};
-use crate::datafusion::optimizer::optimizer::OptimizerRule;
 use crate::distributed::context::BallistaContext;
 use crate::distributed::executor::{ExecutorConfig, ShufflePartition};
 use crate::error::{ballista_error, BallistaError, Result};
@@ -81,10 +79,6 @@ impl Scheduler for BallistaScheduler {
 
         println!("Logical plan:\n{:?}", logical_plan);
         let ctx = DFContext::new();
-
-        // workaround for https://issues.apache.org/jira/browse/ARROW-9542
-        let mut rule = ResolveColumnsRule::new();
-        let logical_plan = rule.optimize(logical_plan)?;
 
         let logical_plan = ctx.optimize(&logical_plan)?;
         println!("Optimized logical plan:\n{:?}", logical_plan);
@@ -792,137 +786,3 @@ pub fn ensure_requirements(plan: &PhysicalPlan) -> Result<Arc<PhysicalPlan>> {
         _ => Ok(Arc::new(plan.clone())),
     }
 }
-
-//TODO the following code is copied from DataFusion and can be removed in the 0.4.0 release
-
-/// Replace UnresolvedColumns with Columns
-pub struct ResolveColumnsRule {}
-
-impl ResolveColumnsRule {
-    #[allow(missing_docs)]
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl Default for ResolveColumnsRule {
-    fn default() -> Self {
-        ResolveColumnsRule::new()
-    }
-}
-
-impl OptimizerRule for ResolveColumnsRule {
-    fn optimize(&mut self, plan: &LogicalPlan) -> datafusion::error::Result<LogicalPlan> {
-        match plan {
-            LogicalPlan::Projection { input, expr, .. } => {
-                Ok(LogicalPlanBuilder::from(&self.optimize(input)?)
-                    .project(rewrite_expr_list(expr, &input.schema())?)?
-                    .build()?)
-            }
-            LogicalPlan::Selection { expr, input } => {
-                Ok(LogicalPlanBuilder::from(&self.optimize(input)?)
-                    .filter(rewrite_expr(expr, &input.schema())?)?
-                    .build()?)
-            }
-            LogicalPlan::Aggregate {
-                input,
-                group_expr,
-                aggr_expr,
-                ..
-            } => Ok(LogicalPlanBuilder::from(&self.optimize(input)?)
-                .aggregate(
-                    rewrite_expr_list(group_expr, &input.schema())?,
-                    rewrite_expr_list(aggr_expr, &input.schema())?,
-                )?
-                .build()?),
-            LogicalPlan::Sort { input, expr, .. } => {
-                Ok(LogicalPlanBuilder::from(&self.optimize(input)?)
-                    .sort(rewrite_expr_list(expr, &input.schema())?)?
-                    .build()?)
-            }
-            _ => Ok(plan.clone()),
-        }
-    }
-}
-
-fn rewrite_expr_list(expr: &[Expr], schema: &Schema) -> datafusion::error::Result<Vec<Expr>> {
-    Ok(expr
-        .iter()
-        .map(|e| rewrite_expr(e, schema))
-        .collect::<datafusion::error::Result<Vec<_>>>()?)
-}
-
-fn rewrite_expr(expr: &Expr, schema: &Schema) -> datafusion::error::Result<Expr> {
-    match expr {
-        Expr::Alias(expr, alias) => Ok(rewrite_expr(&expr, schema)?.alias(&alias)),
-        Expr::Column(name) => Ok(Expr::Column(name.clone())),
-        Expr::BinaryExpr { left, op, right } => Ok(Expr::BinaryExpr {
-            left: Box::new(rewrite_expr(&left, schema)?),
-            op: op.clone(),
-            right: Box::new(rewrite_expr(&right, schema)?),
-        }),
-        Expr::Not(expr) => Ok(Expr::Not(Box::new(rewrite_expr(&expr, schema)?))),
-        Expr::IsNotNull(expr) => Ok(Expr::IsNotNull(Box::new(rewrite_expr(&expr, schema)?))),
-        Expr::IsNull(expr) => Ok(Expr::IsNull(Box::new(rewrite_expr(&expr, schema)?))),
-        Expr::Cast { expr, data_type } => Ok(Expr::Cast {
-            expr: Box::new(rewrite_expr(&expr, schema)?),
-            data_type: data_type.clone(),
-        }),
-        Expr::Sort {
-            expr,
-            asc,
-            nulls_first,
-        } => Ok(Expr::Sort {
-            expr: Box::new(rewrite_expr(&expr, schema)?),
-            asc: *asc,
-            nulls_first: *nulls_first,
-        }),
-        Expr::ScalarFunction {
-            name,
-            args,
-            return_type,
-        } => Ok(Expr::ScalarFunction {
-            name: name.clone(),
-            args: rewrite_expr_list(args, schema)?,
-            return_type: return_type.clone(),
-        }),
-        Expr::AggregateFunction {
-            name,
-            args,
-            return_type,
-        } => Ok(Expr::AggregateFunction {
-            name: name.clone(),
-            args: rewrite_expr_list(args, schema)?,
-            return_type: return_type.clone(),
-        }),
-        _ => Ok(expr.clone()),
-    }
-}
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::dataframe::{col, sum, Context};
-//     use std::collections::HashMap;
-//
-//     #[test]
-//     fn create_plan() -> Result<()> {
-//         let ctx = Context::local(HashMap::new());
-//
-//         let df = ctx
-//             .read_parquet("/mnt/nyctaxi/parquet/year=2019", None)?
-//             .aggregate(vec![col("passenger_count")], vec![sum(col("fare_amount"))])?;
-//
-//         let plan = df.logical_plan();
-//
-//         let plan = create_physical_plan(&plan)?;
-//         let plan = ensure_requirements(&plan)?;
-//         println!("Optimized physical plan:\n{:?}", plan);
-//
-//         let mut scheduler = Scheduler::new();
-//         scheduler.create_job(plan)?;
-//
-//         scheduler.job.explain();
-//         Ok(())
-//     }
-// }

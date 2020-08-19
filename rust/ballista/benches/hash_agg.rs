@@ -50,7 +50,6 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                         vec![Expr::AggregateFunction {
                             name: "sum".to_owned(),
                             args: vec![logicalplan::col("c1")],
-                            return_type: DataType::Int32,
                         }],
                         table,
                     )
@@ -74,7 +73,6 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                         vec![Expr::AggregateFunction {
                             name: "avg".to_owned(),
                             args: vec![logicalplan::col("c1")],
-                            return_type: DataType::Int32,
                         }],
                         table,
                     )
@@ -98,7 +96,6 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                         vec![Expr::AggregateFunction {
                             name: "count".to_owned(),
                             args: vec![logicalplan::col("c1")],
-                            return_type: DataType::Int32,
                         }],
                         table,
                     )
@@ -122,7 +119,6 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                         vec![Expr::AggregateFunction {
                             name: "min".to_owned(),
                             args: vec![logicalplan::col("c1")],
-                            return_type: DataType::Int32,
                         }],
                         table,
                     )
@@ -146,7 +142,6 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                         vec![Expr::AggregateFunction {
                             name: "max".to_owned(),
                             args: vec![logicalplan::col("c1")],
-                            return_type: DataType::Int32,
                         }],
                         table,
                     )

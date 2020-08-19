@@ -502,7 +502,7 @@ pub fn col(name: &str) -> Expr {
 }
 
 pub fn alias(expr: Expr, name: &str) -> Expr {
-    Expr::Alias(Box::new(expr.to_owned()), name.to_owned())
+    Expr::Alias(Box::new(expr), name.to_owned())
 }
 
 pub fn add(l: Expr, r: Expr) -> Expr {
@@ -523,9 +523,9 @@ pub fn div(l: Expr, r: Expr) -> Expr {
 
 fn binary_expr(l: Expr, op: Operator, r: Expr) -> Expr {
     Expr::BinaryExpr {
-        left: Box::new(l.to_owned()),
+        left: Box::new(l),
         op,
-        right: Box::new(r.to_owned()),
+        right: Box::new(r),
     }
 }
 

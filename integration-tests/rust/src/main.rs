@@ -19,9 +19,8 @@ extern crate ballista;
 
 use ballista::arrow::datatypes::{DataType, Field, Schema};
 use ballista::arrow::util::pretty;
-use ballista::dataframe::{max, min, Context, CSV_READER_BATCH_SIZE};
-pub use ballista::datafusion::datasource::csv::CsvReadOptions;
-use ballista::datafusion::logicalplan::*;
+use ballista::dataframe::{Context, CSV_READER_BATCH_SIZE};
+use ballista::datafusion::prelude::*;
 use ballista::error::BallistaError::General;
 use ballista::error::Result;
 use ballista::BALLISTA_VERSION;

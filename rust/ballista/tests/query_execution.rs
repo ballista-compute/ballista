@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use arrow::{array::Int32Array, record_batch::RecordBatch};
 use ballista::arrow::datatypes::{DataType, Field, Schema};
-use ballista::dataframe::{avg, col, count, max, min, sum};
+use ballista::datafusion::prelude::*;
 use ballista::distributed::context::BallistaContext;
 use ballista::distributed::executor::{DiscoveryMode, ExecutorConfig};
 use ballista::error::Result;

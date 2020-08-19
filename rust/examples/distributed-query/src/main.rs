@@ -19,8 +19,8 @@ use structopt::StructOpt;
 
 extern crate ballista;
 use ballista::arrow::util::pretty;
-use ballista::dataframe::{max, Context};
-use ballista::datafusion::logicalplan::*;
+use ballista::dataframe::Context;
+use ballista::datafusion::prelude::*;
 use ballista::error::Result;
 use ballista::BALLISTA_VERSION;
 

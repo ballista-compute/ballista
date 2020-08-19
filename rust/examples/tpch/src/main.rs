@@ -22,7 +22,7 @@ use ballista::arrow::datatypes::{DataType, Field, Schema};
 use ballista::arrow::record_batch::RecordBatch;
 use ballista::arrow::util::pretty;
 use ballista::dataframe::*;
-use ballista::datafusion::execution::physical_plan::csv::CsvReadOptions;
+use ballista::datafusion::prelude::*;
 use ballista::error::Result;
 
 use structopt::StructOpt;
@@ -136,7 +136,7 @@ async fn q1(ctx: &Context, path: &str, format: &FileFormat) -> Result<Vec<Record
     };
 
     let df = input
-        .filter(col("l_shipdate").lt(lit_str("1998-09-01")))? // should be l_shipdate <= date '1998-12-01' - interval ':1' day (3)
+        .filter(col("l_shipdate").lt(lit("1998-09-01")))? // should be l_shipdate <= date '1998-12-01' - interval ':1' day (3)
         // .project(vec![
         //     col("l_returnflag"),
         //     col("l_linestatus"),
@@ -157,15 +157,15 @@ async fn q1(ctx: &Context, path: &str, format: &FileFormat) -> Result<Vec<Record
                 sum(col("l_extendedprice")).alias("sum_base_price"),
                 sum(mult(
                     col("l_extendedprice"),
-                    subtract(lit_f64(1_f64), col("l_discount")),
+                    subtract(lit(1_f64), col("l_discount")),
                 ))
                 .alias("sum_disc_price"),
                 sum(mult(
                     mult(
                         col("l_extendedprice"),
-                        subtract(lit_f64(1_f64), col("l_discount")),
+                        subtract(lit(1_f64), col("l_discount")),
                     ),
-                    add(lit_f64(1_f64), col("l_tax")),
+                    add(lit(1_f64), col("l_tax")),
                 ))
                 .alias("sum_charge"),
                 avg(col("l_quantity")).alias("avg_qty"),
@@ -206,11 +206,11 @@ async fn q6(ctx: &Context, path: &str, format: &FileFormat) -> Result<Vec<Record
     };
 
     let df = input
-        .filter(col("l_shipdate").gt_eq(lit_str("1994-01-01")))?
-        .filter(col("l_shipdate").lt(lit_str("1995-01-01")))?
-        .filter(col("l_discount").gt_eq(lit_f64(0.05)))?
-        .filter(col("l_discount").lt_eq(lit_f64(0.07)))?
-        .filter(col("l_quantity").lt(lit_f64(24.0)))?
+        .filter(col("l_shipdate").gt_eq(lit("1994-01-01")))?
+        .filter(col("l_shipdate").lt(lit("1995-01-01")))?
+        .filter(col("l_discount").gt_eq(lit(0.05)))?
+        .filter(col("l_discount").lt_eq(lit(0.07)))?
+        .filter(col("l_quantity").lt(lit(24.0)))?
         .project(vec![
             mult(col("l_extendedprice"), col("l_discount")).alias("disc_price")
         ])?

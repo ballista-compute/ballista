@@ -22,14 +22,13 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::dataframe::{
-    avg, col, count, max, min, sum, CSV_READER_BATCH_SIZE, PARQUET_READER_BATCH_SIZE,
-};
+use crate::dataframe::{CSV_READER_BATCH_SIZE, PARQUET_READER_BATCH_SIZE};
 use crate::datafusion::execution::context::ExecutionContext as DFContext;
 use crate::datafusion::execution::physical_plan::common;
 use crate::datafusion::execution::physical_plan::csv::CsvReadOptions;
 use crate::datafusion::logicalplan::Expr;
 use crate::datafusion::logicalplan::LogicalPlan;
+use crate::datafusion::prelude::*;
 use crate::distributed::context::BallistaContext;
 use crate::distributed::executor::{ExecutorConfig, ShufflePartition};
 use crate::error::{ballista_error, BallistaError, Result};

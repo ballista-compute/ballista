@@ -19,7 +19,7 @@ extern crate ballista;
 use ballista::arrow::datatypes::{DataType, Field, Schema};
 use ballista::arrow::util::pretty;
 use ballista::dataframe::*;
-use ballista::datafusion::logicalplan::col;
+use ballista::datafusion::prelude::*;
 use ballista::error::Result;
 
 #[tokio::main]

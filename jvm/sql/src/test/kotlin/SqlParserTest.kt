@@ -102,6 +102,17 @@ class SqlParserTest {
   }
 
   @Test
+  fun `parse SELECT with aggregates and HAVING`() {
+    val select = parseSelect("SELECT state, MAX(salary) AS top_wage FROM employee " +
+        "GROUP BY state HAVING MAX(salary) > 10 AND MAX(salary) < 100")
+    val max = SqlFunction("MAX", listOf(SqlIdentifier("salary")))
+    val alias = SqlAlias(max, SqlIdentifier("top_wage"))
+    assertEquals(listOf(SqlIdentifier("state"), alias), select.projection)
+    assertEquals(listOf(SqlIdentifier("state")), select.groupBy)
+    assertEquals("employee", select.tableName)
+  }
+
+  @Test
   fun `parse SELECT with aggregates and CAST`() {
     val select =
         parseSelect("SELECT state, MAX(CAST(salary AS double)) FROM employee GROUP BY state")

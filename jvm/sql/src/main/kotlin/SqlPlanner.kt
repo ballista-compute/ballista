@@ -76,7 +76,11 @@ class SqlPlanner {
         }
       }
       plan = planAggregateQuery(projectionExpr, select, columnNamesInSelection, plan, aggrExpr)
-      return plan.project(projection)
+      plan = plan.project(projection)
+      if (select.having != null) {
+        plan = plan.filter(createLogicalExpr(select.having, plan))
+      }
+      return plan
     }
   }
 

@@ -107,6 +107,35 @@ class SqlTokenizerTest {
   }
 
   @Test
+  fun `tokenize SELECT with aggregates and HAVING`() {
+    val expected =
+        listOf(
+            KeywordToken("SELECT"),
+            IdentifierToken("state"),
+            CommaToken(),
+            IdentifierToken("MAX"),
+            LParenToken(),
+            IdentifierToken("salary"),
+            RParenToken(),
+            KeywordToken("FROM"),
+            IdentifierToken("employee"),
+            KeywordToken("GROUP"),
+            KeywordToken("BY"),
+            IdentifierToken("state"),
+            KeywordToken("HAVING"),
+            IdentifierToken("MAX"),
+            LParenToken(),
+            IdentifierToken("salary"),
+            RParenToken(),
+            OperatorToken(">"),
+            LiteralLongToken("10")
+        )
+    val actual =
+            tokenize("SELECT state, MAX(salary) FROM employee GROUP BY state HAVING MAX(salary) > 10")
+    assertEquals(expected, actual)
+  }
+
+  @Test
   fun `tokenize compound operators`() {
     val expected =
         listOf(
@@ -147,6 +176,7 @@ class SqlTokenizerTest {
     val actual = tokenize("123456789.00 + 987654321.001")
     assertEquals(expected, actual)
   }
+
 
   private fun tokenize(sql: String): List<Token> {
     return SqlTokenizer(sql).tokenize().tokens

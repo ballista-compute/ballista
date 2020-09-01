@@ -93,6 +93,17 @@ class SqlPlannerTest {
   }
 
   @Test
+  fun `plan aggregate query with having`() {
+    val plan = plan("SELECT state, MAX(salary) FROM employee GROUP BY state HAVING MAX(salary) > 10")
+    assertEquals(
+        "Selection: MAX(#salary) > 10\n" +
+            "\tProjection: #0, #1\n" +
+            "\t\tAggregate: groupExpr=[#state], aggregateExpr=[MAX(#salary)]\n" +
+            "\t\t\tScan: ; projection=None\n",
+        format(plan))
+  }
+
+  @Test
   fun `plan aggregate query aggr first`() {
     val plan = plan("SELECT MAX(salary), state FROM employee GROUP BY state")
     assertEquals(

@@ -61,5 +61,6 @@ data class SqlSelect(
     val selection: SqlExpr?,
     val groupBy: List<SqlExpr>,
     val orderBy: List<SqlExpr>,
+    val having: SqlExpr?,
     val tableName: String
 ) : SqlRelation

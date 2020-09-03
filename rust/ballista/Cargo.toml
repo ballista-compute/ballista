@@ -34,10 +34,10 @@ structopt = "0.3"
 etcd-client = "0.5"
 fnv = "1.0.7"
 
-arrow = { git = "https://github.com/apache/arrow" }
-arrow-flight = { git = "https://github.com/apache/arrow" }
-datafusion = { git = "https://github.com/apache/arrow" }
-parquet = { git = "https://github.com/apache/arrow" }
+arrow = { git = "https://github.com/apache/arrow", rev = "3cb0bd82"}
+arrow-flight = { git = "https://github.com/apache/arrow", rev = "3cb0bd82" }
+datafusion = { git = "https://github.com/apache/arrow", rev = "3cb0bd82" }
+parquet = { git = "https://github.com/apache/arrow", rev = "3cb0bd82" }
 
 [[bin]]
 name = "executor"

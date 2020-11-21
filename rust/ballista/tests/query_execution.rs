@@ -54,14 +54,13 @@ pub fn build_table_i32(
     Ok((batch, schema))
 }
 
-async fn execute(use_filter: bool) {
-    //TODO remove unwraps
+async fn execute(use_filter: bool) -> Result<()> {
     let (batch, _) = build_table_i32(
         ("c0", &vec![1, 1, 3]),
         ("c1", &vec![1, 2, 3]),
         ("c2", &vec![1, 2, 3]),
-    )
-    .unwrap();
+    )?;
+
     let batch = ColumnarBatch::from_arrow(&batch);
 
     let batches = vec![batch.clone(), batch];
@@ -113,50 +112,52 @@ async fn execute(use_filter: bool) {
     assert_eq!(2, batch.num_rows());
     assert_eq!(6, batch.num_columns());
 
-    assert_eq!(batch.column("c0").unwrap().data_type(), &DataType::Int32);
+    assert_eq!(batch.column("c0")?.data_type(), &DataType::Int32);
     assert_eq!(
-        batch.column("max_c1").unwrap().data_type(),
+        batch.column("max_c1")?.data_type(),
         &DataType::Int64
     );
     assert_eq!(
-        batch.column("MAX(c1)").unwrap().data_type(),
+        batch.column("MAX(c1)")?.data_type(),
         &DataType::Int64
     );
     assert_eq!(
-        batch.column("AVG(c1)").unwrap().data_type(),
+        batch.column("AVG(c1)")?.data_type(),
         &DataType::Float64
     );
     assert_eq!(
-        batch.column("SUM(c1)").unwrap().data_type(),
+        batch.column("SUM(c1)")?.data_type(),
         &DataType::Int64
     );
     assert_eq!(
-        batch.column("COUNT(c1)").unwrap().data_type(),
+        batch.column("COUNT(c1)")?.data_type(),
         &DataType::UInt64
     );
 
-    let result = batch.to_arrow().unwrap();
+    let result = batch.to_arrow()?;
 
-    let mut r = result_str(&vec![result]).unwrap();
+    let mut r = result_str(&vec![result])?;
 
     // there are two batches => sum and count double
     let mut expected = vec!["1\t1\t2\t1.5\t6\t4", "3\t3\t3\t3.0\t6\t2"];
 
     assert_eq!(r.sort(), expected.sort());
+    Ok(())
 }
 
+
 #[test]
-fn hash_aggregate() -> std::io::Result<()> {
+fn hash_aggregate() -> Result<()> {
     smol::run(async {
-        execute(false).await;
-        std::io::Result::Ok(())
+        execute(false).await?;
+        Ok(())
     })
 }
 
 #[test]
-fn hash_aggregate_with_filter() -> std::io::Result<()> {
+fn hash_aggregate_with_filter() -> Result<()> {
     smol::run(async {
-        execute(true).await;
-        std::io::Result::Ok(())
+        execute(true).await?;
+        Ok(())
     })
 }

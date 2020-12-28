@@ -18,6 +18,8 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.ballistacompute.spark.benchmarks.tpch.Tpch
 import org.rogach.scallop.{ScallopConf, Subcommand}
 
+import scala.collection.mutable.ListBuffer
+
 class Conf(args: Array[String]) extends ScallopConf(args) {
   val convertTpch = new Subcommand("convert-tpch") {
     val input = opt[String](required = true)
@@ -30,6 +32,7 @@ class Conf(args: Array[String]) extends ScallopConf(args) {
     val inputPath = opt[String](required = true)
     val inputFormat = opt[String](required = true)
     val query = opt[String](required = true)
+    val iterations = opt[Int](required = false, default = Some(1))
   }
   addSubcommand(convertTpch)
   addSubcommand(tpch)
@@ -65,8 +68,22 @@ object Main {
         }
 
         val sql = Tpch.query(conf.tpch.query())
-        val resultDf = spark.sql(sql)
-        resultDf.show()
+
+        val timing = new ListBuffer[Long]()
+        for (i <- 0 until conf.tpch.iterations()) {
+          println(s"Iteration $i")
+          val start = System.currentTimeMillis()
+          val resultDf = spark.sql(sql)
+          resultDf.show()
+          val duration = System.currentTimeMillis() - start
+          println(s"Iteration $i took $duration ms")
+          timing += duration
+        }
+
+        // summarize the results
+        timing.zipWithIndex.foreach {
+          case (n, i) => println(s"Iteration $i took $n ms")
+        }
 
       case Some(conf.`convertTpch`) =>
         for (table <- Tpch.tables) {

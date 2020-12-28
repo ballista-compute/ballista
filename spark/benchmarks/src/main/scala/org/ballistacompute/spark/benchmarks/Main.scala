@@ -42,6 +42,17 @@ class Conf(args: Array[String]) extends ScallopConf(args) {
   */
 object Main {
 
+  val tables = Seq(
+    "part",
+    "supplier",
+    "partsupp",
+    "customer",
+    "orders",
+    "lineitem",
+    "nation",
+    "region"
+  )
+
   def main(args: Array[String]): Unit = {
     val conf = new Conf(args)
 
@@ -52,28 +63,35 @@ object Main {
 
     conf.subcommand match {
       case Some(conf.tpch) =>
-        val df = readLineitem(conf, spark)
-        df.createTempView("lineitem")
+        for (table <- tables) {
+          val df = readTable(conf, spark, table)
+          df.createTempView(table)
+        }
+
         val sql = Tpch.query(conf.tpch.query())
         val resultDf = spark.sql(sql)
         resultDf.show()
 
       case Some(conf.`convertTpch`) =>
-        val df = readLineitem(conf, spark)
+        for (table <- tables) {
+          val df = readTable(conf, spark, table)
 
-        conf.convertTpch.outputFormat() match {
-          case "parquet" =>
-            df.repartition(conf.convertTpch.partitions())
-              .write
-              .mode(SaveMode.Overwrite)
-              .parquet(conf.convertTpch.output())
-          case "csv" =>
-            df.repartition(conf.convertTpch.partitions())
-              .write
-              .mode(SaveMode.Overwrite)
-              .csv(conf.convertTpch.output())
-          case _ =>
-            throw new IllegalArgumentException("unsupported output format")
+          conf.convertTpch.outputFormat() match {
+            case "parquet" =>
+              val path = s"${conf.convertTpch.output()}/${table}"
+              df.repartition(conf.convertTpch.partitions())
+                .write
+                .mode(SaveMode.Overwrite)
+                .parquet(path)
+            case "csv" =>
+              val path = s"${conf.convertTpch.output()}/${table}.csv"
+              df.repartition(conf.convertTpch.partitions())
+                .write
+                .mode(SaveMode.Overwrite)
+                .csv(path)
+            case _ =>
+              throw new IllegalArgumentException("unsupported output format")
+          }
         }
 
       case _ =>
@@ -81,24 +99,31 @@ object Main {
     }
   }
 
-  private def readLineitem(conf: Conf, spark: SparkSession): DataFrame = {
+  private def readTable(
+      conf: Conf,
+      spark: SparkSession,
+      tableName: String
+  ): DataFrame = {
     conf.convertTpch.inputFormat() match {
       case "tbl" =>
+        val path = s"${conf.convertTpch.input()}/${tableName}.tbl"
         spark.read
           .option("header", "false")
           .option("inferSchema", "false")
           .option("delimiter", "|")
-          .schema(Tpch.LINEITEM_SCHEMA)
-          .csv(conf.convertTpch.input())
+          .schema(Tpch.tableSchema(tableName))
+          .csv(path)
       case "csv" =>
+        val path = s"${conf.convertTpch.input()}/${tableName}.csv"
         spark.read
           .option("header", "false")
           .option("inferSchema", "false")
-          .schema(Tpch.LINEITEM_SCHEMA)
-          .csv(conf.convertTpch.input())
+          .schema(Tpch.tableSchema(tableName))
+          .csv(path)
       case "parquet" =>
+        val path = s"${conf.convertTpch.input()}/${tableName}"
         spark.read
-          .parquet(conf.convertTpch.input())
+          .parquet(path)
       case _ =>
         throw new IllegalArgumentException("unsupported input format")
     }

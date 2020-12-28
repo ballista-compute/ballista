@@ -12,6 +12,12 @@ This project contains:
 ./gradlew assemble
 ```
 
+## Formatting
+
+```bash
+./gradlew spotlessApply
+```
+
 ## Build Benchmark Docker Image
 
 ```bash
@@ -20,11 +26,13 @@ docker build -t ballistacompute/spark-benchmarks:0.4.0-SNAPSHOT -f benchmarks/Do
 
 ## Ballista Spark Executor
 
-Executor implementing the Ballista protocol (Apache Flight + protobuf-encoded Ballista query plans), allowing Spark to be used from any language supported by Ballista, including Java, Kotlin, Scala, and Rust.
+Executor implementing the Ballista protocol (Apache Flight + protobuf-encoded Ballista query plans), allowing Spark to 
+be used from any language supported by Ballista, including Java, Kotlin, Scala, and Rust.
 
 ## Spark V2 Connector for Ballista
 
-The goal for this component is to allow Spark to interact with Ballista executors (Rust, Kotlin, and Spark executors exist).
+The goal for this component is to allow Spark to interact with Ballista executors (Rust, Kotlin, and Spark executors 
+exist).
 
 ## Running benchmarks on k8s
 

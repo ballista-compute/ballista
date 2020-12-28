@@ -4,6 +4,17 @@ import org.apache.spark.sql.types.{DataTypes, StructField, StructType}
 
 object Tpch {
 
+  val tables = Seq(
+    "part",
+    "supplier",
+    "partsupp",
+    "customer",
+    "orders",
+    "lineitem",
+    "nation",
+    "region"
+  )
+
   def tableSchema(tableName: String) = {
     tableName match {
       case "lineitem" =>

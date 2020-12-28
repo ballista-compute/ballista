@@ -27,9 +27,9 @@ class Conf(args: Array[String]) extends ScallopConf(args) {
     val partitions = opt[Int](required = true)
   }
   val tpch = new Subcommand("tpch") {
-    val inputPath = opt[String]()
-    val inputFormat = opt[String]()
-    val query = opt[String]()
+    val inputPath = opt[String](required = true)
+    val inputFormat = opt[String](required = true)
+    val query = opt[String](required = true)
   }
   addSubcommand(convertTpch)
   addSubcommand(tpch)
@@ -42,17 +42,6 @@ class Conf(args: Array[String]) extends ScallopConf(args) {
   */
 object Main {
 
-  val tables = Seq(
-    "part",
-    "supplier",
-    "partsupp",
-    "customer",
-    "orders",
-    "lineitem",
-    "nation",
-    "region"
-  )
-
   def main(args: Array[String]): Unit = {
     val conf = new Conf(args)
 
@@ -63,8 +52,15 @@ object Main {
 
     conf.subcommand match {
       case Some(conf.tpch) =>
-        for (table <- tables) {
-          val df = readTable(conf, spark, table)
+        // register tables
+        for (table <- Tpch.tables) {
+          val df = readTable(
+            conf,
+            spark,
+            table,
+            conf.tpch.inputPath(),
+            conf.tpch.inputFormat()
+          )
           df.createTempView(table)
         }
 
@@ -73,8 +69,14 @@ object Main {
         resultDf.show()
 
       case Some(conf.`convertTpch`) =>
-        for (table <- tables) {
-          val df = readTable(conf, spark, table)
+        for (table <- Tpch.tables) {
+          val df = readTable(
+            conf,
+            spark,
+            table,
+            conf.convertTpch.input(),
+            conf.convertTpch.inputFormat()
+          )
 
           conf.convertTpch.outputFormat() match {
             case "parquet" =>
@@ -102,11 +104,13 @@ object Main {
   private def readTable(
       conf: Conf,
       spark: SparkSession,
-      tableName: String
+      tableName: String,
+      inputPath: String,
+      inputFormat: String
   ): DataFrame = {
-    conf.convertTpch.inputFormat() match {
+    inputFormat match {
       case "tbl" =>
-        val path = s"${conf.convertTpch.input()}/${tableName}.tbl"
+        val path = s"${inputPath}/${tableName}.tbl"
         spark.read
           .option("header", "false")
           .option("inferSchema", "false")
@@ -114,14 +118,14 @@ object Main {
           .schema(Tpch.tableSchema(tableName))
           .csv(path)
       case "csv" =>
-        val path = s"${conf.convertTpch.input()}/${tableName}.csv"
+        val path = s"${inputPath}/${tableName}.csv"
         spark.read
           .option("header", "false")
           .option("inferSchema", "false")
           .schema(Tpch.tableSchema(tableName))
           .csv(path)
       case "parquet" =>
-        val path = s"${conf.convertTpch.input()}/${tableName}"
+        val path = s"${inputPath}/${tableName}"
         spark.read
           .parquet(path)
       case _ =>

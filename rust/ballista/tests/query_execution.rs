@@ -136,12 +136,14 @@ async fn execute(use_filter: bool) -> Result<()> {
 
     let result = batch.to_arrow()?;
 
-    let mut r = result_str(&vec![result])?;
+    let mut r = result_str(&[result])?;
 
     // there are two batches => sum and count double
     let mut expected = vec!["1\t1\t2\t1.5\t6\t4", "3\t3\t3\t3.0\t6\t2"];
 
-    assert_eq!(r.sort(), expected.sort());
+    r.sort();
+    expected.sort();
+    assert_eq!(r, expected);
     Ok(())
 }
 

@@ -41,7 +41,7 @@ parquet = { git = "https://github.com/apache/arrow", rev = "3cb0bd82" }
 
 [[bin]]
 name = "executor"
-path = "src/bin/executor.rs"
+path = "../ballista/src/bin/executor.rs"
 
 [build-dependencies]
 prost-build = { version = "0.6.1" }

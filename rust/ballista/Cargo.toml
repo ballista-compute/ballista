@@ -13,6 +13,8 @@ include = ["build.rs", "src/**/*", "Cargo.toml", "proto/ballista.proto"]
 [dependencies]
 prost = "0.6"
 prost-types = "0.6"
+tokio = { version = "0.2", features = ["full"] }
+tonic = "0.2"
 
 #arrow = { git = "https://github.com/apache/arrow", rev="1f32ca1" }
 #datafusion = { git = "https://github.com/apache/arrow", rev="1f32ca1" }
@@ -20,6 +22,9 @@ prost-types = "0.6"
 arrow = { git = "https://github.com/andygrove/arrow", branch="physical-plan-accessor-methods" }
 datafusion = { git = "https://github.com/andygrove/arrow", branch="physical-plan-accessor-methods" }
 
-
 [build-dependencies]
 prost-build = { version = "0.6.1" }
+
+[[bin]]
+name = "executor"
+path = "src/bin/executor.rs"

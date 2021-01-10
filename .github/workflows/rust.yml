@@ -16,10 +16,6 @@ jobs:
     - uses: actions/checkout@v2
     - name: Lint Ballista
       run: cd rust && cargo clippy -- -D warnings
-      #    - name: Lint Integration Tests
-      #      run: cd integration-tests/rust && cargo clippy -- -D warnings
-      #    - name: Lint Benchmarks
-      #      run: cd benchmarks && cargo clippy -- -D warnings
 
   Ubuntu:
     runs-on: ubuntu-latest
@@ -27,12 +23,8 @@ jobs:
     - uses: actions/checkout@v2
     - name: Build Ballista
       run: cd rust && cargo build
-      #    - name: Build Integration Tests
-      #      run: cd integration-tests/rust && cargo build
-      #    - name: Build Benchmarks
-      #     run: cd benchmarks && cargo build
-   - name: Run tests
-     run: cd rust && cargo test
+    - name: Run tests
+      run: cd rust && cargo test
 
   Mac:
     runs-on: macOS-latest
@@ -40,10 +32,6 @@ jobs:
     - uses: actions/checkout@v2
     - name: Build Ballista
       run: cd rust && cargo build
-      #   - name: Build Integration Tests
-      #un: cd integration-tests/rust && cargo build
-      #   - name: Build Benchmarks
-      #     run: cd benchmarks && cargo build
     - name: Run tests
       run: cd rust && cargo test
 
@@ -59,12 +47,6 @@ jobs:
     - name: Build Ballista
       run: |
         cd rust && cargo build
-        #   - name: Build Integration Tests
-        #     run: |
-        #       cd integration-tests/rust && cargo build
-        #   - name: Build Becnhmarks
-        #     run: |
-        #       cd benchmarks && cargo build
     - name: Run tests
       run: |
         cd rust && cargo test

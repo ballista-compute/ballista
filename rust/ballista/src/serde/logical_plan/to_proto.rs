@@ -325,13 +325,11 @@ impl TryInto<protobuf::Schema> for &Schema {
                 .iter()
                 .map(|field| {
                     let proto = to_proto_arrow_type(&field.data_type());
-                    proto.and_then(|arrow_type| {
-                        Ok(protobuf::Field {
-                            name: field.name().to_owned(),
-                            arrow_type: arrow_type.into(),
-                            nullable: field.is_nullable(),
-                            children: vec![],
-                        })
+                    proto.map(|arrow_type| protobuf::Field {
+                        name: field.name().to_owned(),
+                        arrow_type: arrow_type.into(),
+                        nullable: field.is_nullable(),
+                        children: vec![],
                     })
                 })
                 .collect::<Result<Vec<_>, _>>()?,

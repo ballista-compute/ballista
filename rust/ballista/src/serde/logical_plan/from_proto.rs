@@ -329,7 +329,7 @@ impl TryInto<Schema> for &protobuf::Schema {
             .iter()
             .map(|c| {
                 let dt: Result<DataType, _> = from_proto_arrow_type(c.arrow_type);
-                dt.and_then(|dt| Ok(Field::new(&c.name, dt, c.nullable)))
+                dt.map(|dt| Field::new(&c.name, dt, c.nullable))
             })
             .collect::<Result<Vec<_>, _>>()?;
         Ok(Schema::new(fields))

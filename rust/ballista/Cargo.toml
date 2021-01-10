@@ -16,11 +16,8 @@ prost-types = "0.6"
 tokio = { version = "0.2", features = ["full"] }
 tonic = "0.2"
 
-#arrow = { git = "https://github.com/apache/arrow", rev="1f32ca1" }
-#datafusion = { git = "https://github.com/apache/arrow", rev="1f32ca1" }
-
-arrow = { git = "https://github.com/andygrove/arrow", branch="physical-plan-accessor-methods" }
-datafusion = { git = "https://github.com/andygrove/arrow", branch="physical-plan-accessor-methods" }
+arrow = { git = "https://github.com/apache/arrow", rev="49a1c7b" }
+datafusion = { git = "https://github.com/apache/arrow", rev="49a1c7b" }
 
 [build-dependencies]
 prost-build = { version = "0.6.1" }

@@ -77,7 +77,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/andygrove/arrow?branch=physical-plan-accessor-methods#1975d1630dbc98fa91cab636e3f61140efd969bf"
+source = "git+https://github.com/apache/arrow?rev=49a1c7b#49a1c7bd411bab921c1d5960aa24d5df047f0097"
 dependencies = [
  "cfg_aliases",
  "chrono",
@@ -415,7 +415,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/andygrove/arrow?branch=physical-plan-accessor-methods#1975d1630dbc98fa91cab636e3f61140efd969bf"
+source = "git+https://github.com/apache/arrow?rev=49a1c7b#49a1c7bd411bab921c1d5960aa24d5df047f0097"
 dependencies = [
  "ahash 0.6.2",
  "arrow",
@@ -1117,7 +1117,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/andygrove/arrow?branch=physical-plan-accessor-methods#1975d1630dbc98fa91cab636e3f61140efd969bf"
+source = "git+https://github.com/apache/arrow?rev=49a1c7b#49a1c7bd411bab921c1d5960aa24d5df047f0097"
 dependencies = [
  "arrow",
  "base64 0.12.3",
@@ -1382,9 +1382,9 @@ checksum = "41cc0f7e4d5d4544e8861606a285bb08d3e70712ccc7d2b84d7c0ccfaf4b05ce"
 
 [[package]]
 name = "redox_syscall"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48b82c2a1e8eb6e1bfde608de2bcbebd4072aa32d056ea48a986990cd5ca0f5a"
+checksum = "f3d82a0e6791428b9525c116cc671feac3ce1e73b26c5724a6bf26ae130ebf18"
 dependencies = [
  "bitflags",
 ]
@@ -1407,7 +1407,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "528532f3d801c87aec9def2add9ca802fe569e44a544afe633765267840abe64"
 dependencies = [
  "getrandom 0.2.1",
- "redox_syscall 0.2.1",
+ "redox_syscall 0.2.2",
 ]
 
 [[package]]

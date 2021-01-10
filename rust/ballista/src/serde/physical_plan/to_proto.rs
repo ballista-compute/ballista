@@ -82,17 +82,17 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
             //         });
             Ok(node)
         } else if let Some(exec) = plan.downcast_ref::<HashJoinExec>() {
-            let left: protobuf::PhysicalPlanNode = exec.left().to_owned().try_into()?;
-            let right: protobuf::PhysicalPlanNode = exec.right().to_owned().try_into()?;
-            let mut node = empty_physical_plan_node();
+            let _left: protobuf::PhysicalPlanNode = exec.left().to_owned().try_into()?;
+            let _right: protobuf::PhysicalPlanNode = exec.right().to_owned().try_into()?;
+            let node = empty_physical_plan_node();
             Ok(node)
         } else if let Some(exec) = plan.downcast_ref::<FilterExec>() {
             let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
             let mut node = empty_physical_plan_node();
             node.input = Some(Box::new(input));
             Ok(node)
-        } else if let Some(exec) = plan.downcast_ref::<CsvExec>() {
-            let mut node = empty_physical_plan_node();
+        } else if let Some(_exec) = plan.downcast_ref::<CsvExec>() {
+            let node = empty_physical_plan_node();
             //         node.scan = Some(protobuf::ScanExecNode {
             //             path: exec.path.clone(),
             //             filename: exec.filenames.clone(),
@@ -109,8 +109,8 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
             //             batch_size: exec.batch_size as u32,
             //         });
             Ok(node)
-        } else if let Some(exec) = plan.downcast_ref::<ParquetExec>() {
-            let mut node = empty_physical_plan_node();
+        } else if let Some(_exec) = plan.downcast_ref::<ParquetExec>() {
+            let node = empty_physical_plan_node();
             //         node.scan = Some(protobuf::ScanExecNode {
             //             path: exec.path.clone(),
             //             filename: exec.filenames.clone(),

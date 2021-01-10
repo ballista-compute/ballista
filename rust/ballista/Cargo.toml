@@ -1,8 +1,8 @@
 [package]
-name = "ballista-proto"
-description = "Ballista Protocol Buffer Definitions"
+name = "ballista"
+description = "Ballista Distributed Compute"
 license = "Apache-2.0"
-version = "0.2.0-SNAPSHOT"
+version = "0.4.0-SNAPSHOT"
 homepage = "https://github.com/ballista-compute/ballista"
 repository = "https://github.com/ballista-compute/ballista"
 authors = ["Andy Grove <andygrove73@gmail.com>"]

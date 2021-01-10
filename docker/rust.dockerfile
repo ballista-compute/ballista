@@ -1,5 +1,5 @@
 # Base image extends debian:buster-slim
-FROM rust:1.45.0-buster AS builder
+FROM rust:1.49.0-buster AS builder
 
 RUN apt update && apt -y install musl musl-dev musl-tools libssl-dev openssl
 

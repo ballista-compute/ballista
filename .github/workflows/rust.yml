@@ -7,7 +7,6 @@ on: [push,pull_request]
 
 env:
   VCPKGRS_DYNAMIC: 1
-  #RUSTUP_VERSION: stable
   #TOOLCHAIN_VERSION: stable-x86_64-pc-windows-msvc
 
 jobs:
@@ -15,44 +14,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Setup
-      run: rustup default ${RUSTUP_VERSION} && rustup component add clippy rustfmt
     - name: Lint Ballista
       run: cd rust && cargo clippy -- -D warnings
-    - name: Lint Integration Tests
-      run: cd integration-tests/rust && cargo clippy -- -D warnings
-    - name: Lint Benchmarks
-      run: cd benchmarks && cargo clippy -- -D warnings
+      #    - name: Lint Integration Tests
+      #      run: cd integration-tests/rust && cargo clippy -- -D warnings
+      #    - name: Lint Benchmarks
+      #      run: cd benchmarks && cargo clippy -- -D warnings
 
   Ubuntu:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Setup
-      run: rustup default ${RUSTUP_VERSION} && rustup component add rustfmt
     - name: Build Ballista
       run: cd rust && cargo build
-    - name: Build Integration Tests
-      run: cd integration-tests/rust && cargo build
-    - name: Build Benchmarks
-      run: cd benchmarks && cargo build
-    - name: Run tests
-      run: cd rust && cargo test
+      #    - name: Build Integration Tests
+      #      run: cd integration-tests/rust && cargo build
+      #    - name: Build Benchmarks
+      #     run: cd benchmarks && cargo build
+   - name: Run tests
+     run: cd rust && cargo test
 
   Mac:
     runs-on: macOS-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Setup
-      run: |
-        brew install rustup
-        rustup default ${RUSTUP_VERSION} && rustup component add rustfmt
     - name: Build Ballista
       run: cd rust && cargo build
-    - name: Build Integration Tests
-      run: cd integration-tests/rust && cargo build
-    - name: Build Benchmarks
-      run: cd benchmarks && cargo build
+      #   - name: Build Integration Tests
+      #un: cd integration-tests/rust && cargo build
+      #   - name: Build Benchmarks
+      #     run: cd benchmarks && cargo build
     - name: Run tests
       run: cd rust && cargo test
 
@@ -68,12 +59,12 @@ jobs:
     - name: Build Ballista
       run: |
         cd rust && cargo build
-    - name: Build Integration Tests
-      run: |
-        cd integration-tests/rust && cargo build
-    - name: Build Becnhmarks
-      run: |
-        cd benchmarks && cargo build
+        #   - name: Build Integration Tests
+        #     run: |
+        #       cd integration-tests/rust && cargo build
+        #   - name: Build Becnhmarks
+        #     run: |
+        #       cd benchmarks && cargo build
     - name: Run tests
       run: |
         cd rust && cargo test

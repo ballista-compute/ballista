@@ -16,8 +16,8 @@
 
 use std::convert::TryInto;
 
-use crate::proto_error;
-use crate::{protobuf, BallistaProtoError};
+use crate::serde::proto_error;
+use crate::serde::{protobuf, BallistaProtoError};
 
 use arrow::datatypes::{DataType, Field, Schema};
 use datafusion::logical_plan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator};

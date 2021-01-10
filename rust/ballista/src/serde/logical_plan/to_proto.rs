@@ -18,7 +18,7 @@
 
 use std::convert::TryInto;
 
-use crate::{empty_expr_node, empty_logical_plan_node, protobuf, BallistaProtoError};
+use crate::serde::{empty_expr_node, empty_logical_plan_node, protobuf, BallistaProtoError};
 
 use arrow::datatypes::{DataType, Schema};
 use datafusion::datasource::parquet::ParquetTable;

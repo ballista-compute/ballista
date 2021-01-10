@@ -19,7 +19,7 @@
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
-use crate::{empty_expr_node, empty_physical_plan_node, protobuf, BallistaProtoError};
+use crate::serde::{empty_expr_node, empty_physical_plan_node, protobuf, BallistaProtoError};
 
 use datafusion::physical_plan::csv::CsvExec;
 use datafusion::physical_plan::expressions::{
@@ -51,17 +51,17 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
             node.projection = Some(protobuf::ProjectionExecNode { expr });
             Ok(node)
         } else if let Some(exec) = plan.downcast_ref::<FilterExec>() {
+            let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
             let mut node = empty_physical_plan_node();
-            //         let input: protobuf::PhysicalPlanNode = exec.child.as_ref().try_into()?;
-            //         node.input = Some(Box::new(input));
+            node.input = Some(Box::new(input));
             //         node.selection = Some(protobuf::SelectionExecNode {
             //             expr: Some(exec.as_ref().filter_expr.as_ref().try_into()?),
             //         });
             Ok(node)
         } else if let Some(exec) = plan.downcast_ref::<HashAggregateExec>() {
+            let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
             let mut node = empty_physical_plan_node();
-            //         let input: protobuf::PhysicalPlanNode = exec.child.as_ref().try_into()?;
-            //         node.input = Some(Box::new(input));
+            node.input = Some(Box::new(input));
             //         node.hash_aggregate = Some(protobuf::HashAggregateExecNode {
             //             mode: match exec.mode {
             //                 AggregateMode::Partial => protobuf::AggregateMode::Partial,
@@ -82,10 +82,14 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
             //         });
             Ok(node)
         } else if let Some(exec) = plan.downcast_ref::<HashJoinExec>() {
+            let left: protobuf::PhysicalPlanNode = exec.left().to_owned().try_into()?;
+            let right: protobuf::PhysicalPlanNode = exec.right().to_owned().try_into()?;
             let mut node = empty_physical_plan_node();
             Ok(node)
         } else if let Some(exec) = plan.downcast_ref::<FilterExec>() {
+            let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
             let mut node = empty_physical_plan_node();
+            node.input = Some(Box::new(input));
             Ok(node)
         } else if let Some(exec) = plan.downcast_ref::<CsvExec>() {
             let mut node = empty_physical_plan_node();

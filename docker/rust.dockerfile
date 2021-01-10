@@ -78,7 +78,7 @@ RUN cargo fetch
 # Compile Ballista dependencies
 RUN mkdir -p /tmp/ballista/src/bin/ && echo 'fn main() {}' >> /tmp/ballista/src/bin/executor.rs
 RUN mkdir -p /tmp/ballista/proto
-COPY proto/ballista.proto /tmp/ballista/proto/
+COPY rust/ballista/proto/ballista.proto /tmp/ballista/proto/
 COPY rust/ballista/build.rs /tmp/ballista/
 
 ARG RELEASE_FLAG=--release

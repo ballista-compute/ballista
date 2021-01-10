@@ -22,16 +22,27 @@ use ballista::distributed::flight_service::BallistaFlightService;
 use ballista::distributed::scheduler::{BallistaScheduler, Scheduler};
 use ballista::BALLISTA_VERSION;
 
+use clap::arg_enum;
 use structopt::StructOpt;
 use tonic::transport::Server;
 
-/// A basic example
+
+arg_enum! {
+    #[derive(Debug)]
+    enum Mode {
+        K8s,
+        Etcd,
+        Standalone
+    }
+}
+
+/// Ballista Rust Executor
 #[derive(StructOpt, Debug)]
 #[structopt(name = "basic")]
 struct Opt {
     /// discovery mode
-    #[structopt(short, long)]
-    mode: Option<String>,
+    #[structopt(short, long, possible_values = &Mode::variants(), case_insensitive = true, default_value = "Standalone")]
+    mode: Mode,
 
     /// etcd urls for use when discovery mode is `etcd`
     #[structopt(long)]
@@ -57,17 +68,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opt = Opt::from_args();
 
     let mode = match opt.mode {
-        Some(s) => match s.as_str() {
-            "k8s" => DiscoveryMode::Kubernetes,
-            "etcd" => DiscoveryMode::Etcd,
-            _ => unimplemented!(),
-        },
-        _ => DiscoveryMode::Standalone,
+        Mode::K8s => DiscoveryMode::Kubernetes,
+        Mode::Etcd => DiscoveryMode::Etcd,
+        Mode::Standalone => DiscoveryMode::Standalone,
     };
 
-    let external_host = opt.external_host.unwrap_or_else(|| "localhost".to_owned());
-    let bind_host = opt.bind_host.unwrap_or_else(|| "0.0.0.0".to_owned());
-    let etcd_urls = opt.etcd_urls.unwrap_or_else(|| "localhost:2379".to_owned());
+    let external_host = opt.external_host.as_deref().unwrap_or("localhost");
+    let bind_host = opt.bind_host.as_deref().unwrap_or("0.0.0.0");
+    let etcd_urls = opt.etcd_urls.as_deref().unwrap_or("localhost:2379");
     let port = opt.port;
 
     let config = ExecutorConfig::new(mode, &external_host, port, &etcd_urls, opt.concurrent_tasks);

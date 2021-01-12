@@ -24,7 +24,9 @@ use arrow_flight::{
     FlightDescriptor, FlightInfo, HandshakeRequest, HandshakeResponse, PutResult, SchemaResult,
     Ticket,
 };
+use datafusion::error::DataFusionError;
 use datafusion::execution::context::ExecutionContext;
+use datafusion::physical_plan::collect;
 use futures::{Stream, StreamExt};
 use tonic::{Request, Response, Status, Streaming};
 
@@ -61,41 +63,49 @@ impl FlightService for BallistaFlightService {
         match &action {
             BallistaAction::InteractiveQuery { plan, .. } => {
                 // execute with DataFusion for now until distributed execution is in place
+                let ctx = ExecutionContext::new();
 
-                let mut datafusion_ctx = ExecutionContext::new();
-                let plan = datafusion_ctx
+                // create the query plan
+                let plan = ctx
                     .optimize(&plan)
-                    .and_then(|plan| datafusion_ctx.create_physical_plan(&plan))
-                    .map_err(|e| Status::internal(format!("{:?}", e)))?;
+                    .and_then(|plan| ctx.create_physical_plan(&plan))
+                    .map_err(|e| datafusion_err_to_tonic_err(&e))?;
 
-                let schema = plan.schema().clone();
-
-                //TODO execute all partitions
-                let mut stream = plan
-                    .execute(0)
+                // execute the query
+                let results = collect(plan.clone())
                     .await
-                    .map_err(|e| Status::internal(format!("{:?}", e)))?;
-                let mut results = vec![];
-                while let Some(batch) = stream.next().await {
-                    results.push(batch?);
+                    .map_err(|e| datafusion_err_to_tonic_err(&e))?;
+                if results.is_empty() {
+                    return Err(Status::internal("There were no results from ticket"));
                 }
 
-                // first FlightData represents schema
-                let mut flights: Vec<Result<FlightData, Status>> =
-                    vec![ /*Ok(FlightData::from(&schema))*/ ];
+                // add an initial FlightData message that sends schema
+                let options = arrow::ipc::writer::IpcWriteOptions::default();
+                let schema = plan.schema();
+                let schema_flight_data =
+                    arrow_flight::utils::flight_data_from_arrow_schema(schema.as_ref(), &options);
+
+                let mut flights: Vec<Result<FlightData, Status>> = vec![Ok(schema_flight_data)];
 
                 let mut batches: Vec<Result<FlightData, Status>> = results
-                    .data
                     .iter()
-                    .map(|batch| Ok(FlightData::from(batch)))
+                    .flat_map(|batch| {
+                        let (flight_dictionaries, flight_batch) =
+                            arrow_flight::utils::flight_data_from_arrow_batch(batch, &options);
+                        flight_dictionaries
+                            .into_iter()
+                            .chain(std::iter::once(flight_batch))
+                            .map(Ok)
+                    })
                     .collect();
 
+                // append batch vector to schema vector, so that the first message sent is the schema
                 flights.append(&mut batches);
 
                 let output = futures::stream::iter(flights);
+
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
-            _ => Err(Status::invalid_argument("Invalid action")),
         }
     }
 
@@ -103,21 +113,21 @@ impl FlightService for BallistaFlightService {
         &self,
         _request: Request<FlightDescriptor>,
     ) -> Result<Response<SchemaResult>, Status> {
-        Err(Status::invalid_argument("get_schema() unimplemented"))
+        Err(Status::unimplemented("get_schema"))
     }
 
     async fn get_flight_info(
         &self,
-        request: Request<FlightDescriptor>,
+        _request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
-        println!("get_flight_info");
+        Err(Status::unimplemented("get_flight_info"))
     }
 
     async fn handshake(
         &self,
         _request: Request<Streaming<HandshakeRequest>>,
     ) -> Result<Response<Self::HandshakeStream>, Status> {
-        Err(Status::unimplemented("Not yet implemented"))
+        Err(Status::unimplemented("handshake"))
     }
 
     async fn list_flights(
@@ -133,9 +143,9 @@ impl FlightService for BallistaFlightService {
     ) -> Result<Response<Self::DoPutStream>, Status> {
         let mut request = request.into_inner();
         while let Some(data) = request.next().await {
-            let data = data?;
+            let _data = data?;
         }
-        Err(Status::unimplemented("Not yet implemented"))
+        Err(Status::unimplemented("do_put"))
     }
 
     async fn do_action(
@@ -144,23 +154,28 @@ impl FlightService for BallistaFlightService {
     ) -> Result<Response<Self::DoActionStream>, Status> {
         let action = request.into_inner();
         let _action = decode_protobuf(&action.body.to_vec()).map_err(|e| to_tonic_err(&e))?;
+        Err(Status::unimplemented("do_action"))
     }
 
     async fn list_actions(
         &self,
         _request: Request<Empty>,
     ) -> Result<Response<Self::ListActionsStream>, Status> {
-        Err(Status::unimplemented("Not yet implemented"))
+        Err(Status::unimplemented("list_actions"))
     }
 
     async fn do_exchange(
         &self,
         _request: Request<Streaming<FlightData>>,
     ) -> Result<Response<Self::DoExchangeStream>, Status> {
-        Err(Status::unimplemented("Not yet implemented"))
+        Err(Status::unimplemented("do_exchange"))
     }
 }
 
 fn to_tonic_err(e: &crate::error::BallistaError) -> Status {
+    Status::internal(format!("{:?}", e))
+}
+
+fn datafusion_err_to_tonic_err(e: &DataFusionError) -> Status {
     Status::internal(format!("{:?}", e))
 }

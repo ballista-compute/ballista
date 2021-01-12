@@ -22,7 +22,7 @@ impl TryInto<protobuf::Action> for Action {
 
     fn try_into(self) -> Result<protobuf::Action, Self::Error> {
         match self {
-            Action::InteractiveQuery { ref plan, settings } => {
+            Action::InteractiveQuery { ref plan, ref settings } => {
                 let plan_proto: protobuf::LogicalPlanNode = plan.try_into()?;
 
                 let settings = settings

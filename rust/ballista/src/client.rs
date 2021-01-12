@@ -26,13 +26,18 @@ use arrow::record_batch::RecordBatch;
 use arrow_flight::flight_service_client::FlightServiceClient;
 use arrow_flight::utils::flight_data_to_arrow_batch;
 use arrow_flight::Ticket;
+use datafusion::logical_plan::LogicalPlan;
 use prost::Message;
+use std::collections::HashMap;
 
+/// Client for sending actions to Ballista executors.
 pub struct BallistaClient {
     flight_client: FlightServiceClient<tonic::transport::channel::Channel>,
 }
 
 impl BallistaClient {
+    /// Create a new BallistaClient to connect to the executor listening on the specified
+    /// host and port
     pub async fn try_new(host: &str, port: usize) -> Result<Self> {
         let addr = format!("http://{}:{}", host, port);
         let flight_client = FlightServiceClient::connect(addr)
@@ -42,7 +47,13 @@ impl BallistaClient {
         Ok(Self { flight_client })
     }
 
-    pub async fn execute_action(&mut self, action: &Action) -> Result<Vec<RecordBatch>> {
+    /// Execute a logical query plan and retrieve the results
+    pub async fn execute_query(&mut self, plan: &LogicalPlan) -> Result<Vec<RecordBatch>> {
+        let action = Action::InteractiveQuery {
+            plan: plan.to_owned(),
+            settings: HashMap::new(),
+        };
+
         let serialized_action: protobuf::Action = action.to_owned().try_into()?;
         let mut buf: Vec<u8> = Vec::with_capacity(serialized_action.encoded_len());
         serialized_action
@@ -85,11 +96,4 @@ impl BallistaClient {
             )),
         }
     }
-}
-
-//TODO eventually remove this because it creates a new connection every time
-pub async fn execute_action(host: &str, port: usize, action: &Action) -> Result<Vec<RecordBatch>> {
-    println!("Creating expensive one-off flight connection to execute an action");
-    let mut client = BallistaClient::try_new(host, port).await?;
-    client.execute_action(action).await
 }

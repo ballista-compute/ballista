@@ -71,8 +71,8 @@ RUN rustup target add x86_64-unknown-linux-musl
 RUN cargo install cargo-build-deps
 
 # prepare toolchain
-RUN rustup update stable && \
-    rustup component add rustfmt --toolchain stable-x86_64-unknown-linux-gnu
+RUN rustup update && \
+    rustup component add rustfmt
 
 # Fetch Ballista dependencies
 COPY rust/ballista/Cargo.toml /tmp/ballista/

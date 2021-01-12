@@ -17,7 +17,7 @@
 use std::convert::TryInto;
 
 use crate::serde::proto_error;
-use crate::serde::{protobuf, BallistaProtoError};
+use crate::serde::{protobuf, BallistaError};
 
 use arrow::datatypes::{DataType, Field, Schema};
 use datafusion::logical_plan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator};
@@ -48,7 +48,7 @@ macro_rules! convert_box_required {
 }
 
 impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
-    type Error = BallistaProtoError;
+    type Error = BallistaError;
 
     fn try_into(self) -> Result<LogicalPlan, Self::Error> {
         if let Some(projection) = &self.projection {
@@ -124,7 +124,7 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
 }
 
 impl TryInto<Expr> for &protobuf::LogicalExprNode {
-    type Error = BallistaProtoError;
+    type Error = BallistaError;
 
     fn try_into(self) -> Result<Expr, Self::Error> {
         if let Some(binary_expr) = &self.binary_expr {
@@ -205,7 +205,7 @@ impl TryInto<Expr> for &protobuf::LogicalExprNode {
 }
 
 // impl TryInto<Action> for &protobuf::Action {
-//     type Error = BallistaProtoError;
+//     type Error = BallistaError;
 //
 //     fn try_into(self) -> Result<Action, Self::Error> {
 //         if self.query.is_some() {
@@ -222,7 +222,7 @@ impl TryInto<Expr> for &protobuf::LogicalExprNode {
 //             let shuffle_id: ShuffleId = convert_required!(self.fetch_shuffle)?;
 //             Ok(Action::FetchShuffle(shuffle_id))
 //         } else {
-//             Err(BallistaProtoError::NotImplemented(format!(
+//             Err(BallistaError::NotImplemented(format!(
 //                 "from_proto(Action) {:?}",
 //                 self
 //             )))
@@ -230,7 +230,7 @@ impl TryInto<Expr> for &protobuf::LogicalExprNode {
 //     }
 // }
 
-fn from_proto_binary_op(op: &str) -> Result<Operator, BallistaProtoError> {
+fn from_proto_binary_op(op: &str) -> Result<Operator, BallistaError> {
     match op {
         "Eq" => Ok(Operator::Eq),
         "NotEq" => Ok(Operator::NotEq),
@@ -249,7 +249,7 @@ fn from_proto_binary_op(op: &str) -> Result<Operator, BallistaProtoError> {
     }
 }
 
-fn from_proto_arrow_type(dt: i32) -> Result<DataType, BallistaProtoError> {
+fn from_proto_arrow_type(dt: i32) -> Result<DataType, BallistaError> {
     match dt {
         dt if dt == protobuf::ArrowType::Uint8 as i32 => Ok(DataType::UInt8),
         dt if dt == protobuf::ArrowType::Int8 as i32 => Ok(DataType::Int8),
@@ -262,7 +262,7 @@ fn from_proto_arrow_type(dt: i32) -> Result<DataType, BallistaProtoError> {
         dt if dt == protobuf::ArrowType::Float as i32 => Ok(DataType::Float32),
         dt if dt == protobuf::ArrowType::Double as i32 => Ok(DataType::Float64),
         dt if dt == protobuf::ArrowType::Utf8 as i32 => Ok(DataType::Utf8),
-        other => Err(BallistaProtoError::General(format!(
+        other => Err(BallistaError::General(format!(
             "Unsupported data type {:?}",
             other
         ))),
@@ -270,7 +270,7 @@ fn from_proto_arrow_type(dt: i32) -> Result<DataType, BallistaProtoError> {
 }
 
 // impl TryInto<ExecutionTask> for &protobuf::Task {
-//     type Error = BallistaProtoError;
+//     type Error = BallistaError;
 //
 //     fn try_into(self) -> Result<ExecutionTask, Self::Error> {
 //         let mut shuffle_locations: HashMap<ShuffleId, ExecutorMeta> = HashMap::new();
@@ -301,7 +301,7 @@ fn from_proto_arrow_type(dt: i32) -> Result<DataType, BallistaProtoError> {
 // }
 //
 // impl TryInto<ShuffleLocation> for &protobuf::ShuffleLocation {
-//     type Error = BallistaProtoError;
+//     type Error = BallistaError;
 //
 //     fn try_into(self) -> Result<ShuffleLocation, Self::Error> {
 //         Ok(ShuffleLocation {}) //TODO why empty?
@@ -309,7 +309,7 @@ fn from_proto_arrow_type(dt: i32) -> Result<DataType, BallistaProtoError> {
 // }
 //
 // impl TryInto<ShuffleId> for &protobuf::ShuffleId {
-//     type Error = BallistaProtoError;
+//     type Error = BallistaError;
 //
 //     fn try_into(self) -> Result<ShuffleId, Self::Error> {
 //         Ok(ShuffleId::new(
@@ -321,7 +321,7 @@ fn from_proto_arrow_type(dt: i32) -> Result<DataType, BallistaProtoError> {
 // }
 
 impl TryInto<Schema> for &protobuf::Schema {
-    type Error = BallistaProtoError;
+    type Error = BallistaError;
 
     fn try_into(self) -> Result<Schema, Self::Error> {
         let fields = self
@@ -337,7 +337,7 @@ impl TryInto<Schema> for &protobuf::Schema {
 }
 
 // impl TryInto<PhysicalPlan> for &protobuf::PhysicalPlanNode {
-//     type Error = BallistaProtoError;
+//     type Error = BallistaError;
 //
 //     fn try_into(self) -> Result<PhysicalPlan, Self::Error> {
 //         if let Some(selection) = &self.selection {
@@ -444,9 +444,7 @@ impl TryInto<Schema> for &protobuf::Schema {
 //     }
 // }
 
-fn parse_required_expr(
-    p: &Option<Box<protobuf::LogicalExprNode>>,
-) -> Result<Expr, BallistaProtoError> {
+fn parse_required_expr(p: &Option<Box<protobuf::LogicalExprNode>>) -> Result<Expr, BallistaError> {
     match p {
         Some(expr) => expr.as_ref().try_into(),
         None => Err(proto_error("Missing required expression")),

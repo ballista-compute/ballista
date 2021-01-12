@@ -14,4 +14,5 @@
 
 //! Serialization code for translating between query plans and protobuf
 
+pub mod error;
 pub mod serde;

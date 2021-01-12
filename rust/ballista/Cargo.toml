@@ -13,6 +13,7 @@ include = ["build.rs", "src/**/*", "Cargo.toml", "proto/ballista.proto"]
 [dependencies]
 prost = "0.6"
 prost-types = "0.6"
+sqlparser = "0.7"
 tokio = { version = "0.2", features = ["full"] }
 tonic = "0.2"
 

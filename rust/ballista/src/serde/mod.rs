@@ -17,8 +17,7 @@
 
 // use std::convert::TryInto;
 // use std::io::Cursor;
-use arrow::error::ArrowError;
-use datafusion::error::DataFusionError;
+use crate::error::BallistaError;
 
 pub const BALLISTA_PROTO_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -34,32 +33,12 @@ pub mod physical_plan;
 // pub(crate) fn decode_protobuf(bytes: &[u8]) -> Result<Action, BallistaError> {
 //     let mut buf = Cursor::new(bytes);
 //     protobuf::Action::decode(&mut buf)
-//         .map_err(|e| BallistaProtoError::General(format!("{:?}", e)))
+//         .map_err(|e| BallistaError::General(format!("{:?}", e)))
 //         .and_then(|node| (&node).try_into())
 // }
 
-pub(crate) fn proto_error(message: &str) -> BallistaProtoError {
-    BallistaProtoError::General(message.to_owned())
-}
-
-/// Error
-#[derive(Debug)]
-pub enum BallistaProtoError {
-    General(String),
-    ArrowError(ArrowError),
-    DataFusionError(DataFusionError),
-}
-
-impl From<ArrowError> for BallistaProtoError {
-    fn from(e: ArrowError) -> Self {
-        BallistaProtoError::ArrowError(e)
-    }
-}
-
-impl From<DataFusionError> for BallistaProtoError {
-    fn from(e: DataFusionError) -> Self {
-        BallistaProtoError::DataFusionError(e)
-    }
+pub(crate) fn proto_error(message: &str) -> BallistaError {
+    BallistaError::General(message.to_owned())
 }
 
 /// Create an empty ExprNode
@@ -119,12 +98,39 @@ pub fn empty_physical_plan_node() -> protobuf::PhysicalPlanNode {
 
 #[cfg(test)]
 mod tests {
-    use crate::serde::*;
+    use super::super::error::Result;
+    use super::protobuf;
+    use arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::logical_plan::{LogicalPlan, LogicalPlanBuilder};
+    use datafusion::physical_plan::csv::CsvReadOptions;
+    use datafusion::prelude::*;
+    use std::convert::TryInto;
 
     #[test]
-    fn sanity_check() {
-        let _ = empty_logical_plan_node();
-        let _ = empty_expr_node();
-        let _ = empty_physical_plan_node();
+    fn roundtrip_logical_plan() -> Result<()> {
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("first_name", DataType::Utf8, false),
+            Field::new("last_name", DataType::Utf8, false),
+            Field::new("state", DataType::Utf8, false),
+            Field::new("salary", DataType::Int32, false),
+        ]);
+
+        let plan = LogicalPlanBuilder::scan_csv(
+            "employee.csv",
+            CsvReadOptions::new().schema(&schema).has_header(true),
+            Some(vec![3, 4]),
+        )
+        .and_then(|plan| plan.aggregate(vec![col("state")], vec![max(col("salary"))]))
+        .and_then(|plan| plan.build())
+        .unwrap();
+
+        let proto: protobuf::LogicalPlanNode = (&plan).try_into()?;
+
+        let plan2: LogicalPlan = (&proto).try_into()?;
+
+        assert_eq!(format!("{:?}", plan), format!("{:?}", plan2));
+
+        Ok(())
     }
 }

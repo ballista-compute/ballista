@@ -19,7 +19,7 @@
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
-use crate::serde::{empty_expr_node, empty_physical_plan_node, protobuf, BallistaProtoError};
+use crate::serde::{empty_expr_node, empty_physical_plan_node, protobuf, BallistaError};
 
 use datafusion::physical_plan::csv::CsvExec;
 use datafusion::physical_plan::expressions::{
@@ -35,7 +35,7 @@ use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
 impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
-    type Error = BallistaProtoError;
+    type Error = BallistaError;
 
     fn try_into(self) -> Result<protobuf::PhysicalPlanNode, Self::Error> {
         let plan = self.as_any();
@@ -144,7 +144,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
         //         Ok(node)
         //     }
         } else {
-            Err(BallistaProtoError::General(format!(
+            Err(BallistaError::General(format!(
                 "physical plan to_proto {:?}",
                 self
             )))
@@ -153,7 +153,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
 }
 
 impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
-    type Error = BallistaProtoError;
+    type Error = BallistaError;
 
     fn try_from(value: Arc<dyn PhysicalExpr>) -> Result<Self, Self::Error> {
         let expr = value.as_any();
@@ -191,7 +191,7 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
         } else if let Some(_expr) = expr.downcast_ref::<ScalarFunctionExpr>() {
             unimplemented!()
         } else {
-            Err(BallistaProtoError::General(format!(
+            Err(BallistaError::General(format!(
                 "unsupported physical expression {:?}",
                 value
             )))

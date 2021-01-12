@@ -31,11 +31,11 @@ use tonic::{Request, Response, Status, Streaming};
 #[derive(Clone)]
 pub struct BallistaFlightService {}
 
-impl BallistaFlightService {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
+// impl BallistaFlightService {
+//     pub fn new() -> Self {
+//         Self {}
+//     }
+// }
 
 type BoxedFlightStream<T> = Pin<Box<dyn Stream<Item = Result<T, Status>> + Send + Sync + 'static>>;
 
@@ -55,90 +55,90 @@ impl FlightService for BallistaFlightService {
     ) -> Result<Response<Self::DoGetStream>, Status> {
         let ticket = request.into_inner();
 
-        let action = decode_protobuf(&ticket.ticket.to_vec()).map_err(|e| to_tonic_err(&e))?;
+        let _action = decode_protobuf(&ticket.ticket.to_vec()).map_err(|e| to_tonic_err(&e))?;
 
         //println!("do_get: {:?}", action);
 
-        match &action {
-            // physical_plan::Action::Execute(task) => {
-            //     match self.executor.submit_task(task) {
-            //         Ok(status) => match status {
-            //             TaskStatus::Completed => {
-            //                 println!("Telling scheduler that task {} has completed", task.key());
-            //                 let results = ShufflePartition {
-            //                     schema: Schema::new(vec![Field::new(
-            //                         "shuffle_id",
-            //                         DataType::Utf8,
-            //                         false,
-            //                     )]),
-            //                     data: vec![],
-            //                 };
-            //
-            //                 // write empty results stream to client
-            //                 let mut flights: Vec<Result<FlightData, Status>> =
-            //                     vec![Ok(FlightData::from(&results.schema))];
-            //
-            //                 let mut batches: Vec<Result<FlightData, Status>> = results
-            //                     .data
-            //                     .iter()
-            //                     .map(|batch| Ok(FlightData::from(batch)))
-            //                     .collect();
-            //
-            //                 flights.append(&mut batches);
-            //
-            //                 let output = futures::stream::iter(flights);
-            //                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
-            //             }
-            //             _ => Err(Status::already_exists(&format!("{:?}", status))),
-            //         },
-            //         Err(e) => Err(Status::internal(e.to_string())),
-            //     }
-            // }
-            // physical_plan::Action::FetchShuffle(shuffle_id) => {
-            //     let results = self
-            //         .executor
-            //         .collect(shuffle_id)
-            //         .map_err(|e| to_tonic_err(&e))?;
-            //
-            //     // write results stream to client
-            //     let mut flights: Vec<Result<FlightData, Status>> =
-            //         vec![Ok(FlightData::from(&results.schema))];
-            //
-            //     let mut batches: Vec<Result<FlightData, Status>> = results
-            //         .data
-            //         .iter()
-            //         .map(|batch| Ok(FlightData::from(batch)))
-            //         .collect();
-            //
-            //     flights.append(&mut batches);
-            //
-            //     let output = futures::stream::iter(flights);
-            //     Ok(Response::new(Box::pin(output) as Self::DoGetStream))
-            // }
-            // physical_plan::Action::InteractiveQuery { plan, settings } => {
-            //     let results = self
-            //         .scheduler
-            //         .execute_query(plan, settings)
-            //         .await
-            //         .map_err(|e| to_tonic_err(&e))?;
-            //
-            //     // write results stream to client
-            //     let mut flights: Vec<Result<FlightData, Status>> =
-            //         vec![Ok(FlightData::from(&results.schema))];
-            //
-            //     let mut batches: Vec<Result<FlightData, Status>> = results
-            //         .data
-            //         .iter()
-            //         .map(|batch| Ok(FlightData::from(batch)))
-            //         .collect();
-            //
-            //     flights.append(&mut batches);
-            //
-            //     let output = futures::stream::iter(flights);
-            //     Ok(Response::new(Box::pin(output) as Self::DoGetStream))
-            // }
-            _ => Err(Status::invalid_argument("Invalid action")),
-        }
+        //  match &action {
+        // physical_plan::Action::Execute(task) => {
+        //     match self.executor.submit_task(task) {
+        //         Ok(status) => match status {
+        //             TaskStatus::Completed => {
+        //                 println!("Telling scheduler that task {} has completed", task.key());
+        //                 let results = ShufflePartition {
+        //                     schema: Schema::new(vec![Field::new(
+        //                         "shuffle_id",
+        //                         DataType::Utf8,
+        //                         false,
+        //                     )]),
+        //                     data: vec![],
+        //                 };
+        //
+        //                 // write empty results stream to client
+        //                 let mut flights: Vec<Result<FlightData, Status>> =
+        //                     vec![Ok(FlightData::from(&results.schema))];
+        //
+        //                 let mut batches: Vec<Result<FlightData, Status>> = results
+        //                     .data
+        //                     .iter()
+        //                     .map(|batch| Ok(FlightData::from(batch)))
+        //                     .collect();
+        //
+        //                 flights.append(&mut batches);
+        //
+        //                 let output = futures::stream::iter(flights);
+        //                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
+        //             }
+        //             _ => Err(Status::already_exists(&format!("{:?}", status))),
+        //         },
+        //         Err(e) => Err(Status::internal(e.to_string())),
+        //     }
+        // }
+        // physical_plan::Action::FetchShuffle(shuffle_id) => {
+        //     let results = self
+        //         .executor
+        //         .collect(shuffle_id)
+        //         .map_err(|e| to_tonic_err(&e))?;
+        //
+        //     // write results stream to client
+        //     let mut flights: Vec<Result<FlightData, Status>> =
+        //         vec![Ok(FlightData::from(&results.schema))];
+        //
+        //     let mut batches: Vec<Result<FlightData, Status>> = results
+        //         .data
+        //         .iter()
+        //         .map(|batch| Ok(FlightData::from(batch)))
+        //         .collect();
+        //
+        //     flights.append(&mut batches);
+        //
+        //     let output = futures::stream::iter(flights);
+        //     Ok(Response::new(Box::pin(output) as Self::DoGetStream))
+        // }
+        // physical_plan::Action::InteractiveQuery { plan, settings } => {
+        //     let results = self
+        //         .scheduler
+        //         .execute_query(plan, settings)
+        //         .await
+        //         .map_err(|e| to_tonic_err(&e))?;
+        //
+        //     // write results stream to client
+        //     let mut flights: Vec<Result<FlightData, Status>> =
+        //         vec![Ok(FlightData::from(&results.schema))];
+        //
+        //     let mut batches: Vec<Result<FlightData, Status>> = results
+        //         .data
+        //         .iter()
+        //         .map(|batch| Ok(FlightData::from(batch)))
+        //         .collect();
+        //
+        //     flights.append(&mut batches);
+        //
+        //     let output = futures::stream::iter(flights);
+        //     Ok(Response::new(Box::pin(output) as Self::DoGetStream))
+        // }
+        Err(Status::invalid_argument("Invalid action"))
+        // }
     }
 
     async fn get_schema(
@@ -171,54 +171,54 @@ impl FlightService for BallistaFlightService {
 
         let request = request.into_inner();
 
-        let action = decode_protobuf(&request.cmd.to_vec()).map_err(|e| to_tonic_err(&e))?;
+        let _action = decode_protobuf(&request.cmd.to_vec()).map_err(|e| to_tonic_err(&e))?;
 
-        match &action {
-            // physical_plan::Action::InteractiveQuery {
-            //     plan: logical_plan,
-            //     settings,
-            // } => {
-            //     println!("Logical plan: {:?}", logical_plan);
-            //
-            //     let plan =
-            //         create_physical_plan(&logical_plan, settings).map_err(|e| to_tonic_err(&e))?;
-            //     println!("Physical plan: {:?}", plan);
-            //
-            //     let plan = ensure_requirements(&plan).map_err(|e| to_tonic_err(&e))?;
-            //     println!("Optimized physical plan: {:?}", plan);
-            //
-            //     let job = create_job(plan).map_err(|e| to_tonic_err(&e))?;
-            //     job.explain();
-            //
-            //     // TODO execute the DAG by serializing stages to protobuf and allocating
-            //     // tasks (partitions) to executors in the cluster
-            //
-            //     Err(Status::invalid_argument("not implemented yet"))
-            //
-            //     //     let job = create_job(logical_plan).map_err(|e| to_tonic_err(&e))?;
-            //     //     println!("Job: {:?}", job);
-            //     //
-            //     //     //TODO execute stages
-            //     //
-            //     //     let uuid = "tbd";
-            //     //
-            //     //     match self.results.lock().expect("failed to lock mutex").get(uuid) {
-            //     //         Some(results) => {
-            //     //             let schema_bytes = schema_to_bytes(&results.schema);
-            //     //
-            //     //             Ok(Response::new(FlightInfo {
-            //     //                 schema: schema_bytes,
-            //     //                 endpoint: vec![],
-            //     //                 flight_descriptor: None,
-            //     //                 total_bytes: -1,
-            //     //                 total_records: -1,
-            //     //             }))
-            //     //         }
-            //     //         _ => Err(Status::not_found("Invalid uuid")),
-            //     //     }
-            // }
-            _ => Err(Status::invalid_argument("Invalid action")),
-        }
+        //match &action {
+        // physical_plan::Action::InteractiveQuery {
+        //     plan: logical_plan,
+        //     settings,
+        // } => {
+        //     println!("Logical plan: {:?}", logical_plan);
+        //
+        //     let plan =
+        //         create_physical_plan(&logical_plan, settings).map_err(|e| to_tonic_err(&e))?;
+        //     println!("Physical plan: {:?}", plan);
+        //
+        //     let plan = ensure_requirements(&plan).map_err(|e| to_tonic_err(&e))?;
+        //     println!("Optimized physical plan: {:?}", plan);
+        //
+        //     let job = create_job(plan).map_err(|e| to_tonic_err(&e))?;
+        //     job.explain();
+        //
+        //     // TODO execute the DAG by serializing stages to protobuf and allocating
+        //     // tasks (partitions) to executors in the cluster
+        //
+        //     Err(Status::invalid_argument("not implemented yet"))
+        //
+        //     //     let job = create_job(logical_plan).map_err(|e| to_tonic_err(&e))?;
+        //     //     println!("Job: {:?}", job);
+        //     //
+        //     //     //TODO execute stages
+        //     //
+        //     //     let uuid = "tbd";
+        //     //
+        //     //     match self.results.lock().expect("failed to lock mutex").get(uuid) {
+        //     //         Some(results) => {
+        //     //             let schema_bytes = schema_to_bytes(&results.schema);
+        //     //
+        //     //             Ok(Response::new(FlightInfo {
+        //     //                 schema: schema_bytes,
+        //     //                 endpoint: vec![],
+        //     //                 flight_descriptor: None,
+        //     //                 total_bytes: -1,
+        //     //                 total_records: -1,
+        //     //             }))
+        //     //         }
+        //     //         _ => Err(Status::not_found("Invalid uuid")),
+        //     //     }
+        // }
+        Err(Status::invalid_argument("Invalid action"))
+        //}
     }
 
     async fn handshake(

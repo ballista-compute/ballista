@@ -143,7 +143,7 @@ impl FlightService for BallistaFlightService {
 
     async fn get_schema(
         &self,
-        request: Request<FlightDescriptor>,
+        _request: Request<FlightDescriptor>,
     ) -> Result<Response<SchemaResult>, Status> {
         println!("get_schema()");
 

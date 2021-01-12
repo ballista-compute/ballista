@@ -12,10 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Serialization code for translating between query plans and protobuf
+use std::collections::HashMap;
 
-pub mod error;
-pub mod flight_service;
+use datafusion::logical_plan::LogicalPlan;
 
-#[macro_use]
-pub mod serde;
+pub mod from_proto;
+// pub mod to_proto;
+
+/// Action that can be sent to an executor
+#[derive(Debug, Clone)]
+pub enum Action {
+    /// Execute the query and return the results
+    InteractiveQuery {
+        plan: LogicalPlan,
+        settings: HashMap<String, String>,
+    },
+}

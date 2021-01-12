@@ -15,14 +15,12 @@
 //! This crate contains code generated from the Ballista Protocol Buffer Definition as well
 //! as convenience code for interacting with the generated code.
 
-use std::collections::HashMap;
 use std::convert::TryInto;
 use std::io::Cursor;
 
 use crate::error::BallistaError;
-use crate::serde::Action as BallistaAction;
+use crate::serde::scheduler::Action as BallistaAction;
 
-use datafusion::logical_plan::LogicalPlan;
 use prost::Message;
 
 pub const BALLISTA_PROTO_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -35,22 +33,13 @@ pub mod protobuf {
 
 pub mod logical_plan;
 pub mod physical_plan;
-
-/// Action that can be sent to an executor
-#[derive(Debug, Clone)]
-pub enum Action {
-    /// Execute the query and return the results
-    InteractiveQuery {
-        plan: LogicalPlan,
-        settings: HashMap<String, String>,
-    },
-}
+pub mod scheduler;
 
 pub(crate) fn decode_protobuf(bytes: &[u8]) -> Result<BallistaAction, BallistaError> {
     let mut buf = Cursor::new(bytes);
-    Action::decode(&mut buf)
+    protobuf::Action::decode(&mut buf)
         .map_err(|e| BallistaError::General(format!("{:?}", e)))
-        .and_then(|node| (&node).try_into())
+        .and_then(|node| node.try_into())
 }
 
 pub(crate) fn proto_error(message: &str) -> BallistaError {

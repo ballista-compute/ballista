@@ -16,8 +16,8 @@
 
 use std::convert::TryInto;
 
-use crate::serde::proto_error;
-use crate::serde::{protobuf, BallistaError};
+use crate::error::BallistaError;
+use crate::serde::{proto_error, protobuf};
 
 use arrow::datatypes::{DataType, Field, Schema};
 use datafusion::logical_plan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator};
@@ -203,32 +203,6 @@ impl TryInto<Expr> for &protobuf::LogicalExprNode {
         }
     }
 }
-
-// impl TryInto<Action> for &protobuf::Action {
-//     type Error = BallistaError;
-//
-//     fn try_into(self) -> Result<Action, Self::Error> {
-//         if self.query.is_some() {
-//             let plan: LogicalPlan = convert_required!(self.query)?;
-//             let mut settings = HashMap::new();
-//             for setting in &self.settings {
-//                 settings.insert(setting.key.to_owned(), setting.value.to_owned());
-//             }
-//             Ok(Action::InteractiveQuery { plan, settings })
-//         } else if self.task.is_some() {
-//             let task: ExecutionTask = convert_required!(self.task)?;
-//             Ok(Action::Execute(task))
-//         } else if self.fetch_shuffle.is_some() {
-//             let shuffle_id: ShuffleId = convert_required!(self.fetch_shuffle)?;
-//             Ok(Action::FetchShuffle(shuffle_id))
-//         } else {
-//             Err(BallistaError::NotImplemented(format!(
-//                 "from_proto(Action) {:?}",
-//                 self
-//             )))
-//         }
-//     }
-// }
 
 fn from_proto_binary_op(op: &str) -> Result<Operator, BallistaError> {
     match op {

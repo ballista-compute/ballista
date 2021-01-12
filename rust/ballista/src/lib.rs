@@ -16,6 +16,7 @@
 
 pub const BALLISTA_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+pub mod client;
 pub mod error;
 pub mod flight_service;
 

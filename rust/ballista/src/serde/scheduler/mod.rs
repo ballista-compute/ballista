@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use datafusion::logical_plan::LogicalPlan;
 
 pub mod from_proto;
-// pub mod to_proto;
+pub mod to_proto;
 
 /// Action that can be sent to an executor
 #[derive(Debug, Clone)]

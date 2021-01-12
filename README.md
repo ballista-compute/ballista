@@ -2,7 +2,6 @@
 
 [![License][license-badge]][license-url]
 [![Crates.io][crates-badge]][crates-url]
-[![Gitter Chat][gitter-badge]][gitter-url]
 [![Discord chat][discord-badge]][discord-url]
 
 [license-badge]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
@@ -11,8 +10,6 @@
 [crates-url]: https://crates.io/crates/ballista
 [discord-badge]: https://img.shields.io/discord/735486030626422884.svg?logo=discord&style=flat-square
 [discord-url]: https://discord.gg/95PMxSk
-[gitter-badge]: https://badges.gitter.im/ballista-rs/community.svg
-[gitter-url]: https://gitter.im/ballista-rs/community
 
 ## Overview
 

@@ -12,13 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Ballista Distributed Compute
+//! Ballista is a distributed compute platform implemented in Rust and based on Apache Arrow, with
+//! strong support for multiple programming languages and also provides interoperability with Apache
+//! Spark.
+
+#![feature(async_closure)]
+
+pub use arrow;
+pub use arrow_flight;
+pub use datafusion;
+pub use parquet;
+
+// include the generated protobuf source as a submodule
+#[allow(clippy::all)]
+pub mod protobuf {
+    include!(concat!(env!("OUT_DIR"), "/ballista.protobuf.rs"));
+}
 
 pub const BALLISTA_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub mod client;
+pub mod dataframe;
+pub mod distributed;
 pub mod error;
-pub mod flight_service;
+pub mod execution;
+pub mod serde;
 
 #[macro_use]
-pub mod serde;
+pub mod utils;

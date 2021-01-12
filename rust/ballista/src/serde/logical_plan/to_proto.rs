@@ -18,7 +18,7 @@
 
 use std::convert::TryInto;
 
-use crate::{empty_expr_node, empty_logical_plan_node, protobuf, BallistaProtoError};
+use crate::serde::{empty_expr_node, empty_logical_plan_node, protobuf, BallistaError};
 
 use arrow::datatypes::{DataType, Schema};
 use datafusion::datasource::parquet::ParquetTable;
@@ -28,7 +28,7 @@ use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::scalar::ScalarValue;
 
 impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
-    type Error = BallistaProtoError;
+    type Error = BallistaError;
 
     fn try_into(self) -> Result<protobuf::LogicalPlanNode, Self::Error> {
         match self {
@@ -78,7 +78,7 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
                     });
                     Ok(node)
                 } else {
-                    Err(BallistaProtoError::General(format!(
+                    Err(BallistaError::General(format!(
                         "logical plan to_proto unsupported table provider {:?}",
                         source
                     )))
@@ -92,7 +92,7 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
                     expr: expr
                         .iter()
                         .map(|expr| expr.try_into())
-                        .collect::<Result<Vec<_>, BallistaProtoError>>()?,
+                        .collect::<Result<Vec<_>, BallistaError>>()?,
                 });
                 Ok(node)
             }
@@ -118,11 +118,11 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
                     group_expr: group_expr
                         .iter()
                         .map(|expr| expr.try_into())
-                        .collect::<Result<Vec<_>, BallistaProtoError>>()?,
+                        .collect::<Result<Vec<_>, BallistaError>>()?,
                     aggr_expr: aggr_expr
                         .iter()
                         .map(|expr| expr.try_into())
-                        .collect::<Result<Vec<_>, BallistaProtoError>>()?,
+                        .collect::<Result<Vec<_>, BallistaError>>()?,
                 });
                 Ok(node)
             }
@@ -165,7 +165,7 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
             LogicalPlan::CreateExternalTable { .. } => unimplemented!(),
             LogicalPlan::Explain { .. } => unimplemented!(),
             LogicalPlan::Extension { .. } => unimplemented!(),
-            // _ => Err(BallistaProtoError::General(format!(
+            // _ => Err(BallistaError::General(format!(
             //     "logical plan to_proto {:?}",
             //     self
             // ))),
@@ -174,7 +174,7 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
 }
 
 impl TryInto<protobuf::LogicalExprNode> for &Expr {
-    type Error = BallistaProtoError;
+    type Error = BallistaError;
 
     fn try_into(self) -> Result<protobuf::LogicalExprNode, Self::Error> {
         match self {
@@ -259,7 +259,7 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                     expr.literal_f64 = n.unwrap() as f64; // TODO remove unwrap
                     Ok(expr)
                 }
-                other => Err(BallistaProtoError::General(format!(
+                other => Err(BallistaError::General(format!(
                     "to_proto unsupported scalar value {:?}",
                     other
                 ))),
@@ -307,7 +307,7 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
             Expr::Sort { .. } => unimplemented!(),
             Expr::InList { .. } => unimplemented!(),
             Expr::Wildcard => unimplemented!(),
-            // _ => Err(BallistaProtoError::General(format!(
+            // _ => Err(BallistaError::General(format!(
             //     "logical expr to_proto {:?}",
             //     self
             // ))),
@@ -316,7 +316,7 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
 }
 
 impl TryInto<protobuf::Schema> for &Schema {
-    type Error = BallistaProtoError;
+    type Error = BallistaError;
 
     fn try_into(self) -> Result<protobuf::Schema, Self::Error> {
         Ok(protobuf::Schema {
@@ -325,13 +325,11 @@ impl TryInto<protobuf::Schema> for &Schema {
                 .iter()
                 .map(|field| {
                     let proto = to_proto_arrow_type(&field.data_type());
-                    proto.and_then(|arrow_type| {
-                        Ok(protobuf::Field {
-                            name: field.name().to_owned(),
-                            arrow_type: arrow_type.into(),
-                            nullable: field.is_nullable(),
-                            children: vec![],
-                        })
+                    proto.map(|arrow_type| protobuf::Field {
+                        name: field.name().to_owned(),
+                        arrow_type: arrow_type.into(),
+                        nullable: field.is_nullable(),
+                        children: vec![],
                     })
                 })
                 .collect::<Result<Vec<_>, _>>()?,
@@ -339,7 +337,7 @@ impl TryInto<protobuf::Schema> for &Schema {
     }
 }
 
-fn to_proto_arrow_type(dt: &DataType) -> Result<protobuf::ArrowType, BallistaProtoError> {
+fn to_proto_arrow_type(dt: &DataType) -> Result<protobuf::ArrowType, BallistaError> {
     match dt {
         DataType::Int8 => Ok(protobuf::ArrowType::Int8),
         DataType::Int16 => Ok(protobuf::ArrowType::Int16),
@@ -352,7 +350,7 @@ fn to_proto_arrow_type(dt: &DataType) -> Result<protobuf::ArrowType, BallistaPro
         DataType::Float32 => Ok(protobuf::ArrowType::Float),
         DataType::Float64 => Ok(protobuf::ArrowType::Double),
         DataType::Utf8 => Ok(protobuf::ArrowType::Utf8),
-        other => Err(BallistaProtoError::General(format!(
+        other => Err(BallistaError::General(format!(
             "Unsupported data type {:?}",
             other
         ))),

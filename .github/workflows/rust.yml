@@ -7,35 +7,22 @@ on: [push,pull_request]
 
 env:
   VCPKGRS_DYNAMIC: 1
-  RUSTUP_VERSION: nightly-2020-05-14
-  TOOLCHAIN_VERSION: nightly-2020-05-14-x86_64-pc-windows-msvc
+  #TOOLCHAIN_VERSION: stable-x86_64-pc-windows-msvc
 
 jobs:
   Lint:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Setup
-      run: rustup default ${RUSTUP_VERSION} && rustup component add clippy rustfmt
     - name: Lint Ballista
       run: cd rust && cargo clippy -- -D warnings
-    - name: Lint Integration Tests
-      run: cd integration-tests/rust && cargo clippy -- -D warnings
-    - name: Lint Benchmarks
-      run: cd benchmarks && cargo clippy -- -D warnings
 
   Ubuntu:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Setup
-      run: rustup default ${RUSTUP_VERSION} && rustup component add rustfmt
     - name: Build Ballista
       run: cd rust && cargo build
-    - name: Build Integration Tests
-      run: cd integration-tests/rust && cargo build
-    - name: Build Benchmarks
-      run: cd benchmarks && cargo build
     - name: Run tests
       run: cd rust && cargo test
 
@@ -43,16 +30,8 @@ jobs:
     runs-on: macOS-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Setup
-      run: |
-        brew install rustup
-        rustup default ${RUSTUP_VERSION} && rustup component add rustfmt
     - name: Build Ballista
       run: cd rust && cargo build
-    - name: Build Integration Tests
-      run: cd integration-tests/rust && cargo build
-    - name: Build Benchmarks
-      run: cd benchmarks && cargo build
     - name: Run tests
       run: cd rust && cargo test
 
@@ -65,20 +44,9 @@ jobs:
         vcpkg update
         vcpkg integrate install
         vcpkg install openssl:x64-windows
-    - name: Setup Rust Nightly
-      run: |
-        rustup default nightly-2020-05-14
-        rustup toolchain install nightly-2020-05-14 --no-self-update
-        rustup component add rustfmt --toolchain nightly-2020-05-14-x86_64-pc-windows-msvc
     - name: Build Ballista
       run: |
         cd rust && cargo build
-    - name: Build Integration Tests
-      run: |
-        cd integration-tests/rust && cargo build
-    - name: Build Becnhmarks
-      run: |
-        cd benchmarks && cargo build
     - name: Run tests
       run: |
         cd rust && cargo test

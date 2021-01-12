@@ -1,5 +1,5 @@
 # Base image extends debian:buster-slim
-FROM rust:1.45.0-buster AS builder
+FROM rust:1.49.0-buster AS builder
 
 RUN apt update && apt -y install musl musl-dev musl-tools libssl-dev openssl
 
@@ -71,10 +71,8 @@ RUN rustup target add x86_64-unknown-linux-musl
 RUN cargo install cargo-build-deps
 
 # prepare toolchain
-COPY rust/rust-toolchain /tmp/ballista/
-WORKDIR /tmp/ballista
-RUN rustup update $(cat rust-toolchain) && \
-    rustup component add rustfmt --toolchain $(cat rust-toolchain)-x86_64-unknown-linux-gnu
+RUN rustup update && \
+    rustup component add rustfmt
 
 # Fetch Ballista dependencies
 COPY rust/ballista/Cargo.toml /tmp/ballista/
@@ -84,9 +82,8 @@ RUN cargo fetch
 # Compile Ballista dependencies
 RUN mkdir -p /tmp/ballista/src/bin/ && echo 'fn main() {}' >> /tmp/ballista/src/bin/executor.rs
 RUN mkdir -p /tmp/ballista/proto
-COPY proto/ballista.proto /tmp/ballista/proto/
+COPY rust/ballista/proto/ballista.proto /tmp/ballista/proto/
 COPY rust/ballista/build.rs /tmp/ballista/
-COPY rust/rust-toolchain /tmp/ballista/
 
 ARG RELEASE_FLAG=--release
 RUN cargo build $RELEASE_FLAG

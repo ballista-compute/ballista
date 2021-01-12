@@ -12,13 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Ballista Distributed Compute
+use std::collections::HashMap;
 
-pub const BALLISTA_VERSION: &str = env!("CARGO_PKG_VERSION");
+use datafusion::logical_plan::LogicalPlan;
 
-pub mod client;
-pub mod error;
-pub mod flight_service;
+pub mod from_proto;
+pub mod to_proto;
 
-#[macro_use]
-pub mod serde;
+/// Action that can be sent to an executor
+#[derive(Debug, Clone)]
+pub enum Action {
+    /// Execute the query and return the results
+    InteractiveQuery {
+        plan: LogicalPlan,
+        settings: HashMap<String, String>,
+    },
+}

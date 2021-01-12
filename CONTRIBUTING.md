@@ -16,6 +16,15 @@ This project depends on some existing technologies, so it is a good idea to lear
 - [Kubernetes](https://kubernetes.io/)
 - [gRPC](https://grpc.io/)
 
+Ballista will extend DataFusion to support distributed query execution of DataFusion queries by providing the following components:
+
+- Serde code to support serialization and deserialization of logical and physical query plans in protocol buffer format (so that full or partial query plans can be sent between processes).
+- Executor process implementing the Flight protocol that can receive a query plan and execute it.
+- Shuffle write operator that can store the partitioned output of a query in the executor’s memory, or persist to the file system.
+- Shuffle read operator than can read shuffle partitions from other executors in the cluster.
+- Distributed query planner / scheduler that will start with a DataFusion physical plan and insert shuffle read and write operators as necessary and then execute the query stages.
+- Kubernetes/Etcd support so that clusters can easily be created.
+
 ## Introduce Yourself!
 
 We have a [Gitter IM room](https://gitter.im/ballista-rs/community) for discussing this project as well as a 

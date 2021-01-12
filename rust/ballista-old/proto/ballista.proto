@@ -79,36 +79,24 @@ message LogicalPlanNode {
 
   LogicalPlanNode input = 1;
 
-  CsvTableScanNode csv_scan = 10;
-  ParquetTableScanNode parquet_scan = 11;
+  ScanNode scan = 10;
   ProjectionNode projection = 20;
   SelectionNode selection = 21;
   LimitNode limit = 22;
   AggregateNode aggregate = 23;
-  JoinNode join = 24;
 }
 
 message ProjectionColumns {
   repeated string columns = 1;
 }
 
-message CsvTableScanNode {
-  string table_name = 1;
-  string path = 2;
-  bool has_header = 3;
-  string delimiter = 4;
-  string file_extension = 5;
-  ProjectionColumns projection = 6;
-  Schema schema = 7;
-  repeated LogicalExprNode filters = 8;
-}
-
-message ParquetTableScanNode {
-  string table_name = 1;
-  string path = 2;
-  ProjectionColumns projection = 3;
-  Schema schema = 4;
-  repeated LogicalExprNode filters = 5;
+//TODO break this out into separate CsvScanNode and ParquetScanNode
+message ScanNode {
+  string path = 1;
+  ProjectionColumns projection = 2;
+  Schema schema = 3;
+  string file_format = 4; // parquet or csv
+  bool has_header = 5; // csv specific
 }
 
 message ProjectionNode {
@@ -122,20 +110,6 @@ message SelectionNode {
 message AggregateNode {
   repeated LogicalExprNode group_expr = 1;
   repeated LogicalExprNode aggr_expr = 2;
-}
-
-enum JoinType {
-  INNER = 0;
-  LEFT = 1;
-  RIGHT = 2;
-}
-
-message JoinNode {
-  LogicalPlanNode left = 1;
-  LogicalPlanNode right = 2;
-  JoinType join_type = 3;
-  repeated string left_join_column = 4;
-  repeated string right_join_column = 5;
 }
 
 message LimitNode {

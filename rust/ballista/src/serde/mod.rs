@@ -12,42 +12,105 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This module contains boring but necessary code to convert between Rust data structures and
-//! protocol buffer representations. Ballista is designed to support multiple programming languages
-//! which is why protocol buffers was chosen for all communication between processes.
-
-use crate::error::BallistaError;
-use crate::execution::physical_plan::Action;
-use crate::protobuf;
-
-use prost::Message;
+//! This crate contains code generated from the Ballista Protocol Buffer Definition as well
+//! as convenience code for interacting with the generated code.
 
 use std::convert::TryInto;
 use std::io::Cursor;
 
-pub mod from_proto;
-pub mod to_proto;
+use crate::error::BallistaError;
+use crate::serde::scheduler::Action as BallistaAction;
 
-pub fn decode_protobuf(bytes: &[u8]) -> Result<Action, BallistaError> {
+use prost::Message;
+
+// include the generated protobuf source as a submodule
+#[allow(clippy::all)]
+pub mod protobuf {
+    include!(concat!(env!("OUT_DIR"), "/ballista.protobuf.rs"));
+}
+
+pub mod logical_plan;
+pub mod physical_plan;
+pub mod scheduler;
+
+pub(crate) fn decode_protobuf(bytes: &[u8]) -> Result<BallistaAction, BallistaError> {
     let mut buf = Cursor::new(bytes);
     protobuf::Action::decode(&mut buf)
         .map_err(|e| BallistaError::General(format!("{:?}", e)))
-        .and_then(|node| (&node).try_into())
+        .and_then(|node| node.try_into())
+}
+
+pub(crate) fn proto_error(message: &str) -> BallistaError {
+    BallistaError::General(message.to_owned())
+}
+
+/// Create an empty ExprNode
+pub fn empty_expr_node() -> protobuf::LogicalExprNode {
+    protobuf::LogicalExprNode {
+        alias: None,
+        column_name: "".to_owned(),
+        has_column_name: false,
+        literal_string: "".to_owned(),
+        has_literal_string: false,
+        literal_int: 0,
+        literal_uint: 0,
+        literal_f32: 0.0,
+        literal_f64: 0.0,
+        has_literal_i8: false,
+        has_literal_i16: false,
+        has_literal_i32: false,
+        has_literal_i64: false,
+        has_literal_u8: false,
+        has_literal_u16: false,
+        has_literal_u32: false,
+        has_literal_u64: false,
+        has_literal_f32: false,
+        has_literal_f64: false,
+        binary_expr: None,
+        aggregate_expr: None,
+    }
+}
+
+/// Create an empty LogicalPlanNode
+pub fn empty_logical_plan_node() -> protobuf::LogicalPlanNode {
+    protobuf::LogicalPlanNode {
+        csv_scan: None,
+        parquet_scan: None,
+        input: None,
+        projection: None,
+        selection: None,
+        limit: None,
+        aggregate: None,
+        join: None,
+    }
+}
+
+/// Create an empty PhysicalPlanNode
+pub fn empty_physical_plan_node() -> protobuf::PhysicalPlanNode {
+    protobuf::PhysicalPlanNode {
+        scan: None,
+        input: None,
+        projection: None,
+        selection: None,
+        global_limit: None,
+        local_limit: None,
+        shuffle_reader: None,
+        hash_aggregate: None,
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::arrow::datatypes::{DataType, Field, Schema};
-    use crate::datafusion::execution::physical_plan::csv::CsvReadOptions;
-    use crate::datafusion::logicalplan::{col, lit, Expr, LogicalPlanBuilder};
-    use crate::error::Result;
-    use crate::execution::physical_plan::Action;
-    use crate::protobuf;
-    use std::collections::HashMap;
+    use super::super::error::Result;
+    use super::protobuf;
+    use arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::logical_plan::{LogicalPlan, LogicalPlanBuilder};
+    use datafusion::physical_plan::csv::CsvReadOptions;
+    use datafusion::prelude::*;
     use std::convert::TryInto;
 
     #[test]
-    fn roundtrip() -> Result<()> {
+    fn roundtrip_logical_plan() -> Result<()> {
         let schema = Schema::new(vec![
             Field::new("id", DataType::Int32, false),
             Field::new("first_name", DataType::Utf8, false),
@@ -59,76 +122,18 @@ mod tests {
         let plan = LogicalPlanBuilder::scan_csv(
             "employee.csv",
             CsvReadOptions::new().schema(&schema).has_header(true),
-            None,
-        )
-        .and_then(|plan| plan.filter(col("state").eq(lit("CO"))))
-        .and_then(|plan| plan.project(vec![col("id")]))
-        .and_then(|plan| plan.build())
-        .unwrap();
-
-        let action = &Action::InteractiveQuery {
-            plan: plan.clone(),
-            settings: HashMap::new(),
-            // tables: vec![TableMeta::Csv {
-            //     table_name: "employee".to_owned(),
-            //     has_header: true,
-            //     path: "/foo/bar.csv".to_owned(),
-            //     schema: schema.clone(),
-            // }],
-        };
-
-        let proto: protobuf::Action = action.try_into()?;
-
-        let action2: Action = (&proto).try_into()?;
-
-        assert_eq!(format!("{:?}", action), format!("{:?}", action2));
-
-        Ok(())
-    }
-
-    #[test]
-    fn roundtrip_aggregate() -> Result<()> {
-        let schema = Schema::new(vec![
-            Field::new("id", DataType::Int32, false),
-            Field::new("first_name", DataType::Utf8, false),
-            Field::new("last_name", DataType::Utf8, false),
-            Field::new("state", DataType::Utf8, false),
-            Field::new("salary", DataType::Int32, false),
-        ]);
-
-        let plan = LogicalPlanBuilder::scan_csv(
-            "employee.csv",
-            CsvReadOptions::new().schema(&schema).has_header(true),
-            None,
+            Some(vec![3, 4]),
         )
         .and_then(|plan| plan.aggregate(vec![col("state")], vec![max(col("salary"))]))
         .and_then(|plan| plan.build())
         .unwrap();
 
-        let action = &Action::InteractiveQuery {
-            plan: plan.clone(),
-            settings: HashMap::new(),
-            // tables: vec![TableMeta::Csv {
-            //     table_name: "employee".to_owned(),
-            //     has_header: true,
-            //     path: "/foo/bar.csv".to_owned(),
-            //     schema: schema.clone(),
-            // }],
-        };
+        let proto: protobuf::LogicalPlanNode = (&plan).try_into()?;
 
-        let proto: protobuf::Action = action.try_into()?;
+        let plan2: LogicalPlan = (&proto).try_into()?;
 
-        let action2: Action = (&proto).try_into()?;
-
-        assert_eq!(format!("{:?}", action), format!("{:?}", action2));
+        assert_eq!(format!("{:?}", plan), format!("{:?}", plan2));
 
         Ok(())
-    }
-
-    fn max(expr: Expr) -> Expr {
-        Expr::AggregateFunction {
-            name: "MAX".to_owned(),
-            args: vec![expr],
-        }
     }
 }

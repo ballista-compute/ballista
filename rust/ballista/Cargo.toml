@@ -11,13 +11,15 @@ build = "build.rs"
 include = ["build.rs", "src/**/*", "Cargo.toml", "proto/ballista.proto"]
 
 [dependencies]
+futures = "0.3"
 prost = "0.6"
 prost-types = "0.6"
 sqlparser = "0.7"
 tokio = { version = "0.2", features = ["full"] }
-tonic = "0.2"
+tonic = "0.3"
 
 arrow = { git = "https://github.com/apache/arrow", rev="49a1c7b" }
+arrow-flight = { git = "https://github.com/apache/arrow", rev="49a1c7b" }
 datafusion = { git = "https://github.com/apache/arrow", rev="49a1c7b" }
 
 [build-dependencies]

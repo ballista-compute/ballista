@@ -97,6 +97,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "arrow-flight"
+version = "3.0.0-SNAPSHOT"
+source = "git+https://github.com/apache/arrow?rev=49a1c7b#49a1c7bd411bab921c1d5960aa24d5df047f0097"
+dependencies = [
+ "arrow",
+ "bytes 1.0.0",
+ "futures",
+ "proc-macro2",
+ "prost",
+ "prost-derive",
+ "tokio",
+ "tonic",
+ "tonic-build",
+]
+
+[[package]]
 name = "async-stream"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -150,7 +166,9 @@ name = "ballista"
 version = "0.4.0-SNAPSHOT"
 dependencies = [
  "arrow",
+ "arrow-flight",
  "datafusion",
+ "futures",
  "prost",
  "prost-build",
  "prost-types",
@@ -158,12 +176,6 @@ dependencies = [
  "tokio",
  "tonic",
 ]
-
-[[package]]
-name = "base64"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b41b7ea54a0c9d92199de89e20e58d49f02f8e699814ef3fdf266f6f748d15c7"
 
 [[package]]
 name = "base64"
@@ -1737,13 +1749,13 @@ dependencies = [
 
 [[package]]
 name = "tonic"
-version = "0.2.1"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4afef9ce97ea39593992cf3fa00ff33b1ad5eb07665b31355df63a690e38c736"
+checksum = "74a5d6e7439ecf910463667080de772a9c7ddf26bc9fb4f3252ac3862e43337d"
 dependencies = [
  "async-stream",
  "async-trait",
- "base64 0.11.0",
+ "base64 0.12.3",
  "bytes 0.5.6",
  "futures-core",
  "futures-util",
@@ -1763,6 +1775,18 @@ dependencies = [
  "tower-service",
  "tracing",
  "tracing-futures",
+]
+
+[[package]]
+name = "tonic-build"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19970cf58f3acc820962be74c4021b8bbc8e8a1c4e3a02095d0aa60cde5f3633"
+dependencies = [
+ "proc-macro2",
+ "prost-build",
+ "quote",
+ "syn",
 ]
 
 [[package]]

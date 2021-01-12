@@ -23,8 +23,6 @@ use crate::serde::scheduler::Action as BallistaAction;
 
 use prost::Message;
 
-pub const BALLISTA_PROTO_VERSION: &str = env!("CARGO_PKG_VERSION");
-
 // include the generated protobuf source as a submodule
 #[allow(clippy::all)]
 pub mod protobuf {

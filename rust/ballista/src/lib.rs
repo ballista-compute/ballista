@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Serialization code for translating between query plans and protobuf
+//! Ballista Distributed Compute
+
+pub const BALLISTA_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub mod error;
 pub mod flight_service;

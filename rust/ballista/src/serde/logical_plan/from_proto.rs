@@ -114,7 +114,16 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
             LogicalPlanBuilder::scan_parquet(&scan.path, None, 24)? //TODO projection, concurrency
                 .build()
                 .map_err(|e| e.into())
-        } else {
+        } else if let Some(sort) = &self.sort {
+            let input: LogicalPlan = convert_box_required!(self.input)?;
+            let sort_expr: Vec<Expr> = sort.expr.iter()
+                                        .map(|expr| expr.try_into())
+                                        .collect::<Result<Vec<Expr>, _>>()?;
+            LogicalPlanBuilder::from(&input)
+                .sort(sort_expr)?
+                .build()
+                .map_err(|e| e.into())
+        }else {
             Err(proto_error(&format!(
                 "Unsupported logical plan '{:?}'",
                 self

@@ -86,6 +86,7 @@ message LogicalPlanNode {
   LimitNode limit = 22;
   AggregateNode aggregate = 23;
   JoinNode join = 24;
+  SortNode sort = 25;
 }
 
 message ProjectionColumns {
@@ -117,6 +118,10 @@ message ProjectionNode {
 
 message SelectionNode {
   LogicalExprNode expr = 2;
+}
+
+message SortNode{
+    repeated LogicalExprNode expr = 1;
 }
 
 message AggregateNode {

@@ -159,7 +159,17 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
                 node.limit = Some(protobuf::LimitNode { limit: *n as u32 });
                 Ok(node)
             }
-            LogicalPlan::Sort { .. } => unimplemented!(),
+            LogicalPlan::Sort { input, expr } => {
+                let input: protobuf::LogicalPlanNode = input.as_ref().try_into()?;
+                let mut node = empty_logical_plan_node();
+                node.input = Some(Box::new(input));
+                let selection_expr: Vec<protobuf::LogicalExprNode> = expr
+                                                            .iter()
+                                                            .map(|expr| expr.try_into())
+                                                            .collect::<Result<Vec<_>, BallistaError>>()?;
+                node.sort = Some(protobuf::SortNode{expr: selection_expr });
+                Ok(node)
+            },
             LogicalPlan::Repartition { .. } => unimplemented!(),
             LogicalPlan::EmptyRelation { .. } => unimplemented!(),
             LogicalPlan::CreateExternalTable { .. } => unimplemented!(),

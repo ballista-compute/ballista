@@ -82,6 +82,7 @@ pub fn empty_logical_plan_node() -> protobuf::LogicalPlanNode {
         limit: None,
         aggregate: None,
         join: None,
+        sort: None,
     }
 }
 
@@ -108,6 +109,29 @@ mod tests {
     use datafusion::physical_plan::csv::CsvReadOptions;
     use datafusion::prelude::*;
     use std::convert::TryInto;
+
+    #[test]
+    fn roundtrip_logical_plan_sort()->Result<()>{
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("first_name", DataType::Utf8, false),
+            Field::new("last_name", DataType::Utf8, false),
+            Field::new("state", DataType::Utf8, false),
+            Field::new("salary", DataType::Int32, false),
+        ]);
+
+        let plan = LogicalPlanBuilder::scan_csv(
+            "employee.csv",
+            CsvReadOptions::new().schema(&schema).has_header(true),
+            Some(vec![3, 4]),
+        ).and_then(|plan| plan.sort(vec![col("salary")]))
+        .and_then(|plan| plan.build()).unwrap();
+        let proto: protobuf::LogicalPlanNode = (&plan).try_into()?;
+        let plan2: LogicalPlan = (&proto).try_into()?;
+        assert_eq!(format!("{:?}", plan), format!("{:?}", plan2));
+        Ok(())
+    }
+
 
     #[test]
     fn roundtrip_logical_plan() -> Result<()> {

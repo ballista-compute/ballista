@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-fn main() {
+fn main()->Result<(), String> {
+    println!("cargo:rerun-if-changed=proto/ballista.proto");
     prost_build::compile_protos(&["proto/ballista.proto"], &["proto"])
-        .unwrap_or_else(|e| panic!("protobuf compilation failed: {}", e));
+        .map_err(|e| format!("protobuf compilation failed: {}", e))
 }

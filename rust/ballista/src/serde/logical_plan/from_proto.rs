@@ -14,13 +14,13 @@
 
 //! Serde code to convert from protocol buffers to Rust data structures.
 
-use std::convert::TryInto;
+use std::{convert::TryInto, unimplemented};
 
 use crate::error::BallistaError;
 use crate::serde::{proto_error, protobuf};
 
 use arrow::datatypes::{DataType, Field, Schema};
-use datafusion::logical_plan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator};
+use datafusion::{logical_plan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator}};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::physical_plan::csv::CsvReadOptions;
 use datafusion::scalar::ScalarValue;
@@ -125,6 +125,56 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
                 .sort(sort_expr)?
                 .build()
                 .map_err(|e| e.into())
+            
+        }else if let Some(repartition) = &self.repartition{
+            use datafusion::logical_plan::Partitioning;
+            let input: LogicalPlan = convert_box_required!(self.input)?;
+            use protobuf::repartition_node::PartitionMethod;
+            let pb_partition_method = repartition.partition_method.clone()
+                                                                            .ok_or(
+                                                                                BallistaError::General(String::from("Protobuf deserialization error, RepartitionNode was missing required field 'partition_method'"))
+                                                                            )?;
+            
+
+            let partitioning_scheme = match pb_partition_method{
+                PartitionMethod::Hash(protobuf::HashRepartition{hash_expr: pb_hash_expr, batch_size})=>{
+                    Partitioning::Hash(pb_hash_expr.iter()
+                                        .map(|pb_expr| pb_expr.try_into())
+                                        .collect::<Result<Vec<_>, _>>()?,
+                                         batch_size as usize)
+                },
+                PartitionMethod::RoundRobin(batch_size)=> Partitioning::RoundRobinBatch(batch_size as usize),
+            };
+            
+            LogicalPlanBuilder::from(&input)
+                .repartition(partitioning_scheme)?.build()
+                .map_err(|e| e.into())
+        
+        }else if let Some(empty_relation) = &self.empty_relation{
+            LogicalPlanBuilder::empty(empty_relation.produce_one_row)
+                .build()
+                .map_err(|e| e.into())
+        } else if let Some(create_extern_table) = &self.create_external_table{
+            let pb_schema = (create_extern_table.schema.clone())
+                                            .ok_or(
+                                                BallistaError::General(String::from("Protobuf deserialization error, CreateExternalTableNode was missing required field schema."))
+                                            )?;
+            
+            
+            let pb_file_type: protobuf::FileType = create_extern_table.file_type.try_into()?;
+            
+            Ok(LogicalPlan::CreateExternalTable{
+                schema: pb_schema.try_into()?,
+                name: create_extern_table.name.clone(),
+                location: create_extern_table.location.clone(),
+                file_type: pb_file_type.into(),
+                has_header: create_extern_table.has_header,
+            })
+        } else if let Some(explain) = &self.explain{
+            let input: LogicalPlan = convert_box_required!(self.input)?;
+            LogicalPlanBuilder::from(&input)
+                .explain(explain.verbose)?.build()
+                .map_err(|e| e.into())
         } else if let Some(limit) = &self.limit {
             let input: LogicalPlan = convert_box_required!(self.input)?;
             LogicalPlanBuilder::from(&input)
@@ -139,6 +189,27 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
         }
     }
 }
+
+impl TryInto<datafusion::logical_plan::DFSchema> for protobuf::Schema{
+    type Error = BallistaError;
+    fn try_into(self)->Result<datafusion::logical_plan::DFSchema, Self::Error>{
+        let schema: Schema = (&self).try_into()?;
+        schema.try_into().map_err(|df_err| BallistaError::DataFusionError(df_err))
+    }
+} 
+
+impl TryInto<datafusion::logical_plan::DFSchemaRef> for protobuf::Schema{
+    type Error = BallistaError;
+    fn try_into(self) -> Result<datafusion::logical_plan::DFSchemaRef, Self::Error> {
+        use datafusion::logical_plan::ToDFSchema;
+        let schema: Schema = (&self).try_into()?;
+        schema.to_dfschema_ref().map_err(|df_err| BallistaError::DataFusionError(df_err))
+    }
+}
+
+
+
+
 
 impl TryInto<Expr> for &protobuf::LogicalExprNode {
     type Error = BallistaError;
@@ -326,6 +397,32 @@ impl TryInto<Schema> for &protobuf::Schema {
         Ok(Schema::new(fields))
     }
 }
+use std::convert::TryFrom;
+impl TryFrom<i32> for protobuf::FileType{
+    type Error = BallistaError;
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        use protobuf::FileType;
+        match value{
+            _x if _x == FileType::NdJson as i32   => Ok(FileType::NdJson),
+            _x if _x == FileType::Parquet as i32   => Ok(FileType::Parquet),
+            _x if _x == FileType::Csv as i32   => Ok(FileType::Csv),
+            invalid => Err(BallistaError::General(format!("Attempted to convert invalid i32 to protobuf::Filetype: {}",invalid )))
+        }
+    }
+}
+
+impl Into<datafusion::sql::parser::FileType> for protobuf::FileType{
+    fn into(self)->datafusion::sql::parser::FileType{
+        use datafusion::sql::parser::FileType;
+        match self{
+            protobuf::FileType::NdJson => FileType::NdJson,
+            protobuf::FileType::Parquet => FileType::Parquet,
+            protobuf::FileType::Csv => FileType::CSV,
+        }
+    }
+}
+
+
 
 // impl TryInto<PhysicalPlan> for &protobuf::PhysicalPlanNode {
 //     type Error = BallistaError;

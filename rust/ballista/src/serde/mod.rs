@@ -111,7 +111,7 @@ mod tests {
     use std::convert::TryInto;
 
     #[test]
-    fn roundtrip_logical_plan_sort()->Result<()>{
+    fn roundtrip_logical_plan_sort() -> Result<()> {
         let schema = Schema::new(vec![
             Field::new("id", DataType::Int32, false),
             Field::new("first_name", DataType::Utf8, false),
@@ -124,14 +124,15 @@ mod tests {
             "employee.csv",
             CsvReadOptions::new().schema(&schema).has_header(true),
             Some(vec![3, 4]),
-        ).and_then(|plan| plan.sort(vec![col("salary")]))
-        .and_then(|plan| plan.build()).unwrap();
+        )
+        .and_then(|plan| plan.sort(vec![col("salary")]))
+        .and_then(|plan| plan.build())
+        .unwrap();
         let proto: protobuf::LogicalPlanNode = (&plan).try_into()?;
         let plan2: LogicalPlan = (&proto).try_into()?;
         assert_eq!(format!("{:?}", plan), format!("{:?}", plan2));
         Ok(())
     }
-
 
     #[test]
     fn roundtrip_logical_plan() -> Result<()> {

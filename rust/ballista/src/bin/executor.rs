@@ -22,7 +22,6 @@ use clap::arg_enum;
 use structopt::StructOpt;
 use tonic::transport::Server;
 
-
 arg_enum! {
     #[derive(Debug)]
     enum Mode {

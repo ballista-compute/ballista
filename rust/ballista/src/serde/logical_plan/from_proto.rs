@@ -14,13 +14,13 @@
 
 //! Serde code to convert from protocol buffers to Rust data structures.
 
-use std::convert::TryInto;
+use std::{convert::TryInto, unimplemented};
 
 use crate::error::BallistaError;
 use crate::serde::{proto_error, protobuf};
 
 use arrow::datatypes::{DataType, Field, Schema};
-use datafusion::logical_plan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator};
+use datafusion::{logical_plan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator}};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::physical_plan::csv::CsvReadOptions;
 use datafusion::scalar::ScalarValue;

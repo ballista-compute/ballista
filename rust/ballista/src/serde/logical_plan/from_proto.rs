@@ -14,13 +14,13 @@
 
 //! Serde code to convert from protocol buffers to Rust data structures.
 
-use std::{convert::TryInto, unimplemented};
+use std::convert::TryInto;
 
 use crate::error::BallistaError;
 use crate::serde::{proto_error, protobuf};
 
 use arrow::datatypes::{DataType, Field, Schema};
-use datafusion::{logical_plan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator}};
+use datafusion::logical_plan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::physical_plan::csv::CsvReadOptions;
 use datafusion::scalar::ScalarValue;
@@ -131,8 +131,8 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
             let input: LogicalPlan = convert_box_required!(self.input)?;
             use protobuf::repartition_node::PartitionMethod;
             let pb_partition_method = repartition.partition_method.clone()
-                                                                            .ok_or(
-                                                                                BallistaError::General(String::from("Protobuf deserialization error, RepartitionNode was missing required field 'partition_method'"))
+                                                                            .ok_or_else(
+                                                                                || BallistaError::General(String::from("Protobuf deserialization error, RepartitionNode was missing required field 'partition_method'"))
                                                                             )?;
             
 
@@ -156,8 +156,8 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
                 .map_err(|e| e.into())
         } else if let Some(create_extern_table) = &self.create_external_table{
             let pb_schema = (create_extern_table.schema.clone())
-                                            .ok_or(
-                                                BallistaError::General(String::from("Protobuf deserialization error, CreateExternalTableNode was missing required field schema."))
+                                            .ok_or_else(
+                                                || BallistaError::General(String::from("Protobuf deserialization error, CreateExternalTableNode was missing required field schema."))
                                             )?;
             
             
@@ -194,7 +194,7 @@ impl TryInto<datafusion::logical_plan::DFSchema> for protobuf::Schema{
     type Error = BallistaError;
     fn try_into(self)->Result<datafusion::logical_plan::DFSchema, Self::Error>{
         let schema: Schema = (&self).try_into()?;
-        schema.try_into().map_err(|df_err| BallistaError::DataFusionError(df_err))
+        schema.try_into().map_err( BallistaError::DataFusionError)
     }
 } 
 
@@ -203,13 +203,9 @@ impl TryInto<datafusion::logical_plan::DFSchemaRef> for protobuf::Schema{
     fn try_into(self) -> Result<datafusion::logical_plan::DFSchemaRef, Self::Error> {
         use datafusion::logical_plan::ToDFSchema;
         let schema: Schema = (&self).try_into()?;
-        schema.to_dfschema_ref().map_err(|df_err| BallistaError::DataFusionError(df_err))
+        schema.to_dfschema_ref().map_err(BallistaError::DataFusionError)
     }
 }
-
-
-
-
 
 impl TryInto<Expr> for &protobuf::LogicalExprNode {
     type Error = BallistaError;
@@ -397,6 +393,7 @@ impl TryInto<Schema> for &protobuf::Schema {
         Ok(Schema::new(fields))
     }
 }
+
 use std::convert::TryFrom;
 impl TryFrom<i32> for protobuf::FileType{
     type Error = BallistaError;

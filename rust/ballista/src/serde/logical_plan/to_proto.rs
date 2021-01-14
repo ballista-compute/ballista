@@ -164,12 +164,14 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
                 let mut node = empty_logical_plan_node();
                 node.input = Some(Box::new(input));
                 let selection_expr: Vec<protobuf::LogicalExprNode> = expr
-                                                            .iter()
-                                                            .map(|expr| expr.try_into())
-                                                            .collect::<Result<Vec<_>, BallistaError>>()?;
-                node.sort = Some(protobuf::SortNode{expr: selection_expr });
+                    .iter()
+                    .map(|expr| expr.try_into())
+                    .collect::<Result<Vec<_>, BallistaError>>()?;
+                node.sort = Some(protobuf::SortNode {
+                    expr: selection_expr,
+                });
                 Ok(node)
-            },
+            }
             LogicalPlan::Repartition { .. } => unimplemented!(),
             LogicalPlan::EmptyRelation { .. } => unimplemented!(),
             LogicalPlan::CreateExternalTable { .. } => unimplemented!(),
@@ -361,7 +363,7 @@ fn to_proto_arrow_type(dt: &DataType) -> Result<protobuf::ArrowType, BallistaErr
         DataType::Float64 => Ok(protobuf::ArrowType::Double),
         DataType::Utf8 => Ok(protobuf::ArrowType::Utf8),
         other => Err(BallistaError::General(format!(
-            "Unsupported data type {:?}",
+            "logical_plan::to_proto() Unsupported data type {:?}",
             other
         ))),
     }

@@ -11,6 +11,7 @@ build = "build.rs"
 include = ["build.rs", "src/**/*", "Cargo.toml", "proto/ballista.proto"]
 
 [dependencies]
+clap = "2"
 futures = "0.3"
 prost = "0.6"
 prost-types = "0.6"

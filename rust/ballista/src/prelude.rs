@@ -12,14 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Ballista Distributed Compute
+//! Ballista Prelude (common imports)
 
-pub const BALLISTA_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-pub mod client;
-pub mod error;
-pub mod flight_service;
-pub mod prelude;
-
-#[macro_use]
-pub mod serde;
+pub use crate::client::BallistaClient;
+pub use crate::error::{BallistaError, Result};

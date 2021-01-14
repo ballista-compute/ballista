@@ -12,14 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Ballista Distributed Compute
+use ballista::prelude::*;
+use datafusion::logical_plan::LogicalPlanBuilder;
 
-pub const BALLISTA_VERSION: &str = env!("CARGO_PKG_VERSION");
+#[tokio::main]
+async fn main() -> Result<()> {
+    let plan = LogicalPlanBuilder::scan_parquet(
+        "/mnt/tpch/parquet-sf100-partitioned/customer/",
+        Some(vec![3, 4]),
+        10,
+    )?
+    .limit(10)?
+    .build()?;
 
-pub mod client;
-pub mod error;
-pub mod flight_service;
-pub mod prelude;
+    let mut client = BallistaClient::try_new("localhost", 8000).await?;
+    let batches = client.execute_query(&plan).await?;
+    batches.iter().for_each(|b| println!("{:?}", b));
 
-#[macro_use]
-pub mod serde;
+    Ok(())
+}

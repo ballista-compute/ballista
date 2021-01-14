@@ -125,9 +125,15 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
                 .sort(sort_expr)?
                 .build()
                 .map_err(|e| e.into())
+        } else if let Some(limit) = &self.limit {
+            let input: LogicalPlan = convert_box_required!(self.input)?;
+            LogicalPlanBuilder::from(&input)
+                .limit(limit.limit as usize)?
+                .build()
+                .map_err(|e| e.into())
         } else {
             Err(proto_error(&format!(
-                "Unsupported logical plan '{:?}'",
+                "logical_plan::from_proto() Unsupported logical plan '{:?}'",
                 self
             )))
         }

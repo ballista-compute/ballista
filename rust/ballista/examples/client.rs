@@ -18,10 +18,11 @@ use datafusion::logical_plan::LogicalPlanBuilder;
 #[tokio::main]
 async fn main() -> Result<()> {
     let plan = LogicalPlanBuilder::scan_parquet(
-        "/mnt/tpch/parquet-sf100-partitioned/lineitem/",
+        "/mnt/tpch/parquet-sf100-partitioned/customer/",
         Some(vec![3, 4]),
         10,
     )?
+    .limit(10)?
     .build()?;
 
     let mut client = BallistaClient::try_new("localhost", 8000).await?;

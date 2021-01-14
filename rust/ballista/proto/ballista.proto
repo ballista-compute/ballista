@@ -87,6 +87,10 @@ message LogicalPlanNode {
   AggregateNode aggregate = 23;
   JoinNode join = 24;
   SortNode sort = 25;
+  RepartitionNode repartition = 26;
+  EmptyRelationNode empty_relation = 27;
+  CreateExternalTableNode create_external_table = 28;
+  ExplainNode explain = 29;
 }
 
 message ProjectionColumns {
@@ -122,6 +126,45 @@ message SelectionNode {
 
 message SortNode{
     repeated LogicalExprNode expr = 1;
+}
+
+message RepartitionNode{
+    oneof partition_method{
+        uint64 round_robin = 1;
+        HashRepartition hash = 2;
+    }
+}
+
+message HashRepartition{
+    repeated LogicalExprNode hash_expr = 2;
+    uint64 batch_size = 1;
+}
+
+message EmptyRelationNode{
+    bool produce_one_row = 1;
+}
+
+message CreateExternalTableNode{
+    string name = 1;
+    string location = 2;
+    FileType file_type = 3;
+    bool has_header = 4;
+    Schema schema = 5;
+}
+
+enum FileType{
+    NdJson = 0;
+    Parquet = 1;
+    CSV = 2;
+}
+
+message ExplainNode{
+    bool verbose = 1;
+}
+ 
+message DfField{
+    string qualifier = 2;
+    Field field = 1;
 }
 
 message AggregateNode {

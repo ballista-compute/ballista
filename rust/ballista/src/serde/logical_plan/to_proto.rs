@@ -171,62 +171,75 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
                     expr: selection_expr,
                 });
                 Ok(node)
-            },
-            LogicalPlan::Repartition { input, partitioning_scheme } => {
+            }
+            LogicalPlan::Repartition {
+                input,
+                partitioning_scheme,
+            } => {
                 use datafusion::logical_plan::Partitioning;
                 let input: protobuf::LogicalPlanNode = input.as_ref().try_into()?;
                 let mut node = empty_logical_plan_node();
                 node.input = Some(Box::new(input));
-                
+
                 //Assumed common usize field was batch size
                 //Used u64 to avoid any nastyness involving large values, most data clusters are probably uniformly 64 bits any ways
                 use protobuf::repartition_node::PartitionMethod;
 
-                let pb_partition_method = match partitioning_scheme{
-                    Partitioning::Hash(exprs, batch_size)=>{
-                        PartitionMethod::Hash(protobuf::HashRepartition{
-                            hash_expr: exprs.iter()
-                            .map(|expr| expr.try_into())
-                            .collect::<Result<Vec<_>, BallistaError>>()?,
+                let pb_partition_method = match partitioning_scheme {
+                    Partitioning::Hash(exprs, batch_size) => {
+                        PartitionMethod::Hash(protobuf::HashRepartition {
+                            hash_expr: exprs.iter().map(|expr| expr.try_into()).collect::<Result<
+                                Vec<_>,
+                                BallistaError,
+                            >>(
+                            )?,
                             batch_size: *batch_size as u64,
                         })
-                    },
-                    Partitioning::RoundRobinBatch(batch_size)  =>{
+                    }
+                    Partitioning::RoundRobinBatch(batch_size) => {
                         PartitionMethod::RoundRobin(*batch_size as u64)
                     }
                 };
 
-                node.repartition = Some(protobuf::RepartitionNode{
+                node.repartition = Some(protobuf::RepartitionNode {
                     partition_method: Some(pb_partition_method),
                 });
-                
-                Ok(node)
-            },
-            LogicalPlan::EmptyRelation { produce_one_row, .. } =>{
-                let mut node = empty_logical_plan_node();                  
-                node.empty_relation = Some(protobuf::EmptyRelationNode{produce_one_row: *produce_one_row});                          
-                Ok(node)
 
-            },
-            LogicalPlan::CreateExternalTable { name, location, file_type, has_header , schema: df_schema} => {
+                Ok(node)
+            }
+            LogicalPlan::EmptyRelation {
+                produce_one_row, ..
+            } => {
+                let mut node = empty_logical_plan_node();
+                node.empty_relation = Some(protobuf::EmptyRelationNode {
+                    produce_one_row: *produce_one_row,
+                });
+                Ok(node)
+            }
+            LogicalPlan::CreateExternalTable {
+                name,
+                location,
+                file_type,
+                has_header,
+                schema: df_schema,
+            } => {
                 let mut node = empty_logical_plan_node();
                 use datafusion::sql::parser::FileType;
                 let schema: Schema = df_schema.as_ref().clone().into();
-                let pb_schema: protobuf::Schema = (&schema).try_into()
-                                                        .map_err(
-                                                                |e| BallistaError::General(format!("Could not convert schema into protobuf: {:?}", e)
-                                                            )
-                                                        )?;
-                
+                let pb_schema: protobuf::Schema = (&schema).try_into().map_err(|e| {
+                    BallistaError::General(format!(
+                        "Could not convert schema into protobuf: {:?}",
+                        e
+                    ))
+                })?;
 
-                let pb_file_type: protobuf::FileType = match file_type{
+                let pb_file_type: protobuf::FileType = match file_type {
                     FileType::NdJson => protobuf::FileType::NdJson,
                     FileType::Parquet => protobuf::FileType::Parquet,
                     FileType::CSV => protobuf::FileType::Csv,
                 };
-                
-            
-                node.create_external_table = Some(protobuf::CreateExternalTableNode{
+
+                node.create_external_table = Some(protobuf::CreateExternalTableNode {
                     name: name.clone(),
                     location: location.clone(),
                     file_type: pb_file_type as i32,
@@ -234,16 +247,14 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
                     schema: Some(pb_schema),
                 });
                 Ok(node)
-            },
-            LogicalPlan::Explain { verbose, plan, ..} => {
+            }
+            LogicalPlan::Explain { verbose, plan, .. } => {
                 let mut node = empty_logical_plan_node();
                 let input: protobuf::LogicalPlanNode = plan.as_ref().try_into()?;
                 node.input = Some(Box::new(input));
-                node.explain = Some(protobuf::ExplainNode{
-                    verbose: *verbose,  
-                });    
+                node.explain = Some(protobuf::ExplainNode { verbose: *verbose });
                 Ok(node)
-            },
+            }
             LogicalPlan::Extension { .. } => unimplemented!(),
             // _ => Err(BallistaError::General(format!(
             //     "logical plan to_proto {:?}",

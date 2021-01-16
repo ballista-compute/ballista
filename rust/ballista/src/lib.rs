@@ -25,6 +25,8 @@ pub mod executor;
 pub mod flight_service;
 pub mod k8s;
 pub mod prelude;
+pub mod shuffle_read;
+pub mod shuffle_write;
 
 #[macro_use]
 pub mod serde;

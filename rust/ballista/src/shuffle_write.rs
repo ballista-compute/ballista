@@ -17,15 +17,18 @@
 //! stages of query execution.
 
 use std::any::Any;
+use std::fs::File;
 
 use crate::memory_stream::MemoryStream;
 
 use arrow::array::{ArrayRef, StringBuilder, UInt32Builder};
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
+use arrow::ipc::writer::FileWriter;
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use datafusion::error::{DataFusionError, Result};
 use datafusion::physical_plan::{ExecutionPlan, Partitioning, SendableRecordBatchStream};
+use futures::stream::StreamExt;
 use tonic::codegen::Arc;
 
 /// Shuffle write operator
@@ -87,9 +90,18 @@ impl ExecutionPlan for ShuffleWriteExec {
         // TODO use tokio to execute all input partitions in parallel
 
         for input_partition in 0..num_partitions {
-            let _stream = self.child.execute(input_partition).await?;
+            // execute input partition
+            let mut stream = self.child.execute(input_partition).await?;
+
+            // stream data to disk in IPC format
             let path = format!("{}/{}", self.output_path, input_partition);
-            // TODO write stream to disk in IPC format
+            let file = File::create(&path)?;
+            let mut writer = FileWriter::try_new(file, self.child.schema().as_ref())?;
+            while let Some(result) = stream.next().await {
+                let batch = result?;
+                writer.write(&batch)?;
+            }
+            writer.finish()?;
 
             partition_id.append_value(input_partition as u32)?;
             partition_location.append_value(&path)?;

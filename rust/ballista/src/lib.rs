@@ -23,6 +23,7 @@ pub mod error;
 pub mod etcd;
 pub mod executor;
 pub mod flight_service;
+pub mod k8s;
 pub mod prelude;
 
 #[macro_use]

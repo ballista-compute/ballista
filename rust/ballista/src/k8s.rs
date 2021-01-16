@@ -15,8 +15,8 @@
 //! Ballista k8s cluster management utilities
 
 use crate::error::BallistaError;
-use crate::execution::physical_plan::ExecutorMeta;
 
+use crate::serde::scheduler::ExecutorMeta;
 use k8s_openapi::api;
 
 const CLUSTER_LABEL_KEY: &str = "ballista-cluster";

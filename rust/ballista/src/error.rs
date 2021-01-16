@@ -36,9 +36,9 @@ pub enum BallistaError {
     IoError(io::Error),
     // ReqwestError(reqwest::Error),
     //HttpError(http::Error),
-    // KubeAPIError(kube::error::Error),
-    // KubeAPIRequestError(k8s_openapi::RequestError),
-    // KubeAPIResponseError(k8s_openapi::ResponseError),
+    KubeAPIError(kube::error::Error),
+    KubeAPIRequestError(k8s_openapi::RequestError),
+    KubeAPIResponseError(k8s_openapi::ResponseError),
     // TonicError(tonic::status::Status)
 }
 
@@ -87,24 +87,24 @@ impl From<io::Error> for BallistaError {
 //         BallistaError::HttpError(e)
 //     }
 // }
-//
-// impl From<kube::error::Error> for BallistaError {
-//     fn from(e: kube::error::Error) -> Self {
-//         BallistaError::KubeAPIError(e)
-//     }
-// }
-//
-// impl From<k8s_openapi::RequestError> for BallistaError {
-//     fn from(e: k8s_openapi::RequestError) -> Self {
-//         BallistaError::KubeAPIRequestError(e)
-//     }
-// }
-//
-// impl From<k8s_openapi::ResponseError> for BallistaError {
-//     fn from(e: k8s_openapi::ResponseError) -> Self {
-//         BallistaError::KubeAPIResponseError(e)
-//     }
-// }
+
+impl From<kube::error::Error> for BallistaError {
+    fn from(e: kube::error::Error) -> Self {
+        BallistaError::KubeAPIError(e)
+    }
+}
+
+impl From<k8s_openapi::RequestError> for BallistaError {
+    fn from(e: k8s_openapi::RequestError) -> Self {
+        BallistaError::KubeAPIRequestError(e)
+    }
+}
+
+impl From<k8s_openapi::ResponseError> for BallistaError {
+    fn from(e: k8s_openapi::ResponseError) -> Self {
+        BallistaError::KubeAPIResponseError(e)
+    }
+}
 
 // impl From<tonic::status::Status> for BallistaError {
 //     fn from(e: tonic::status::Status) -> Self {
@@ -123,13 +123,13 @@ impl Display for BallistaError {
             BallistaError::IoError(ref desc) => write!(f, "IO error: {}", desc),
             // BallistaError::ReqwestError(ref desc) => write!(f, "Reqwest error: {}", desc),
             // BallistaError::HttpError(ref desc) => write!(f, "HTTP error: {}", desc),
-            // BallistaError::KubeAPIError(ref desc) => write!(f, "Kube API error: {}", desc),
-            // BallistaError::KubeAPIRequestError(ref desc) => {
-            //     write!(f, "KubeAPI request error: {}", desc)
-            // }
-            // BallistaError::KubeAPIResponseError(ref desc) => {
-            //     write!(f, "KubeAPI response error: {}", desc)
-            // }
+            BallistaError::KubeAPIError(ref desc) => write!(f, "Kube API error: {}", desc),
+            BallistaError::KubeAPIRequestError(ref desc) => {
+                write!(f, "KubeAPI request error: {}", desc)
+            }
+            BallistaError::KubeAPIResponseError(ref desc) => {
+                write!(f, "KubeAPI response error: {}", desc)
+            }
         }
     }
 }

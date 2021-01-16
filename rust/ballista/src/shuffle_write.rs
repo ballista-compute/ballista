@@ -126,6 +126,7 @@ mod tests {
     use arrow::datatypes::{DataType, Field, Schema};
     use datafusion::physical_plan::memory::MemoryExec;
     use futures::stream::StreamExt;
+    use tempfile::TempDir;
 
     #[tokio::test]
     async fn test() -> Result<()> {
@@ -140,7 +141,9 @@ mod tests {
         let mem_table: Arc<dyn ExecutionPlan> =
             Arc::new(MemoryExec::try_new(&partitions, schema, None)?);
 
-        let shuffle_write_exec = ShuffleWriteExec::new(mem_table, "/tmp");
+        let tmp_dir = TempDir::new()?;
+
+        let shuffle_write_exec = ShuffleWriteExec::new(mem_table, tmp_dir.path().to_str().unwrap());
         assert_eq!(
             1,
             shuffle_write_exec.output_partitioning().partition_count()

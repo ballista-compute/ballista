@@ -203,6 +203,7 @@ dependencies = [
  "prost-types",
  "sqlparser",
  "structopt",
+ "tempfile",
  "tokio",
  "tonic",
  "uuid",

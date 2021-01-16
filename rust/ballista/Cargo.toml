@@ -30,6 +30,9 @@ arrow = { git = "https://github.com/apache/arrow", rev="49a1c7b" }
 arrow-flight = { git = "https://github.com/apache/arrow", rev="49a1c7b" }
 datafusion = { git = "https://github.com/apache/arrow", rev="49a1c7b" }
 
+[dev-dependencies]
+tempfile = "3"
+
 [build-dependencies]
 prost-build = { version = "0.6.1" }
 

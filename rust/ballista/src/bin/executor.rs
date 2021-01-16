@@ -84,7 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // TODO split scheduler and executor into separate processes soon
     // let scheduler: Arc<dyn Scheduler> = Arc::new(BallistaScheduler::new(config.clone()));
-    let executor: Arc<dyn Executor> = Arc::new(BallistaExecutor::new(config));
+    //let executor: Arc<dyn Executor> = Arc::new(BallistaExecutor::new(config));
 
     let service = BallistaFlightService {}; //::new(/*scheduler, executor*/);
     let server = FlightServiceServer::new(service);

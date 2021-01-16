@@ -10,6 +10,14 @@ env:
   #TOOLCHAIN_VERSION: stable-x86_64-pc-windows-msvc
 
 jobs:
+
+  CheckFormat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Checks Ballista formatting
+        run: cd rust && cargo fmt -- --check > /dev/null || echo "Please run cargo fmt on your commit." && ( exit 1 )
+
   Lint:
     runs-on: ubuntu-latest
     steps:
@@ -19,6 +27,9 @@ jobs:
 
   Ubuntu:
     runs-on: ubuntu-latest
+    needs: 
+      - CheckFormat
+      - Lint
     steps:
     - uses: actions/checkout@v2
     - name: Build Ballista
@@ -28,6 +39,9 @@ jobs:
 
   Mac:
     runs-on: macOS-latest
+    needs: 
+      - CheckFormat
+      - Lint
     steps:
     - uses: actions/checkout@v2
     - name: Build Ballista
@@ -37,6 +51,9 @@ jobs:
 
   Windows:
     runs-on: windows-2016
+    needs: 
+      - CheckFormat
+      - Lint
     steps:
     - uses: actions/checkout@v2
     - name: Prepare the Windows Build Environment
@@ -53,6 +70,9 @@ jobs:
 
   Docker:
     runs-on: ubuntu-latest
+    needs: 
+      - CheckFormat
+      - Lint
     env:
       # this points to the repository that others fork from. Useful to fetch cached images from
       BASE_REPOSITORY: ballista-compute/ballista

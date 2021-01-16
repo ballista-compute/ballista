@@ -14,6 +14,8 @@
 
 //! Ballista Rust executor binary.
 
+use std::sync::Arc;
+
 use arrow_flight::flight_service_server::FlightServiceServer;
 use ballista::flight_service::BallistaFlightService;
 use ballista::BALLISTA_VERSION;
@@ -21,6 +23,7 @@ use ballista::BALLISTA_VERSION;
 use clap::arg_enum;
 use structopt::StructOpt;
 use tonic::transport::Server;
+use ballista::executor::{DiscoveryMode, BallistaExecutor};
 
 arg_enum! {
     #[derive(Debug)]
@@ -62,11 +65,11 @@ struct Opt {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opt = Opt::from_args();
 
-    // let mode = match opt.mode {
-    //    Mode::K8s => DiscoveryMode::Kubernetes,
-    //    Mode::Etcd => DiscoveryMode::Etcd,
-    //    Mode::Standalone => DiscoveryMode::Standalone,
-    // };
+    let mode = match opt.mode {
+       Mode::K8s => DiscoveryMode::Kubernetes,
+       Mode::Etcd => DiscoveryMode::Etcd,
+       Mode::Standalone => DiscoveryMode::Standalone,
+    };
 
     let _external_host = opt.external_host.as_deref().unwrap_or("localhost");
     let bind_host = opt.bind_host.as_deref().unwrap_or("0.0.0.0");
@@ -81,7 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // TODO split scheduler and executor into separate processes soon
     // let scheduler: Arc<dyn Scheduler> = Arc::new(BallistaScheduler::new(config.clone()));
-    // let executor: Arc<dyn Executor> = Arc::new(BallistaExecutor::new(config));
+    let executor: Arc<dyn Executor> = Arc::new(BallistaExecutor::new(config));
 
     let service = BallistaFlightService {}; //::new(/*scheduler, executor*/);
     let server = FlightServiceServer::new(service);

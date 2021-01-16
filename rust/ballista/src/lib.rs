@@ -20,6 +20,7 @@ pub mod client;
 pub mod columnar_batch;
 pub mod context;
 pub mod error;
+pub mod etcd;
 pub mod executor;
 pub mod flight_service;
 pub mod prelude;

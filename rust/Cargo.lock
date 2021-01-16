@@ -171,6 +171,7 @@ dependencies = [
  "clap",
  "crossbeam 0.7.3",
  "datafusion",
+ "etcd-client",
  "futures",
  "prost",
  "prost-build",
@@ -568,6 +569,19 @@ name = "encode_unicode"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a357d28ed41a50f9c765dbfe56cbc04a64e53e5fc58ba79fbc34c10ef3df831f"
+
+[[package]]
+name = "etcd-client"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d75fdc59d59bc197ef130c3d25645f7e67202fc04e2eb6ee0b8a6e2481e8dcbf"
+dependencies = [
+ "http",
+ "prost",
+ "tokio",
+ "tonic",
+ "tonic-build",
+]
 
 [[package]]
 name = "fixedbitset"

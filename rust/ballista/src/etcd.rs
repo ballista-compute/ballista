@@ -35,6 +35,8 @@ pub fn start_etcd_thread(
     let cluster_name = cluster_name.to_owned();
     let host = host.to_owned();
     let uuid = uuid.to_owned();
+
+    //TODO convert to use tokio
     thread::spawn(move || {
         // smol::run(async move {
         //     loop {

@@ -135,6 +135,7 @@ impl BallistaExecutor {
             let task_status_map = task_status_map.clone();
             let shuffle_partitions = shuffle_partitions.clone();
 
+            //TODO convert to use tokio
             // thread::spawn(move || {
             //     smol::run(async {
             //         Task::blocking(async move {

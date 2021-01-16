@@ -18,7 +18,11 @@
 
 use std::any::Any;
 
-use arrow::datatypes::SchemaRef;
+use crate::memory_stream::MemoryStream;
+
+use arrow::array::{ArrayRef, StringBuilder, UInt32Builder};
+use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
+use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use datafusion::error::{DataFusionError, Result};
 use datafusion::physical_plan::{ExecutionPlan, Partitioning, SendableRecordBatchStream};
@@ -75,15 +79,67 @@ impl ExecutionPlan for ShuffleWriteExec {
     async fn execute(&self, partition: usize) -> Result<SendableRecordBatchStream> {
         assert!(partition == 0);
 
+        let num_partitions = self.child.output_partitioning().partition_count();
+        let mut partition_id = UInt32Builder::new(num_partitions);
+        let mut partition_location =
+            StringBuilder::with_capacity(num_partitions, num_partitions * 256);
+
         // TODO use tokio to execute all input partitions in parallel
 
-        for input_partition in 0..self.child.output_partitioning().partition_count() {
+        for input_partition in 0..num_partitions {
             let _stream = self.child.execute(input_partition).await?;
-            let _path = format!("{}/{}", self.output_path, input_partition);
+            let path = format!("{}/{}", self.output_path, input_partition);
             // TODO write stream to disk in IPC format
+
+            partition_id.append_value(input_partition as u32)?;
+            partition_location.append_value(&path)?;
         }
 
-        // TODO return summary of the shuffle partitions in a single RecordBatch
-        todo!()
+        let partition_id: ArrayRef = Arc::new(partition_id.finish());
+        let partition_location: ArrayRef = Arc::new(partition_location.finish());
+
+        let schema = SchemaRef::new(Schema::new(vec![
+            Field::new("partition_id", DataType::UInt32, false),
+            Field::new("partition_location", DataType::Utf8, false),
+        ]));
+        let batch = RecordBatch::try_new(schema.clone(), vec![partition_id, partition_location])?;
+        Ok(Box::pin(MemoryStream::try_new(vec![batch], schema, None)?))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arrow::array::Int32Array;
+    use arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::physical_plan::memory::MemoryExec;
+    use futures::stream::StreamExt;
+
+    #[tokio::test]
+    async fn test() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![Field::new("c0", DataType::Int32, false)]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int32Array::from(vec![1, 2, 3]))],
+        )?;
+
+        let partitions = vec![vec![batch.clone()], vec![batch]];
+        let mem_table: Arc<dyn ExecutionPlan> =
+            Arc::new(MemoryExec::try_new(&partitions, schema, None)?);
+
+        let shuffle_write_exec = ShuffleWriteExec::new(mem_table, "/tmp");
+        assert_eq!(
+            1,
+            shuffle_write_exec.output_partitioning().partition_count()
+        );
+
+        let mut stream = shuffle_write_exec.execute(0).await?;
+        let batch = stream.next().await.unwrap()?;
+        assert_eq!(2, batch.num_columns());
+        assert_eq!(2, batch.num_rows());
+        assert!(stream.next().await.is_none());
+
+        Ok(())
     }
 }

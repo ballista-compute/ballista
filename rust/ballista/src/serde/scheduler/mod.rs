@@ -13,8 +13,11 @@
 // limitations under the License.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use datafusion::logical_plan::LogicalPlan;
+use datafusion::physical_plan::ExecutionPlan;
+use uuid::Uuid;
 
 pub mod from_proto;
 pub mod to_proto;
@@ -27,4 +30,61 @@ pub enum Action {
         plan: LogicalPlan,
         settings: HashMap<String, String>,
     },
+}
+
+/// Unique identifier for the output shuffle partition of an operator.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ShuffleId {
+    pub(crate) job_uuid: Uuid,
+    pub(crate) stage_id: usize,
+    pub(crate) partition_id: usize,
+}
+
+impl ShuffleId {
+    pub fn new(job_uuid: Uuid, stage_id: usize, partition_id: usize) -> Self {
+        Self {
+            job_uuid,
+            stage_id,
+            partition_id,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ExecutorMeta {
+    pub id: String,
+    pub host: String,
+    pub port: usize,
+}
+
+/// Task that can be sent to an executor for execution
+#[derive(Debug, Clone)]
+pub struct ExecutionTask {
+    pub(crate) job_uuid: Uuid,
+    pub(crate) stage_id: usize,
+    pub(crate) partition_id: usize,
+    pub(crate) plan: Arc<dyn ExecutionPlan>,
+    pub(crate) shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
+}
+
+impl ExecutionTask {
+    pub fn new(
+        job_uuid: Uuid,
+        stage_id: usize,
+        partition_id: usize,
+        plan: Arc<dyn ExecutionPlan>,
+        shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
+    ) -> Self {
+        Self {
+            job_uuid,
+            stage_id,
+            partition_id,
+            plan,
+            shuffle_locations,
+        }
+    }
+
+    pub fn key(&self) -> String {
+        format!("{}.{}.{}", self.job_uuid, self.stage_id, self.partition_id)
+    }
 }

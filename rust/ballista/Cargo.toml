@@ -11,7 +11,9 @@ build = "build.rs"
 include = ["build.rs", "src/**/*", "Cargo.toml", "proto/ballista.proto"]
 
 [dependencies]
+async-trait = "0.1.36"
 clap = "2"
+crossbeam = "0.7"
 futures = "0.3"
 prost = "0.6"
 prost-types = "0.6"
@@ -19,6 +21,7 @@ sqlparser = "0.7"
 structopt = "0.3"
 tokio = { version = "0.2", features = ["full"] }
 tonic = "0.3"
+uuid = { version = "0.8", features = ["serde", "v4"] }
 
 arrow = { git = "https://github.com/apache/arrow", rev="49a1c7b" }
 arrow-flight = { git = "https://github.com/apache/arrow", rev="49a1c7b" }

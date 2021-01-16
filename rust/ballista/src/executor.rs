@@ -16,20 +16,13 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::thread;
 
-// use crate::distributed::context::BallistaContext;
-// use crate::distributed::etcd::start_etcd_thread;
-// use crate::distributed::scheduler::ExecutionTask;
-use crate::error::{ballista_error, Result};
-// use crate::execution::physical_plan::ShuffleId;
+use crate::context::BallistaContext;
+use crate::error::Result;
+use crate::serde::scheduler::{ExecutionTask, ShuffleId};
 
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
-
-use crate::context::BallistaContext;
-use crate::serde::scheduler::ExecutionTask;
-use async_trait::async_trait;
 use crossbeam::crossbeam_channel::{unbounded, Receiver, Sender};
 use uuid::Uuid;
 
@@ -94,18 +87,11 @@ pub enum TaskStatus {
     Failed(String),
 }
 
-pub struct BallistaExecutor {
-    /// Task status
-    pub(crate) task_status_map: Arc<Mutex<HashMap<String, TaskStatus>>>,
-    /// Results from executing a task
-    shuffle_partitions: Arc<Mutex<HashMap<String, ShufflePartition>>>,
-    /// Channel for submitting tasks to workers
-    tx: Sender<ExecutionTask>,
-}
+pub struct BallistaExecutor {}
 
 impl BallistaExecutor {
     pub fn new(config: ExecutorConfig) -> Self {
-        let uuid = Uuid::new_v4();
+        let _uuid = Uuid::new_v4();
 
         match &config.discovery_mode {
             DiscoveryMode::Etcd => {
@@ -126,7 +112,7 @@ impl BallistaExecutor {
         let task_status_map = Arc::new(Mutex::new(HashMap::new()));
         let shuffle_partitions = Arc::new(Mutex::new(HashMap::new()));
 
-        let (tx, rx): (Sender<ExecutionTask>, Receiver<ExecutionTask>) = unbounded();
+        let (_tx, rx): (Sender<ExecutionTask>, Receiver<ExecutionTask>) = unbounded();
 
         // launch worker threads
         for _ in 0..config.concurrent_tasks {
@@ -134,77 +120,60 @@ impl BallistaExecutor {
             let config = config.clone();
             let task_status_map = task_status_map.clone();
             let shuffle_partitions = shuffle_partitions.clone();
-
-            //TODO convert to use tokio
-            // thread::spawn(move || {
-            //     smol::run(async {
-            //         Task::blocking(async move {
-            //             loop {
-            //                 match rx.recv() {
-            //                     Ok(task) => {
-            //                         let shuffle_id = ShuffleId::new(
-            //                             task.job_uuid,
-            //                             task.stage_id,
-            //                             task.partition_id,
-            //                         );
-            //
-            //                         set_task_status(
-            //                             &task_status_map,
-            //                             &task.key(),
-            //                             TaskStatus::Running,
-            //                         );
-            //
-            //                         match execute_task(&config, &task).await {
-            //                             Ok((schema, batches)) => {
-            //                                 let key = format!(
-            //                                     "{}:{}:{}",
-            //                                     shuffle_id.job_uuid,
-            //                                     shuffle_id.stage_id,
-            //                                     shuffle_id.partition_id
-            //                                 );
-            //                                 let mut shuffle_partitions = shuffle_partitions
-            //                                     .lock()
-            //                                     .expect("failed to lock mutex");
-            //
-            //                                 shuffle_partitions.insert(
-            //                                     key,
-            //                                     ShufflePartition {
-            //                                         schema,
-            //                                         data: batches,
-            //                                     },
-            //                                 );
-            //                                 set_task_status(
-            //                                     &task_status_map,
-            //                                     &task.key(),
-            //                                     TaskStatus::Completed,
-            //                                 );
-            //                             }
-            //                             Err(e) => {
-            //                                 println!("Task failed: {:?}", e);
-            //                                 set_task_status(
-            //                                     &task_status_map,
-            //                                     &task.key(),
-            //                                     TaskStatus::Failed(e.to_string()),
-            //                                 );
-            //                             }
-            //                         }
-            //                     }
-            //                     Err(e) => {
-            //                         println!("Executor thread terminated due to error: {:?}", e);
-            //                         break;
-            //                     }
-            //                 }
-            //             }
-            //         })
-            //         .await
-            //     })
-            // });
+            tokio::spawn(async move {
+                main_loop(&config, &rx, task_status_map, shuffle_partitions).await
+            });
         }
 
-        Self {
-            task_status_map,
-            shuffle_partitions,
-            tx,
+        Self {}
+    }
+}
+
+async fn main_loop(
+    config: &ExecutorConfig,
+    rx: &Receiver<ExecutionTask>,
+    task_status_map: Arc<Mutex<HashMap<String, TaskStatus>>>,
+    shuffle_partitions: Arc<Mutex<HashMap<String, ShufflePartition>>>,
+) {
+    loop {
+        match rx.recv() {
+            Ok(task) => {
+                let shuffle_id = ShuffleId::new(task.job_uuid, task.stage_id, task.partition_id);
+
+                set_task_status(&task_status_map, &task.key(), TaskStatus::Running);
+
+                match execute_task(&config, &task).await {
+                    Ok((schema, batches)) => {
+                        let key = format!(
+                            "{}:{}:{}",
+                            shuffle_id.job_uuid, shuffle_id.stage_id, shuffle_id.partition_id
+                        );
+                        let mut shuffle_partitions =
+                            shuffle_partitions.lock().expect("failed to lock mutex");
+
+                        shuffle_partitions.insert(
+                            key,
+                            ShufflePartition {
+                                schema,
+                                data: batches,
+                            },
+                        );
+                        set_task_status(&task_status_map, &task.key(), TaskStatus::Completed);
+                    }
+                    Err(e) => {
+                        println!("Task failed: {:?}", e);
+                        set_task_status(
+                            &task_status_map,
+                            &task.key(),
+                            TaskStatus::Failed(e.to_string()),
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                println!("Executor thread terminated due to error: {:?}", e);
+                break;
+            }
         }
     }
 }
@@ -223,7 +192,7 @@ async fn execute_task(
     task: &ExecutionTask,
 ) -> Result<(Schema, Vec<RecordBatch>)> {
     // create new execution context specifically for this query
-    let ctx = Arc::new(BallistaContext::new(
+    let _ctx = Arc::new(BallistaContext::new(
         &config,
         task.shuffle_locations.clone(),
     ));

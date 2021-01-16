@@ -33,36 +33,37 @@ pub fn start_etcd_thread(
 ) {
     let etcd_urls = etcd_urls.to_owned();
     let cluster_name = cluster_name.to_owned();
-    let host = host.to_owned();
     let uuid = uuid.to_owned();
+    let host = host.to_owned();
 
-    //TODO convert to use tokio
-    thread::spawn(move || {
-        // smol::run(async move {
-        //     loop {
-        //         match Client::connect([&etcd_urls], None).await {
-        //             Ok(mut client) => {
-        //                 println!("Connected to etcd at {} ok", etcd_urls);
-        //                 let lease_time_seconds = 60;
-        //                 let key = format!("/ballista/{}/{}", cluster_name, &uuid);
-        //                 let value = format!("{}:{}", host, port);
-        //                 match client.lease_grant(lease_time_seconds, None).await {
-        //                     Ok(lease) => {
-        //                         let options = PutOptions::new().with_lease(lease.id());
-        //                         match client.put(key.clone(), value.clone(), Some(options)).await {
-        //                             Ok(_) => println!("Registered with etcd as {}.", key),
-        //                             Err(e) => println!("etcd put failed: {:?}", e.to_string()),
-        //                         }
-        //                     }
-        //                     Err(e) => println!("etcd lease grant failed: {:?}", e.to_string()),
-        //                 }
-        //             }
-        //             Err(e) => println!("Failed to connect to etcd {:?}", e.to_string()),
-        //         }
-        //         thread::sleep(Duration::from_secs(15));
-        //     }
-        // });
+    tokio::spawn(async move {
+        main_loop(&etcd_urls, &cluster_name, &uuid, &host, port).await;
     });
+}
+
+async fn main_loop(etcd_urls: &str, cluster_name: &str, uuid: &Uuid, host: &str, port: usize) {
+    loop {
+        match Client::connect([&etcd_urls], None).await {
+            Ok(mut client) => {
+                println!("Connected to etcd at {} ok", etcd_urls);
+                let lease_time_seconds = 60;
+                let key = format!("/ballista/{}/{}", cluster_name, &uuid);
+                let value = format!("{}:{}", host, port);
+                match client.lease_grant(lease_time_seconds, None).await {
+                    Ok(lease) => {
+                        let options = PutOptions::new().with_lease(lease.id());
+                        match client.put(key.clone(), value.clone(), Some(options)).await {
+                            Ok(_) => println!("Registered with etcd as {}.", key),
+                            Err(e) => println!("etcd put failed: {:?}", e.to_string()),
+                        }
+                    }
+                    Err(e) => println!("etcd lease grant failed: {:?}", e.to_string()),
+                }
+            }
+            Err(e) => println!("Failed to connect to etcd {:?}", e.to_string()),
+        }
+        thread::sleep(Duration::from_secs(15));
+    }
 }
 
 pub async fn etcd_get_executors(etcd_urls: &str, cluster_name: &str) -> Result<Vec<ExecutorMeta>> {

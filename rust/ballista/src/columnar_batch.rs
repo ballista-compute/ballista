@@ -104,16 +104,6 @@ impl ColumnarBatch {
     }
 }
 
-macro_rules! build_literal_array {
-    ($LEN:expr, $BUILDER:ident, $VALUE:expr) => {{
-        let mut builder = $BUILDER::new($LEN);
-        for _ in 0..$LEN {
-            builder.append_value($VALUE)?;
-        }
-        Ok(Arc::new(builder.finish()))
-    }};
-}
-
 /// A columnar value can either be a scalar value or an Arrow array.
 #[allow(dead_code)]
 #[derive(Debug, Clone)]

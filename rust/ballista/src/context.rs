@@ -16,35 +16,23 @@
 
 use std::collections::HashMap;
 
-// use crate::distributed::client::execute_action;
-// use crate::distributed::etcd::etcd_get_executors;
-use crate::executor::{DiscoveryMode, ExecutorConfig};
-// use crate::distributed::k8s::k8s_get_executors;
-// use crate::distributed::scheduler::ExecutionTask;
-use crate::error::{ballista_error, Result};
-
-// use crate::execution::physical_plan::{
-//     Action, ColumnarBatch, ExecutionContext, ExecutorMeta, ShuffleId,
-// };
-use crate::columnar_batch::ColumnarBatch;
+use crate::executor::ExecutorConfig;
 use crate::serde::scheduler::{ExecutorMeta, ShuffleId};
 
-use async_trait::async_trait;
-
 pub struct BallistaContext {
-    /// map from shuffle id to executor uuid
-    pub(crate) shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
-    pub(crate) config: ExecutorConfig,
+    // map from shuffle id to executor uuid
+// shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
+// config: ExecutorConfig,
 }
 
 impl BallistaContext {
     pub fn new(
-        config: &ExecutorConfig,
-        shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
+        _config: &ExecutorConfig,
+        _shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
     ) -> Self {
         Self {
-            config: config.clone(),
-            shuffle_locations,
+            // config: config.clone(),
+            // shuffle_locations,
         }
     }
 }

@@ -14,16 +14,13 @@
 
 //! Ballista Rust executor binary.
 
-use std::sync::Arc;
-
 use arrow_flight::flight_service_server::FlightServiceServer;
+use ballista::executor::DiscoveryMode;
 use ballista::flight_service::BallistaFlightService;
 use ballista::BALLISTA_VERSION;
-
 use clap::arg_enum;
 use structopt::StructOpt;
 use tonic::transport::Server;
-use ballista::executor::{DiscoveryMode, BallistaExecutor};
 
 arg_enum! {
     #[derive(Debug)]
@@ -65,10 +62,10 @@ struct Opt {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opt = Opt::from_args();
 
-    let mode = match opt.mode {
-       Mode::K8s => DiscoveryMode::Kubernetes,
-       Mode::Etcd => DiscoveryMode::Etcd,
-       Mode::Standalone => DiscoveryMode::Standalone,
+    let _mode = match opt.mode {
+        Mode::K8s => DiscoveryMode::Kubernetes,
+        Mode::Etcd => DiscoveryMode::Etcd,
+        Mode::Standalone => DiscoveryMode::Standalone,
     };
 
     let _external_host = opt.external_host.as_deref().unwrap_or("localhost");

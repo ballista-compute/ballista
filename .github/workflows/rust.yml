@@ -1,7 +1,12 @@
 name: Rust
-
-on: [push,pull_request]
-
+# Runs rust ci only when files in rust directory have been changed
+on: 
+  push:
+    paths: 
+      - 'rust/**'
+  pull_request:
+    paths:
+      - 'rust/**'
 # Note, toolchain version must match the rustup version: either "nightly" or "nightly-YYYY-MM-DD"
 # and must contain the toolchain for the OS at the end.
 
@@ -10,15 +15,18 @@ env:
   #TOOLCHAIN_VERSION: stable-x86_64-pc-windows-msvc
 
 jobs:
-  Lint:
+  Pre-Test Checks:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - name: Lint Ballista
       run: cd rust && cargo clippy -- -D warnings
+    - name: Check Ballista formatting
+      run: cd rust && cargo fmt -- --check
 
   Ubuntu:
     runs-on: ubuntu-latest
+    needs: [Pre-Test Checks]
     steps:
     - uses: actions/checkout@v2
     - name: Build Ballista
@@ -28,6 +36,7 @@ jobs:
 
   Mac:
     runs-on: macOS-latest
+    needs: [Pre-Test Checks]
     steps:
     - uses: actions/checkout@v2
     - name: Build Ballista
@@ -37,6 +46,7 @@ jobs:
 
   Windows:
     runs-on: windows-2016
+    needs: [Pre-Test Checks]
     steps:
     - uses: actions/checkout@v2
     - name: Prepare the Windows Build Environment

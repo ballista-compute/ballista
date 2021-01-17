@@ -10,7 +10,7 @@ env:
   #TOOLCHAIN_VERSION: stable-x86_64-pc-windows-msvc
 
 jobs:
-  Pre-Test Checks:
+  PreTestChecks:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -21,7 +21,7 @@ jobs:
 
   Ubuntu:
     runs-on: ubuntu-latest
-    needs: [Pre-Test Checks]
+    needs: [PreTestChecks]
     steps:
     - uses: actions/checkout@v2
     - name: Build Ballista
@@ -31,7 +31,7 @@ jobs:
 
   Mac:
     runs-on: macOS-latest
-    needs: [Pre-Test Checks]
+    needs: [PreTestChecks]
     steps:
     - uses: actions/checkout@v2
     - name: Build Ballista
@@ -41,7 +41,7 @@ jobs:
 
   Windows:
     runs-on: windows-2016
-    needs: [Pre-Test Checks]
+    needs: [PreTestChecks]
     steps:
     - uses: actions/checkout@v2
     - name: Prepare the Windows Build Environment

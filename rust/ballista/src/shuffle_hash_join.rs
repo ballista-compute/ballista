@@ -15,6 +15,8 @@
 //! The ShuffleHashJoinExec operator accepts two inputs that are hash-partitioned on join keys so
 //! that each partition of the Shuffle Hash Join operates on the corresponding partitions of the
 //! two inputs
+//!
+//! This operator is EXPERIMENTAL and still under development
 
 use std::any::Any;
 use std::sync::Arc;

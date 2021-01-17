@@ -15,6 +15,8 @@
 //! The ShuffleWriteExec operator simply executes a physical plan and streams each output partition
 //! to disk so that the Shuffle Read operator can later request to stream this data in subsequent
 //! stages of query execution.
+//!
+//! This operator is EXPERIMENTAL and still under development
 
 use std::any::Any;
 

@@ -24,6 +24,7 @@ prost = "0.6"
 prost-types = "0.6"
 sqlparser = "0.7"
 structopt = "0.3"
+tempfile = "3"
 tokio = { version = "0.2", features = ["full"] }
 tonic = "0.3"
 uuid = { version = "0.8", features = ["serde", "v4"] }
@@ -33,7 +34,6 @@ arrow-flight = { git = "https://github.com/apache/arrow", rev="49a1c7b" }
 datafusion = { git = "https://github.com/apache/arrow", rev="49a1c7b" }
 
 [dev-dependencies]
-tempfile = "3"
 
 [build-dependencies]
 prost-build = { version = "0.6.1" }

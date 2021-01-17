@@ -20,7 +20,7 @@ use std::sync::{Arc, Mutex};
 use crate::context::BallistaContext;
 use crate::error::{ballista_error, Result};
 use crate::etcd::start_etcd_thread;
-use crate::serde::scheduler::{ExecutionTask, ShuffleId};
+use crate::serde::scheduler::{QueryStageTask, ShuffleId};
 
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
@@ -72,7 +72,7 @@ pub struct ShufflePartition {
 #[async_trait]
 pub trait Executor: Send + Sync {
     /// Execute a query and store the resulting shuffle partitions in memory
-    fn submit_task(&self, task: &ExecutionTask) -> Result<TaskStatus>;
+    fn submit_task(&self, task: &QueryStageTask) -> Result<TaskStatus>;
 
     /// Collect the results of a prior task that resulted in a shuffle partition
     fn collect(&self, shuffle_id: &ShuffleId) -> Result<ShufflePartition>;
@@ -93,7 +93,7 @@ pub enum TaskStatus {
 pub struct BallistaExecutor {
     task_status_map: Arc<Mutex<HashMap<String, TaskStatus>>>,
     shuffle_partitions: Arc<Mutex<HashMap<String, ShufflePartition>>>,
-    tx: Sender<ExecutionTask>,
+    tx: Sender<QueryStageTask>,
 }
 
 impl BallistaExecutor {
@@ -118,7 +118,7 @@ impl BallistaExecutor {
         let task_status_map = Arc::new(Mutex::new(HashMap::new()));
         let shuffle_partitions = Arc::new(Mutex::new(HashMap::new()));
 
-        let (tx, rx): (Sender<ExecutionTask>, Receiver<ExecutionTask>) = unbounded();
+        let (tx, rx): (Sender<QueryStageTask>, Receiver<QueryStageTask>) = unbounded();
 
         // launch worker threads
         for _ in 0..config.concurrent_tasks {
@@ -141,7 +141,7 @@ impl BallistaExecutor {
 
 async fn main_loop(
     config: &ExecutorConfig,
-    rx: &Receiver<ExecutionTask>,
+    rx: &Receiver<QueryStageTask>,
     task_status_map: Arc<Mutex<HashMap<String, TaskStatus>>>,
     shuffle_partitions: Arc<Mutex<HashMap<String, ShufflePartition>>>,
 ) {
@@ -199,7 +199,7 @@ fn set_task_status(
 
 async fn execute_task(
     config: &ExecutorConfig,
-    task: &ExecutionTask,
+    task: &QueryStageTask,
 ) -> Result<(Schema, Vec<RecordBatch>)> {
     // create new execution context specifically for this query
     let _ctx = Arc::new(BallistaContext::new(
@@ -221,7 +221,7 @@ async fn execute_task(
 
 #[async_trait]
 impl Executor for BallistaExecutor {
-    fn submit_task(&self, task: &ExecutionTask) -> Result<TaskStatus> {
+    fn submit_task(&self, task: &QueryStageTask) -> Result<TaskStatus> {
         // is it already submitted?
         {
             let task_status = self.task_status_map.lock().expect("failed to lock mutex");

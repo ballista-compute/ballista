@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::error::BallistaError;
+use crate::error::{ballista_error, BallistaError};
 use crate::serde::protobuf;
 use crate::serde::scheduler::Action;
 use std::convert::TryInto;
@@ -22,7 +22,10 @@ impl TryInto<protobuf::Action> for Action {
 
     fn try_into(self) -> Result<protobuf::Action, Self::Error> {
         match self {
-            Action::InteractiveQuery { ref plan, ref settings } => {
+            Action::InteractiveQuery {
+                ref plan,
+                ref settings,
+            } => {
                 let plan_proto: protobuf::LogicalPlanNode = plan.try_into()?;
 
                 let settings = settings
@@ -40,7 +43,7 @@ impl TryInto<protobuf::Action> for Action {
                     settings,
                 })
             }
-            // Action::Execute(task) => Ok(protobuf::Action {
+            // Action::ExecuteTask(task) => Ok(protobuf::Action {
             //     query: None,
             //     task: Some(task.try_into()?),
             //     fetch_shuffle: None,
@@ -52,6 +55,7 @@ impl TryInto<protobuf::Action> for Action {
             //     fetch_shuffle: Some(shuffle_id.try_into()?),
             //     settings: vec![],
             // }),
+            _ => Err(ballista_error("scheduler::to_proto() unimplemented Action")),
         }
     }
 }

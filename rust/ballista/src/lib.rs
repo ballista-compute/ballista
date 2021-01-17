@@ -27,6 +27,7 @@ pub mod k8s;
 pub mod memory_stream;
 pub mod prelude;
 pub mod shuffle_write;
+pub mod utils;
 
 #[macro_use]
 pub mod serde;

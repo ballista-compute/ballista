@@ -27,9 +27,16 @@ pub mod to_proto;
 pub enum Action {
     /// Execute the query and return the results
     InteractiveQuery {
+        /// Logical plan to execute
         plan: LogicalPlan,
+        /// Settings that can be used to control certain aspects of query execution, such as
+        /// batch sizes
         settings: HashMap<String, String>,
     },
+    /// Execute a query and store the results in memory
+    ExecuteQueryStage(QueryStageTask),
+    /// Collect a shuffle partition
+    FetchShuffle(ShuffleId),
 }
 
 /// Unique identifier for the output shuffle partition of an operator.
@@ -50,6 +57,7 @@ impl ShuffleId {
     }
 }
 
+/// Meta-data for an executor, used when fetching shuffle partitions from other executors
 #[derive(Debug, Clone)]
 pub struct ExecutorMeta {
     pub id: String,
@@ -57,17 +65,24 @@ pub struct ExecutorMeta {
     pub port: usize,
 }
 
-/// Task that can be sent to an executor for execution
+/// Task that can be sent to an executor to execute one stage of a query and write
+/// results out to disk
 #[derive(Debug, Clone)]
-pub struct ExecutionTask {
+pub struct QueryStageTask {
+    /// Unique ID representing this query execution
     pub(crate) job_uuid: Uuid,
+    /// Unique ID representing this query stage within the overall query
     pub(crate) stage_id: usize,
+    /// The partition to execute. The same plan could be sent to multiple executors and each
+    /// executor will execute a single partition per QueryStageTask
     pub(crate) partition_id: usize,
+    /// The physical plan for this query stage
     pub(crate) plan: Arc<dyn ExecutionPlan>,
+    /// Location of shuffle partitions that this query stage may depend on
     pub(crate) shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
 }
 
-impl ExecutionTask {
+impl QueryStageTask {
     pub fn new(
         job_uuid: Uuid,
         stage_id: usize,

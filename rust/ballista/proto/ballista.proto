@@ -12,41 +12,51 @@ option java_outer_classname = "BallistaProto";
 
 // logical expressions
 message LogicalExprNode {
+  oneof ExprType {
+    // column references
+    string column_name = 10;
 
-  // column references
-  string column_name = 10;
-  bool has_column_name = 11;
+    // alias
+    AliasNode alias = 14;
 
-  // alias
-  AliasNode alias = 14;
+    // literals
+    string literal_string = 20;
+    int32 literal_int8 = 21;
+    int32 literal_int16 = 22;
+    int32 literal_int32 = 23;
+    int64 literal_int64 = 24;
 
-  // literals
-  string literal_string = 21;
-  bool has_literal_string = 22;
+    uint32 literal_uint8 = 25;
+    uint32 literal_uint16 = 26;
+    uint32 literal_uint32 = 27;
+    uint64 literal_uint64 = 28;
 
-  int64 literal_int = 23;
-  bool has_literal_i8 = 24;
-  bool has_literal_i16 = 25;
-  bool has_literal_i32 = 26;
-  bool has_literal_i64 = 27;
+    float literal_f32 = 29;
+    double literal_f64 = 30;
 
-  uint64 literal_uint = 28;
-  bool has_literal_u8 = 29;
-  bool has_literal_u16 = 30;
-  bool has_literal_u32 = 31;
-  bool has_literal_u64 = 32;
+    // binary expressions
+    BinaryExprNode binary_expr = 40;
 
-  float literal_f32 = 33;
-  bool has_literal_f32 = 34;
+    // aggregate expressions
+    AggregateExprNode aggregate_expr = 50;
 
-  double literal_f64 = 35;
-  bool has_literal_f64 = 36;
+    // null checks
+    IsNull is_null_expr = 60;
+    IsNotNull is_not_null_expr = 61;
+    Not not_expr = 62;
+  }
+}
 
-  // binary expressions
-  BinaryExprNode binary_expr = 40;
+message IsNull {
+  LogicalExprNode expr = 1;
+}
 
-  // aggregate expressions
-  AggregateExprNode aggregate_expr = 50;
+message IsNotNull {
+  LogicalExprNode expr = 1;
+}
+
+message Not {
+  LogicalExprNode expr = 1;
 }
 
 message AliasNode {

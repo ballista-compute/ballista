@@ -19,7 +19,7 @@
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
-use crate::serde::{empty_expr_node, empty_physical_plan_node, protobuf, BallistaError};
+use crate::serde::{empty_physical_plan_node, protobuf, BallistaError};
 
 use datafusion::physical_plan::csv::CsvExec;
 use datafusion::physical_plan::expressions::{
@@ -158,18 +158,22 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
     fn try_from(value: Arc<dyn PhysicalExpr>) -> Result<Self, Self::Error> {
         let expr = value.as_any();
         if let Some(expr) = expr.downcast_ref::<Column>() {
-            let mut node = empty_expr_node();
-            node.column_name = expr.name().to_owned();
-            node.has_column_name = true;
-            Ok(node)
+            Ok(protobuf::LogicalExprNode {
+                expr_type: Some(protobuf::logical_expr_node::ExprType::ColumnName(
+                    expr.name().to_owned(),
+                )),
+            })
         } else if let Some(expr) = expr.downcast_ref::<BinaryExpr>() {
-            let mut node = empty_expr_node();
-            node.binary_expr = Some(Box::new(protobuf::BinaryExprNode {
+            let binary_expr = Box::new(protobuf::BinaryExprNode {
                 l: Some(Box::new(expr.left().to_owned().try_into()?)),
                 r: Some(Box::new(expr.right().to_owned().try_into()?)),
                 op: format!("{:?}", expr.op()),
-            }));
-            Ok(node)
+            });
+            Ok(protobuf::LogicalExprNode {
+                expr_type: Some(protobuf::logical_expr_node::ExprType::BinaryExpr(
+                    binary_expr,
+                )),
+            })
         } else if let Some(_expr) = expr.downcast_ref::<Literal>() {
             unimplemented!()
         } else if let Some(_expr) = expr.downcast_ref::<CaseExpr>() {

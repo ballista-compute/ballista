@@ -24,6 +24,7 @@ use datafusion::logical_plan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::physical_plan::csv::CsvReadOptions;
 use datafusion::scalar::ScalarValue;
+use protobuf::logical_expr_node::ExprType;
 
 // use uuid::Uuid;
 
@@ -217,79 +218,76 @@ impl TryInto<Expr> for &protobuf::LogicalExprNode {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<Expr, Self::Error> {
-        if let Some(binary_expr) = &self.binary_expr {
-            Ok(Expr::BinaryExpr {
+        match &self.expr_type {
+            Some(ExprType::BinaryExpr(binary_expr)) => Ok(Expr::BinaryExpr {
                 left: Box::new(parse_required_expr(&binary_expr.l)?),
                 op: from_proto_binary_op(&binary_expr.op)?,
                 right: Box::new(parse_required_expr(&binary_expr.r)?),
-            })
-        } else if self.has_column_name {
-            Ok(Expr::Column(self.column_name.clone()))
-        } else if self.has_literal_string {
-            Ok(Expr::Literal(ScalarValue::Utf8(Some(
-                self.literal_string.clone(),
-            ))))
-        } else if self.has_literal_f32 {
-            Ok(Expr::Literal(ScalarValue::Float32(Some(self.literal_f32))))
-        } else if self.has_literal_f64 {
-            Ok(Expr::Literal(ScalarValue::Float64(Some(self.literal_f64))))
-        } else if self.has_literal_i8 {
-            Ok(Expr::Literal(ScalarValue::Int8(Some(
-                self.literal_int as i8,
-            ))))
-        } else if self.has_literal_i16 {
-            Ok(Expr::Literal(ScalarValue::Int16(Some(
-                self.literal_int as i16,
-            ))))
-        } else if self.has_literal_i32 {
-            Ok(Expr::Literal(ScalarValue::Int32(Some(
-                self.literal_int as i32,
-            ))))
-        } else if self.has_literal_i64 {
-            Ok(Expr::Literal(ScalarValue::Int64(Some(
-                self.literal_int as i64,
-            ))))
-        } else if self.has_literal_u8 {
-            Ok(Expr::Literal(ScalarValue::UInt8(Some(
-                self.literal_uint as u8,
-            ))))
-        } else if self.has_literal_u16 {
-            Ok(Expr::Literal(ScalarValue::UInt16(Some(
-                self.literal_uint as u16,
-            ))))
-        } else if self.has_literal_u32 {
-            Ok(Expr::Literal(ScalarValue::UInt32(Some(
-                self.literal_uint as u32,
-            ))))
-        } else if self.has_literal_u64 {
-            Ok(Expr::Literal(ScalarValue::UInt64(Some(
-                self.literal_uint as u64,
-            ))))
-        } else if let Some(aggregate_expr) = &self.aggregate_expr {
-            let fun = match aggregate_expr.aggr_function {
-                f if f == protobuf::AggregateFunction::Min as i32 => AggregateFunction::Min,
-                f if f == protobuf::AggregateFunction::Max as i32 => AggregateFunction::Max,
-                f if f == protobuf::AggregateFunction::Sum as i32 => AggregateFunction::Sum,
-                f if f == protobuf::AggregateFunction::Avg as i32 => AggregateFunction::Avg,
-                f if f == protobuf::AggregateFunction::Count as i32 => AggregateFunction::Count,
-                _ => unimplemented!(),
-            };
+            }),
+            Some(ExprType::ColumnName(column_name)) => Ok(Expr::Column(column_name.to_owned())),
+            Some(ExprType::LiteralString(literal_string)) => Ok(Expr::Literal(ScalarValue::Utf8(
+                Some(literal_string.to_owned()),
+            ))),
+            Some(ExprType::LiteralF32(value)) => {
+                Ok(Expr::Literal(ScalarValue::Float32(Some(*value))))
+            }
+            Some(ExprType::LiteralF64(value)) => {
+                Ok(Expr::Literal(ScalarValue::Float64(Some(*value))))
+            }
+            Some(ExprType::LiteralInt8(value)) => {
+                Ok(Expr::Literal(ScalarValue::Int8(Some(*value as i8))))
+            }
+            Some(ExprType::LiteralInt16(value)) => {
+                Ok(Expr::Literal(ScalarValue::Int16(Some(*value as i16))))
+            }
+            Some(ExprType::LiteralInt32(value)) => {
+                Ok(Expr::Literal(ScalarValue::Int32(Some(*value))))
+            }
+            Some(ExprType::LiteralInt64(value)) => {
+                Ok(Expr::Literal(ScalarValue::Int64(Some(*value))))
+            }
+            Some(ExprType::LiteralUint8(value)) => {
+                Ok(Expr::Literal(ScalarValue::UInt8(Some(*value as u8))))
+            }
+            Some(ExprType::LiteralUint16(value)) => {
+                Ok(Expr::Literal(ScalarValue::UInt16(Some(*value as u16))))
+            }
+            Some(ExprType::LiteralUint32(value)) => {
+                Ok(Expr::Literal(ScalarValue::UInt32(Some(*value))))
+            }
+            Some(ExprType::LiteralUint64(value)) => {
+                Ok(Expr::Literal(ScalarValue::UInt64(Some(*value))))
+            }
+            Some(ExprType::AggregateExpr(expr)) => {
+                let fun = match expr.aggr_function {
+                    f if f == protobuf::AggregateFunction::Min as i32 => AggregateFunction::Min,
+                    f if f == protobuf::AggregateFunction::Max as i32 => AggregateFunction::Max,
+                    f if f == protobuf::AggregateFunction::Sum as i32 => AggregateFunction::Sum,
+                    f if f == protobuf::AggregateFunction::Avg as i32 => AggregateFunction::Avg,
+                    f if f == protobuf::AggregateFunction::Count as i32 => AggregateFunction::Count,
+                    _ => unimplemented!(),
+                };
 
-            Ok(Expr::AggregateFunction {
-                fun,
-                args: vec![parse_required_expr(&aggregate_expr.expr)?],
-                distinct: false, //TODO
-            })
-        } else if let Some(alias) = &self.alias {
-            Ok(Expr::Alias(
+                Ok(Expr::AggregateFunction {
+                    fun,
+                    args: vec![parse_required_expr(&expr.expr)?],
+                    distinct: false, //TODO
+                })
+            }
+            Some(ExprType::Alias(alias)) => Ok(Expr::Alias(
                 Box::new(parse_required_expr(&alias.expr)?),
                 alias.alias.clone(),
-            ))
-        } else {
-            Err(proto_error(&format!(
-                "Unsupported logical expression '{:?}'",
-                self
-            )))
+            )),
+            Some(ExprType::IsNullExpr(is_null)) => {
+                Ok(Expr::IsNull(Box::new(parse_required_expr(&is_null.expr)?)))
+            }
+            Some(ExprType::IsNotNullExpr(is_not_null)) => Ok(Expr::IsNotNull(Box::new(
+                parse_required_expr(&is_not_null.expr)?,
+            ))),
+            Some(ExprType::NotExpr(not)) => {
+                Ok(Expr::Not(Box::new(parse_required_expr(&not.expr)?)))
+            }
+            None => Err(proto_error("Unexpected empty logical expression")),
         }
     }
 }

@@ -18,7 +18,7 @@
 
 use std::convert::TryInto;
 
-use crate::serde::{empty_expr_node, empty_logical_plan_node, protobuf, BallistaError};
+use crate::serde::{empty_logical_plan_node, protobuf, BallistaError};
 
 use arrow::datatypes::{DataType, Schema};
 use datafusion::datasource::parquet::ParquetTable;
@@ -270,85 +270,100 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
     fn try_into(self) -> Result<protobuf::LogicalExprNode, Self::Error> {
         match self {
             Expr::Column(name) => {
-                let mut expr = empty_expr_node();
-                expr.has_column_name = true;
-                expr.column_name = name.clone();
+                let expr = protobuf::LogicalExprNode {
+                    expr_type: Some(protobuf::logical_expr_node::ExprType::ColumnName(
+                        name.clone(),
+                    )),
+                };
                 Ok(expr)
             }
             Expr::Alias(expr, alias) => {
-                let mut expr_node = empty_expr_node();
-                expr_node.alias = Some(Box::new(protobuf::AliasNode {
+                let alias = Box::new(protobuf::AliasNode {
                     expr: Some(Box::new(expr.as_ref().try_into()?)),
                     alias: alias.to_owned(),
-                }));
-                Ok(expr_node)
+                });
+                let expr = protobuf::LogicalExprNode {
+                    expr_type: Some(protobuf::logical_expr_node::ExprType::Alias(alias)),
+                };
+                Ok(expr)
             }
             Expr::Literal(value) => match value {
                 ScalarValue::Utf8(s) => {
-                    let mut expr = empty_expr_node();
-                    expr.has_literal_string = true;
-                    expr.literal_string = s.as_ref().unwrap().to_owned(); //TODO remove unwrap
-                    Ok(expr)
+                    Ok(protobuf::LogicalExprNode {
+                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralString(
+                            s.as_ref().unwrap().to_owned(),
+                        )), // TODO remove unwrap
+                    })
                 }
                 ScalarValue::Int8(n) => {
-                    let mut expr = empty_expr_node();
-                    expr.has_literal_i8 = true;
-                    expr.literal_int = n.unwrap() as i64; // TODO remove unwrap
-                    Ok(expr)
+                    Ok(protobuf::LogicalExprNode {
+                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralInt8(
+                            n.unwrap() as i32,
+                        )), // TODO remove unwrap
+                    })
                 }
                 ScalarValue::Int16(n) => {
-                    let mut expr = empty_expr_node();
-                    expr.has_literal_i16 = true;
-                    expr.literal_int = n.unwrap() as i64; // TODO remove unwrap
-                    Ok(expr)
+                    Ok(protobuf::LogicalExprNode {
+                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralInt16(
+                            n.unwrap() as i32,
+                        )), // TODO remove unwrap
+                    })
                 }
                 ScalarValue::Int32(n) => {
-                    let mut expr = empty_expr_node();
-                    expr.has_literal_i32 = true;
-                    expr.literal_int = n.unwrap() as i64; // TODO remove unwrap
-                    Ok(expr)
+                    Ok(protobuf::LogicalExprNode {
+                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralInt32(
+                            n.unwrap(),
+                        )), // TODO remove unwrap
+                    })
                 }
                 ScalarValue::Int64(n) => {
-                    let mut expr = empty_expr_node();
-                    expr.has_literal_i64 = true;
-                    expr.literal_int = n.unwrap() as i64; // TODO remove unwrap
-                    Ok(expr)
+                    Ok(protobuf::LogicalExprNode {
+                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralInt64(
+                            n.unwrap(),
+                        )), // TODO remove unwrap
+                    })
                 }
                 ScalarValue::UInt8(n) => {
-                    let mut expr = empty_expr_node();
-                    expr.has_literal_u8 = true;
-                    expr.literal_uint = n.unwrap() as u64; // TODO remove unwrap
-                    Ok(expr)
+                    Ok(protobuf::LogicalExprNode {
+                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralUint8(
+                            n.unwrap() as u32,
+                        )), // TODO remove unwrap
+                    })
                 }
                 ScalarValue::UInt16(n) => {
-                    let mut expr = empty_expr_node();
-                    expr.has_literal_u16 = true;
-                    expr.literal_uint = n.unwrap() as u64; // TODO remove unwrap
-                    Ok(expr)
+                    Ok(protobuf::LogicalExprNode {
+                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralUint16(
+                            n.unwrap() as u32,
+                        )), // TODO remove unwrap
+                    })
                 }
                 ScalarValue::UInt32(n) => {
-                    let mut expr = empty_expr_node();
-                    expr.has_literal_u32 = true;
-                    expr.literal_uint = n.unwrap() as u64; // TODO remove unwrap
-                    Ok(expr)
+                    Ok(protobuf::LogicalExprNode {
+                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralUint32(
+                            n.unwrap(),
+                        )), // TODO remove unwrap
+                    })
                 }
                 ScalarValue::UInt64(n) => {
-                    let mut expr = empty_expr_node();
-                    expr.has_literal_u64 = true;
-                    expr.literal_uint = n.unwrap() as u64; // TODO remove unwrap
-                    Ok(expr)
+                    Ok(protobuf::LogicalExprNode {
+                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralUint64(
+                            n.unwrap(),
+                        )), // TODO remove unwrap
+                    })
                 }
                 ScalarValue::Float32(n) => {
-                    let mut expr = empty_expr_node();
-                    expr.has_literal_f32 = true;
-                    expr.literal_f32 = n.unwrap() as f32; // TODO remove unwrap
-                    Ok(expr)
+                    Ok(protobuf::LogicalExprNode {
+                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralF32(
+                            n.unwrap(),
+                        )), // TODO remove unwrap
+                    })
                 }
                 ScalarValue::Float64(n) => {
-                    let mut expr = empty_expr_node();
-                    expr.has_literal_f64 = true;
-                    expr.literal_f64 = n.unwrap() as f64; // TODO remove unwrap
-                    Ok(expr)
+                    Ok(protobuf::LogicalExprNode {
+                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralF64(
+                            n.unwrap(),
+                        )), // TODO remove unwrap
+                    })
                 }
                 other => Err(BallistaError::General(format!(
                     "to_proto unsupported scalar value {:?}",
@@ -356,19 +371,20 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                 ))),
             },
             Expr::BinaryExpr { left, op, right } => {
-                let mut expr = empty_expr_node();
-                expr.binary_expr = Some(Box::new(protobuf::BinaryExprNode {
+                let binary_expr = Box::new(protobuf::BinaryExprNode {
                     l: Some(Box::new(left.as_ref().try_into()?)),
                     r: Some(Box::new(right.as_ref().try_into()?)),
                     op: format!("{:?}", op),
-                }));
-                Ok(expr)
+                });
+                Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(protobuf::logical_expr_node::ExprType::BinaryExpr(
+                        binary_expr,
+                    )),
+                })
             }
             Expr::AggregateFunction {
                 ref fun, ref args, ..
             } => {
-                let mut expr = empty_expr_node();
-
                 let aggr_function = match fun {
                     AggregateFunction::Min => protobuf::AggregateFunction::Min,
                     AggregateFunction::Max => protobuf::AggregateFunction::Max,
@@ -378,19 +394,44 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                 };
 
                 let arg = &args[0];
-                expr.aggregate_expr = Some(Box::new(protobuf::AggregateExprNode {
+                let aggregate_expr = Box::new(protobuf::AggregateExprNode {
                     aggr_function: aggr_function.into(),
                     expr: Some(Box::new(arg.try_into()?)),
-                }));
-                Ok(expr)
+                });
+                Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(protobuf::logical_expr_node::ExprType::AggregateExpr(
+                        aggregate_expr,
+                    )),
+                })
             }
             Expr::ScalarVariable(_) => unimplemented!(),
             Expr::ScalarFunction { .. } => unimplemented!(),
             Expr::ScalarUDF { .. } => unimplemented!(),
             Expr::AggregateUDF { .. } => unimplemented!(),
-            Expr::Not(_) => unimplemented!(),
-            Expr::IsNull(_) => unimplemented!(),
-            Expr::IsNotNull(_) => unimplemented!(),
+            Expr::Not(expr) => {
+                let expr = Box::new(protobuf::Not {
+                    expr: Some(Box::new(expr.as_ref().try_into()?)),
+                });
+                Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(protobuf::logical_expr_node::ExprType::NotExpr(expr)),
+                })
+            }
+            Expr::IsNull(expr) => {
+                let expr = Box::new(protobuf::IsNull {
+                    expr: Some(Box::new(expr.as_ref().try_into()?)),
+                });
+                Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(protobuf::logical_expr_node::ExprType::IsNullExpr(expr)),
+                })
+            }
+            Expr::IsNotNull(expr) => {
+                let expr = Box::new(protobuf::IsNotNull {
+                    expr: Some(Box::new(expr.as_ref().try_into()?)),
+                });
+                Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(protobuf::logical_expr_node::ExprType::IsNotNullExpr(expr)),
+                })
+            }
             Expr::Between { .. } => unimplemented!(),
             Expr::Negative(_) => unimplemented!(),
             Expr::Case { .. } => unimplemented!(),

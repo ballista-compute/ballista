@@ -44,33 +44,6 @@ pub(crate) fn proto_error(message: &str) -> BallistaError {
     BallistaError::General(message.to_owned())
 }
 
-/// Create an empty ExprNode
-pub fn empty_expr_node() -> protobuf::LogicalExprNode {
-    protobuf::LogicalExprNode {
-        alias: None,
-        column_name: "".to_owned(),
-        has_column_name: false,
-        literal_string: "".to_owned(),
-        has_literal_string: false,
-        literal_int: 0,
-        literal_uint: 0,
-        literal_f32: 0.0,
-        literal_f64: 0.0,
-        has_literal_i8: false,
-        has_literal_i16: false,
-        has_literal_i32: false,
-        has_literal_i64: false,
-        has_literal_u8: false,
-        has_literal_u16: false,
-        has_literal_u32: false,
-        has_literal_u64: false,
-        has_literal_f32: false,
-        has_literal_f64: false,
-        binary_expr: None,
-        aggregate_expr: None,
-    }
-}
-
 /// Create an empty LogicalPlanNode
 pub fn empty_logical_plan_node() -> protobuf::LogicalPlanNode {
     protobuf::LogicalPlanNode {

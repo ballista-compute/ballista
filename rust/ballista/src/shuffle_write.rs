@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The ShuffleWriteExec operator simply executes a physical plan and streams each output partition
-//! to disk so that the Shuffle Read operator can later request to stream this data in subsequent
-//! stages of query execution.
+//! The ShuffleWriteExec operator simply executes one partition of a physical plan, optionally
+//! repartitions the output, and streams each output partition to disk for later retrieval by
+//! future query stages.
 //!
 //! This operator is EXPERIMENTAL and still under development
 
@@ -36,16 +36,27 @@ use tonic::codegen::Arc;
 pub struct ShuffleWriteExec {
     /// The child plan to execute and write shuffle partitions for
     child: Arc<dyn ExecutionPlan>,
+    /// Partition to execute
+    child_partition: usize,
     /// Output path for shuffle partitions
     output_path: String,
+    /// Number of shuffle partitions to crate
+    target_partition_count: usize,
 }
 
 impl ShuffleWriteExec {
     /// Create a new ShuffleWriteExec
-    pub fn new(child: Arc<dyn ExecutionPlan>, output_path: &str) -> Self {
+    pub fn new(
+        child: Arc<dyn ExecutionPlan>,
+        child_partition: usize,
+        output_path: &str,
+        target_partition_count: usize,
+    ) -> Self {
         Self {
             child,
+            child_partition,
             output_path: output_path.to_owned(),
+            target_partition_count,
         }
     }
 }
@@ -87,19 +98,23 @@ impl ExecutionPlan for ShuffleWriteExec {
         let mut partition_location =
             StringBuilder::with_capacity(num_partitions, num_partitions * 256);
 
-        // TODO use tokio to execute all input partitions in parallel
+        // execute input partition
+        let mut stream = self.child.execute(self.child_partition).await?;
 
-        for input_partition in 0..num_partitions {
-            // execute input partition
-            let mut stream = self.child.execute(input_partition).await?;
+        //TODO apply partitioning - for now we just write out a single shuffle partition (which
+        // is just the raw output from the executed plan's partition)
+        //
+        // When performing a shuffle as an input to a ShuffleHashJoin we will want to use hash
+        // partitioning. In other cases we can just repartition using round-robin with the goal
+        // of increasing parallelism in future query stages
 
-            // stream data to disk in IPC format
-            let path = format!("{}/{}", self.output_path, input_partition);
-            write_stream_to_disk(&mut stream, &path).await?;
+        // stream data to disk in IPC format
+        let shuffle_partition = 0;
+        let path = format!("{}/{}", self.output_path, shuffle_partition);
+        write_stream_to_disk(&mut stream, &path).await?;
 
-            partition_id.append_value(input_partition as u32)?;
-            partition_location.append_value(&path)?;
-        }
+        partition_id.append_value(shuffle_partition as u32)?;
+        partition_location.append_value(&path)?;
 
         let partition_id: ArrayRef = Arc::new(partition_id.finish());
         let partition_location: ArrayRef = Arc::new(partition_location.finish());
@@ -137,7 +152,8 @@ mod tests {
 
         let tmp_dir = TempDir::new()?;
 
-        let shuffle_write_exec = ShuffleWriteExec::new(mem_table, tmp_dir.path().to_str().unwrap());
+        let shuffle_write_exec =
+            ShuffleWriteExec::new(mem_table, 0, tmp_dir.path().to_str().unwrap(), 200);
         assert_eq!(
             1,
             shuffle_write_exec.output_partitioning().partition_count()
@@ -146,7 +162,7 @@ mod tests {
         let mut stream = shuffle_write_exec.execute(0).await?;
         let batch = stream.next().await.unwrap()?;
         assert_eq!(2, batch.num_columns());
-        assert_eq!(2, batch.num_rows());
+        assert_eq!(1, batch.num_rows());
         assert!(stream.next().await.is_none());
 
         Ok(())

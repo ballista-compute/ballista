@@ -19,11 +19,13 @@ use std::sync::{Arc, Mutex};
 
 use crate::context::BallistaContext;
 use crate::error::Result;
+use crate::etcd::start_etcd_thread;
 use crate::serde::scheduler::{ExecutionTask, ShuffleId};
 
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use crossbeam::crossbeam_channel::{unbounded, Receiver, Sender};
+use log::info;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -91,22 +93,21 @@ pub struct BallistaExecutor {}
 
 impl BallistaExecutor {
     pub fn new(config: ExecutorConfig) -> Self {
-        let _uuid = Uuid::new_v4();
+        let uuid = Uuid::new_v4();
 
         match &config.discovery_mode {
             DiscoveryMode::Etcd => {
-                println!("Running in etcd mode");
-                //TODO
-                // start_etcd_thread(
-                //     &config.etcd_urls,
-                //     "default",
-                //     &uuid,
-                //     &config.host,
-                //     config.port,
-                // );
+                info!("Running in etcd mode");
+                start_etcd_thread(
+                    &config.etcd_urls,
+                    "default",
+                    &uuid,
+                    &config.host,
+                    config.port,
+                );
             }
-            DiscoveryMode::Kubernetes => println!("Running in k8s mode"),
-            DiscoveryMode::Standalone => println!("Running in standalone mode"),
+            DiscoveryMode::Kubernetes => info!("Running in k8s mode"),
+            DiscoveryMode::Standalone => info!("Running in standalone mode"),
         }
 
         let task_status_map = Arc::new(Mutex::new(HashMap::new()));
@@ -161,7 +162,7 @@ async fn main_loop(
                         set_task_status(&task_status_map, &task.key(), TaskStatus::Completed);
                     }
                     Err(e) => {
-                        println!("Task failed: {:?}", e);
+                        info!("Task failed: {:?}", e);
                         set_task_status(
                             &task_status_map,
                             &task.key(),
@@ -171,7 +172,7 @@ async fn main_loop(
                 }
             }
             Err(e) => {
-                println!("Executor thread terminated due to error: {:?}", e);
+                info!("Executor thread terminated due to error: {:?}", e);
                 break;
             }
         }

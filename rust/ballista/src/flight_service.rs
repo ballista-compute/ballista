@@ -15,10 +15,12 @@
 //! Implementation of the Apache Arrow Flight protocol that wraps an executor.
 
 use std::pin::Pin;
+use std::sync::Arc;
 
 use crate::serde::decode_protobuf;
 use crate::serde::scheduler::Action as BallistaAction;
 
+use crate::executor::BallistaExecutor;
 use arrow_flight::{
     flight_service_server::FlightService, Action, ActionType, Criteria, Empty, FlightData,
     FlightDescriptor, FlightInfo, HandshakeRequest, HandshakeResponse, PutResult, SchemaResult,
@@ -32,13 +34,15 @@ use tonic::{Request, Response, Status, Streaming};
 
 /// Service implementing the Apache Arrow Flight Protocol
 #[derive(Clone)]
-pub struct BallistaFlightService {}
+pub struct BallistaFlightService {
+    executor: Arc<BallistaExecutor>,
+}
 
-// impl BallistaFlightService {
-//     pub fn new() -> Self {
-//         Self {}
-//     }
-// }
+impl BallistaFlightService {
+    pub fn new(executor: Arc<BallistaExecutor>) -> Self {
+        Self { executor }
+    }
+}
 
 type BoxedFlightStream<T> = Pin<Box<dyn Stream<Item = Result<T, Status>> + Send + Sync + 'static>>;
 

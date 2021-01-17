@@ -14,11 +14,14 @@
 
 //! Ballista Rust executor binary.
 
+use std::sync::Arc;
+
 use arrow_flight::flight_service_server::FlightServiceServer;
-use ballista::executor::DiscoveryMode;
+use ballista::executor::{BallistaExecutor, DiscoveryMode, ExecutorConfig};
 use ballista::flight_service::BallistaFlightService;
 use ballista::BALLISTA_VERSION;
 use clap::arg_enum;
+use log::info;
 use structopt::StructOpt;
 use tonic::transport::Server;
 
@@ -60,32 +63,31 @@ struct Opt {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    env_logger::init();
+
     let opt = Opt::from_args();
 
-    let _mode = match opt.mode {
+    let mode = match opt.mode {
         Mode::K8s => DiscoveryMode::Kubernetes,
         Mode::Etcd => DiscoveryMode::Etcd,
         Mode::Standalone => DiscoveryMode::Standalone,
     };
 
-    let _external_host = opt.external_host.as_deref().unwrap_or("localhost");
+    let external_host = opt.external_host.as_deref().unwrap_or("localhost");
     let bind_host = opt.bind_host.as_deref().unwrap_or("0.0.0.0");
-    let _etcd_urls = opt.etcd_urls.as_deref().unwrap_or("localhost:2379");
+    let etcd_urls = opt.etcd_urls.as_deref().unwrap_or("localhost:2379");
     let port = opt.port;
 
-    // let config = ExecutorConfig::new(mode, &external_host, port, &etcd_urls, opt.concurrent_tasks);
-    // println!("Running with config: {:?}", config);
+    let config = ExecutorConfig::new(mode, &external_host, port, &etcd_urls, opt.concurrent_tasks);
+    info!("Running with config: {:?}", config);
 
     let addr = format!("{}:{}", bind_host, port);
     let addr = addr.parse()?;
 
-    // TODO split scheduler and executor into separate processes soon
-    // let scheduler: Arc<dyn Scheduler> = Arc::new(BallistaScheduler::new(config.clone()));
-    //let executor: Arc<dyn Executor> = Arc::new(BallistaExecutor::new(config));
-
-    let service = BallistaFlightService {}; //::new(/*scheduler, executor*/);
+    let executor = Arc::new(BallistaExecutor::new(config));
+    let service = BallistaFlightService::new(executor);
     let server = FlightServiceServer::new(service);
-    println!(
+    info!(
         "Ballista v{} Rust Executor listening on {:?}",
         BALLISTA_VERSION, addr
     );

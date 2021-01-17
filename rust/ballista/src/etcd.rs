@@ -18,9 +18,10 @@ use std::thread;
 use std::time::Duration;
 
 use crate::error::{ballista_error, Result};
-
 use crate::serde::scheduler::ExecutorMeta;
+
 use etcd_client::{Client, GetOptions, PutOptions};
+use log::{debug, warn};
 use uuid::Uuid;
 
 /// Start a thread that will register the executor with etcd periodically
@@ -45,7 +46,7 @@ async fn main_loop(etcd_urls: &str, cluster_name: &str, uuid: &Uuid, host: &str,
     loop {
         match Client::connect([&etcd_urls], None).await {
             Ok(mut client) => {
-                println!("Connected to etcd at {} ok", etcd_urls);
+                debug!("Connected to etcd at {} ok", etcd_urls);
                 let lease_time_seconds = 60;
                 let key = format!("/ballista/{}/{}", cluster_name, &uuid);
                 let value = format!("{}:{}", host, port);
@@ -53,14 +54,14 @@ async fn main_loop(etcd_urls: &str, cluster_name: &str, uuid: &Uuid, host: &str,
                     Ok(lease) => {
                         let options = PutOptions::new().with_lease(lease.id());
                         match client.put(key.clone(), value.clone(), Some(options)).await {
-                            Ok(_) => println!("Registered with etcd as {}.", key),
-                            Err(e) => println!("etcd put failed: {:?}", e.to_string()),
+                            Ok(_) => debug!("Registered with etcd as {}.", key),
+                            Err(e) => warn!("etcd put failed: {:?}", e.to_string()),
                         }
                     }
-                    Err(e) => println!("etcd lease grant failed: {:?}", e.to_string()),
+                    Err(e) => warn!("etcd lease grant failed: {:?}", e.to_string()),
                 }
             }
-            Err(e) => println!("Failed to connect to etcd {:?}", e.to_string()),
+            Err(e) => warn!("Failed to connect to etcd {:?}", e.to_string()),
         }
         thread::sleep(Duration::from_secs(15));
     }
@@ -69,7 +70,7 @@ async fn main_loop(etcd_urls: &str, cluster_name: &str, uuid: &Uuid, host: &str,
 pub async fn etcd_get_executors(etcd_urls: &str, cluster_name: &str) -> Result<Vec<ExecutorMeta>> {
     match Client::connect([etcd_urls], None).await {
         Ok(mut client) => {
-            println!("get_executor_ids got client");
+            debug!("get_executor_ids got client");
             let key = format!("/ballista/{}", cluster_name);
             let resp = client
                 .get(key, Some(GetOptions::new().with_all_keys()))

@@ -18,14 +18,15 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use crate::context::BallistaContext;
-use crate::error::Result;
+use crate::error::{ballista_error, Result};
 use crate::etcd::start_etcd_thread;
 use crate::serde::scheduler::{ExecutionTask, ShuffleId};
 
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
+use async_trait::async_trait;
 use crossbeam::crossbeam_channel::{unbounded, Receiver, Sender};
-use log::info;
+use log::{error, info};
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -68,14 +69,14 @@ pub struct ShufflePartition {
     pub(crate) data: Vec<RecordBatch>,
 }
 
-// #[async_trait]
-// pub trait Executor: Send + Sync {
-//     /// Execute a query and store the resulting shuffle partitions in memory
-//     fn submit_task(&self, task: &ExecutionTask) -> Result<TaskStatus>;
-//
-//     /// Collect the results of a prior task that resulted in a shuffle partition
-//     fn collect(&self, shuffle_id: &ShuffleId) -> Result<ShufflePartition>;
-// }
+#[async_trait]
+pub trait Executor: Send + Sync {
+    /// Execute a query and store the resulting shuffle partitions in memory
+    fn submit_task(&self, task: &ExecutionTask) -> Result<TaskStatus>;
+
+    /// Collect the results of a prior task that resulted in a shuffle partition
+    fn collect(&self, shuffle_id: &ShuffleId) -> Result<ShufflePartition>;
+}
 
 #[derive(Debug, Clone)]
 pub enum TaskStatus {
@@ -89,7 +90,11 @@ pub enum TaskStatus {
     Failed(String),
 }
 
-pub struct BallistaExecutor {}
+pub struct BallistaExecutor {
+    task_status_map: Arc<Mutex<HashMap<String, TaskStatus>>>,
+    shuffle_partitions: Arc<Mutex<HashMap<String, ShufflePartition>>>,
+    tx: Sender<ExecutionTask>,
+}
 
 impl BallistaExecutor {
     pub fn new(config: ExecutorConfig) -> Self {
@@ -113,7 +118,7 @@ impl BallistaExecutor {
         let task_status_map = Arc::new(Mutex::new(HashMap::new()));
         let shuffle_partitions = Arc::new(Mutex::new(HashMap::new()));
 
-        let (_tx, rx): (Sender<ExecutionTask>, Receiver<ExecutionTask>) = unbounded();
+        let (tx, rx): (Sender<ExecutionTask>, Receiver<ExecutionTask>) = unbounded();
 
         // launch worker threads
         for _ in 0..config.concurrent_tasks {
@@ -126,7 +131,11 @@ impl BallistaExecutor {
             });
         }
 
-        Self {}
+        Self {
+            tx,
+            task_status_map,
+            shuffle_partitions,
+        }
     }
 }
 
@@ -162,7 +171,7 @@ async fn main_loop(
                         set_task_status(&task_status_map, &task.key(), TaskStatus::Completed);
                     }
                     Err(e) => {
-                        info!("Task failed: {:?}", e);
+                        error!("Task failed: {:?}", e);
                         set_task_status(
                             &task_status_map,
                             &task.key(),
@@ -172,7 +181,7 @@ async fn main_loop(
                 }
             }
             Err(e) => {
-                info!("Executor thread terminated due to error: {:?}", e);
+                error!("Executor thread terminated: {:?}", e.to_string());
                 break;
             }
         }
@@ -198,8 +207,7 @@ async fn execute_task(
         task.shuffle_locations.clone(),
     ));
 
-    //TODO
-    unimplemented!()
+    todo!()
 
     // let exec_plan = task.plan.as_execution_plan();
     // let stream = exec_plan.execute(ctx, task.partition_id).await?;
@@ -211,48 +219,48 @@ async fn execute_task(
     // Ok((stream.schema().as_ref().to_owned(), batches))
 }
 
-// #[async_trait]
-// impl Executor for BallistaExecutor {
-//     fn submit_task(&self, task: &ExecutionTask) -> Result<TaskStatus> {
-//         // is it already submitted?
-//         {
-//             let task_status = self.task_status_map.lock().expect("failed to lock mutex");
-//             if let Some(status) = task_status.get(&task.key()) {
-//                 return Ok(status.to_owned());
-//             }
-//         }
-//
-//         match self.tx.send(task.to_owned()) {
-//             Ok(_) => {
-//                 set_task_status(&self.task_status_map, &task.key(), TaskStatus::Pending);
-//                 Ok(TaskStatus::Pending)
-//             }
-//             Err(_) => {
-//                 set_task_status(
-//                     &self.task_status_map,
-//                     &task.key(),
-//                     TaskStatus::Failed("could not submit".to_owned()),
-//                 );
-//                 Err(ballista_error("send error"))
-//             }
-//         }
-//     }
-//
-//     fn collect(&self, shuffle_id: &ShuffleId) -> Result<ShufflePartition> {
-//         let key = format!(
-//             "{}:{}:{}",
-//             shuffle_id.job_uuid, shuffle_id.stage_id, shuffle_id.partition_id
-//         );
-//         let mut shuffle_partitions = self
-//             .shuffle_partitions
-//             .lock()
-//             .expect("failed to lock mutex");
-//         match shuffle_partitions.remove(&key) {
-//             Some(partition) => Ok(partition),
-//             _ => Err(ballista_error(&format!(
-//                 "invalid shuffle partition id {}",
-//                 key
-//             ))),
-//         }
-//     }
-// }
+#[async_trait]
+impl Executor for BallistaExecutor {
+    fn submit_task(&self, task: &ExecutionTask) -> Result<TaskStatus> {
+        // is it already submitted?
+        {
+            let task_status = self.task_status_map.lock().expect("failed to lock mutex");
+            if let Some(status) = task_status.get(&task.key()) {
+                return Ok(status.to_owned());
+            }
+        }
+
+        match self.tx.send(task.to_owned()) {
+            Ok(_) => {
+                set_task_status(&self.task_status_map, &task.key(), TaskStatus::Pending);
+                Ok(TaskStatus::Pending)
+            }
+            Err(_) => {
+                set_task_status(
+                    &self.task_status_map,
+                    &task.key(),
+                    TaskStatus::Failed("could not submit".to_owned()),
+                );
+                Err(ballista_error("send error"))
+            }
+        }
+    }
+
+    fn collect(&self, shuffle_id: &ShuffleId) -> Result<ShufflePartition> {
+        let key = format!(
+            "{}:{}:{}",
+            shuffle_id.job_uuid, shuffle_id.stage_id, shuffle_id.partition_id
+        );
+        let mut shuffle_partitions = self
+            .shuffle_partitions
+            .lock()
+            .expect("failed to lock mutex");
+        match shuffle_partitions.remove(&key) {
+            Some(partition) => Ok(partition),
+            _ => Err(ballista_error(&format!(
+                "invalid shuffle partition id {}",
+                key
+            ))),
+        }
+    }
+}

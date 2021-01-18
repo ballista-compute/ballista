@@ -454,7 +454,7 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                 else_expr,
             } => {
                 let when_then_expr = when_then_expr
-                    .into_iter()
+                    .iter()
                     .map(|(w, t)| {
                         Ok(protobuf::WhenThen {
                             when_expr: Some(w.as_ref().try_into()?),

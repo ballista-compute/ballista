@@ -44,6 +44,11 @@ message LogicalExprNode {
     IsNull is_null_expr = 60;
     IsNotNull is_not_null_expr = 61;
     Not not_expr = 62;
+
+    BetweenNode between = 70;
+    CaseNode case_ = 71;
+    CastNode cast = 72;
+    SortExprNode sort = 73;
   }
 }
 
@@ -82,6 +87,35 @@ enum AggregateFunction {
 message AggregateExprNode {
   AggregateFunction aggr_function = 1;
   LogicalExprNode expr = 2;
+}
+
+message BetweenNode {
+  LogicalExprNode expr = 1;
+  bool negated = 2;
+  LogicalExprNode low = 3;
+  LogicalExprNode high = 4;
+}
+
+message CaseNode {
+  LogicalExprNode expr = 1;
+  repeated WhenThen when_then_expr = 2;
+  LogicalExprNode else_expr = 3;
+}
+
+message WhenThen {
+  LogicalExprNode when_expr = 1;
+  LogicalExprNode then_expr = 2;
+}
+
+message CastNode {
+  LogicalExprNode expr = 1;
+  ArrowType arrow_type = 2;
+}
+
+message SortExprNode {
+  LogicalExprNode expr = 1;
+  bool asc = 2;
+  bool nulls_first = 3;
 }
 
 // LogicalPlan is a nested type

@@ -21,12 +21,13 @@ use crate::error::{ballista_error, BallistaError, Result};
 use crate::serde::protobuf::{self};
 use crate::serde::scheduler::Action;
 
+use crate::memory_stream::MemoryStream;
 use arrow::datatypes::Schema;
-use arrow::record_batch::RecordBatch;
 use arrow_flight::flight_service_client::FlightServiceClient;
 use arrow_flight::utils::flight_data_to_arrow_batch;
 use arrow_flight::Ticket;
 use datafusion::logical_plan::LogicalPlan;
+use datafusion::physical_plan::SendableRecordBatchStream;
 use prost::Message;
 use std::collections::HashMap;
 
@@ -48,12 +49,16 @@ impl BallistaClient {
     }
 
     /// Execute a logical query plan and retrieve the results
-    pub async fn execute_query(&mut self, plan: &LogicalPlan) -> Result<Vec<RecordBatch>> {
+    pub async fn execute_query(&mut self, plan: &LogicalPlan) -> Result<SendableRecordBatchStream> {
         let action = Action::InteractiveQuery {
             plan: plan.to_owned(),
             settings: HashMap::new(),
         };
+        self.execute_action(&action).await
+    }
 
+    /// Execute an action and retrieve the results
+    pub async fn execute_action(&mut self, action: &Action) -> Result<SendableRecordBatchStream> {
         let serialized_action: protobuf::Action = action.to_owned().try_into()?;
         let mut buf: Vec<u8> = Vec::with_capacity(serialized_action.encoded_len());
         serialized_action
@@ -80,6 +85,8 @@ impl BallistaClient {
                 let schema = Arc::new(Schema::try_from(&flight_data)?);
 
                 // all the remaining stream messages should be dictionary and record batches
+
+                //TODO we should stream the data rather than load into memory first
                 let mut batches = vec![];
                 while let Some(flight_data) = stream
                     .message()
@@ -89,7 +96,8 @@ impl BallistaClient {
                     let batch = flight_data_to_arrow_batch(&flight_data, schema.clone(), &[])?;
                     batches.push(batch);
                 }
-                Ok(batches)
+
+                Ok(Box::pin(MemoryStream::try_new(batches, schema, None)?))
             }
             None => Err(ballista_error(
                 "Did not receive schema batch from flight server",

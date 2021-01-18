@@ -432,11 +432,75 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                     expr_type: Some(protobuf::logical_expr_node::ExprType::IsNotNullExpr(expr)),
                 })
             }
-            Expr::Between { .. } => unimplemented!(),
+            Expr::Between {
+                expr,
+                negated,
+                low,
+                high,
+            } => {
+                let expr = Box::new(protobuf::BetweenNode {
+                    expr: Some(Box::new(expr.as_ref().try_into()?)),
+                    negated: *negated,
+                    low: Some(Box::new(low.as_ref().try_into()?)),
+                    high: Some(Box::new(high.as_ref().try_into()?)),
+                });
+                Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(protobuf::logical_expr_node::ExprType::Between(expr)),
+                })
+            }
+            Expr::Case {
+                expr,
+                when_then_expr,
+                else_expr,
+            } => {
+                let when_then_expr = when_then_expr
+                    .iter()
+                    .map(|(w, t)| {
+                        Ok(protobuf::WhenThen {
+                            when_expr: Some(w.as_ref().try_into()?),
+                            then_expr: Some(t.as_ref().try_into()?),
+                        })
+                    })
+                    .collect::<Result<Vec<protobuf::WhenThen>, BallistaError>>()?;
+                let expr = Box::new(protobuf::CaseNode {
+                    expr: match expr {
+                        Some(e) => Some(Box::new(e.as_ref().try_into()?)),
+                        None => None,
+                    },
+                    when_then_expr,
+                    else_expr: match else_expr {
+                        Some(e) => Some(Box::new(e.as_ref().try_into()?)),
+                        None => None,
+                    },
+                });
+                Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(protobuf::logical_expr_node::ExprType::Case(expr)),
+                })
+            }
+            Expr::Cast { expr, data_type } => {
+                let expr = Box::new(protobuf::CastNode {
+                    expr: Some(Box::new(expr.as_ref().try_into()?)),
+                    arrow_type: to_proto_arrow_type(data_type)?.into(),
+                });
+                Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(protobuf::logical_expr_node::ExprType::Cast(expr)),
+                })
+            }
+            Expr::Sort {
+                expr,
+                asc,
+                nulls_first,
+            } => {
+                let expr = Box::new(protobuf::SortExprNode {
+                    expr: Some(Box::new(expr.as_ref().try_into()?)),
+                    asc: *asc,
+                    nulls_first: *nulls_first,
+                });
+                Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(protobuf::logical_expr_node::ExprType::Sort(expr)),
+                })
+            }
             Expr::Negative(_) => unimplemented!(),
-            Expr::Case { .. } => unimplemented!(),
-            Expr::Cast { .. } => unimplemented!(),
-            Expr::Sort { .. } => unimplemented!(),
             Expr::InList { .. } => unimplemented!(),
             Expr::Wildcard => unimplemented!(),
             // _ => Err(BallistaError::General(format!(
@@ -471,6 +535,7 @@ impl TryInto<protobuf::Schema> for &Schema {
 
 fn to_proto_arrow_type(dt: &DataType) -> Result<protobuf::ArrowType, BallistaError> {
     match dt {
+        DataType::Boolean => Ok(protobuf::ArrowType::Bool),
         DataType::Int8 => Ok(protobuf::ArrowType::Int8),
         DataType::Int16 => Ok(protobuf::ArrowType::Int16),
         DataType::Int32 => Ok(protobuf::ArrowType::Int32),
@@ -479,9 +544,11 @@ fn to_proto_arrow_type(dt: &DataType) -> Result<protobuf::ArrowType, BallistaErr
         DataType::UInt16 => Ok(protobuf::ArrowType::Uint16),
         DataType::UInt32 => Ok(protobuf::ArrowType::Uint32),
         DataType::UInt64 => Ok(protobuf::ArrowType::Uint64),
+        DataType::Float16 => Ok(protobuf::ArrowType::HalfFloat),
         DataType::Float32 => Ok(protobuf::ArrowType::Float),
         DataType::Float64 => Ok(protobuf::ArrowType::Double),
         DataType::Utf8 => Ok(protobuf::ArrowType::Utf8),
+        DataType::Binary => Ok(protobuf::ArrowType::Binary),
         other => Err(BallistaError::General(format!(
             "logical_plan::to_proto() Unsupported data type {:?}",
             other

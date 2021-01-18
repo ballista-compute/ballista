@@ -2,7 +2,5 @@
 
 members = [
     "ballista",
-#    "examples/apache-spark-rust-bindings",
-#    "examples/distributed-query",
-#    "examples/tpch",
+    "examples/tpch",
 ]

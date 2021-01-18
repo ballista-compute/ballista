@@ -287,6 +287,44 @@ impl TryInto<Expr> for &protobuf::LogicalExprNode {
             Some(ExprType::NotExpr(not)) => {
                 Ok(Expr::Not(Box::new(parse_required_expr(&not.expr)?)))
             }
+            Some(ExprType::Between(between)) => Ok(Expr::Between {
+                expr: Box::new(parse_required_expr(&between.expr)?),
+                negated: between.negated,
+                low: Box::new(parse_required_expr(&between.low)?),
+                high: Box::new(parse_required_expr(&between.high)?),
+            }),
+            Some(ExprType::Case(case)) => {
+                let when_then_expr = case
+                    .when_then_expr
+                    .iter()
+                    .map(|e| {
+                        Ok((
+                            Box::new(match &e.when_expr {
+                                Some(e) => e.try_into(),
+                                None => Err(proto_error("Missing required expression")),
+                            }?),
+                            Box::new(match &e.then_expr {
+                                Some(e) => e.try_into(),
+                                None => Err(proto_error("Missing required expression")),
+                            }?),
+                        ))
+                    })
+                    .collect::<Result<Vec<(Box<Expr>, Box<Expr>)>, BallistaError>>()?;
+                Ok(Expr::Case {
+                    expr: parse_optional_expr(&case.expr)?.map(Box::new),
+                    when_then_expr,
+                    else_expr: parse_optional_expr(&case.else_expr)?.map(Box::new),
+                })
+            }
+            Some(ExprType::Cast(cast)) => Ok(Expr::Cast {
+                expr: Box::new(parse_required_expr(&cast.expr)?),
+                data_type: from_proto_arrow_type(cast.arrow_type)?,
+            }),
+            Some(ExprType::Sort(sort)) => Ok(Expr::Sort {
+                expr: Box::new(parse_required_expr(&sort.expr)?),
+                asc: sort.asc,
+                nulls_first: sort.nulls_first,
+            }),
             None => Err(proto_error("Unexpected empty logical expression")),
         }
     }
@@ -313,6 +351,7 @@ fn from_proto_binary_op(op: &str) -> Result<Operator, BallistaError> {
 
 fn from_proto_arrow_type(dt: i32) -> Result<DataType, BallistaError> {
     match dt {
+        dt if dt == protobuf::ArrowType::Bool as i32 => Ok(DataType::Boolean),
         dt if dt == protobuf::ArrowType::Uint8 as i32 => Ok(DataType::UInt8),
         dt if dt == protobuf::ArrowType::Int8 as i32 => Ok(DataType::Int8),
         dt if dt == protobuf::ArrowType::Uint16 as i32 => Ok(DataType::UInt16),
@@ -321,9 +360,11 @@ fn from_proto_arrow_type(dt: i32) -> Result<DataType, BallistaError> {
         dt if dt == protobuf::ArrowType::Int32 as i32 => Ok(DataType::Int32),
         dt if dt == protobuf::ArrowType::Uint64 as i32 => Ok(DataType::UInt64),
         dt if dt == protobuf::ArrowType::Int64 as i32 => Ok(DataType::Int64),
+        dt if dt == protobuf::ArrowType::HalfFloat as i32 => Ok(DataType::Float16),
         dt if dt == protobuf::ArrowType::Float as i32 => Ok(DataType::Float32),
         dt if dt == protobuf::ArrowType::Double as i32 => Ok(DataType::Float64),
         dt if dt == protobuf::ArrowType::Utf8 as i32 => Ok(DataType::Utf8),
+        dt if dt == protobuf::ArrowType::Binary as i32 => Ok(DataType::Binary),
         other => Err(BallistaError::General(format!(
             "Unsupported data type {:?}",
             other
@@ -538,5 +579,14 @@ fn parse_required_expr(p: &Option<Box<protobuf::LogicalExprNode>>) -> Result<Exp
     match p {
         Some(expr) => expr.as_ref().try_into(),
         None => Err(proto_error("Missing required expression")),
+    }
+}
+
+fn parse_optional_expr(
+    p: &Option<Box<protobuf::LogicalExprNode>>,
+) -> Result<Option<Expr>, BallistaError> {
+    match p {
+        Some(expr) => expr.as_ref().try_into().map(Some),
+        None => Ok(None),
     }
 }

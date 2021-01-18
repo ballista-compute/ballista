@@ -20,12 +20,12 @@ import org.ballistacompute.logical.*
 import org.ballistacompute.physical.QueryAction
 
 class ProtobufDeserializer {
-
+@Throws(RuntimeException::class)
   fun fromProto(node: LogicalPlanNode): LogicalPlan {
-    return if (node.hasScan()) {
-      val schema = fromProto(node.scan.schema)
-      val ds = CsvDataSource(node.scan.path, schema, true, 1024)
-      Scan(node.scan.path, ds, node.scan.projection.columnsList.asByteStringList().map { it.toString() })
+    return if (node.hasCsvScan() ) {
+      val schema = fromProto(node.csvScan.schema)
+      val ds = CsvDataSource(node.csvScan.path, schema, node.csvScan.hasHeader, 1024)
+      Scan(node.csvScan.path, ds, node.csvScan.projection.columnsList.asByteStringList().map { it.toString() })
     } else if (node.hasSelection()) {
       Selection(fromProto(node.input), fromProto(node.selection.expr))
     } else if (node.hasProjection()) {
@@ -42,55 +42,65 @@ class ProtobufDeserializer {
     }
   }
 
+  @Throws(RuntimeException::class)
   fun fromProto(node: LogicalExprNode): LogicalExpr {
-    return if (node.hasBinaryExpr()) {
-      val binaryNode = node.binaryExpr
-      val ll = fromProto(binaryNode.l)
-      val rr = fromProto(binaryNode.r)
-      when (binaryNode.op) {
-        "eq" -> Eq(ll, rr)
-        "neq" -> Neq(ll, rr)
-        "lt" -> Lt(ll, rr)
-        "lteq" -> LtEq(ll, rr)
-        "gt" -> Gt(ll, rr)
-        "gteq" -> GtEq(ll, rr)
-        "and" -> And(ll, rr)
-        "or" -> Or(ll, rr)
-        "add" -> Add(ll, rr)
-        "subtract" -> Subtract(ll, rr)
-        "multiply" -> Multiply(ll, rr)
-        "divide" -> Divide(ll, rr)
-        else -> throw RuntimeException("Failed to parse logical binary expression: $node")
-      }
-    } else if (node.hasColumnName) {
-      col(node.columnName)
-    } else if (node.hasLiteralString) {
-      lit(node.literalString)
-    } else if (node.hasLiteralI8 || node.hasLiteralI16 || node.hasLiteralI32 || node.hasLiteralI64) {
-      lit(node.literalInt)
-    } else if (node.hasLiteralU8 || node.hasLiteralU16 || node.hasLiteralU32 || node.hasLiteralU64) {
-        lit(node.literalUint)
-    } else if (node.hasLiteralF32) {
-        lit(node.literalF32)
-    } else if (node.hasLiteralF64) {
-      lit(node.literalF64)
-    } else if (node.hasAggregateExpr()) {
-      val aggr = node.aggregateExpr
-      val expr = fromProto(aggr.expr)
-      return when (aggr.aggrFunction) {
-        AggregateFunction.MIN -> Min(expr)
-        AggregateFunction.MAX -> Max(expr)
-        AggregateFunction.SUM -> Sum(expr)
-        AggregateFunction.AVG -> Avg(expr)
-        else ->
-            throw RuntimeException(
-                "Failed to parse logical aggregate expression: ${aggr.aggrFunction}")
-      }
-    } else {
-      throw RuntimeException("Failed to parse logical expression: $node")
-    }
-  }
 
+      return when (node.exprTypeCase){
+          LogicalExprNode.ExprTypeCase.BINARY_EXPR -> {
+              val binaryNode = node.binaryExpr
+              val ll = fromProto(binaryNode.l)
+              val rr = fromProto(binaryNode.r)
+              when (binaryNode.op) {
+                  "eq" -> Eq(ll, rr)
+                  "neq" -> Neq(ll, rr)
+                  "lt" -> Lt(ll, rr)
+                  "lteq" -> LtEq(ll, rr)
+                  "gt" -> Gt(ll, rr)
+                  "gteq" -> GtEq(ll, rr)
+                  "and" -> And(ll, rr)
+                  "or" -> Or(ll, rr)
+                  "add" -> Add(ll, rr)
+                  "subtract" -> Subtract(ll, rr)
+                  "multiply" -> Multiply(ll, rr)
+                  "divide" -> Divide(ll, rr)
+                  else -> throw RuntimeException("Failed to parse logical binary expression: $node")
+              }
+          }
+          LogicalExprNode.ExprTypeCase.ALIAS -> Alias(fromProto(node.alias.expr), node.alias.alias)
+          LogicalExprNode.ExprTypeCase.COLUMN_NAME -> col(node.columnName)
+          LogicalExprNode.ExprTypeCase.LITERAL_STRING -> lit(node.literalString)
+          LogicalExprNode.ExprTypeCase.LITERAL_INT8 -> lit(node.literalInt8.toLong())
+          LogicalExprNode.ExprTypeCase.LITERAL_INT16 -> lit(node.literalInt16.toLong())
+          LogicalExprNode.ExprTypeCase.LITERAL_INT32 -> lit(node.literalInt32.toLong())
+          LogicalExprNode.ExprTypeCase.LITERAL_INT64 -> lit(node.literalInt64)
+          LogicalExprNode.ExprTypeCase.LITERAL_UINT8 -> lit(node.literalUint8.toLong())
+          LogicalExprNode.ExprTypeCase.LITERAL_UINT16 -> lit(node.literalUint16.toLong())
+          LogicalExprNode.ExprTypeCase.LITERAL_UINT32 -> lit(node.literalUint32.toLong())
+          LogicalExprNode.ExprTypeCase.LITERAL_UINT64 -> lit(node.literalUint64)
+          LogicalExprNode.ExprTypeCase.LITERAL_F32 -> lit(node.literalF32)
+          LogicalExprNode.ExprTypeCase.LITERAL_F64 -> lit(node.literalF64)
+          LogicalExprNode.ExprTypeCase.AGGREGATE_EXPR -> {
+              val aggr = node.aggregateExpr
+              val expr = fromProto(aggr.expr)
+              return when (aggr.aggrFunction) {
+                  AggregateFunction.MIN -> Min(expr)
+                  AggregateFunction.MAX -> Max(expr)
+                  AggregateFunction.SUM -> Sum(expr)
+                  AggregateFunction.AVG -> Avg(expr)
+                  AggregateFunction.COUNT -> Count(expr)
+                  AggregateFunction.COUNT_DISTINCT -> CountDistinct(expr)
+                  else ->
+                      throw RuntimeException(
+                              "Failed to parse logical aggregate expression: ${aggr.aggrFunction}")
+              }
+          }
+          LogicalExprNode.ExprTypeCase.IS_NULL_EXPR -> TODO("Requires that IsNullExpr is implemented in kotlin first")
+          LogicalExprNode.ExprTypeCase.IS_NOT_NULL_EXPR -> TODO("Requires that IsNotNullExpr is implemented in kotlin first")
+          LogicalExprNode.ExprTypeCase.NOT_EXPR -> TODO("Requires that NotExpr is implemented in kotlin first")
+          LogicalExprNode.ExprTypeCase.EXPRTYPE_NOT_SET,null -> throw RuntimeException("Found null expr enum when deserializing protobuf logical expression")
+      }
+  }
+    @Throws(IllegalStateException::class)
   fun fromProto(schema: Schema): org.ballistacompute.datatypes.Schema {
 
     val arrowFields =

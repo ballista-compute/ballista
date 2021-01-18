@@ -15,7 +15,10 @@
 package org.ballistacompute.protobuf
 
 import org.ballistacompute.datasource.CsvDataSource
+import org.ballistacompute.datasource.ParquetDataSource
 import org.ballistacompute.logical.*
+import org.ballistacompute.logical.JoinType
+
 
 /** Utility to convert between logical plan and protobuf representation. */
 class ProtobufSerializer {
@@ -31,13 +34,26 @@ class ProtobufSerializer {
               .addAllColumns(plan.projection)
               .build()
             LogicalPlanNode.newBuilder()
-                .setScan(
-                    ScanNode.newBuilder()
-                        .setPath(plan.path)
-                        .setProjection(projectionColumns)
-                        .build())
-                .build()
+                    .setCsvScan(
+                            CsvTableScanNode.newBuilder()
+                                    .setPath(plan.path)
+                                    .setProjection(projectionColumns)
+                                    .build()
+                    ).build()
           }
+            is ParquetDataSource ->{
+                val projectionColumns = ProjectionColumns.newBuilder()
+                        .addAllColumns(plan.projection)
+                        .build()
+
+                LogicalPlanNode.newBuilder()
+                        .setParquetScan(
+                                ParquetTableScanNode.newBuilder()
+                                        .setPath(plan.path)
+                                        .setProjection(projectionColumns)
+                                        .build()
+                        ).build()
+            }
           else -> throw UnsupportedOperationException("Unsupported datasource used in scan")
         }
       }
@@ -70,6 +86,24 @@ class ProtobufSerializer {
                     .build())
             .build()
       }
+        is Join ->{
+            val joinType = when(plan.join_type){
+                JoinType.Inner ->org.ballistacompute.protobuf.JoinType.INNER
+                JoinType.Left -> org.ballistacompute.protobuf.JoinType.LEFT
+                JoinType.Right -> org.ballistacompute.protobuf.JoinType.RIGHT
+            }
+
+            LogicalPlanNode.newBuilder()
+                    .setJoin(
+                            JoinNode.newBuilder()
+                                    .setJoinType( joinType)
+                                    .setLeft(toProto(plan.left))
+                                    .setRight(toProto(plan.right))
+                                    .addAllLeftJoinColumn(plan.on.map{it.first})
+                                    .addAllRightJoinColumn(plan.on.map{it.second})
+                                    .build()
+                    ).build()
+        }
       else ->
           throw IllegalStateException(
               "Cannot serialize logical operator to protobuf: ${plan.javaClass.name}")
@@ -80,19 +114,19 @@ class ProtobufSerializer {
   fun toProto(expr: LogicalExpr): LogicalExprNode {
     return when (expr) {
       is Column -> {
-        LogicalExprNode.newBuilder().setHasColumnName(true).setColumnName(expr.name).build()
+        LogicalExprNode.newBuilder().setColumnName(expr.name).build()
       }
       is LiteralString -> {
-        LogicalExprNode.newBuilder().setHasLiteralString(true).setLiteralString(expr.str).build()
+        LogicalExprNode.newBuilder().setLiteralString(expr.str).build()
       }
         is LiteralFloat -> {
-            LogicalExprNode.newBuilder().setHasLiteralF32(true).setLiteralF32(expr.n).build()
+            LogicalExprNode.newBuilder().setLiteralF32(expr.n).build()
         }
       is LiteralDouble -> {
-        LogicalExprNode.newBuilder().setHasLiteralF64(true).setLiteralF64(expr.n).build()
+        LogicalExprNode.newBuilder().setLiteralF64(expr.n).build()
       }
       is LiteralLong -> {
-        LogicalExprNode.newBuilder().setHasLiteralI64(true).setLiteralInt(expr.n).build()
+        LogicalExprNode.newBuilder().setLiteralInt64(expr.n).build()
       }
       is BooleanBinaryExpr -> {
         val op =

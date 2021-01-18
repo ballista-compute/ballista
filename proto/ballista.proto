@@ -12,41 +12,51 @@ option java_outer_classname = "BallistaProto";
 
 // logical expressions
 message LogicalExprNode {
+  oneof ExprType {
+    // column references
+    string column_name = 10;
 
-  // column references
-  string column_name = 10;
-  bool has_column_name = 11;
+    // alias
+    AliasNode alias = 14;
 
-  // alias
-  AliasNode alias = 14;
+    // literals
+    string literal_string = 20;
+    int32 literal_int8 = 21;
+    int32 literal_int16 = 22;
+    int32 literal_int32 = 23;
+    int64 literal_int64 = 24;
 
-  // literals
-  string literal_string = 21;
-  bool has_literal_string = 22;
+    uint32 literal_uint8 = 25;
+    uint32 literal_uint16 = 26;
+    uint32 literal_uint32 = 27;
+    uint64 literal_uint64 = 28;
 
-  int64 literal_int = 23;
-  bool has_literal_i8 = 24;
-  bool has_literal_i16 = 25;
-  bool has_literal_i32 = 26;
-  bool has_literal_i64 = 27;
+    float literal_f32 = 29;
+    double literal_f64 = 30;
 
-  uint64 literal_uint = 28;
-  bool has_literal_u8 = 29;
-  bool has_literal_u16 = 30;
-  bool has_literal_u32 = 31;
-  bool has_literal_u64 = 32;
+    // binary expressions
+    BinaryExprNode binary_expr = 40;
 
-  float literal_f32 = 33;
-  bool has_literal_f32 = 34;
+    // aggregate expressions
+    AggregateExprNode aggregate_expr = 50;
 
-  double literal_f64 = 35;
-  bool has_literal_f64 = 36;
+    // null checks
+    IsNull is_null_expr = 60;
+    IsNotNull is_not_null_expr = 61;
+    Not not_expr = 62;
+  }
+}
 
-  // binary expressions
-  BinaryExprNode binary_expr = 40;
+message IsNull {
+  LogicalExprNode expr = 1;
+}
 
-  // aggregate expressions
-  AggregateExprNode aggregate_expr = 50;
+message IsNotNull {
+  LogicalExprNode expr = 1;
+}
+
+message Not {
+  LogicalExprNode expr = 1;
 }
 
 message AliasNode {
@@ -79,24 +89,41 @@ message LogicalPlanNode {
 
   LogicalPlanNode input = 1;
 
-  ScanNode scan = 10;
+  CsvTableScanNode csv_scan = 10;
+  ParquetTableScanNode parquet_scan = 11;
   ProjectionNode projection = 20;
   SelectionNode selection = 21;
   LimitNode limit = 22;
   AggregateNode aggregate = 23;
+  JoinNode join = 24;
+  SortNode sort = 25;
+  RepartitionNode repartition = 26;
+  EmptyRelationNode empty_relation = 27;
+  CreateExternalTableNode create_external_table = 28;
+  ExplainNode explain = 29;
 }
 
 message ProjectionColumns {
   repeated string columns = 1;
 }
 
-//TODO break this out into separate CsvScanNode and ParquetScanNode
-message ScanNode {
-  string path = 1;
-  ProjectionColumns projection = 2;
-  Schema schema = 3;
-  string file_format = 4; // parquet or csv
-  bool has_header = 5; // csv specific
+message CsvTableScanNode {
+  string table_name = 1;
+  string path = 2;
+  bool has_header = 3;
+  string delimiter = 4;
+  string file_extension = 5;
+  ProjectionColumns projection = 6;
+  Schema schema = 7;
+  repeated LogicalExprNode filters = 8;
+}
+
+message ParquetTableScanNode {
+  string table_name = 1;
+  string path = 2;
+  ProjectionColumns projection = 3;
+  Schema schema = 4;
+  repeated LogicalExprNode filters = 5;
 }
 
 message ProjectionNode {
@@ -107,9 +134,66 @@ message SelectionNode {
   LogicalExprNode expr = 2;
 }
 
+message SortNode{
+    repeated LogicalExprNode expr = 1;
+}
+
+message RepartitionNode{
+    oneof partition_method{
+        uint64 round_robin = 1;
+        HashRepartition hash = 2;
+    }
+}
+
+message HashRepartition{
+    repeated LogicalExprNode hash_expr = 2;
+    uint64 batch_size = 1;
+}
+
+message EmptyRelationNode{
+    bool produce_one_row = 1;
+}
+
+message CreateExternalTableNode{
+    string name = 1;
+    string location = 2;
+    FileType file_type = 3;
+    bool has_header = 4;
+    Schema schema = 5;
+}
+
+enum FileType{
+    NdJson = 0;
+    Parquet = 1;
+    CSV = 2;
+}
+
+message ExplainNode{
+    bool verbose = 1;
+}
+ 
+message DfField{
+    string qualifier = 2;
+    Field field = 1;
+}
+
 message AggregateNode {
   repeated LogicalExprNode group_expr = 1;
   repeated LogicalExprNode aggr_expr = 2;
+}
+
+enum JoinType {
+  INNER = 0;
+  LEFT = 1;
+  RIGHT = 2;
+}
+
+message JoinNode {
+  LogicalPlanNode left = 1;
+  LogicalPlanNode right = 2;
+  JoinType join_type = 3;
+  repeated string left_join_column = 4;
+  repeated string right_join_column = 5;
 }
 
 message LimitNode {

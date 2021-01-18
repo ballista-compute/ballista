@@ -22,7 +22,7 @@ use crate::error::{BallistaError, Result};
 use crate::serde::scheduler::Action;
 
 use datafusion::dataframe::DataFrame;
-use datafusion::logical_plan::Expr;
+use datafusion::logical_plan::{DFSchema, Expr, LogicalPlan, Partitioning};
 use datafusion::physical_plan::csv::CsvReadOptions;
 use datafusion::physical_plan::SendableRecordBatchStream;
 
@@ -103,6 +103,7 @@ impl BallistaDataFrame {
     }
 
     pub async fn collect(&self) -> Result<SendableRecordBatchStream> {
+        //TODO use BallistaContextState to determine how to submit the query to the cluster
         let mut client = BallistaClient::try_new("localhost", 8000).await?;
         client
             .execute_action(&Action::InteractiveQuery {
@@ -128,41 +129,71 @@ impl BallistaDataFrame {
         ))
     }
 
-    // pub async fn filter(&self, expr: Expr) -> Result<Arc<BallistaDataFrame>> {
-    //     self.df.filter(expr).map_err(|e| BallistaError::from(e))
+    pub async fn filter(&self, expr: Expr) -> Result<BallistaDataFrame> {
+        Ok(Self::from(
+            self.state.clone(),
+            self.df.filter(expr).map_err(BallistaError::from)?,
+        ))
+    }
+
+    pub async fn aggregate(
+        &self,
+        group_expr: Vec<Expr>,
+        aggr_expr: Vec<Expr>,
+    ) -> Result<BallistaDataFrame> {
+        Ok(Self::from(
+            self.state.clone(),
+            self.df
+                .aggregate(group_expr, aggr_expr)
+                .map_err(BallistaError::from)?,
+        ))
+    }
+
+    pub async fn limit(&self, n: usize) -> Result<BallistaDataFrame> {
+        Ok(Self::from(
+            self.state.clone(),
+            self.df.limit(n).map_err(BallistaError::from)?,
+        ))
+    }
+
+    pub async fn sort(&self, expr: Vec<Expr>) -> Result<BallistaDataFrame> {
+        Ok(Self::from(
+            self.state.clone(),
+            self.df.sort(expr).map_err(BallistaError::from)?,
+        ))
+    }
+
+    // TODO lifetime issue
+    // pub async fn join(&self, right: Arc<dyn DataFrame>, join_type: JoinType, left_cols: &[&str], right_cols: &[&str]) -> Result<BallistaDataFrame> {
+    //     Ok(Self::from(self.state.clone(), self.df.join(right, join_type, &left_cols, &right_cols).map_err(BallistaError::from)?))
     // }
-    //
-    // pub async fn aggregate(&self, group_expr: Vec<Expr>, aggr_expr: Vec<Expr>) -> Result<Arc<BallistaDataFrame>> {
-    //     self.df.aggregate(group_expr, aggr_expr).map_err(|e| BallistaError::from(e))
-    // }
-    //
-    // pub async fn limit(&self, n: usize) -> Result<Arc<BallistaDataFrame>> {
-    //     self.df.limit(n).map_err(|e| BallistaError::from(e))
-    // }
-    //
-    // pub async fn sort(&self, expr: Vec<Expr>) -> Result<Arc<BallistaDataFrame>> {
-    //     self.df.sort(expr).map_err(|e| BallistaError::from(e))
-    // }
-    //
-    // pub async fn join(&self, right: Arc<dyn DataFrame>, join_type: JoinType, left_cols: &[&str], right_cols: &[&str]) -> Result<Arc<BallistaDataFrame>> {
-    //     self.df.join(right, join_type, left_cols, right_cols).map_err(|e| BallistaError::from(e))
-    // }
-    //
-    // pub async fn repartition(&self, partitioning_scheme: Partitioning) -> Result<Arc<BallistaDataFrame>> {
-    //     self.df.repartition(partitioning_scheme).map_err(|e| BallistaError::from(e))
-    // }
-    //
-    // pub async fn schema(&self) -> &DFSchema {
-    //     self.df.schema()
-    // }
-    //
-    // pub async fn to_logical_plan(&self) -> LogicalPlan {
-    //     self.df.to_logical_plan()
-    // }
-    //
-    // pub async fn explain(&self, verbose: bool) -> Result<Arc<BallistaDataFrame>> {
-    //     self.df.explain(verbose).map_err(|e| BallistaError::from(e))
-    // }
+
+    pub async fn repartition(
+        &self,
+        partitioning_scheme: Partitioning,
+    ) -> Result<BallistaDataFrame> {
+        Ok(Self::from(
+            self.state.clone(),
+            self.df
+                .repartition(partitioning_scheme)
+                .map_err(BallistaError::from)?,
+        ))
+    }
+
+    pub async fn schema(&self) -> &DFSchema {
+        self.df.schema()
+    }
+
+    pub async fn to_logical_plan(&self) -> LogicalPlan {
+        self.df.to_logical_plan()
+    }
+
+    pub async fn explain(&self, verbose: bool) -> Result<BallistaDataFrame> {
+        Ok(Self::from(
+            self.state.clone(),
+            self.df.explain(verbose).map_err(BallistaError::from)?,
+        ))
+    }
 }
 
 // #[async_trait]

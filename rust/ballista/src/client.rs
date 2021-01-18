@@ -53,7 +53,11 @@ impl BallistaClient {
             plan: plan.to_owned(),
             settings: HashMap::new(),
         };
+        self.execute_action(&action).await
+    }
 
+    /// Execute an action and retrieve the results
+    pub async fn execute_action(&mut self, action: &Action) -> Result<Vec<RecordBatch>> {
         let serialized_action: protobuf::Action = action.to_owned().try_into()?;
         let mut buf: Vec<u8> = Vec::with_capacity(serialized_action.encoded_len());
         serialized_action

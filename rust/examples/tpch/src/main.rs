@@ -16,14 +16,15 @@ use std::collections::HashMap;
 use std::process::exit;
 use std::time::Instant;
 
+extern crate arrow;
 extern crate ballista;
+extern crate datafusion;
 
-use ballista::arrow::datatypes::{DataType, Field, Schema};
-use ballista::arrow::record_batch::RecordBatch;
-use ballista::arrow::util::pretty;
-use ballista::dataframe::*;
-use ballista::datafusion::prelude::*;
-use ballista::error::Result;
+use arrow::datatypes::{DataType, Field, Schema};
+use arrow::record_batch::RecordBatch;
+use arrow::util::pretty;
+use ballista::prelude::*;
+use datafusion::prelude::*;
 
 use structopt::StructOpt;
 
@@ -72,9 +73,16 @@ async fn main() -> Result<()> {
     let start = Instant::now();
 
     let mut settings = HashMap::new();
-    settings.insert(PARQUET_READER_BATCH_SIZE, "65536");
+    settings.insert("parquet.reader.batch.size", "65536");
 
-    let ctx = Context::remote(executor_host, executor_port, settings);
+    // TODO enable these when we get Spark demo working again
+    // spark_settings.insert("spark.app.name", "rust-client-demo");
+    // spark_settings.insert("spark.ballista.host", "localhost");
+    // spark_settings.insert("spark.ballista.port", "50051");
+    // spark_settings.insert("spark.executor.memory", "4g");
+    // spark_settings.insert("spark.executor.cores", "4");
+
+    let ctx = BallistaContext::remote(executor_host, executor_port, settings);
 
     let results = match query_no {
         1 => q1(&ctx, path, &format).await?,
@@ -123,7 +131,7 @@ async fn main() -> Result<()> {
 ///     l_returnflag,
 ///     l_linestatus;
 ///
-async fn q1(ctx: &Context, path: &str, format: &FileFormat) -> Result<Vec<RecordBatch>> {
+async fn q1(ctx: &BallistaContext, path: &str, format: &FileFormat) -> Result<Vec<RecordBatch>> {
     // TODO this is WIP and not the real query yet
 
     let input = match format {
@@ -135,7 +143,7 @@ async fn q1(ctx: &Context, path: &str, format: &FileFormat) -> Result<Vec<Record
         FileFormat::Parquet => ctx.read_parquet(path)?,
     };
 
-    let df = input
+    let _df = input
         .filter(col("l_shipdate").lt(lit("1998-09-01")))? // should be l_shipdate <= date '1998-12-01' - interval ':1' day (3)
         // .project(vec![
         //     col("l_returnflag"),
@@ -155,18 +163,10 @@ async fn q1(ctx: &Context, path: &str, format: &FileFormat) -> Result<Vec<Record
             vec![
                 sum(col("l_quantity")).alias("sum_qty"),
                 sum(col("l_extendedprice")).alias("sum_base_price"),
-                sum(mult(
-                    col("l_extendedprice"),
-                    subtract(lit(1_f64), col("l_discount")),
-                ))
-                .alias("sum_disc_price"),
-                sum(mult(
-                    mult(
-                        col("l_extendedprice"),
-                        subtract(lit(1_f64), col("l_discount")),
-                    ),
-                    add(lit(1_f64), col("l_tax")),
-                ))
+                sum(col("l_extendedprice") * lit(1_f64) - col("l_discount"))
+                    .alias("sum_disc_price"),
+                sum((col("l_extendedprice") * (lit(1_f64) - col("l_discount")))
+                    * (lit(1_f64) + col("l_tax")))
                 .alias("sum_charge"),
                 avg(col("l_quantity")).alias("avg_qty"),
                 avg(col("l_extendedprice")).alias("avg_price"),
@@ -176,9 +176,13 @@ async fn q1(ctx: &Context, path: &str, format: &FileFormat) -> Result<Vec<Record
         )?;
     //.sort()?
 
-    df.explain();
+    //df.explain();
 
-    df.collect().await
+    //df.collect().await
+
+    //TODO get logical plan and send to Ballista context
+
+    todo!()
 }
 
 /// TPCH Query 6.
@@ -195,7 +199,7 @@ async fn q1(ctx: &Context, path: &str, format: &FileFormat) -> Result<Vec<Record
 ///     and l_discount between :2 - 0.01 and :2 + 0.01
 ///     and l_quantity < :3;
 ///
-async fn q6(ctx: &Context, path: &str, format: &FileFormat) -> Result<Vec<RecordBatch>> {
+async fn q6(ctx: &BallistaContext, path: &str, format: &FileFormat) -> Result<Vec<RecordBatch>> {
     let input = match format {
         FileFormat::Csv => {
             let schema = lineitem_schema();
@@ -205,18 +209,23 @@ async fn q6(ctx: &Context, path: &str, format: &FileFormat) -> Result<Vec<Record
         FileFormat::Parquet => ctx.read_parquet(path)?,
     };
 
-    let df = input
+    let _df = input
         .filter(col("l_shipdate").gt_eq(lit("1994-01-01")))?
         .filter(col("l_shipdate").lt(lit("1995-01-01")))?
         .filter(col("l_discount").gt_eq(lit(0.05)))?
         .filter(col("l_discount").lt_eq(lit(0.07)))?
         .filter(col("l_quantity").lt(lit(24.0)))?
-        .project(vec![
-            mult(col("l_extendedprice"), col("l_discount")).alias("disc_price")
+        .select(vec![
+            (col("l_extendedprice") * col("l_discount")).alias("disc_price")
         ])?
         .aggregate(vec![], vec![sum(col("disc_price")).alias("revenue")])?;
-    df.explain();
-    df.collect().await
+    //df.explain();
+
+    //df.collect().await
+
+    //TODO get logical plan and send to Ballista context
+
+    todo!()
 }
 
 #[allow(dead_code)]

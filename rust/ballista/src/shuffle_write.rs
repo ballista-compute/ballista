@@ -111,6 +111,9 @@ impl ExecutionPlan for ShuffleWriteExec {
         // stream data to disk in IPC format
         let shuffle_partition = 0;
         let path = format!("{}/{}", self.output_path, shuffle_partition);
+
+        // TODO collect stats when streaming to disk - starting with batch count, row count,
+        // data size in bytes
         write_stream_to_disk(&mut stream, &path).await?;
 
         partition_id.append_value(shuffle_partition as u32)?;
@@ -119,6 +122,7 @@ impl ExecutionPlan for ShuffleWriteExec {
         let partition_id: ArrayRef = Arc::new(partition_id.finish());
         let partition_location: ArrayRef = Arc::new(partition_location.finish());
 
+        // TODO include statistics - batch count, row count, data size in bytes
         let schema = SchemaRef::new(Schema::new(vec![
             Field::new("partition_id", DataType::UInt32, false),
             Field::new("partition_location", DataType::Utf8, false),

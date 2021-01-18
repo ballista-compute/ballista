@@ -65,8 +65,6 @@ in any programming language with minimal serialization overhead.
 The following examples should help illustrate the current capabilities of Ballista
 
 - [TPC-H Benchmark](https://github.com/ballista-compute/ballista/tree/main/rust/examples/tpch)
-- [Distributed query execution in Rust](https://github.com/ballista-compute/ballista/tree/main/rust/examples/distributed-query)
-- [Rust bindings for Apache Spark](https://github.com/ballista-compute/ballista/tree/main/rust/examples/apache-spark-rust-bindings)
 
 ## Releases
 

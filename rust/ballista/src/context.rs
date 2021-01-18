@@ -15,9 +15,14 @@
 //! Distributed execution context.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
+use crate::error::Result;
 use crate::executor::ExecutorConfig;
 use crate::serde::scheduler::{ExecutorMeta, ShuffleId};
+
+use datafusion::dataframe::DataFrame;
+use datafusion::physical_plan::csv::CsvReadOptions;
 
 pub struct BallistaContext {
     // map from shuffle id to executor uuid
@@ -34,6 +39,18 @@ impl BallistaContext {
             // config: config.clone(),
             // shuffle_locations,
         }
+    }
+
+    pub fn remote(_host: &str, _port: usize, _settings: HashMap<&str, &str>) -> Self {
+        todo!()
+    }
+
+    pub fn read_parquet(&self, _path: &str) -> Result<Arc<dyn DataFrame>> {
+        todo!()
+    }
+
+    pub fn read_csv(&self, _path: &str, _options: CsvReadOptions) -> Result<Arc<dyn DataFrame>> {
+        todo!()
     }
 }
 

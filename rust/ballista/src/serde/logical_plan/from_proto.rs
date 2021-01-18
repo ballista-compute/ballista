@@ -14,7 +14,7 @@
 
 //! Serde code to convert from protocol buffers to Rust data structures.
 
-use std::convert::TryInto;
+use std::{convert::TryInto, unimplemented};
 
 use crate::error::BallistaError;
 use crate::serde::{proto_error, protobuf};
@@ -187,7 +187,7 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
                 .build()
                 .map_err(|e| e.into())
         } else {
-            Err(proto_error(&format!(
+            Err(proto_error(format!(
                 "logical_plan::from_proto() Unsupported logical plan '{:?}'",
                 self
             )))
@@ -218,47 +218,62 @@ impl TryInto<Expr> for &protobuf::LogicalExprNode {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<Expr, Self::Error> {
-        match &self.expr_type {
-            Some(ExprType::BinaryExpr(binary_expr)) => Ok(Expr::BinaryExpr {
+        let expr_type = self
+            .expr_type
+            .as_ref()
+            .ok_or_else(|| proto_error("Unexpected empty logical expression"))?;
+        match expr_type {
+            ExprType::BinaryExpr(binary_expr) => Ok(Expr::BinaryExpr {
                 left: Box::new(parse_required_expr(&binary_expr.l)?),
                 op: from_proto_binary_op(&binary_expr.op)?,
                 right: Box::new(parse_required_expr(&binary_expr.r)?),
             }),
-            Some(ExprType::ColumnName(column_name)) => Ok(Expr::Column(column_name.to_owned())),
-            Some(ExprType::LiteralString(literal_string)) => Ok(Expr::Literal(ScalarValue::Utf8(
-                Some(literal_string.to_owned()),
-            ))),
-            Some(ExprType::LiteralF32(value)) => {
-                Ok(Expr::Literal(ScalarValue::Float32(Some(*value))))
-            }
-            Some(ExprType::LiteralF64(value)) => {
-                Ok(Expr::Literal(ScalarValue::Float64(Some(*value))))
-            }
-            Some(ExprType::LiteralInt8(value)) => {
+            ExprType::ColumnName(column_name) => Ok(Expr::Column(column_name.to_owned())),
+            ExprType::LiteralString(literal_string) => Ok(Expr::Literal(ScalarValue::Utf8(Some(
+                literal_string.to_owned(),
+            )))),
+            ExprType::LiteralF32(value) => Ok(Expr::Literal(ScalarValue::Float32(Some(*value)))),
+            ExprType::LiteralF64(value) => Ok(Expr::Literal(ScalarValue::Float64(Some(*value)))),
+            ExprType::LiteralInt8(value) => {
                 Ok(Expr::Literal(ScalarValue::Int8(Some(*value as i8))))
             }
-            Some(ExprType::LiteralInt16(value)) => {
+            ExprType::LiteralInt16(value) => {
                 Ok(Expr::Literal(ScalarValue::Int16(Some(*value as i16))))
             }
-            Some(ExprType::LiteralInt32(value)) => {
-                Ok(Expr::Literal(ScalarValue::Int32(Some(*value))))
-            }
-            Some(ExprType::LiteralInt64(value)) => {
-                Ok(Expr::Literal(ScalarValue::Int64(Some(*value))))
-            }
-            Some(ExprType::LiteralUint8(value)) => {
+            ExprType::LiteralInt32(value) => Ok(Expr::Literal(ScalarValue::Int32(Some(*value)))),
+            ExprType::LiteralInt64(value) => Ok(Expr::Literal(ScalarValue::Int64(Some(*value)))),
+            ExprType::LiteralUint8(value) => {
                 Ok(Expr::Literal(ScalarValue::UInt8(Some(*value as u8))))
             }
-            Some(ExprType::LiteralUint16(value)) => {
+            ExprType::LiteralUint16(value) => {
                 Ok(Expr::Literal(ScalarValue::UInt16(Some(*value as u16))))
             }
-            Some(ExprType::LiteralUint32(value)) => {
-                Ok(Expr::Literal(ScalarValue::UInt32(Some(*value))))
+            ExprType::LiteralUint32(value) => Ok(Expr::Literal(ScalarValue::UInt32(Some(*value)))),
+            ExprType::LiteralUint64(value) => Ok(Expr::Literal(ScalarValue::UInt64(Some(*value)))),
+            ExprType::LiteralNull(arrow_type) => {
+                let arrow_type = protobuf::ArrowType::from_i32(*arrow_type).ok_or_else(|| {
+                    proto_error(format!(
+                        "Received a LiteralNull message with unknwown type {}",
+                        arrow_type
+                    ))
+                })?;
+                match arrow_type {
+                    protobuf::ArrowType::Int8 => Ok(Expr::Literal(ScalarValue::Int8(None))),
+                    protobuf::ArrowType::Int16 => Ok(Expr::Literal(ScalarValue::Int16(None))),
+                    protobuf::ArrowType::Int32 => Ok(Expr::Literal(ScalarValue::Int32(None))),
+                    protobuf::ArrowType::Int64 => Ok(Expr::Literal(ScalarValue::Int64(None))),
+                    protobuf::ArrowType::Uint8 => Ok(Expr::Literal(ScalarValue::UInt8(None))),
+                    protobuf::ArrowType::Uint16 => Ok(Expr::Literal(ScalarValue::UInt16(None))),
+                    protobuf::ArrowType::Uint32 => Ok(Expr::Literal(ScalarValue::UInt32(None))),
+                    protobuf::ArrowType::Uint64 => Ok(Expr::Literal(ScalarValue::UInt64(None))),
+                    protobuf::ArrowType::Utf8 => Ok(Expr::Literal(ScalarValue::Utf8(None))),
+                    protobuf::ArrowType::Float => Ok(Expr::Literal(ScalarValue::Float32(None))),
+                    protobuf::ArrowType::Double => Ok(Expr::Literal(ScalarValue::Float64(None))),
+                    protobuf::ArrowType::None => Err(proto_error("Received untyped null value")),
+                    _ => unimplemented!(),
+                }
             }
-            Some(ExprType::LiteralUint64(value)) => {
-                Ok(Expr::Literal(ScalarValue::UInt64(Some(*value))))
-            }
-            Some(ExprType::AggregateExpr(expr)) => {
+            ExprType::AggregateExpr(expr) => {
                 let fun = match expr.aggr_function {
                     f if f == protobuf::AggregateFunction::Min as i32 => AggregateFunction::Min,
                     f if f == protobuf::AggregateFunction::Max as i32 => AggregateFunction::Max,
@@ -274,26 +289,24 @@ impl TryInto<Expr> for &protobuf::LogicalExprNode {
                     distinct: false, //TODO
                 })
             }
-            Some(ExprType::Alias(alias)) => Ok(Expr::Alias(
+            ExprType::Alias(alias) => Ok(Expr::Alias(
                 Box::new(parse_required_expr(&alias.expr)?),
                 alias.alias.clone(),
             )),
-            Some(ExprType::IsNullExpr(is_null)) => {
+            ExprType::IsNullExpr(is_null) => {
                 Ok(Expr::IsNull(Box::new(parse_required_expr(&is_null.expr)?)))
             }
-            Some(ExprType::IsNotNullExpr(is_not_null)) => Ok(Expr::IsNotNull(Box::new(
+            ExprType::IsNotNullExpr(is_not_null) => Ok(Expr::IsNotNull(Box::new(
                 parse_required_expr(&is_not_null.expr)?,
             ))),
-            Some(ExprType::NotExpr(not)) => {
-                Ok(Expr::Not(Box::new(parse_required_expr(&not.expr)?)))
-            }
-            Some(ExprType::Between(between)) => Ok(Expr::Between {
+            ExprType::NotExpr(not) => Ok(Expr::Not(Box::new(parse_required_expr(&not.expr)?))),
+            ExprType::Between(between) => Ok(Expr::Between {
                 expr: Box::new(parse_required_expr(&between.expr)?),
                 negated: between.negated,
                 low: Box::new(parse_required_expr(&between.low)?),
                 high: Box::new(parse_required_expr(&between.high)?),
             }),
-            Some(ExprType::Case(case)) => {
+            ExprType::Case(case) => {
                 let when_then_expr = case
                     .when_then_expr
                     .iter()
@@ -316,16 +329,15 @@ impl TryInto<Expr> for &protobuf::LogicalExprNode {
                     else_expr: parse_optional_expr(&case.else_expr)?.map(Box::new),
                 })
             }
-            Some(ExprType::Cast(cast)) => Ok(Expr::Cast {
+            ExprType::Cast(cast) => Ok(Expr::Cast {
                 expr: Box::new(parse_required_expr(&cast.expr)?),
                 data_type: from_proto_arrow_type(cast.arrow_type)?,
             }),
-            Some(ExprType::Sort(sort)) => Ok(Expr::Sort {
+            ExprType::Sort(sort) => Ok(Expr::Sort {
                 expr: Box::new(parse_required_expr(&sort.expr)?),
                 asc: sort.asc,
                 nulls_first: sort.nulls_first,
             }),
-            None => Err(proto_error("Unexpected empty logical expression")),
         }
     }
 }
@@ -342,7 +354,7 @@ fn from_proto_binary_op(op: &str) -> Result<Operator, BallistaError> {
         "Minus" => Ok(Operator::Minus),
         "Multiply" => Ok(Operator::Multiply),
         "Divide" => Ok(Operator::Divide),
-        other => Err(proto_error(&format!(
+        other => Err(proto_error(format!(
             "Unsupported binary operator '{:?}'",
             other
         ))),

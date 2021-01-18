@@ -34,6 +34,8 @@ message LogicalExprNode {
     float literal_f32 = 29;
     double literal_f64 = 30;
 
+    ArrowType literal_null = 31;
+
     // binary expressions
     BinaryExprNode binary_expr = 40;
 

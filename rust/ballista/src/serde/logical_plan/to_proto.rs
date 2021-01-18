@@ -26,6 +26,7 @@ use datafusion::datasource::CsvFile;
 use datafusion::logical_plan::{Expr, JoinType, LogicalPlan};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::scalar::ScalarValue;
+use protobuf::logical_expr_node::ExprType;
 
 impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
     type Error = BallistaError;
@@ -264,6 +265,16 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
     }
 }
 
+fn create_proto_scalar<I, T: FnOnce(&I) -> ExprType>(
+    v: &Option<I>,
+    null_arrow_type: protobuf::ArrowType,
+    constructor: T,
+) -> ExprType {
+    v.as_ref()
+        .map(constructor)
+        .unwrap_or(ExprType::LiteralNull(null_arrow_type as i32))
+}
+
 impl TryInto<protobuf::LogicalExprNode> for &Expr {
     type Error = BallistaError;
 
@@ -271,9 +282,7 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
         match self {
             Expr::Column(name) => {
                 let expr = protobuf::LogicalExprNode {
-                    expr_type: Some(protobuf::logical_expr_node::ExprType::ColumnName(
-                        name.clone(),
-                    )),
+                    expr_type: Some(ExprType::ColumnName(name.clone())),
                 };
                 Ok(expr)
             }
@@ -283,88 +292,66 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                     alias: alias.to_owned(),
                 });
                 let expr = protobuf::LogicalExprNode {
-                    expr_type: Some(protobuf::logical_expr_node::ExprType::Alias(alias)),
+                    expr_type: Some(ExprType::Alias(alias)),
                 };
                 Ok(expr)
             }
             Expr::Literal(value) => match value {
-                ScalarValue::Utf8(s) => {
-                    Ok(protobuf::LogicalExprNode {
-                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralString(
-                            s.as_ref().unwrap().to_owned(),
-                        )), // TODO remove unwrap
-                    })
-                }
-                ScalarValue::Int8(n) => {
-                    Ok(protobuf::LogicalExprNode {
-                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralInt8(
-                            n.unwrap() as i32,
-                        )), // TODO remove unwrap
-                    })
-                }
-                ScalarValue::Int16(n) => {
-                    Ok(protobuf::LogicalExprNode {
-                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralInt16(
-                            n.unwrap() as i32,
-                        )), // TODO remove unwrap
-                    })
-                }
-                ScalarValue::Int32(n) => {
-                    Ok(protobuf::LogicalExprNode {
-                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralInt32(
-                            n.unwrap(),
-                        )), // TODO remove unwrap
-                    })
-                }
-                ScalarValue::Int64(n) => {
-                    Ok(protobuf::LogicalExprNode {
-                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralInt64(
-                            n.unwrap(),
-                        )), // TODO remove unwrap
-                    })
-                }
-                ScalarValue::UInt8(n) => {
-                    Ok(protobuf::LogicalExprNode {
-                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralUint8(
-                            n.unwrap() as u32,
-                        )), // TODO remove unwrap
-                    })
-                }
-                ScalarValue::UInt16(n) => {
-                    Ok(protobuf::LogicalExprNode {
-                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralUint16(
-                            n.unwrap() as u32,
-                        )), // TODO remove unwrap
-                    })
-                }
-                ScalarValue::UInt32(n) => {
-                    Ok(protobuf::LogicalExprNode {
-                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralUint32(
-                            n.unwrap(),
-                        )), // TODO remove unwrap
-                    })
-                }
-                ScalarValue::UInt64(n) => {
-                    Ok(protobuf::LogicalExprNode {
-                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralUint64(
-                            n.unwrap(),
-                        )), // TODO remove unwrap
-                    })
-                }
-                ScalarValue::Float32(n) => {
-                    Ok(protobuf::LogicalExprNode {
-                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralF32(
-                            n.unwrap(),
-                        )), // TODO remove unwrap
-                    })
-                }
-                ScalarValue::Float64(n) => {
-                    Ok(protobuf::LogicalExprNode {
-                        expr_type: Some(protobuf::logical_expr_node::ExprType::LiteralF64(
-                            n.unwrap(),
-                        )), // TODO remove unwrap
-                    })
-                }
+                ScalarValue::Utf8(s) => Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(create_proto_scalar(s, protobuf::ArrowType::Utf8, |s| {
+                        ExprType::LiteralString(s.to_owned())
+                    })),
+                }),
+                ScalarValue::Int8(n) => Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(create_proto_scalar(n, protobuf::ArrowType::Int8, |s| {
+                        ExprType::LiteralInt8(*s as i32)
+                    })),
+                }),
+                ScalarValue::Int16(n) => Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(create_proto_scalar(n, protobuf::ArrowType::Int16, |s| {
+                        ExprType::LiteralInt16(*s as i32)
+                    })),
+                }),
+                ScalarValue::Int32(n) => Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(create_proto_scalar(n, protobuf::ArrowType::Int32, |s| {
+                        ExprType::LiteralInt32(*s)
+                    })),
+                }),
+                ScalarValue::Int64(n) => Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(create_proto_scalar(n, protobuf::ArrowType::Int64, |s| {
+                        ExprType::LiteralInt64(*s)
+                    })),
+                }),
+                ScalarValue::UInt8(n) => Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(create_proto_scalar(n, protobuf::ArrowType::Uint8, |s| {
+                        ExprType::LiteralUint8(*s as u32)
+                    })),
+                }),
+                ScalarValue::UInt16(n) => Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(create_proto_scalar(n, protobuf::ArrowType::Uint16, |s| {
+                        ExprType::LiteralUint16(*s as u32)
+                    })),
+                }),
+                ScalarValue::UInt32(n) => Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(create_proto_scalar(n, protobuf::ArrowType::Uint32, |s| {
+                        ExprType::LiteralUint32(*s)
+                    })),
+                }),
+                ScalarValue::UInt64(n) => Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(create_proto_scalar(n, protobuf::ArrowType::Uint64, |s| {
+                        ExprType::LiteralUint64(*s)
+                    })),
+                }),
+                ScalarValue::Float32(n) => Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(create_proto_scalar(n, protobuf::ArrowType::Float, |s| {
+                        ExprType::LiteralF32(*s)
+                    })),
+                }),
+                ScalarValue::Float64(n) => Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(create_proto_scalar(n, protobuf::ArrowType::Double, |s| {
+                        ExprType::LiteralF64(*s)
+                    })),
+                }),
                 other => Err(BallistaError::General(format!(
                     "to_proto unsupported scalar value {:?}",
                     other
@@ -377,9 +364,7 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                     op: format!("{:?}", op),
                 });
                 Ok(protobuf::LogicalExprNode {
-                    expr_type: Some(protobuf::logical_expr_node::ExprType::BinaryExpr(
-                        binary_expr,
-                    )),
+                    expr_type: Some(ExprType::BinaryExpr(binary_expr)),
                 })
             }
             Expr::AggregateFunction {
@@ -399,9 +384,7 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                     expr: Some(Box::new(arg.try_into()?)),
                 });
                 Ok(protobuf::LogicalExprNode {
-                    expr_type: Some(protobuf::logical_expr_node::ExprType::AggregateExpr(
-                        aggregate_expr,
-                    )),
+                    expr_type: Some(ExprType::AggregateExpr(aggregate_expr)),
                 })
             }
             Expr::ScalarVariable(_) => unimplemented!(),
@@ -413,7 +396,7 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                     expr: Some(Box::new(expr.as_ref().try_into()?)),
                 });
                 Ok(protobuf::LogicalExprNode {
-                    expr_type: Some(protobuf::logical_expr_node::ExprType::NotExpr(expr)),
+                    expr_type: Some(ExprType::NotExpr(expr)),
                 })
             }
             Expr::IsNull(expr) => {
@@ -421,7 +404,7 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                     expr: Some(Box::new(expr.as_ref().try_into()?)),
                 });
                 Ok(protobuf::LogicalExprNode {
-                    expr_type: Some(protobuf::logical_expr_node::ExprType::IsNullExpr(expr)),
+                    expr_type: Some(ExprType::IsNullExpr(expr)),
                 })
             }
             Expr::IsNotNull(expr) => {
@@ -429,7 +412,7 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                     expr: Some(Box::new(expr.as_ref().try_into()?)),
                 });
                 Ok(protobuf::LogicalExprNode {
-                    expr_type: Some(protobuf::logical_expr_node::ExprType::IsNotNullExpr(expr)),
+                    expr_type: Some(ExprType::IsNotNullExpr(expr)),
                 })
             }
             Expr::Between {
@@ -445,7 +428,7 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                     high: Some(Box::new(high.as_ref().try_into()?)),
                 });
                 Ok(protobuf::LogicalExprNode {
-                    expr_type: Some(protobuf::logical_expr_node::ExprType::Between(expr)),
+                    expr_type: Some(ExprType::Between(expr)),
                 })
             }
             Expr::Case {
@@ -474,7 +457,7 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                     },
                 });
                 Ok(protobuf::LogicalExprNode {
-                    expr_type: Some(protobuf::logical_expr_node::ExprType::Case(expr)),
+                    expr_type: Some(ExprType::Case(expr)),
                 })
             }
             Expr::Cast { expr, data_type } => {
@@ -483,7 +466,7 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                     arrow_type: to_proto_arrow_type(data_type)?.into(),
                 });
                 Ok(protobuf::LogicalExprNode {
-                    expr_type: Some(protobuf::logical_expr_node::ExprType::Cast(expr)),
+                    expr_type: Some(ExprType::Cast(expr)),
                 })
             }
             Expr::Sort {
@@ -497,7 +480,7 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                     nulls_first: *nulls_first,
                 });
                 Ok(protobuf::LogicalExprNode {
-                    expr_type: Some(protobuf::logical_expr_node::ExprType::Sort(expr)),
+                    expr_type: Some(ExprType::Sort(expr)),
                 })
             }
             Expr::Negative(_) => unimplemented!(),

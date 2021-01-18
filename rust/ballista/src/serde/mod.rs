@@ -40,8 +40,8 @@ pub(crate) fn decode_protobuf(bytes: &[u8]) -> Result<BallistaAction, BallistaEr
         .and_then(|node| node.try_into())
 }
 
-pub(crate) fn proto_error(message: &str) -> BallistaError {
-    BallistaError::General(message.to_owned())
+pub(crate) fn proto_error<S: Into<String>>(message: S) -> BallistaError {
+    BallistaError::General(message.into())
 }
 
 /// Create an empty LogicalPlanNode

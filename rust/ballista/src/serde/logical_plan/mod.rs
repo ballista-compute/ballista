@@ -1,6 +1,6 @@
 // Copyright 2020 Andy Grove
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// expr: (), negated: (), low: (), high: () expr: (), negated: (), low: (), high: () Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
@@ -22,7 +22,7 @@ mod roundtrip_tests {
     use super::super::protobuf;
     use arrow::datatypes::{DataType, Field, Schema};
     use core::panic;
-    use datafusion::logical_plan::{LogicalPlan, LogicalPlanBuilder};
+    use datafusion::logical_plan::{Expr, LogicalPlan, LogicalPlanBuilder};
     use datafusion::physical_plan::csv::CsvReadOptions;
     use datafusion::prelude::*;
     use std::convert::TryInto;
@@ -47,7 +47,7 @@ mod roundtrip_tests {
 
     #[test]
     fn roundtrip_repartition() -> Result<()> {
-        use datafusion::logical_plan::{Expr, Partitioning};
+        use datafusion::logical_plan::Partitioning;
         let test_batch_sizes = [usize::MIN, usize::MAX, 43256];
         let test_expr: Vec<Expr> = vec![
             Expr::Column("c1".to_string()) + Expr::Column("c2".to_string()),
@@ -213,6 +213,50 @@ mod roundtrip_tests {
         .unwrap();
 
         roundtrip_test!(plan);
+        Ok(())
+    }
+
+    #[test]
+    fn roundtrip_between() -> Result<()> {
+        let test_expr = Expr::Between {
+            expr: Box::new(Expr::Literal((1.0).into())),
+            negated: true,
+            low: Box::new(Expr::Literal((2.0).into())),
+            high: Box::new(Expr::Literal((3.0).into())),
+        };
+        roundtrip_test!(test_expr, protobuf::LogicalExprNode, Expr);
+        Ok(())
+    }
+
+    #[test]
+    fn roundtrip_case() -> Result<()> {
+        let test_expr = Expr::Case {
+            expr: Some(Box::new(Expr::Literal((1.0).into()))),
+            when_then_expr: vec![(Box::new(Expr::Literal((2.0).into())), Box::new(Expr::Literal((3.0).into())))],
+            else_expr: Some(Box::new(Expr::Literal((4.0).into()))),
+        };
+        roundtrip_test!(test_expr, protobuf::LogicalExprNode, Expr);
+        Ok(())
+    }
+
+    #[test]
+    fn roundtrip_cast() -> Result<()> {
+        let test_expr = Expr::Cast {
+            expr: Box::new(Expr::Literal((1.0).into())),
+            data_type: DataType::Boolean,
+        };
+        roundtrip_test!(test_expr, protobuf::LogicalExprNode, Expr);
+        Ok(())
+    }
+
+    #[test]
+    fn roundtrip_sort_expr() -> Result<()> {
+        let test_expr = Expr::Sort {
+            expr: Box::new(Expr::Literal((1.0).into())),
+            asc: true,
+            nulls_first: true,
+        };
+        roundtrip_test!(test_expr, protobuf::LogicalExprNode, Expr);
         Ok(())
     }
 }

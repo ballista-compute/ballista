@@ -14,7 +14,6 @@
 
 package org.ballistacompute.logical
 
-import org.apache.arrow.flatbuf.Bool
 import java.sql.SQLException
 import org.apache.arrow.vector.types.pojo.ArrowType
 import org.ballistacompute.datatypes.ArrowTypes
@@ -80,7 +79,6 @@ class LiteralLong(val n: Long) : LogicalExpr {
 
 /** Convenience method to create a LiteralLong */
 fun lit(value: Long) = LiteralLong(value)
-
 
 /** Logical expression representing a literal double value. */
 class LiteralFloat(val n: Float) : LogicalExpr {

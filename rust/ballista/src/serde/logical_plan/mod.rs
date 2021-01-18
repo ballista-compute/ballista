@@ -262,4 +262,29 @@ mod roundtrip_tests {
         roundtrip_test!(test_expr, protobuf::LogicalExprNode, Expr);
         Ok(())
     }
+
+    #[test]
+    fn roundtrip_negative() -> Result<()> {
+        let test_expr = Expr::Negative(Box::new(Expr::Literal((1.0).into())));
+        roundtrip_test!(test_expr, protobuf::LogicalExprNode, Expr);
+        Ok(())
+    }
+
+    #[test]
+    fn roundtrip_inlist() -> Result<()> {
+        let test_expr = Expr::InList {
+            expr: Box::new(Expr::Literal((1.0).into())),
+            list: vec![Expr::Literal((2.0).into())],
+            negated: true,
+        };
+        roundtrip_test!(test_expr, protobuf::LogicalExprNode, Expr);
+        Ok(())
+    }
+
+    #[test]
+    fn roundtrip_wildcard() -> Result<()> {
+        let test_expr = Expr::Wildcard;
+        roundtrip_test!(test_expr, protobuf::LogicalExprNode, Expr);
+        Ok(())
+    }
 }

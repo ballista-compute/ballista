@@ -49,6 +49,9 @@ message LogicalExprNode {
     CaseNode case_ = 71;
     CastNode cast = 72;
     SortExprNode sort = 73;
+    NegativeNode negative = 74;
+    InListNode in_list = 75;
+    bool wildcard = 76;
   }
 }
 
@@ -73,6 +76,16 @@ message BinaryExprNode {
   LogicalExprNode l = 1;
   LogicalExprNode r = 2;
   string op = 3;
+}
+
+message NegativeNode {
+  LogicalExprNode expr = 1;
+}
+
+message InListNode {
+  LogicalExprNode expr = 1;
+  repeated LogicalExprNode list = 2;
+  bool negated = 3;
 }
 
 enum AggregateFunction {

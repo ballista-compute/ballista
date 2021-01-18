@@ -26,8 +26,11 @@ async fn main() -> Result<()> {
     .build()?;
 
     let mut client = BallistaClient::try_new("localhost", 8000).await?;
-    let batches = client.execute_query(&plan).await?;
-    batches.iter().for_each(|b| println!("{:?}", b));
+    let mut stream = client.execute_query(&plan).await?;
+    while let Some(result) = stream.next().await {
+        let batch = result?;
+        println!("{:?}", batch)
+    }
 
     Ok(())
 }

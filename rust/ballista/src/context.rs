@@ -15,30 +15,45 @@
 //! Distributed execution context.
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
-use crate::error::Result;
-use crate::executor::ExecutorConfig;
-use crate::serde::scheduler::{ExecutorMeta, ShuffleId};
+use crate::client::BallistaClient;
+use crate::error::{BallistaError, Result};
+use crate::serde::scheduler::Action;
 
 use datafusion::dataframe::DataFrame;
+use datafusion::logical_plan::Expr;
 use datafusion::physical_plan::csv::CsvReadOptions;
 use datafusion::physical_plan::SendableRecordBatchStream;
 
+#[allow(dead_code)]
+pub struct BallistaContextState {
+    settings: HashMap<String, String>, // map from shuffle id to executor uuid
+                                       // shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
+                                       // config: ExecutorConfig
+}
+
+impl BallistaContextState {
+    pub fn new(settings: HashMap<String, String>) -> Self {
+        Self { settings }
+    }
+}
+
+#[allow(dead_code)]
 pub struct BallistaContext {
-    // map from shuffle id to executor uuid
-// shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
-// config: ExecutorConfig,
+    state: Arc<Mutex<BallistaContextState>>,
+}
+
+impl Default for BallistaContext {
+    fn default() -> Self {
+        Self::new(HashMap::new())
+    }
 }
 
 impl BallistaContext {
-    pub fn new(
-        _config: &ExecutorConfig,
-        _shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
-    ) -> Self {
+    pub fn new(settings: HashMap<String, String>) -> Self {
         Self {
-            // config: config.clone(),
-            // shuffle_locations,
+            state: Arc::new(Mutex::new(BallistaContextState::new(settings))),
         }
     }
 
@@ -71,6 +86,83 @@ impl BallistaContext {
     pub fn execute(&self) -> Result<SendableRecordBatchStream> {
         todo!()
     }
+}
+
+/// The Ballista DataFrame is a wrapper around the DataFusion DataFrame and overrides the
+/// `collect` method so that the query is executed against Ballista and not DataFusion.
+pub struct BallistaDataFrame {
+    /// Ballista context state
+    state: Arc<Mutex<BallistaContextState>>,
+    /// DataFusion DataFrame representing logical query plan
+    df: Arc<dyn DataFrame>,
+}
+
+impl BallistaDataFrame {
+    pub fn from(state: Arc<Mutex<BallistaContextState>>, df: Arc<dyn DataFrame>) -> Self {
+        Self { state, df }
+    }
+
+    pub async fn collect(&self) -> Result<SendableRecordBatchStream> {
+        let mut client = BallistaClient::try_new("localhost", 8000).await?;
+        client
+            .execute_action(&Action::InteractiveQuery {
+                plan: self.df.to_logical_plan(),
+                settings: Default::default(),
+            })
+            .await
+    }
+
+    pub async fn select_columns(&self, columns: Vec<&str>) -> Result<BallistaDataFrame> {
+        Ok(Self::from(
+            self.state.clone(),
+            self.df
+                .select_columns(columns)
+                .map_err(BallistaError::from)?,
+        ))
+    }
+
+    pub async fn select(&self, expr: Vec<Expr>) -> Result<BallistaDataFrame> {
+        Ok(Self::from(
+            self.state.clone(),
+            self.df.select(expr).map_err(BallistaError::from)?,
+        ))
+    }
+
+    // pub async fn filter(&self, expr: Expr) -> Result<Arc<BallistaDataFrame>> {
+    //     self.df.filter(expr).map_err(|e| BallistaError::from(e))
+    // }
+    //
+    // pub async fn aggregate(&self, group_expr: Vec<Expr>, aggr_expr: Vec<Expr>) -> Result<Arc<BallistaDataFrame>> {
+    //     self.df.aggregate(group_expr, aggr_expr).map_err(|e| BallistaError::from(e))
+    // }
+    //
+    // pub async fn limit(&self, n: usize) -> Result<Arc<BallistaDataFrame>> {
+    //     self.df.limit(n).map_err(|e| BallistaError::from(e))
+    // }
+    //
+    // pub async fn sort(&self, expr: Vec<Expr>) -> Result<Arc<BallistaDataFrame>> {
+    //     self.df.sort(expr).map_err(|e| BallistaError::from(e))
+    // }
+    //
+    // pub async fn join(&self, right: Arc<dyn DataFrame>, join_type: JoinType, left_cols: &[&str], right_cols: &[&str]) -> Result<Arc<BallistaDataFrame>> {
+    //     self.df.join(right, join_type, left_cols, right_cols).map_err(|e| BallistaError::from(e))
+    // }
+    //
+    // pub async fn repartition(&self, partitioning_scheme: Partitioning) -> Result<Arc<BallistaDataFrame>> {
+    //     self.df.repartition(partitioning_scheme).map_err(|e| BallistaError::from(e))
+    // }
+    //
+    // pub async fn schema(&self) -> &DFSchema {
+    //     self.df.schema()
+    // }
+    //
+    // pub async fn to_logical_plan(&self) -> LogicalPlan {
+    //     self.df.to_logical_plan()
+    // }
+    //
+    // pub async fn explain(&self, verbose: bool) -> Result<Arc<BallistaDataFrame>> {
+    //     self.df.explain(verbose).map_err(|e| BallistaError::from(e))
+    // }
 }
 
 // #[async_trait]

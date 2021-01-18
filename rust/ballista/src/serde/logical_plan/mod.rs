@@ -232,7 +232,10 @@ mod roundtrip_tests {
     fn roundtrip_case() -> Result<()> {
         let test_expr = Expr::Case {
             expr: Some(Box::new(Expr::Literal((1.0).into()))),
-            when_then_expr: vec![(Box::new(Expr::Literal((2.0).into())), Box::new(Expr::Literal((3.0).into())))],
+            when_then_expr: vec![(
+                Box::new(Expr::Literal((2.0).into())),
+                Box::new(Expr::Literal((3.0).into())),
+            )],
             else_expr: Some(Box::new(Expr::Literal((4.0).into()))),
         };
         roundtrip_test!(test_expr, protobuf::LogicalExprNode, Expr);

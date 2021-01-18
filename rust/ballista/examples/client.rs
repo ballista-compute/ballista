@@ -12,21 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Minimal example showing how to execute a query with Ballista
+//!
+//! This is EXPERIMENTAL and under development still
+
 use ballista::prelude::*;
-use datafusion::logical_plan::LogicalPlanBuilder;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let plan = LogicalPlanBuilder::scan_parquet(
-        "/mnt/tpch/parquet-sf100-partitioned/customer/",
-        Some(vec![3, 4]),
-        10,
-    )?
-    .limit(10)?
-    .build()?;
+    let path = "/mnt/tpch/parquet-sf100-partitioned/customer/";
 
-    let mut client = BallistaClient::try_new("localhost", 8000).await?;
-    let mut stream = client.execute_query(&plan).await?;
+    let ctx = BallistaContext::default();
+
+    let mut stream = ctx.read_parquet(path)?.limit(10)?.collect().await?;
+
     while let Some(result) = stream.next().await {
         let batch = result?;
         println!("{:?}", batch)

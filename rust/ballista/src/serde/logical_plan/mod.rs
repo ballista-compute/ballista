@@ -217,6 +217,27 @@ mod roundtrip_tests {
     }
 
     #[test]
+    fn roundtrip_not() -> Result<()> {
+        let test_expr = Expr::Not(Box::new(Expr::Literal((1.0).into())));
+        roundtrip_test!(test_expr, protobuf::LogicalExprNode, Expr);
+        Ok(())
+    }
+
+    #[test]
+    fn roundtrip_is_null() -> Result<()> {
+        let test_expr = Expr::IsNull(Box::new(Expr::Column("id".into())));
+        roundtrip_test!(test_expr, protobuf::LogicalExprNode, Expr);
+        Ok(())
+    }
+
+    #[test]
+    fn roundtrip_is_not_null() -> Result<()> {
+        let test_expr = Expr::IsNotNull(Box::new(Expr::Column("id".into())));
+        roundtrip_test!(test_expr, protobuf::LogicalExprNode, Expr);
+        Ok(())
+    }
+
+    #[test]
     fn roundtrip_between() -> Result<()> {
         let test_expr = Expr::Between {
             expr: Box::new(Expr::Literal((1.0).into())),

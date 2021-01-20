@@ -17,3 +17,5 @@
 pub use crate::client::BallistaClient;
 pub use crate::context::BallistaContext;
 pub use crate::error::{BallistaError, Result};
+
+pub use futures::StreamExt;

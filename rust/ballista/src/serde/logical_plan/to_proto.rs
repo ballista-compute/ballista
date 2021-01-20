@@ -483,9 +483,34 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                     expr_type: Some(ExprType::Sort(expr)),
                 })
             }
-            Expr::Negative(_) => unimplemented!(),
-            Expr::InList { .. } => unimplemented!(),
-            Expr::Wildcard => unimplemented!(),
+            Expr::Negative(expr) => {
+                let expr = Box::new(protobuf::NegativeNode {
+                    expr: Some(Box::new(expr.as_ref().try_into()?)),
+                });
+                Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(protobuf::logical_expr_node::ExprType::Negative(expr)),
+                })
+            }
+            Expr::InList {
+                expr,
+                list,
+                negated,
+            } => {
+                let expr = Box::new(protobuf::InListNode {
+                    expr: Some(Box::new(expr.as_ref().try_into()?)),
+                    list: list
+                        .iter()
+                        .map(|expr| expr.try_into())
+                        .collect::<Result<Vec<_>, BallistaError>>()?,
+                    negated: *negated,
+                });
+                Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(protobuf::logical_expr_node::ExprType::InList(expr)),
+                })
+            }
+            Expr::Wildcard => Ok(protobuf::LogicalExprNode {
+                expr_type: Some(protobuf::logical_expr_node::ExprType::Wildcard(true)),
+            }),
             // _ => Err(BallistaError::General(format!(
             //     "logical expr to_proto {:?}",
             //     self

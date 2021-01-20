@@ -198,14 +198,13 @@ fn set_task_status(
 }
 
 async fn execute_task(
-    config: &ExecutorConfig,
-    task: &QueryStageTask,
+    _config: &ExecutorConfig,
+    _task: &QueryStageTask,
 ) -> Result<(Schema, Vec<RecordBatch>)> {
     // create new execution context specifically for this query
-    let _ctx = Arc::new(BallistaContext::new(
-        &config,
-        task.shuffle_locations.clone(),
-    ));
+    let _ctx = Arc::new(BallistaContext::default());
+    // &config,
+    // task.shuffle_locations.clone(),
 
     todo!()
 

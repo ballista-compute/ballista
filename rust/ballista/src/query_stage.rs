@@ -28,6 +28,7 @@ use arrow::datatypes::SchemaRef;
 use async_trait::async_trait;
 use datafusion::error::{DataFusionError, Result};
 use datafusion::physical_plan::{ExecutionPlan, Partitioning, SendableRecordBatchStream};
+use futures::StreamExt;
 use uuid::Uuid;
 
 /// QueryStageExec executes a subset of a query plan and returns a data set containing statistics
@@ -114,7 +115,11 @@ impl ExecutionPlan for QueryStageExec {
                 .await
                 .map_err(|e| DataFusionError::Execution(format!("Ballista Error: {:?}", e)))?;
 
-            batches.append(&mut partition_metadata);
+            //TODO we should stream rather than load into memory
+            while let Some(result) = partition_metadata.next().await {
+                let batch = result?;
+                batches.push(batch);
+            }
         }
 
         let schema = batches[0].schema();

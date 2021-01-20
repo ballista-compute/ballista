@@ -338,9 +338,9 @@ impl TryInto<Expr> for &protobuf::LogicalExprNode {
                 asc: sort.asc,
                 nulls_first: sort.nulls_first,
             }),
-            ExprType::Negative(negative) => Ok(Expr::Negative(Box::new(
-                parse_required_expr(&negative.expr)?,
-            ))),
+            ExprType::Negative(negative) => Ok(Expr::Negative(Box::new(parse_required_expr(
+                &negative.expr,
+            )?))),
             ExprType::InList(in_list) => Ok(Expr::InList {
                 expr: Box::new(parse_required_expr(&in_list.expr)?),
                 list: in_list

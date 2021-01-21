@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
-use std::process::exit;
-use std::time::Instant;
+use std::{collections::HashMap, process::exit, time::Instant};
 
 extern crate arrow;
 extern crate ballista;
 extern crate datafusion;
 
-use arrow::datatypes::{DataType, Field, Schema};
-use arrow::util::pretty;
+use arrow::{datatypes::{DataType, Field, Schema},
+            util::pretty};
 use ballista::prelude::*;
 use datafusion::prelude::*;
 
@@ -30,6 +28,7 @@ use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "tpch")]
+
 struct Opt {
     #[structopt()]
     format: String,
@@ -53,26 +52,36 @@ enum FileFormat {
 }
 
 #[tokio::main]
+
 async fn main() -> Result<()> {
+
     let opt: Opt = Opt::from_args();
+
     let format = opt.format.as_str();
+
     let path = opt.path.as_str();
+
     let query_no = opt.query;
+
     let executor_host = opt.executor_host.as_str();
+
     let executor_port = opt.executor_port;
 
     let format = match format {
         "csv" => FileFormat::Csv,
         "parquet" => FileFormat::Parquet,
         _ => {
+
             println!("Invalid file format");
+
             exit(-1);
-        }
+        },
     };
 
     let start = Instant::now();
 
     let mut settings = HashMap::new();
+
     settings.insert("parquet.reader.batch.size", "65536");
 
     // TODO enable these when we get Spark demo working again
@@ -88,26 +97,28 @@ async fn main() -> Result<()> {
         1 => q1(&ctx, path, &format).await?,
         6 => q6(&ctx, path, &format).await?,
         _ => {
+
             println!("Invalid query no");
+
             exit(-1);
-        }
+        },
     };
 
     let mut stream = df.collect().await?;
+
     let mut batches = vec![];
+
     while let Some(result) = stream.next().await {
+
         let batch = result?;
+
         batches.push(batch);
     }
 
     // print the results
     pretty::print_batches(&batches)?;
 
-    println!(
-        "TPC-H query {} took {} ms",
-        query_no,
-        start.elapsed().as_millis()
-    );
+    println!("TPC-H query {} took {} ms", query_no, start.elapsed().as_millis());
 
     Ok(())
 }
@@ -137,16 +148,20 @@ async fn main() -> Result<()> {
 /// order by
 ///     l_returnflag,
 ///     l_linestatus;
-///
+
 async fn q1(ctx: &BallistaContext, path: &str, format: &FileFormat) -> Result<BallistaDataFrame> {
+
     // TODO this is WIP and not the real query yet
 
     let input = match format {
         FileFormat::Csv => {
+
             let schema = lineitem_schema();
+
             let options = CsvReadOptions::new().schema(&schema).has_header(true);
+
             ctx.read_csv(path, options)?
-        }
+        },
         FileFormat::Parquet => ctx.read_parquet(path)?,
     };
 
@@ -170,11 +185,8 @@ async fn q1(ctx: &BallistaContext, path: &str, format: &FileFormat) -> Result<Ba
             vec![
                 sum(col("l_quantity")).alias("sum_qty"),
                 sum(col("l_extendedprice")).alias("sum_base_price"),
-                sum(col("l_extendedprice") * lit(1_f64) - col("l_discount"))
-                    .alias("sum_disc_price"),
-                sum((col("l_extendedprice") * (lit(1_f64) - col("l_discount")))
-                    * (lit(1_f64) + col("l_tax")))
-                .alias("sum_charge"),
+                sum(col("l_extendedprice") * lit(1_f64) - col("l_discount")).alias("sum_disc_price"),
+                sum((col("l_extendedprice") * (lit(1_f64) - col("l_discount"))) * (lit(1_f64) + col("l_tax"))).alias("sum_charge"),
                 avg(col("l_quantity")).alias("avg_qty"),
                 avg(col("l_extendedprice")).alias("avg_price"),
                 avg(col("l_discount")).alias("avg_disc"),
@@ -196,14 +208,18 @@ async fn q1(ctx: &BallistaContext, path: &str, format: &FileFormat) -> Result<Ba
 ///     and l_shipdate < date ':1' + interval '1' year
 ///     and l_discount between :2 - 0.01 and :2 + 0.01
 ///     and l_quantity < :3;
-///
+
 async fn q6(ctx: &BallistaContext, path: &str, format: &FileFormat) -> Result<BallistaDataFrame> {
+
     let input = match format {
         FileFormat::Csv => {
+
             let schema = lineitem_schema();
+
             let options = CsvReadOptions::new().schema(&schema).has_header(true);
+
             ctx.read_csv(path, options)?
-        }
+        },
         FileFormat::Parquet => ctx.read_parquet(path)?,
     };
 
@@ -213,14 +229,14 @@ async fn q6(ctx: &BallistaContext, path: &str, format: &FileFormat) -> Result<Ba
         .filter(col("l_discount").gt_eq(lit(0.05)))?
         .filter(col("l_discount").lt_eq(lit(0.07)))?
         .filter(col("l_quantity").lt(lit(24.0)))?
-        .select(vec![
-            (col("l_extendedprice") * col("l_discount")).alias("disc_price")
-        ])?
+        .select(vec![(col("l_extendedprice") * col("l_discount")).alias("disc_price")])?
         .aggregate(vec![], vec![sum(col("disc_price")).alias("revenue")])
 }
 
 #[allow(dead_code)]
+
 fn lineitem_schema() -> Schema {
+
     Schema::new(vec![
         Field::new("l_orderkey", DataType::UInt32, true),
         Field::new("l_partkey", DataType::UInt32, true),

@@ -12,26 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::error::{ballista_error, BallistaError};
-use crate::serde::protobuf;
-use crate::serde::scheduler::Action;
+use crate::{error::{ballista_error, BallistaError},
+            serde::{protobuf, scheduler::Action}};
 use std::convert::TryInto;
 
 impl TryInto<protobuf::Action> for Action {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<protobuf::Action, Self::Error> {
+
         match self {
-            Action::InteractiveQuery {
-                ref plan,
-                ref settings,
-            } => {
+            Action::InteractiveQuery { ref plan, ref settings } => {
+
                 let plan_proto: protobuf::LogicalPlanNode = plan.try_into()?;
 
                 let settings = settings
                     .iter()
                     .map(|e| protobuf::KeyValuePair {
-                        key: e.0.to_string(),
+                        key:   e.0.to_string(),
                         value: e.1.to_string(),
                     })
                     .collect();
@@ -42,7 +40,7 @@ impl TryInto<protobuf::Action> for Action {
                     fetch_shuffle: None,
                     settings,
                 })
-            }
+            },
             // Action::ExecuteTask(task) => Ok(protobuf::Action {
             //     query: None,
             //     task: Some(task.try_into()?),

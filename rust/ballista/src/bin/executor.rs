@@ -17,9 +17,9 @@
 use std::sync::Arc;
 
 use arrow_flight::flight_service_server::FlightServiceServer;
-use ballista::executor::{BallistaExecutor, DiscoveryMode, ExecutorConfig};
-use ballista::flight_service::BallistaFlightService;
-use ballista::BALLISTA_VERSION;
+use ballista::{executor::{BallistaExecutor, DiscoveryMode, ExecutorConfig},
+               flight_service::BallistaFlightService,
+               BALLISTA_VERSION};
 use clap::arg_enum;
 use log::info;
 use structopt::StructOpt;
@@ -37,6 +37,7 @@ arg_enum! {
 /// Ballista Rust Executor
 #[derive(StructOpt, Debug)]
 #[structopt(name = "basic")]
+
 struct Opt {
     /// discovery mode
     #[structopt(short, long, possible_values = &Mode::variants(), case_insensitive = true, default_value = "Standalone")]
@@ -62,7 +63,9 @@ struct Opt {
 }
 
 #[tokio::main]
+
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+
     env_logger::init();
 
     let opt = Opt::from_args();
@@ -74,23 +77,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let external_host = opt.external_host.as_deref().unwrap_or("localhost");
+
     let bind_host = opt.bind_host.as_deref().unwrap_or("0.0.0.0");
+
     let etcd_urls = opt.etcd_urls.as_deref().unwrap_or("localhost:2379");
+
     let port = opt.port;
 
     let config = ExecutorConfig::new(mode, &external_host, port, &etcd_urls, opt.concurrent_tasks);
+
     info!("Running with config: {:?}", config);
 
     let addr = format!("{}:{}", bind_host, port);
+
     let addr = addr.parse()?;
 
     let executor = Arc::new(BallistaExecutor::new(config));
+
     let service = BallistaFlightService::new(executor);
+
     let server = FlightServiceServer::new(service);
-    info!(
-        "Ballista v{} Rust Executor listening on {:?}",
-        BALLISTA_VERSION, addr
-    );
+
+    info!("Ballista v{} Rust Executor listening on {:?}", BALLISTA_VERSION, addr);
+
     Server::builder().add_service(server).serve(addr).await?;
+
     Ok(())
 }

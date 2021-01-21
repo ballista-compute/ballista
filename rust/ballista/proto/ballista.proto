@@ -20,6 +20,7 @@ message LogicalExprNode {
     AliasNode alias = 14;
 
     // literals
+    bool literal_bool = 35;
     string literal_string = 20;
     int32 literal_int8 = 21;
     int32 literal_int16 = 22;
@@ -34,7 +35,15 @@ message LogicalExprNode {
     float literal_f32 = 29;
     double literal_f64 = 30;
 
-    ArrowType literal_null = 31;
+    int32 literal_date_32 = 32;
+    int64 literal_time_microsecond = 33;
+    int64 literal_time_nanosecond = 34;
+
+
+    ScalarType literal_null = 31;
+
+    ScalarType literal_null_list = 35;
+
 
     // binary expressions
     BinaryExprNode binary_expr = 40;
@@ -56,6 +65,8 @@ message LogicalExprNode {
     bool wildcard = 76;
   }
 }
+
+
 
 message IsNull {
   LogicalExprNode expr = 1;
@@ -379,34 +390,135 @@ message Field {
   repeated Field children = 4;
 }
 
-// copied from GandivaType from Apache Arrow project
-enum ArrowType {
-  NONE = 0;     // arrow::Type::NA
-  BOOL = 1;     // arrow::Type::BOOL
-  UINT8 = 2;    // arrow::Type::UINT8
-  INT8 = 3;     // arrow::Type::INT8
-  UINT16 = 4;   // represents arrow::Type fields in src/arrow/type.h
-  INT16 = 5;
-  UINT32 = 6;
-  INT32 = 7;
-  UINT64 = 8;
-  INT64 = 9;
-  HALF_FLOAT = 10;
-  FLOAT = 11;
-  DOUBLE = 12;
-  UTF8 = 13;
-  BINARY = 14;
-  FIXED_SIZE_BINARY = 15;
-  DATE32 = 16;
-  DATE64 = 17;
-  TIMESTAMP = 18;
-  TIME32 = 19;
-  TIME64 = 20;
-  INTERVAL = 21;
-  DECIMAL = 22;
-  LIST = 23;
-  STRUCT = 24;
-  UNION = 25;
-  DICTIONARY = 26;
-  MAP = 27;
+message FixedSizeBinary{
+    int32 length = 1;
 }
+
+message Timestamp{
+    TimeUnit time_unit = 1;
+    string timezone = 2;
+}
+
+enum DateUnit{
+    Day = 0;
+    DateMillisecond = 1;
+}
+
+enum TimeUnit{
+    Second = 0;
+    TimeMillisecond = 1;
+    Microsecond = 2;
+    Nanosecond = 3;
+}
+
+enum IntervalUnit{
+    YearMonth = 0;
+    DayTime = 1;
+}
+
+message Decimal{
+    uint64 whole = 1;
+    uint64 fractional = 2;
+}
+
+message List{
+    Field field_type = 1;
+}
+
+message FixedSizeList{
+    Field field_type = 1;
+    int32 list_size = 2;
+}
+
+message Dictionary{
+    ArrowType key = 1;
+    ArrowType value = 2;
+}
+
+message Struct{
+    repeated Field sub_field_types = 1;
+}
+
+message Union{
+    repeated Field union_types = 1;
+}
+
+
+
+
+
+//Nullable scalar types
+enum ScalarType{
+    NONE = 0;     // arrow::Type::NA
+    BOOL = 1;     // arrow::Type::BOOL
+    UINT8 = 2;    // arrow::Type::UINT8
+    INT8 = 3;     // arrow::Type::INT8
+    UINT16 = 4;   // represents arrow::Type fields in src/arrow/type.h
+    INT16 = 5;
+    UINT32 = 6;
+    INT32 = 7;
+    UINT64 = 8;
+    INT64 = 9;
+    FLOAT32 = 11;
+    FLOAT64 = 12;
+    UTF8 = 13;
+    LARGE_UTF8 = 24;
+    DATE32 = 16;
+    TIMESTAMP = 18;
+    TIME_MICROSECOND = 19;
+    TIME_NANOSECOND = 20;
+    LIST = 23;
+}
+
+// Broke out into multiple message types so that type 
+// metadata did not need to be in separate message
+//All types that are of the empty message types contain no additional metadata
+// about the type
+message ArrowType{
+    oneof type{
+        EmptyMessage NONE = 1;     // arrow::Type::NA
+        EmptyMessage BOOL =  2;     // arrow::Type::BOOL
+        EmptyMessage UINT8 = 3;    // arrow::Type::UINT8
+        EmptyMessage INT8 =  4;     // arrow::Type::INT8
+        EmptyMessage UINT16 =5;   // represents arrow::Type fields in src/arrow/type.h
+        EmptyMessage INT16 = 6;
+        EmptyMessage UINT32 =7;
+        EmptyMessage INT32 = 8;
+        EmptyMessage UINT64 =9;
+        EmptyMessage INT64 =10 ;
+        EmptyMessage FLOAT16 =11 ;
+        EmptyMessage FLOAT32 =12 ; 
+        EmptyMessage FLOAT64 =13 ;
+        EmptyMessage UTF8 =14 ;
+        EmptyMessage LARGE_UTF8 = 32;
+        EmptyMessage BINARY =15 ;
+        int32 FIXED_SIZE_BINARY =16 ;
+        EmptyMessage LARGE_BINARY = 31;
+        DateUnit DATE32 =17 ;
+        DateUnit DATE64 =18 ;
+        TimeUnit DURATION = 19;
+        Timestamp TIMESTAMP =20 ;
+        TimeUnit TIME32 =21 ;
+        TimeUnit TIME64 =22 ;
+        IntervalUnit INTERVAL =23 ;
+        Decimal DECIMAL =24 ;
+        List LIST =25;
+        List LARGE_LIST = 26;
+        FixedSizeList FIXED_SIZE_LIST = 27;
+        Struct STRUCT =28;
+        Union UNION =29;
+        Dictionary DICTIONARY =30;
+    }
+}
+
+
+//Useful for representing an empty enum variant in rust
+// E.G. enum example{One, Two(i32)}
+// maps to 
+// message example{
+//    oneof{
+//        EmptyMessage One = 1;
+//        i32 Two = 2;
+//   }
+//}
+message EmptyMessage{}

@@ -14,21 +14,24 @@
 
 use std::fs::File;
 
-use arrow::error::Result;
-use arrow::ipc::writer::FileWriter;
+use arrow::{error::Result, ipc::writer::FileWriter};
 use datafusion::physical_plan::SendableRecordBatchStream;
 use futures::StreamExt;
 
 /// Stream data to disk in Arrow IPC format
-pub async fn write_stream_to_disk(
-    stream: &mut SendableRecordBatchStream,
-    path: &str,
-) -> Result<()> {
+
+pub async fn write_stream_to_disk(stream: &mut SendableRecordBatchStream, path: &str) -> Result<()> {
+
     let file = File::create(&path)?;
+
     let mut writer = FileWriter::try_new(file, stream.schema().as_ref())?;
+
     while let Some(result) = stream.next().await {
+
         let batch = result?;
+
         writer.write(&batch)?;
     }
+
     writer.finish()
 }

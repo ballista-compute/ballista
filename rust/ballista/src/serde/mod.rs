@@ -15,17 +15,17 @@
 //! This crate contains code generated from the Ballista Protocol Buffer Definition as well
 //! as convenience code for interacting with the generated code.
 
-use std::convert::TryInto;
-use std::io::Cursor;
+use std::{convert::TryInto, io::Cursor};
 
-use crate::error::BallistaError;
-use crate::serde::scheduler::Action as BallistaAction;
+use crate::{error::BallistaError, serde::scheduler::Action as BallistaAction};
 
 use prost::Message;
 
 // include the generated protobuf source as a submodule
 #[allow(clippy::all)]
+
 pub mod protobuf {
+
     include!(concat!(env!("OUT_DIR"), "/ballista.protobuf.rs"));
 }
 
@@ -34,44 +34,51 @@ pub mod physical_plan;
 pub mod scheduler;
 
 pub(crate) fn decode_protobuf(bytes: &[u8]) -> Result<BallistaAction, BallistaError> {
+
     let mut buf = Cursor::new(bytes);
+
     protobuf::Action::decode(&mut buf)
         .map_err(|e| BallistaError::General(format!("{:?}", e)))
         .and_then(|node| node.try_into())
 }
 
 pub(crate) fn proto_error<S: Into<String>>(message: S) -> BallistaError {
+
     BallistaError::General(message.into())
 }
 
 /// Create an empty LogicalPlanNode
+
 pub fn empty_logical_plan_node() -> protobuf::LogicalPlanNode {
+
     protobuf::LogicalPlanNode {
-        csv_scan: None,
-        parquet_scan: None,
-        input: None,
-        projection: None,
-        selection: None,
-        limit: None,
-        aggregate: None,
-        join: None,
-        sort: None,
-        repartition: None,
-        empty_relation: None,
-        explain: None,
+        csv_scan:              None,
+        parquet_scan:          None,
+        input:                 None,
+        projection:            None,
+        selection:             None,
+        limit:                 None,
+        aggregate:             None,
+        join:                  None,
+        sort:                  None,
+        repartition:           None,
+        empty_relation:        None,
+        explain:               None,
         create_external_table: None,
     }
 }
 
 /// Create an empty PhysicalPlanNode
+
 pub fn empty_physical_plan_node() -> protobuf::PhysicalPlanNode {
+
     protobuf::PhysicalPlanNode {
-        scan: None,
-        input: None,
-        projection: None,
-        selection: None,
-        global_limit: None,
-        local_limit: None,
+        scan:           None,
+        input:          None,
+        projection:     None,
+        selection:      None,
+        global_limit:   None,
+        local_limit:    None,
         shuffle_reader: None,
         hash_aggregate: None,
     }

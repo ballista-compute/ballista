@@ -17,13 +17,12 @@ use std::time::Instant;
 
 extern crate ballista;
 
-use ballista::arrow::datatypes::{DataType, Field, Schema};
-use ballista::arrow::util::pretty;
-use ballista::dataframe::{Context, CSV_READER_BATCH_SIZE};
-use ballista::datafusion::prelude::*;
-use ballista::error::BallistaError::General;
-use ballista::error::Result;
+use arrow::datatypes::{DataType, Field, Schema};
+use arrow::util::pretty;
+use ballista::error::{BallistaError, Result};
+use ballista::prelude::*;
 use ballista::BALLISTA_VERSION;
+use datafusion::prelude::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -54,10 +53,10 @@ async fn main() -> Result<()> {
 
 async fn execute(path: &str, host: &str, name: &&str, port: &usize) -> Result<String> {
     let start = Instant::now();
-    let mut settings = HashMap::new();
-    settings.insert(CSV_READER_BATCH_SIZE, "1024");
-    let ctx = Context::remote(host, *port, settings);
-    let response = ctx
+    let settings = HashMap::new();
+    //settings.insert(CSV_READER_BATCH_SIZE, "1024");
+    let ctx = BallistaContext::remote(host, *port, settings);
+    let mut stream = ctx
         .read_csv(path, CsvReadOptions::new().schema(&nyctaxi_schema()))?
         .aggregate(
             vec![col("passenger_count")],
@@ -65,6 +64,13 @@ async fn execute(path: &str, host: &str, name: &&str, port: &usize) -> Result<St
         )?
         .collect()
         .await?;
+
+    // collect results
+    let mut batches = vec![];
+    while let Some(result) = stream.next().await {
+        let batch = result?;
+        batches.push(batch);
+    }
 
     let duration = start.elapsed();
     println!(
@@ -74,24 +80,27 @@ async fn execute(path: &str, host: &str, name: &&str, port: &usize) -> Result<St
         port,
         duration.as_millis()
     );
-    pretty::print_batches(&response)?;
+    pretty::print_batches(&batches)?;
 
     fn check(x: usize, y: usize, label: &str) -> Result<String> {
         if x == y {
             Ok(format!("{} has correct count", label))
         } else {
-            Err(General(format!("{:?} not equal to {:?}", x, y)))
+            Err(BallistaError::General(format!(
+                "{:?} not equal to {:?}",
+                x, y
+            )))
         }
     }
 
     let mut tests = Vec::new();
 
-    tests.push(check(1, response.len(), "Length"));
-    let batch = &response[0];
+    tests.push(check(1, batches.len(), "Length"));
+    let batch = &batches[0];
     tests.push(check(3, batch.num_columns(), "Number of Columns"));
     tests.push(check(10, batch.num_rows(), "Number of Rows"));
 
-    println!("{:?}", &response[0].schema());
+    println!("{:?}", &batches[0].schema());
 
     let passenger_count = batch.column(0);
     let min_fare_amt = batch.column(1);
@@ -101,7 +110,10 @@ async fn execute(path: &str, host: &str, name: &&str, port: &usize) -> Result<St
         if x == &y {
             Ok(format!("Column {} has correct data type", label))
         } else {
-            Err(General(format!("{:?} not equal to {:?}", x, y)))
+            Err(BallistaError::General(format!(
+                "{:?} not equal to {:?}",
+                x, y
+            )))
         }
     }
 

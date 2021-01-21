@@ -53,7 +53,7 @@ struct Opt {
     external_host: Option<String>,
 
     /// bind port
-    #[structopt(short, long, default_value = "8000")]
+    #[structopt(short, long, default_value = "50051")]
     port: usize,
 
     /// max concurrent tasks

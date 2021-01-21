@@ -26,17 +26,29 @@ use datafusion::execution::context::ExecutionContext;
 use datafusion::logical_plan::{DFSchema, Expr, LogicalPlan, Partitioning};
 use datafusion::physical_plan::csv::CsvReadOptions;
 use datafusion::physical_plan::SendableRecordBatchStream;
+use log::info;
+
+#[derive(Debug)]
+pub enum ClusterMeta {
+    Direct { host: String, port: usize }, //TODO add etcd and k8s options here
+}
 
 #[allow(dead_code)]
 pub struct BallistaContextState {
+    /// Meta-data required for connecting to a scheduler instances in the cluster
+    cluster_meta: ClusterMeta,
+    /// General purpose settings
     settings: HashMap<String, String>, // map from shuffle id to executor uuid
                                        // shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
                                        // config: ExecutorConfig
 }
 
 impl BallistaContextState {
-    pub fn new(settings: HashMap<String, String>) -> Self {
-        Self { settings }
+    pub fn new(cluster_meta: ClusterMeta, settings: HashMap<String, String>) -> Self {
+        Self {
+            cluster_meta,
+            settings,
+        }
     }
 }
 
@@ -45,27 +57,26 @@ pub struct BallistaContext {
     state: Arc<Mutex<BallistaContextState>>,
 }
 
-impl Default for BallistaContext {
-    fn default() -> Self {
-        Self::new(HashMap::new())
-    }
-}
-
 impl BallistaContext {
-    pub fn new(settings: HashMap<String, String>) -> Self {
-        Self {
-            state: Arc::new(Mutex::new(BallistaContextState::new(settings))),
-        }
-    }
-
     /// Create a context for executing queries against a remote Ballista executor instance
-    pub fn remote(_host: &str, _port: usize, _settings: HashMap<&str, &str>) -> Self {
-        todo!()
+    pub fn remote(host: &str, port: usize, settings: HashMap<&str, &str>) -> Self {
+        let meta = ClusterMeta::Direct {
+            host: host.to_owned(),
+            port,
+        };
+        let settings: HashMap<String, String> = settings
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect();
+        let state = BallistaContextState::new(meta, settings);
+        Self {
+            state: Arc::new(Mutex::new(state)),
+        }
     }
 
     /// Create a DataFrame representing a Parquet table scan
     pub fn read_parquet(&self, path: &str) -> Result<BallistaDataFrame> {
-        // use local DataFusion context for now but later this might call an executor
+        // use local DataFusion context for now but later this might call the scheduler
         let mut ctx = ExecutionContext::new();
         let df = ctx.read_parquet(path)?;
         Ok(BallistaDataFrame::from(self.state.clone(), df))
@@ -73,7 +84,7 @@ impl BallistaContext {
 
     /// Create a DataFrame representing a CSV table scan
     pub fn read_csv(&self, path: &str, options: CsvReadOptions) -> Result<BallistaDataFrame> {
-        // use local DataFusion context for now but later this might call an executor
+        // use local DataFusion context for now but later this might call the scheduler
         let mut ctx = ExecutionContext::new();
         let df = ctx.read_csv(path, options)?;
         Ok(BallistaDataFrame::from(self.state.clone(), df))
@@ -105,8 +116,14 @@ impl BallistaDataFrame {
     }
 
     pub async fn collect(&self) -> Result<SendableRecordBatchStream> {
-        //TODO use BallistaContextState to determine how to submit the query to the cluster
-        let mut client = BallistaClient::try_new("localhost", 8000).await?;
+        let (host, port) = {
+            let state = self.state.lock().unwrap();
+            match &state.cluster_meta {
+                ClusterMeta::Direct { host, port, .. } => (host.to_owned(), *port),
+            }
+        };
+        info!("Connecting to Ballista executor at {}:{}", host, port);
+        let mut client = BallistaClient::try_new(&host, port).await?;
         client
             .execute_action(&Action::InteractiveQuery {
                 plan: self.df.to_logical_plan(),

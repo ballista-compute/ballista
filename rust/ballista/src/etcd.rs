@@ -14,7 +14,6 @@
 
 //! Support for etcd discovery mechanism.
 
-use std::thread;
 use std::time::Duration;
 
 use crate::error::{ballista_error, Result};
@@ -63,7 +62,7 @@ async fn main_loop(etcd_urls: &str, cluster_name: &str, uuid: &Uuid, host: &str,
             }
             Err(e) => warn!("Failed to connect to etcd {:?}", e.to_string()),
         }
-        thread::sleep(Duration::from_secs(15));
+        tokio::time::delay_for(Duration::from_secs(15)).await;
     }
 }
 

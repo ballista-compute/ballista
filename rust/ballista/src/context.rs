@@ -66,7 +66,7 @@ impl BallistaContext {
         };
         let settings: HashMap<String, String> = settings
             .into_iter()
-            .map(|(k, v)| (k.to_owned().clone(), v.to_owned().clone()))
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
             .collect();
         let state = BallistaContextState::new(meta, settings);
         Self {

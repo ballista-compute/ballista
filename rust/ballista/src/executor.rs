@@ -17,7 +17,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::context::BallistaContext;
 use crate::error::{ballista_error, Result};
 use crate::etcd::start_etcd_thread;
 use crate::serde::scheduler::{QueryStageTask, ShuffleId};
@@ -202,7 +201,7 @@ async fn execute_task(
     _task: &QueryStageTask,
 ) -> Result<(Schema, Vec<RecordBatch>)> {
     // create new execution context specifically for this query
-    let _ctx = Arc::new(BallistaContext::default());
+    // let _ctx = Arc::new(BallistaContext::default());
     // &config,
     // task.shuffle_locations.clone(),
 

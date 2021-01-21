@@ -21,11 +21,11 @@ extern crate ballista;
 extern crate datafusion;
 
 use arrow::datatypes::{DataType, Field, Schema};
-use arrow::record_batch::RecordBatch;
 use arrow::util::pretty;
 use ballista::prelude::*;
 use datafusion::prelude::*;
 
+use ballista::context::BallistaDataFrame;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -84,7 +84,7 @@ async fn main() -> Result<()> {
 
     let ctx = BallistaContext::remote(executor_host, executor_port, settings);
 
-    let results = match query_no {
+    let df = match query_no {
         1 => q1(&ctx, path, &format).await?,
         6 => q6(&ctx, path, &format).await?,
         _ => {
@@ -93,8 +93,15 @@ async fn main() -> Result<()> {
         }
     };
 
+    let mut stream = df.collect().await?;
+    let mut batches = vec![];
+    while let Some(result) = stream.next().await {
+        let batch = result?;
+        batches.push(batch);
+    }
+
     // print the results
-    pretty::print_batches(&results)?;
+    pretty::print_batches(&batches)?;
 
     println!(
         "TPC-H query {} took {} ms",
@@ -131,7 +138,7 @@ async fn main() -> Result<()> {
 ///     l_returnflag,
 ///     l_linestatus;
 ///
-async fn q1(ctx: &BallistaContext, path: &str, format: &FileFormat) -> Result<Vec<RecordBatch>> {
+async fn q1(ctx: &BallistaContext, path: &str, format: &FileFormat) -> Result<BallistaDataFrame> {
     // TODO this is WIP and not the real query yet
 
     let input = match format {
@@ -143,7 +150,7 @@ async fn q1(ctx: &BallistaContext, path: &str, format: &FileFormat) -> Result<Ve
         FileFormat::Parquet => ctx.read_parquet(path)?,
     };
 
-    let _df = input
+    input
         .filter(col("l_shipdate").lt(lit("1998-09-01")))? // should be l_shipdate <= date '1998-12-01' - interval ':1' day (3)
         // .project(vec![
         //     col("l_returnflag"),
@@ -173,16 +180,7 @@ async fn q1(ctx: &BallistaContext, path: &str, format: &FileFormat) -> Result<Ve
                 avg(col("l_discount")).alias("avg_disc"),
                 count(col("l_quantity")).alias("count_order"), // should be count(*) not count(col)
             ],
-        )?;
-    //.sort()?
-
-    //df.explain();
-
-    //df.collect().await
-
-    //TODO get logical plan and send to Ballista context
-
-    todo!()
+        )
 }
 
 /// TPCH Query 6.
@@ -199,7 +197,7 @@ async fn q1(ctx: &BallistaContext, path: &str, format: &FileFormat) -> Result<Ve
 ///     and l_discount between :2 - 0.01 and :2 + 0.01
 ///     and l_quantity < :3;
 ///
-async fn q6(ctx: &BallistaContext, path: &str, format: &FileFormat) -> Result<Vec<RecordBatch>> {
+async fn q6(ctx: &BallistaContext, path: &str, format: &FileFormat) -> Result<BallistaDataFrame> {
     let input = match format {
         FileFormat::Csv => {
             let schema = lineitem_schema();
@@ -209,7 +207,7 @@ async fn q6(ctx: &BallistaContext, path: &str, format: &FileFormat) -> Result<Ve
         FileFormat::Parquet => ctx.read_parquet(path)?,
     };
 
-    let _df = input
+    input
         .filter(col("l_shipdate").gt_eq(lit("1994-01-01")))?
         .filter(col("l_shipdate").lt(lit("1995-01-01")))?
         .filter(col("l_discount").gt_eq(lit(0.05)))?
@@ -218,14 +216,7 @@ async fn q6(ctx: &BallistaContext, path: &str, format: &FileFormat) -> Result<Ve
         .select(vec![
             (col("l_extendedprice") * col("l_discount")).alias("disc_price")
         ])?
-        .aggregate(vec![], vec![sum(col("disc_price")).alias("revenue")])?;
-    //df.explain();
-
-    //df.collect().await
-
-    //TODO get logical plan and send to Ballista context
-
-    todo!()
+        .aggregate(vec![], vec![sum(col("disc_price")).alias("revenue")])
 }
 
 #[allow(dead_code)]

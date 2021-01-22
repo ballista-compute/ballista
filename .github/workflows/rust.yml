@@ -113,6 +113,14 @@ jobs:
     needs: [Docker]
     steps:
     - uses: actions/checkout@v2
+    # github does not provide a clean ref name. We build it here, see https://stackoverflow.com/a/58035262/931303
+    - name: Extract git reference name
+      shell: bash
+      run: echo "##[set-output name=ref;]$(A=${GITHUB_REF#refs/heads/}; A=${A#refs/pulls/}; echo ${A////.})"
+      id: extract_ref
+    # Replace ballista-rust image label in docker-compose for local image by git reference name
+    - name: Replace image label
+      run: cd integration-tests && sed -i "s/ballistacompute\/ballista-rust:$PARTITION_COLUMN.*$/${{ steps.extract_ref.outputs.ref }}/" docker-compose.yml
     - name: Build integration test stack
       run: cd integration-tests && docker-compose up -d
     - name: Wait for executors to start

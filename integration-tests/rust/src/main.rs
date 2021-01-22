@@ -34,8 +34,8 @@ async fn main() -> Result<()> {
 
     let mut targets = HashMap::new();
     targets.insert("Rust", 50051);
-    targets.insert("JVM", 50052);
-    targets.insert("Spark", 50053);
+    // targets.insert("JVM", 50052);
+    // targets.insert("Spark", 50053);
 
     for (name, port) in &targets {
         println!(

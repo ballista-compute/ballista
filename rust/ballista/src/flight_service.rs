@@ -32,6 +32,7 @@ use datafusion::error::DataFusionError;
 use datafusion::execution::context::ExecutionContext;
 use datafusion::physical_plan::collect;
 use futures::{Stream, StreamExt};
+use log::{debug, info};
 use tempfile::TempDir;
 use tonic::{Request, Response, Status, Streaming};
 
@@ -64,20 +65,27 @@ impl FlightService for BallistaFlightService {
         request: Request<Ticket>,
     ) -> Result<Response<Self::DoGetStream>, Status> {
         let ticket = request.into_inner();
+        info!("Received do_get request");
 
-        let action = decode_protobuf(&ticket.ticket.to_vec()).map_err(|e| from_ballista_err(&e))?;
+        let action = decode_protobuf(&ticket.ticket).map_err(|e| from_ballista_err(&e))?;
 
         match &action {
             BallistaAction::InteractiveQuery { plan, .. } => {
+                info!("Running interactive query");
+                debug!("Logical plan: {:?}", plan);
                 // execute with DataFusion for now until distributed execution is in place
                 let ctx = ExecutionContext::new();
 
                 // create the query plan
                 let plan = ctx
                     .optimize(&plan)
-                    .and_then(|plan| ctx.create_physical_plan(&plan))
+                    .and_then(|plan| {
+                        debug!("Optimized logical plan: {:?}", plan);
+                        ctx.create_physical_plan(&plan)
+                    })
                     .map_err(|e| from_datafusion_err(&e))?;
 
+                debug!("Physical plan: {:?}", plan);
                 // execute the query
                 let results = collect(plan.clone())
                     .await
@@ -85,6 +93,7 @@ impl FlightService for BallistaFlightService {
                 if results.is_empty() {
                     return Err(Status::internal("There were no results from ticket"));
                 }
+                debug!("Received {} record batches", results.len());
 
                 // add an initial FlightData message that sends schema
                 let options = arrow::ipc::writer::IpcWriteOptions::default();

@@ -5,9 +5,9 @@ authors = ["Andy Grove <andygrove73@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-arrow = { git = "https://github.com/apache/arrow", rev="49a1c7b" }
-arrow-flight = { git = "https://github.com/apache/arrow", rev="49a1c7b" }
-datafusion = { git = "https://github.com/apache/arrow", rev="49a1c7b" }
+arrow = { git = "https://github.com/apache/arrow", rev="d613aa6" }
+arrow-flight = { git = "https://github.com/apache/arrow", rev="d613aa6" }
+datafusion = { git = "https://github.com/apache/arrow", rev="d613aa6" }
 ballista = { path = "../../rust/ballista" }
 
 tokio = { version = "0.2", features = ["full"] }

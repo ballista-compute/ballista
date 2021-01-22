@@ -23,11 +23,10 @@ use prost::Message;
 
 // include the generated protobuf source as a submodule
 #[allow(clippy::all)]
+#[path = "./ballista.protobuf.rs"]
+pub mod protobuf;
 
-pub mod protobuf {
-
-    include!(concat!(env!("OUT_DIR"), "/ballista.protobuf.rs"));
-}
+ 
 
 pub mod logical_plan;
 pub mod physical_plan;

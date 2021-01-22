@@ -10,51 +10,51 @@ env:
   #TOOLCHAIN_VERSION: stable-x86_64-pc-windows-msvc
 
 jobs:
-  PreTestChecks:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: Lint Ballista
-      run: cd rust && cargo clippy -- -D warnings
-    - name: Check Ballista formatting
-      run: cd rust && cargo fmt -- --check
-
-  Ubuntu:
-    runs-on: ubuntu-latest
-    needs: [PreTestChecks]
-    steps:
-    - uses: actions/checkout@v2
-    - name: Build Ballista
-      run: cd rust && cargo build
-    - name: Run tests
-      run: cd rust && cargo test
-
-  Mac:
-    runs-on: macOS-latest
-    needs: [PreTestChecks]
-    steps:
-    - uses: actions/checkout@v2
-    - name: Build Ballista
-      run: cd rust && cargo build
-    - name: Run tests
-      run: cd rust && cargo test
-
-  Windows:
-    runs-on: windows-2016
-    needs: [PreTestChecks]
-    steps:
-    - uses: actions/checkout@v2
-    - name: Prepare the Windows Build Environment
-      run: |
-        vcpkg update
-        vcpkg integrate install
-        vcpkg install openssl:x64-windows
-    - name: Build Ballista
-      run: |
-        cd rust && cargo build
-    - name: Run tests
-      run: |
-        cd rust && cargo test
+#  PreTestChecks:
+#    runs-on: ubuntu-latest
+#    steps:
+#    - uses: actions/checkout@v2
+#    - name: Lint Ballista
+#      run: cd rust && cargo clippy -- -D warnings
+#    - name: Check Ballista formatting
+#      run: cd rust && cargo fmt -- --check
+#
+#  Ubuntu:
+#    runs-on: ubuntu-latest
+#    needs: [PreTestChecks]
+#    steps:
+#    - uses: actions/checkout@v2
+#    - name: Build Ballista
+#      run: cd rust && cargo build
+#    - name: Run tests
+#      run: cd rust && cargo test
+#
+#  Mac:
+#    runs-on: macOS-latest
+#    needs: [PreTestChecks]
+#    steps:
+#    - uses: actions/checkout@v2
+#    - name: Build Ballista
+#      run: cd rust && cargo build
+#    - name: Run tests
+#      run: cd rust && cargo test
+#
+#  Windows:
+#    runs-on: windows-2016
+#    needs: [PreTestChecks]
+#    steps:
+#    - uses: actions/checkout@v2
+#    - name: Prepare the Windows Build Environment
+#      run: |
+#        vcpkg update
+#        vcpkg integrate install
+#        vcpkg install openssl:x64-windows
+#    - name: Build Ballista
+#      run: |
+#        cd rust && cargo build
+#    - name: Run tests
+#      run: |
+#        cd rust && cargo test
 
   Docker:
     runs-on: ubuntu-latest

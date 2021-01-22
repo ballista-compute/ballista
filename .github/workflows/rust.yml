@@ -110,6 +110,7 @@ jobs:
 
   IntegrationTests:
     runs-on: ubuntu-latest
+    needs: [Docker]
     steps:
     - uses: actions/checkout@v2
     - name: Build integration test stack

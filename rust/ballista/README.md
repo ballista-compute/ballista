@@ -1,3 +1,9 @@
-# Ballista Protocol Buffer Definitions for Rust
+# Ballista Rust
 
-This crate simply contains code generated from the ballista.proto file.
+This crate contains the Ballista Rust Executor.
+
+## Run Executor
+
+```bash
+RUST_LOG=info cargo run --bin executor
+```

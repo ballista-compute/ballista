@@ -37,32 +37,36 @@ use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 struct BenchmarkOpt {
+    /// Ballista executor host
+    #[structopt(long = "host")]
+    host: String,
+
+    /// Ballista executor port
+    #[structopt(long = "port")]
+    port: usize,
+
     /// Query number
-    #[structopt(short, long)]
+    #[structopt(long)]
     query: usize,
 
     /// Activate debug mode to see query results
-    #[structopt(short, long)]
+    #[structopt(long)]
     debug: bool,
 
     /// Number of iterations of each test run
-    #[structopt(short = "i", long = "iterations", default_value = "3")]
+    #[structopt(long = "iterations", default_value = "3")]
     iterations: usize,
 
-    /// Number of threads to use for parallel execution
-    #[structopt(short = "c", long = "concurrency", default_value = "2")]
-    concurrency: usize,
-
     /// Batch size when reading CSV or Parquet files
-    #[structopt(short = "s", long = "batch-size", default_value = "32768")]
+    #[structopt(long = "batch-size", default_value = "32768")]
     batch_size: usize,
 
     /// Path to data files
-    #[structopt(parse(from_os_str), required = true, short = "p", long = "path")]
+    #[structopt(parse(from_os_str), required = true, long = "path")]
     path: PathBuf,
 
-    /// File format: `csv` or `parquet`
-    #[structopt(short = "f", long = "format", default_value = "csv")]
+    /// File format: `csv`, `tbl` or `parquet`
+    #[structopt(long = "format")]
     file_format: String,
 }
 
@@ -119,7 +123,7 @@ async fn benchmark(opt: BenchmarkOpt) -> Result<Vec<arrow::record_batch::RecordB
     let mut settings = HashMap::new();
     settings.insert("batch.size".to_owned(), format!("{}", opt.batch_size));
 
-    let ctx = BallistaContext::remote("localhost", 50051, settings);
+    let ctx = BallistaContext::remote(opt.host.as_str(), opt.port, settings);
 
     // register tables with Ballista context
     let path = opt.path.to_str().unwrap();

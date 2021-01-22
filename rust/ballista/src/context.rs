@@ -21,12 +21,17 @@ use crate::client::BallistaClient;
 use crate::error::{BallistaError, Result};
 use crate::serde::scheduler::Action;
 
+use arrow::datatypes::SchemaRef;
 use datafusion::dataframe::DataFrame;
+use datafusion::datasource::datasource::Statistics;
+use datafusion::datasource::TableProvider;
+use datafusion::error::Result as DFResult;
 use datafusion::execution::context::ExecutionContext;
 use datafusion::logical_plan::{DFSchema, Expr, LogicalPlan, Partitioning};
 use datafusion::physical_plan::csv::CsvReadOptions;
-use datafusion::physical_plan::SendableRecordBatchStream;
+use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
 use log::info;
+use std::any::Any;
 
 #[derive(Debug)]
 pub enum ClusterMeta {
@@ -37,6 +42,8 @@ pub enum ClusterMeta {
 pub struct BallistaContextState {
     /// Meta-data required for connecting to a scheduler instances in the cluster
     cluster_meta: ClusterMeta,
+    /// Tables that have been registered with this context
+    tables: HashMap<String, LogicalPlan>,
     /// General purpose settings
     settings: HashMap<String, String>, // map from shuffle id to executor uuid
                                        // shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
@@ -47,6 +54,7 @@ impl BallistaContextState {
     pub fn new(cluster_meta: ClusterMeta, settings: HashMap<String, String>) -> Self {
         Self {
             cluster_meta,
+            tables: HashMap::new(),
             settings,
         }
     }
@@ -87,21 +95,64 @@ impl BallistaContext {
     }
 
     /// Register a DataFrame as a table that can be referenced from a SQL query
-    pub fn register_table(&self, _name: &str, _table: Arc<dyn DataFrame>) -> Result<()> {
-        todo!()
+    pub fn register_table(&self, name: &str, table: &BallistaDataFrame) -> Result<()> {
+        let mut state = self.state.lock().unwrap();
+        state
+            .tables
+            .insert(name.to_owned(), table.to_logical_plan());
+        Ok(())
     }
 
-    pub fn register_csv(&self, _name: &str, _path: &str, _options: CsvReadOptions) -> Result<()> {
-        todo!()
+    pub fn register_csv(&self, name: &str, path: &str, options: CsvReadOptions) -> Result<()> {
+        let df = self.read_csv(path, options)?;
+        self.register_table(name, &df)
     }
 
-    pub fn register_parquet(&self, _name: &str, _path: &str) -> Result<()> {
-        todo!()
+    pub fn register_parquet(&self, name: &str, path: &str) -> Result<()> {
+        let df = self.read_parquet(path)?;
+        self.register_table(name, &df)
     }
 
     /// Create a DataFrame from a SQL statement
-    pub fn sql(&self, _sql: &str) -> Result<BallistaDataFrame> {
-        todo!()
+    pub fn sql(&self, sql: &str) -> Result<BallistaDataFrame> {
+        // use local DataFusion context for now but later this might call the scheduler
+        let mut ctx = ExecutionContext::new();
+        // register tables
+        let state = self.state.lock().unwrap();
+        for (name, plan) in &state.tables {
+            let plan = ctx.optimize(plan)?;
+            let plan = ctx.create_physical_plan(&plan)?;
+            ctx.register_table(name, Box::new(DFTableAdapter { plan }))
+        }
+        let df = ctx.sql(sql)?;
+        Ok(BallistaDataFrame::from(self.state.clone(), df))
+    }
+}
+
+struct DFTableAdapter {
+    plan: Arc<dyn ExecutionPlan>,
+}
+
+impl TableProvider for DFTableAdapter {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn schema(&self) -> SchemaRef {
+        self.plan.schema()
+    }
+
+    fn scan(
+        &self,
+        _projection: &Option<Vec<usize>>,
+        _batch_size: usize,
+        _filters: &[Expr],
+    ) -> DFResult<Arc<dyn ExecutionPlan>> {
+        Ok(self.plan.clone())
+    }
+
+    fn statistics(&self) -> Statistics {
+        unimplemented!()
     }
 }
 

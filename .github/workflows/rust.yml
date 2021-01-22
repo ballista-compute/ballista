@@ -112,7 +112,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Build images
-      run: bash dev/build-all.sh
+      run: cd dev && bash ./build-all.sh
     - name: Build integration tests
       run: cd integration-tests/rust && cargo build
 #    - name: Build integration test stack

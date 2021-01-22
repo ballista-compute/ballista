@@ -111,9 +111,7 @@ jobs:
     # Ballista integration tests require docker images to be available.
     # Replace ballista-rust image label in docker-compose for local image by git reference name
     - name: Replace rust image name
-      run: cd integration-tests && sed -i "s~ballistacompute/ballista-rust:~$IMAGE_NAME:~" docker-compose.yml
-    - name: Replace rust image label
-      run: cd integration-tests && sed -i "s/ballistacompute\/ballista-rust:$PARTITION_COLUMN.*$/${{ steps.extract_ref.outputs.ref }}/" docker-compose.yml
+      run: cd integration-tests && sed -i "s~ballistacompute/ballista-rust:.*~$IMAGE_NAME:${{ steps.extract_ref.outputs.ref }}~" docker-compose.yml
     - name: Build integration test stack
       run: cd integration-tests && docker-compose up -d
     - name: Wait for executors to start

@@ -1,242 +1,358 @@
-// Copyright 2020 Andy Grove
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+//   http://www.apache.org/licenses/LICENSE-2.0
 //
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
 
-use std::collections::HashMap;
-use std::process::exit;
+//! Benchmark derived from TPC-H. This is not an official TPC-H benchmark.
+//!
+//! This is a modified version of the DataFusion version of these benchmarks.
+
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-extern crate arrow;
 extern crate ballista;
-extern crate datafusion;
 
-use arrow::datatypes::{DataType, Field, Schema};
+use arrow::datatypes::{DataType, DateUnit, Field, Schema};
 use arrow::util::pretty;
 use ballista::prelude::*;
 use datafusion::prelude::*;
 
-use ballista::context::BallistaDataFrame;
+use parquet::basic::Compression;
+use parquet::file::properties::WriterProperties;
+use std::collections::HashMap;
 use structopt::StructOpt;
 
-#[derive(StructOpt, Debug)]
-#[structopt(name = "tpch")]
-struct Opt {
-    #[structopt()]
-    format: String,
-
-    #[structopt()]
-    path: String,
-
-    #[structopt()]
+#[derive(Debug, StructOpt)]
+struct BenchmarkOpt {
+    /// Query number
+    #[structopt(short, long)]
     query: usize,
 
-    #[structopt(short = "h", long = "host", default_value = "localhost")]
-    executor_host: String,
+    /// Activate debug mode to see query results
+    #[structopt(short, long)]
+    debug: bool,
 
-    #[structopt(short = "p", long = "port", default_value = "50051")]
-    executor_port: usize,
+    /// Number of iterations of each test run
+    #[structopt(short = "i", long = "iterations", default_value = "3")]
+    iterations: usize,
+
+    /// Number of threads to use for parallel execution
+    #[structopt(short = "c", long = "concurrency", default_value = "2")]
+    concurrency: usize,
+
+    /// Batch size when reading CSV or Parquet files
+    #[structopt(short = "s", long = "batch-size", default_value = "32768")]
+    batch_size: usize,
+
+    /// Path to data files
+    #[structopt(parse(from_os_str), required = true, short = "p", long = "path")]
+    path: PathBuf,
+
+    /// File format: `csv` or `parquet`
+    #[structopt(short = "f", long = "format", default_value = "csv")]
+    file_format: String,
 }
 
-enum FileFormat {
-    Csv,
-    Parquet,
+#[derive(Debug, StructOpt)]
+struct ConvertOpt {
+    /// Path to csv files
+    #[structopt(parse(from_os_str), required = true, short = "i", long = "input")]
+    input_path: PathBuf,
+
+    /// Output path
+    #[structopt(parse(from_os_str), required = true, short = "o", long = "output")]
+    output_path: PathBuf,
+
+    /// Output file format: `csv` or `parquet`
+    #[structopt(short = "f", long = "format")]
+    file_format: String,
+
+    /// Compression to use when writing Parquet files
+    #[structopt(short = "c", long = "compression", default_value = "snappy")]
+    compression: String,
+
+    /// Number of partitions to produce
+    #[structopt(short = "p", long = "partitions", default_value = "1")]
+    partitions: usize,
+
+    /// Batch size when reading CSV or Parquet files
+    #[structopt(short = "s", long = "batch-size", default_value = "4096")]
+    batch_size: usize,
 }
+
+#[derive(Debug, StructOpt)]
+#[structopt(name = "TPC-H", about = "TPC-H Benchmarks.")]
+enum TpchOpt {
+    Benchmark(BenchmarkOpt),
+    Convert(ConvertOpt),
+}
+
+const TABLES: &[&str] = &[
+    "part", "supplier", "partsupp", "customer", "orders", "lineitem", "nation", "region",
+];
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let opt: Opt = Opt::from_args();
-    let format = opt.format.as_str();
-    let path = opt.path.as_str();
-    let query_no = opt.query;
-    let executor_host = opt.executor_host.as_str();
-    let executor_port = opt.executor_port;
+    env_logger::init();
+    match TpchOpt::from_args() {
+        TpchOpt::Benchmark(opt) => benchmark(opt).await.map(|_| ()),
+        TpchOpt::Convert(opt) => convert_tbl(opt).await,
+    }
+}
 
-    let format = match format {
-        "csv" => FileFormat::Csv,
-        "parquet" => FileFormat::Parquet,
-        _ => {
-            println!("Invalid file format");
-            exit(-1);
-        }
-    };
-
-    let start = Instant::now();
+async fn benchmark(opt: BenchmarkOpt) -> Result<Vec<arrow::record_batch::RecordBatch>> {
+    println!("Running benchmarks with the following options: {:?}", opt);
 
     let mut settings = HashMap::new();
-    settings.insert("parquet.reader.batch.size", "65536");
+    settings.insert("batch.size".to_owned(), format!("{}", opt.batch_size));
 
-    // TODO enable these when we get Spark demo working again
-    // spark_settings.insert("spark.app.name", "rust-client-demo");
-    // spark_settings.insert("spark.ballista.host", "localhost");
-    // spark_settings.insert("spark.ballista.port", "50051");
-    // spark_settings.insert("spark.executor.memory", "4g");
-    // spark_settings.insert("spark.executor.cores", "4");
+    let ctx = BallistaContext::remote("localhost", 50051, settings);
 
-    let ctx = BallistaContext::remote(executor_host, executor_port, settings);
-
-    let df = match query_no {
-        1 => q1(&ctx, path, &format).await?,
-        6 => q6(&ctx, path, &format).await?,
-        _ => {
-            println!("Invalid query no");
-            exit(-1);
+    // register tables with Ballista context
+    let path = opt.path.to_str().unwrap();
+    let file_format = opt.file_format.as_str();
+    for table in TABLES {
+        match file_format {
+            // dbgen creates .tbl ('|' delimited) files without header
+            "tbl" => {
+                let path = format!("{}/{}.tbl", path, table);
+                let schema = get_schema(table);
+                let options = CsvReadOptions::new()
+                    .schema(&schema)
+                    .delimiter(b'|')
+                    .has_header(false)
+                    .file_extension(".tbl");
+                ctx.register_csv(table, &path, options)?;
+            }
+            "csv" => {
+                let path = format!("{}/{}", path, table);
+                let schema = get_schema(table);
+                let options = CsvReadOptions::new().schema(&schema).has_header(true);
+                ctx.register_csv(table, &path, options)?;
+            }
+            "parquet" => {
+                let path = format!("{}/{}", path, table);
+                ctx.register_parquet(table, &path)?;
+            }
+            other => {
+                unimplemented!("Invalid file format '{}'", other);
+            }
         }
-    };
-
-    let mut stream = df.collect().await?;
-    let mut batches = vec![];
-    while let Some(result) = stream.next().await {
-        let batch = result?;
-        batches.push(batch);
     }
 
-    // print the results
-    pretty::print_batches(&batches)?;
+    let mut millis = vec![];
+    let mut batches = vec![];
 
-    println!(
-        "TPC-H query {} took {} ms",
-        query_no,
-        start.elapsed().as_millis()
-    );
+    // run benchmark
+    for i in 0..opt.iterations {
+        let start = Instant::now();
+        let sql = get_query_sql(opt.query)?;
+        let df = ctx.sql(&sql)?;
+
+        let mut stream = df.collect().await?;
+        while let Some(result) = stream.next().await {
+            let batch = result?;
+            batches.push(batch);
+        }
+        pretty::print_batches(&batches)?;
+
+        let elapsed = start.elapsed().as_secs_f64() * 1000.0;
+        millis.push(elapsed as f64);
+        println!("Query {} iteration {} took {:.1} ms", opt.query, i, elapsed);
+    }
+
+    let avg = millis.iter().sum::<f64>() / millis.len() as f64;
+    println!("Query {} avg time: {:.2} ms", opt.query, avg);
+
+    Ok(batches)
+}
+
+fn get_query_sql(query: usize) -> Result<String> {
+    if query > 0 && query < 23 {
+        let filename = format!("queries/q{}.sql", query);
+        Ok(fs::read_to_string(&filename).expect("failed to read query"))
+    } else {
+        Err(BallistaError::General(
+            "invalid query. Expected value between 1 and 22".to_owned(),
+        ))
+    }
+}
+
+async fn convert_tbl(opt: ConvertOpt) -> Result<()> {
+    let output_root_path = Path::new(&opt.output_path);
+    for table in TABLES {
+        let start = Instant::now();
+        let schema = get_schema(table);
+
+        let input_path = format!("{}/{}.tbl", opt.input_path.to_str().unwrap(), table);
+        let options = CsvReadOptions::new()
+            .schema(&schema)
+            .delimiter(b'|')
+            .file_extension(".tbl");
+
+        let config = ExecutionConfig::new().with_batch_size(opt.batch_size);
+        let mut ctx = ExecutionContext::with_config(config);
+
+        // build plan to read the TBL file
+        let mut csv = ctx.read_csv(&input_path, options)?;
+
+        // optionally, repartition the file
+        if opt.partitions > 1 {
+            csv = csv.repartition(Partitioning::RoundRobinBatch(opt.partitions))?
+        }
+
+        // create the physical plan
+        let csv = csv.to_logical_plan();
+        let csv = ctx.optimize(&csv)?;
+        let csv = ctx.create_physical_plan(&csv)?;
+
+        let output_path = output_root_path.join(table);
+        let output_path = output_path.to_str().unwrap().to_owned();
+
+        println!(
+            "Converting '{}' to {} files in directory '{}'",
+            &input_path, &opt.file_format, &output_path
+        );
+        match opt.file_format.as_str() {
+            "csv" => ctx.write_csv(csv, output_path).await?,
+            "parquet" => {
+                let compression = match opt.compression.as_str() {
+                    "none" => Compression::UNCOMPRESSED,
+                    "snappy" => Compression::SNAPPY,
+                    "brotli" => Compression::BROTLI,
+                    "gzip" => Compression::GZIP,
+                    "lz4" => Compression::LZ4,
+                    "lz0" => Compression::LZO,
+                    "zstd" => Compression::ZSTD,
+                    other => {
+                        return Err(BallistaError::NotImplemented(format!(
+                            "Invalid compression format: {}",
+                            other
+                        )))
+                    }
+                };
+                let props = WriterProperties::builder()
+                    .set_compression(compression)
+                    .build();
+                ctx.write_parquet(csv, output_path, Some(props)).await?
+            }
+            other => {
+                return Err(BallistaError::NotImplemented(format!(
+                    "Invalid output format: {}",
+                    other
+                )))
+            }
+        }
+        println!("Conversion completed in {} ms", start.elapsed().as_millis());
+    }
 
     Ok(())
 }
 
-/// TPCH Query 1.
-///
-/// The full SQL is:
-///
-/// select
-///     l_returnflag,
-///     l_linestatus,
-///     sum(l_quantity) as sum_qty,
-///     sum(l_extendedprice) as sum_base_price,
-///     sum(l_extendedprice * (1 - l_discount)) as sum_disc_price,
-///     sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge,
-///     avg(l_quantity) as avg_qty,
-///     avg(l_extendedprice) as avg_price,
-///     avg(l_discount) as avg_disc,
-///     count(*) as count_order
-/// from
-///     lineitem
-/// where
-///     l_shipdate <= date '1998-12-01' - interval ':1' day (3)
-/// group by
-///     l_returnflag,
-///     l_linestatus
-/// order by
-///     l_returnflag,
-///     l_linestatus;
-///
-async fn q1(ctx: &BallistaContext, path: &str, format: &FileFormat) -> Result<BallistaDataFrame> {
-    // TODO this is WIP and not the real query yet
+fn get_schema(table: &str) -> Schema {
+    // note that the schema intentionally uses signed integers so that any generated Parquet
+    // files can also be used to benchmark tools that only support signed integers, such as
+    // Apache Spark
 
-    let input = match format {
-        FileFormat::Csv => {
-            let schema = lineitem_schema();
-            let options = CsvReadOptions::new().schema(&schema).has_header(true);
-            ctx.read_csv(path, options)?
-        }
-        FileFormat::Parquet => ctx.read_parquet(path)?,
-    };
+    match table {
+        "part" => Schema::new(vec![
+            Field::new("p_partkey", DataType::Int32, false),
+            Field::new("p_name", DataType::Utf8, false),
+            Field::new("p_mfgr", DataType::Utf8, false),
+            Field::new("p_brand", DataType::Utf8, false),
+            Field::new("p_type", DataType::Utf8, false),
+            Field::new("p_size", DataType::Int32, false),
+            Field::new("p_container", DataType::Utf8, false),
+            Field::new("p_retailprice", DataType::Float64, false),
+            Field::new("p_comment", DataType::Utf8, false),
+        ]),
 
-    input
-        .filter(col("l_shipdate").lt(lit("1998-09-01")))? // should be l_shipdate <= date '1998-12-01' - interval ':1' day (3)
-        // .project(vec![
-        //     col("l_returnflag"),
-        //     col("l_linestatus"),
-        //     col("l_quantity"),
-        //     col("l_extendedprice"),
-        //     col("l_tax"),
-        //     col("l_discount"),
-        //     mult(
-        //         &col("l_extendedprice"),
-        //         &subtract(&lit_f64(1_f64), &col("l_discount")),
-        //     )
-        //     .alias("disc_price"),
-        // ])?
-        .aggregate(
-            vec![col("l_returnflag"), col("l_linestatus")],
-            vec![
-                sum(col("l_quantity")).alias("sum_qty"),
-                sum(col("l_extendedprice")).alias("sum_base_price"),
-                sum(col("l_extendedprice") * lit(1_f64) - col("l_discount"))
-                    .alias("sum_disc_price"),
-                sum((col("l_extendedprice") * (lit(1_f64) - col("l_discount")))
-                    * (lit(1_f64) + col("l_tax")))
-                .alias("sum_charge"),
-                avg(col("l_quantity")).alias("avg_qty"),
-                avg(col("l_extendedprice")).alias("avg_price"),
-                avg(col("l_discount")).alias("avg_disc"),
-                count(col("l_quantity")).alias("count_order"), // should be count(*) not count(col)
-            ],
-        )
-}
+        "supplier" => Schema::new(vec![
+            Field::new("s_suppkey", DataType::Int32, false),
+            Field::new("s_name", DataType::Utf8, false),
+            Field::new("s_address", DataType::Utf8, false),
+            Field::new("s_nationkey", DataType::Int32, false),
+            Field::new("s_phone", DataType::Utf8, false),
+            Field::new("s_acctbal", DataType::Float64, false),
+            Field::new("s_comment", DataType::Utf8, false),
+        ]),
 
-/// TPCH Query 6.
-///
-/// The Full SQL is:
-///
-/// select
-///     sum(l_extendedprice * l_discount) as revenue
-/// from
-///     lineitem
-/// where
-///     l_shipdate >= date ':1'
-///     and l_shipdate < date ':1' + interval '1' year
-///     and l_discount between :2 - 0.01 and :2 + 0.01
-///     and l_quantity < :3;
-///
-async fn q6(ctx: &BallistaContext, path: &str, format: &FileFormat) -> Result<BallistaDataFrame> {
-    let input = match format {
-        FileFormat::Csv => {
-            let schema = lineitem_schema();
-            let options = CsvReadOptions::new().schema(&schema).has_header(true);
-            ctx.read_csv(path, options)?
-        }
-        FileFormat::Parquet => ctx.read_parquet(path)?,
-    };
+        "partsupp" => Schema::new(vec![
+            Field::new("ps_partkey", DataType::Int32, false),
+            Field::new("ps_suppkey", DataType::Int32, false),
+            Field::new("ps_availqty", DataType::Int32, false),
+            Field::new("ps_supplycost", DataType::Float64, false),
+            Field::new("ps_comment", DataType::Utf8, false),
+        ]),
 
-    input
-        .filter(col("l_shipdate").gt_eq(lit("1994-01-01")))?
-        .filter(col("l_shipdate").lt(lit("1995-01-01")))?
-        .filter(col("l_discount").gt_eq(lit(0.05)))?
-        .filter(col("l_discount").lt_eq(lit(0.07)))?
-        .filter(col("l_quantity").lt(lit(24.0)))?
-        .select(vec![
-            (col("l_extendedprice") * col("l_discount")).alias("disc_price")
-        ])?
-        .aggregate(vec![], vec![sum(col("disc_price")).alias("revenue")])
-}
+        "customer" => Schema::new(vec![
+            Field::new("c_custkey", DataType::Int32, false),
+            Field::new("c_name", DataType::Utf8, false),
+            Field::new("c_address", DataType::Utf8, false),
+            Field::new("c_nationkey", DataType::Int32, false),
+            Field::new("c_phone", DataType::Utf8, false),
+            Field::new("c_acctbal", DataType::Float64, false),
+            Field::new("c_mktsegment", DataType::Utf8, false),
+            Field::new("c_comment", DataType::Utf8, false),
+        ]),
 
-#[allow(dead_code)]
-fn lineitem_schema() -> Schema {
-    Schema::new(vec![
-        Field::new("l_orderkey", DataType::UInt32, true),
-        Field::new("l_partkey", DataType::UInt32, true),
-        Field::new("l_suppkey", DataType::UInt32, true),
-        Field::new("l_linenumber", DataType::UInt32, true),
-        Field::new("l_quantity", DataType::Float64, true),
-        Field::new("l_extendedprice", DataType::Float64, true),
-        Field::new("l_discount", DataType::Float64, true),
-        Field::new("l_tax", DataType::Float64, true),
-        Field::new("l_returnflag", DataType::Utf8, true),
-        Field::new("l_linestatus", DataType::Utf8, true),
-        Field::new("l_shipdate", DataType::Utf8, true),
-        Field::new("l_commitdate", DataType::Utf8, true),
-        Field::new("l_receiptdate", DataType::Utf8, true),
-        Field::new("l_shipinstruct", DataType::Utf8, true),
-        Field::new("l_shipmode", DataType::Utf8, true),
-        Field::new("l_comment", DataType::Utf8, true),
-    ])
+        "orders" => Schema::new(vec![
+            Field::new("o_orderkey", DataType::Int32, false),
+            Field::new("o_custkey", DataType::Int32, false),
+            Field::new("o_orderstatus", DataType::Utf8, false),
+            Field::new("o_totalprice", DataType::Float64, false),
+            Field::new("o_orderdate", DataType::Date32(DateUnit::Day), false),
+            Field::new("o_orderpriority", DataType::Utf8, false),
+            Field::new("o_clerk", DataType::Utf8, false),
+            Field::new("o_shippriority", DataType::Int32, false),
+            Field::new("o_comment", DataType::Utf8, false),
+        ]),
+
+        "lineitem" => Schema::new(vec![
+            Field::new("l_orderkey", DataType::Int32, false),
+            Field::new("l_partkey", DataType::Int32, false),
+            Field::new("l_suppkey", DataType::Int32, false),
+            Field::new("l_linenumber", DataType::Int32, false),
+            Field::new("l_quantity", DataType::Float64, false),
+            Field::new("l_extendedprice", DataType::Float64, false),
+            Field::new("l_discount", DataType::Float64, false),
+            Field::new("l_tax", DataType::Float64, false),
+            Field::new("l_returnflag", DataType::Utf8, false),
+            Field::new("l_linestatus", DataType::Utf8, false),
+            Field::new("l_shipdate", DataType::Date32(DateUnit::Day), false),
+            Field::new("l_commitdate", DataType::Date32(DateUnit::Day), false),
+            Field::new("l_receiptdate", DataType::Date32(DateUnit::Day), false),
+            Field::new("l_shipinstruct", DataType::Utf8, false),
+            Field::new("l_shipmode", DataType::Utf8, false),
+            Field::new("l_comment", DataType::Utf8, false),
+        ]),
+
+        "nation" => Schema::new(vec![
+            Field::new("n_nationkey", DataType::Int32, false),
+            Field::new("n_name", DataType::Utf8, false),
+            Field::new("n_regionkey", DataType::Int32, false),
+            Field::new("n_comment", DataType::Utf8, false),
+        ]),
+
+        "region" => Schema::new(vec![
+            Field::new("r_regionkey", DataType::Int32, false),
+            Field::new("r_name", DataType::Utf8, false),
+            Field::new("r_comment", DataType::Utf8, false),
+        ]),
+
+        _ => unimplemented!(),
+    }
 }

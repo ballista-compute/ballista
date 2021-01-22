@@ -2720,6 +2720,8 @@ dependencies = [
  "arrow-flight",
  "ballista",
  "datafusion",
+ "env_logger",
+ "parquet",
  "structopt",
  "tokio",
 ]

@@ -59,15 +59,11 @@ pub struct BallistaContext {
 
 impl BallistaContext {
     /// Create a context for executing queries against a remote Ballista executor instance
-    pub fn remote(host: &str, port: usize, settings: HashMap<&str, &str>) -> Self {
+    pub fn remote(host: &str, port: usize, settings: HashMap<String, String>) -> Self {
         let meta = ClusterMeta::Direct {
             host: host.to_owned(),
             port,
         };
-        let settings: HashMap<String, String> = settings
-            .into_iter()
-            .map(|(k, v)| (k.to_owned(), v.to_owned()))
-            .collect();
         let state = BallistaContextState::new(meta, settings);
         Self {
             state: Arc::new(Mutex::new(state)),
@@ -92,6 +88,14 @@ impl BallistaContext {
 
     /// Register a DataFrame as a table that can be referenced from a SQL query
     pub fn register_table(&self, _name: &str, _table: Arc<dyn DataFrame>) -> Result<()> {
+        todo!()
+    }
+
+    pub fn register_csv(&self, _name: &str, _path: &str, _options: CsvReadOptions) -> Result<()> {
+        todo!()
+    }
+
+    pub fn register_parquet(&self, _name: &str, _path: &str) -> Result<()> {
         todo!()
     }
 

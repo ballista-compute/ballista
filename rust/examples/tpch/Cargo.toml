@@ -10,6 +10,8 @@ ballista = { path="../../ballista" }
 arrow = { git = "https://github.com/apache/arrow", rev="49a1c7b" }
 arrow-flight = { git = "https://github.com/apache/arrow", rev="49a1c7b" }
 datafusion = { git = "https://github.com/apache/arrow", rev="49a1c7b" }
+parquet = { git = "https://github.com/apache/arrow", rev="49a1c7b" }
 
+env_logger = "0.8"
 tokio = { version = "0.2", features = ["full"] }
 structopt = "0.3"

@@ -107,3 +107,16 @@ jobs:
       # we can't push images on pull requests, as tokens only allow read access (for security reasons)
       if: github.event_name != 'pull_request'
       run: docker push $IMAGE_NAME:${{ steps.extract_ref.outputs.ref }}
+
+  IntegrationTests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build integration test stack
+      run: cd integration-tests && docker-compose up -d
+    - name: Wait for executors to start
+      uses: jakejarvis/wait-action@master
+      with:
+        time: "20s"
+    - name: Run integration tests
+      run: cd integration-tests && cargo run

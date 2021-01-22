@@ -113,7 +113,7 @@ jobs:
     - name: Replace image label
       run: cd integration-tests && sed -i "s/ballistacompute\/ballista-rust:$PARTITION_COLUMN.*$/${{ steps.extract_ref.outputs.ref }}/" docker-compose.yml
     - name: Build integration test stack
-      run: cd integration-tests && docker-compose up -d
+      run: cd integration-tests && docker imags && docker-compose up -d
     - name: Wait for executors to start
       uses: jakejarvis/wait-action@master
       with:

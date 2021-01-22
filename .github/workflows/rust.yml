@@ -119,4 +119,4 @@ jobs:
       with:
         time: "20s"
     - name: Run integration tests
-      run: cd integration-tests && cargo run
+      run: cd integration-tests/rust && cargo run

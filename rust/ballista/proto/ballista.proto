@@ -427,7 +427,7 @@ message Union{
 
 
 message ScalarListValue{
-    ScalarValue datatype = 1;
+    ScalarType datatype = 1;
     repeated ScalarValue values = 2;
 }
 
@@ -447,6 +447,7 @@ message ScalarValue{
         uint64 uint64_value = 28;
         float  float32_value = 29;
         double float64_value = 30;
+        //Literal Date32 value always has a unit of day
         int32  date_32_value = 32;
         int64  time_microsecond_value = 33;
         int64  time_nanosecond_value = 34;

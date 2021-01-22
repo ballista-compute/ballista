@@ -13,7 +13,7 @@
 // limitations under the License.
 
 //! Ballista Distributed Compute
-
+#![allow(unused_imports)]
 pub const BALLISTA_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub mod client;

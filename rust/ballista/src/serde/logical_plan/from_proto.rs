@@ -24,6 +24,7 @@ use datafusion::logical_plan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::physical_plan::csv::CsvReadOptions;
 use datafusion::scalar::ScalarValue;
+use protobuf::scalar_type::Datatype;
 
 // use uuid::Uuid;
 
@@ -46,6 +47,18 @@ macro_rules! convert_box_required {
         }
     }};
 }
+
+
+impl TryInto<arrow::datatypes::Field> for &protobuf::Field{
+    type Error = BallistaError;
+    fn try_into(self) -> Result<arrow::datatypes::Field, Self::Error> {
+        let pb_datatype= self.arrow_type.as_ref().ok_or_else(|| proto_error("Protobuf deserialization error: Field message missing required field 'arrow_type'"))?;
+        Ok(arrow::datatypes::Field::new(&self.name[..], pb_datatype.as_ref().try_into()?, self.nullable ))   
+    }
+}
+
+
+
 
 impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
     type Error = BallistaError;
@@ -218,6 +231,7 @@ impl TryInto<Expr> for &protobuf::LogicalExprNode {
 
     fn try_into(self) -> Result<Expr, Self::Error> {
         use protobuf::logical_expr_node::ExprType;
+
         let expr_type = self
             .expr_type
             .as_ref()
@@ -229,49 +243,52 @@ impl TryInto<Expr> for &protobuf::LogicalExprNode {
                 right: Box::new(parse_required_expr(&binary_expr.r)?),
             }),
             ExprType::ColumnName(column_name) => Ok(Expr::Column(column_name.to_owned())),
-            ExprType::LiteralString(literal_string) => Ok(Expr::Literal(ScalarValue::Utf8(Some(
-                literal_string.to_owned(),
-            )))),
-            ExprType::LiteralF32(value) => Ok(Expr::Literal(ScalarValue::Float32(Some(*value)))),
-            ExprType::LiteralF64(value) => Ok(Expr::Literal(ScalarValue::Float64(Some(*value)))),
-            ExprType::LiteralInt8(value) => {
-                Ok(Expr::Literal(ScalarValue::Int8(Some(*value as i8))))
-            }
-            ExprType::LiteralInt16(value) => {
-                Ok(Expr::Literal(ScalarValue::Int16(Some(*value as i16))))
-            }
-            ExprType::LiteralInt32(value) => Ok(Expr::Literal(ScalarValue::Int32(Some(*value)))),
-            ExprType::LiteralInt64(value) => Ok(Expr::Literal(ScalarValue::Int64(Some(*value)))),
-            ExprType::LiteralUint8(value) => {
-                Ok(Expr::Literal(ScalarValue::UInt8(Some(*value as u8))))
-            }
-            ExprType::LiteralUint16(value) => {
-                Ok(Expr::Literal(ScalarValue::UInt16(Some(*value as u16))))
-            }
-            ExprType::LiteralUint32(value) => Ok(Expr::Literal(ScalarValue::UInt32(Some(*value)))),
-            ExprType::LiteralUint64(value) => Ok(Expr::Literal(ScalarValue::UInt64(Some(*value)))),
-            ExprType::LiteralDate32(value) => Ok(Expr::Literal(ScalarValue::Date32(Some(*value)))),
-            ExprType::LiteralTimeMicrosecond(value) => Ok(Expr::Literal(ScalarValue::TimeMicrosecond(Some(*value)))),
-            ExprType::LiteralTimeNanosecond(value) => Ok(Expr::Literal(ScalarValue::TimeNanosecond(Some(*value)))),
-
-            ExprType::LiteralNull(arrow_type) => {
-                use protobuf::new_scalar_type::NewScalarType;
-                match arrow_type {
-                    protobuf::ArrowType::Int8 => Ok(Expr::Literal(ScalarValue::Int8(None))),
-                    protobuf::ArrowType::Int16 => Ok(Expr::Literal(ScalarValue::Int16(None))),
-                    protobuf::ArrowType::Int32 => Ok(Expr::Literal(ScalarValue::Int32(None))),
-                    protobuf::ArrowType::Int64 => Ok(Expr::Literal(ScalarValue::Int64(None))),
-                    protobuf::ArrowType::Uint8 => Ok(Expr::Literal(ScalarValue::UInt8(None))),
-                    protobuf::ArrowType::Uint16 => Ok(Expr::Literal(ScalarValue::UInt16(None))),
-                    protobuf::ArrowType::Uint32 => Ok(Expr::Literal(ScalarValue::UInt32(None))),
-                    protobuf::ArrowType::Uint64 => Ok(Expr::Literal(ScalarValue::UInt64(None))),
-                    protobuf::ArrowType::Utf8 => Ok(Expr::Literal(ScalarValue::Utf8(None))),
-                    protobuf::ArrowType::Float => Ok(Expr::Literal(ScalarValue::Float32(None))),
-                    protobuf::ArrowType::Double => Ok(Expr::Literal(ScalarValue::Float64(None))),
-                    protobuf::ArrowType::None => Err(proto_error("Received untyped null value")),
-                    _ => unimplemented!(),
-                }
-            }
+            ExprType::Literal(literal)=> {
+                let literal_temp: &protobuf::ScalarValue =literal; 
+                let literal_value = literal.value.as_ref().ok_or_else(|| proto_error("Protobuf deserialization error: Literal message missing require field 'value'"))?;
+                use datafusion::scalar::ScalarValue;
+                let scalar_value = match literal_value{
+                    protobuf::scalar_value::Value::BoolValue(v) => ScalarValue::Boolean(Some(*v)),
+                    protobuf::scalar_value::Value::StringValue(v) => ScalarValue::Utf8(Some(v.to_owned())),
+                    protobuf::scalar_value::Value::Int8Value(v) => ScalarValue::Int8(Some(*v as i8)),
+                    protobuf::scalar_value::Value::Int16Value(v) => ScalarValue::Int16(Some(*v as i16)),
+                    protobuf::scalar_value::Value::Int32Value(v) => ScalarValue::Int32(Some(*v  )),
+                    protobuf::scalar_value::Value::Int64Value(v) => ScalarValue::Int64(Some(*v)),
+                    protobuf::scalar_value::Value::Uint8Value(v) => ScalarValue::UInt8(Some(*v as u8)),
+                    protobuf::scalar_value::Value::Uint16Value(v) => ScalarValue::UInt16(Some(*v as u16)),
+                    protobuf::scalar_value::Value::Uint32Value(v) => ScalarValue::UInt32(Some(*v)),
+                    protobuf::scalar_value::Value::Uint64Value(v) => ScalarValue::UInt64(Some(*v)),
+                    protobuf::scalar_value::Value::Float32Value(v) => ScalarValue::Float32(Some(*v)),
+                    protobuf::scalar_value::Value::Float64Value(v) => ScalarValue::Float64(Some(*v)),
+                    protobuf::scalar_value::Value::Date32Value(v) => ScalarValue::Date32(Some(*v)),
+                    protobuf::scalar_value::Value::TimeMicrosecondValue(v) => ScalarValue::TimeMicrosecond(Some(*v)),
+                    protobuf::scalar_value::Value::TimeNanosecondValue(v) => ScalarValue::TimeNanosecond(Some(*v)),
+                    protobuf::scalar_value::Value::ListValue(v) => todo!("Deal with list conversion"),
+                    protobuf::scalar_value::Value::NullListValue(v) => todo!("Deal with null list conversion"),
+                    protobuf::scalar_value::Value::NullValue(v) => {
+                        let null_type_enum = protobuf::BasicDatafusionScalarType::from_i32(*v).ok_or_else(|| proto_error("Protobuf deserialization error found invalid enum variant for DatafusionScalar"))?;
+                        match null_type_enum{
+                            protobuf::BasicDatafusionScalarType::Bool => ScalarValue::Boolean(None),
+                            protobuf::BasicDatafusionScalarType::Uint8 =>ScalarValue::UInt8(None),
+                            protobuf::BasicDatafusionScalarType::Int8 =>ScalarValue::Int8(None),
+                            protobuf::BasicDatafusionScalarType::Uint16 =>ScalarValue::UInt16(None),
+                            protobuf::BasicDatafusionScalarType::Int16 =>ScalarValue::Int16(None),
+                            protobuf::BasicDatafusionScalarType::Uint32 =>ScalarValue::UInt32(None),
+                            protobuf::BasicDatafusionScalarType::Int32 =>ScalarValue::Int32(None),
+                            protobuf::BasicDatafusionScalarType::Uint64 =>ScalarValue::UInt64(None),
+                            protobuf::BasicDatafusionScalarType::Int64 =>ScalarValue::Int64(None),
+                            protobuf::BasicDatafusionScalarType::Float32 =>ScalarValue::Float32(None),
+                            protobuf::BasicDatafusionScalarType::Float64 =>ScalarValue::Float64(None),
+                            protobuf::BasicDatafusionScalarType::Utf8 =>ScalarValue::Utf8(None),
+                            protobuf::BasicDatafusionScalarType::LargeUtf8 =>ScalarValue::LargeUtf8(None),
+                            protobuf::BasicDatafusionScalarType::Date32 =>ScalarValue::Date32(None),
+                            protobuf::BasicDatafusionScalarType::TimeMicrosecond =>ScalarValue::TimeMicrosecond(None),
+                            protobuf::BasicDatafusionScalarType::TimeNanosecond =>ScalarValue::TimeNanosecond(None),
+                        }
+                    }
+                };
+                Ok(Expr::Literal(scalar_value))
+            },
             ExprType::AggregateExpr(expr) => {
                 let fun = match expr.aggr_function {
                     f if f == protobuf::AggregateFunction::Min as i32 => AggregateFunction::Min,
@@ -328,10 +345,15 @@ impl TryInto<Expr> for &protobuf::LogicalExprNode {
                     else_expr: parse_optional_expr(&case.else_expr)?.map(Box::new),
                 })
             }
-            ExprType::Cast(cast) => Ok(Expr::Cast {
-                expr: Box::new(parse_required_expr(&cast.expr)?),
-                data_type: from_proto_arrow_type(cast.arrow_type)?,
-            }),
+            ExprType::Cast(cast) => {
+                let expr = Box::new(parse_required_expr(&cast.expr)?);
+                let arrow_type: &protobuf::ArrowType = cast.arrow_type.as_ref().ok_or_else(|| proto_error("Protobuf deserialization error: CastNode message missing required field 'arrow_type'"))?;
+                let data_type = arrow_type.try_into()?;
+                Ok(Expr::Cast{
+                    expr: expr,
+                    data_type: data_type,
+                })
+            },
             ExprType::Sort(sort) => Ok(Expr::Sort {
                 expr: Box::new(parse_required_expr(&sort.expr)?),
                 asc: sort.asc,
@@ -375,28 +397,6 @@ fn from_proto_binary_op(op: &str) -> Result<Operator, BallistaError> {
     }
 }
 
-fn from_proto_arrow_type(dt: i32) -> Result<DataType, BallistaError> {
-    match dt {
-        dt if dt == protobuf::ArrowType::Bool as i32 => Ok(DataType::Boolean),
-        dt if dt == protobuf::ArrowType::Uint8 as i32 => Ok(DataType::UInt8),
-        dt if dt == protobuf::ArrowType::Int8 as i32 => Ok(DataType::Int8),
-        dt if dt == protobuf::ArrowType::Uint16 as i32 => Ok(DataType::UInt16),
-        dt if dt == protobuf::ArrowType::Int16 as i32 => Ok(DataType::Int16),
-        dt if dt == protobuf::ArrowType::Uint32 as i32 => Ok(DataType::UInt32),
-        dt if dt == protobuf::ArrowType::Int32 as i32 => Ok(DataType::Int32),
-        dt if dt == protobuf::ArrowType::Uint64 as i32 => Ok(DataType::UInt64),
-        dt if dt == protobuf::ArrowType::Int64 as i32 => Ok(DataType::Int64),
-        dt if dt == protobuf::ArrowType::HalfFloat as i32 => Ok(DataType::Float16),
-        dt if dt == protobuf::ArrowType::Float as i32 => Ok(DataType::Float32),
-        dt if dt == protobuf::ArrowType::Double as i32 => Ok(DataType::Float64),
-        dt if dt == protobuf::ArrowType::Utf8 as i32 => Ok(DataType::Utf8),
-        dt if dt == protobuf::ArrowType::Binary as i32 => Ok(DataType::Binary),
-        other => Err(BallistaError::General(format!(
-            "Unsupported data type {:?}",
-            other
-        ))),
-    }
-}
 
 // impl TryInto<ExecutionTask> for &protobuf::Task {
 //     type Error = BallistaError;
@@ -449,16 +449,23 @@ fn from_proto_arrow_type(dt: i32) -> Result<DataType, BallistaError> {
 //     }
 // }
 
+
+
+
 impl TryInto<Schema> for &protobuf::Schema {
     type Error = BallistaError;
 
-    fn try_into(self) -> Result<Schema, Self::Error> {
+    fn try_into(self) -> Result<Schema, BallistaError> {
         let fields = self
             .columns
             .iter()
             .map(|c| {
-                let dt: Result<DataType, _> = from_proto_arrow_type(c.arrow_type);
-                dt.map(|dt| Field::new(&c.name, dt, c.nullable))
+                let pb_arrow_type_res =  c.arrow_type.as_ref().ok_or_else(|| proto_error("Protobuf deserialization error: Field message was missing required field 'arrow_type'"));
+                let pb_arrow_type: &Box<protobuf::ArrowType> = match pb_arrow_type_res{
+                    Ok(res)=>res,
+                    Err(e) => return Err(e),
+                };
+                Ok(Field::new(&c.name, pb_arrow_type.as_ref().try_into()?, c.nullable))
             })
             .collect::<Result<Vec<_>, _>>()?;
         Ok(Schema::new(fields))

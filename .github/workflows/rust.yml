@@ -115,7 +115,7 @@ jobs:
     - name: Build images
       run: bash dev/build-rust.sh
     - name: Build benchmarks
-      run: cd benchmarks && cargo build
+      run: cd benchmarks/tpch && cargo build
 #    - name: Build integration test stack
 #      run: cd integration-tests && docker-compose up -d
 #    - name: Wait for executors to start

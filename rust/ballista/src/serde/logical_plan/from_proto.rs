@@ -208,8 +208,10 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
                     .map_err(|e| e.into())
             }
             LogicalPlanType::Join(join) => {
-                let left_keys: Vec<&str> = join.left_join_column.iter().map(|i| i.as_str()).collect();
-                let right_keys: Vec<&str> = join.right_join_column.iter().map(|i| i.as_str()).collect();
+                let left_keys: Vec<&str> =
+                    join.left_join_column.iter().map(|i| i.as_str()).collect();
+                let right_keys: Vec<&str> =
+                    join.right_join_column.iter().map(|i| i.as_str()).collect();
                 let join_type = protobuf::JoinType::from_i32(join.join_type).ok_or_else(|| {
                     proto_error(format!(
                         "Received a JoinNode message with unknwown JoinType {}",
@@ -230,7 +232,7 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
                     )?
                     .build()
                     .map_err(|e| e.into())
-            },
+            }
         }
     }
 }

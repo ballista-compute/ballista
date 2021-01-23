@@ -7,9 +7,9 @@ spec:
   - name: populate-data
     image: alpine:3.12.0
     command: ["/bin/sh", "-c"]
-    # download file; split it in ~10 parts; rm file
+    # rm file if exist; download file; split it in ~10 parts; rm file
     args:
-      - wget https://s3.amazonaws.com/nyc-tlc/trip+data/yellow_tripdata_2019-01.csv -P /mnt &&
+      - rm -rf /mnt/yellow_tripdata_2019-01.csv && wget https://s3.amazonaws.com/nyc-tlc/trip+data/yellow_tripdata_2019-01.csv -P /mnt &&
         wget -O - https://raw.githubusercontent.com/ballista-compute/ballista/main/dev/split-csv.sh | /bin/sh -s /mnt/yellow_tripdata_2019-01.csv 766779 /mnt/nyctaxi/csv &&
         rm -rf /mnt/yellow_tripdata_2019-01.csv
     volumeMounts:

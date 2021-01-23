@@ -24,6 +24,12 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.ballistacompute</groupId>
+            <artifactId>logical-plan</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
             <groupId>org.apache.arrow</groupId>
             <artifactId>arrow-memory</artifactId>
         </dependency>

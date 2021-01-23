@@ -74,7 +74,7 @@
         <dependencies>
             <dependency>
                 <groupId>org.jetbrains.kotlin</groupId>
-                <artifactId>kotlin-stdlib</artifactId>
+                <artifactId>kotlin-stdlib-jdk8</artifactId>
                 <version>${kotlin.version}</version>
             </dependency>
             <dependency>
@@ -89,19 +89,6 @@
                 <version>${kotlin.version}</version>
                 <scope>test</scope>
             </dependency>
-
-<!--            implementation(platform("org.jetbrains.kotlin:kotlin-bom"))-->
-
-<!--            // Use the Kotlin JDK 8 standard library.-->
-<!--            implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")-->
-
-<!--            // Use the Kotlin test library.-->
-<!--            testImplementation("org.jetbrains.kotlin:kotlin-test")-->
-
-<!--            // Use the Kotlin JUnit integration.-->
-<!--            testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")-->
-<!--            testImplementation("org.junit.jupiter:junit-jupiter:5.5.2")-->
-
 
             <dependency>
                 <groupId>org.apache.arrow</groupId>

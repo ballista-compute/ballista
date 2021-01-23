@@ -21,7 +21,7 @@ To start a Rust executor from source:
 
 ```bash
 cd $BALLISTA_HOME/rust/ballista
-RUST_LOG=info cargo run --bin executor
+RUST_LOG=info cargo run --release --bin executor
 ```
 
 To start a Rust executor using Docker Compose:

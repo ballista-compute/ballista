@@ -14,7 +14,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>1.8</java.version>
-        <kotlin.version>1.4.21</kotlin.version>
+        <kotlin.version>1.3.50</kotlin.version>
         <arrow.version>0.17.0</arrow.version>
         <parquet.version>1.11.0</parquet.version>
     </properties>
@@ -22,15 +22,20 @@
     <modules>
         <module>datatypes</module>
         <module>datasource</module>
-        <module>logical-plan</module>
         <module>fuzzer</module>
+<!--        <module>jdbc</module>-->
+        <module>logical-plan</module>
+        <module>optimizer</module>
         <module>physical-plan</module>
+        <module>query-planner</module>
         <!--
         <module>protobuf</module>
         -->
     </modules>
 
     <build>
+        <sourceDirectory>${project.basedir}/src/main/kotlin</sourceDirectory>
+        <testSourceDirectory>${project.basedir}/src/test/kotlin</testSourceDirectory>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -72,6 +77,31 @@
                 <artifactId>kotlin-stdlib</artifactId>
                 <version>${kotlin.version}</version>
             </dependency>
+            <dependency>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-test</artifactId>
+                <version>${kotlin.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-test-junit5</artifactId>
+                <version>${kotlin.version}</version>
+                <scope>test</scope>
+            </dependency>
+
+<!--            implementation(platform("org.jetbrains.kotlin:kotlin-bom"))-->
+
+<!--            // Use the Kotlin JDK 8 standard library.-->
+<!--            implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")-->
+
+<!--            // Use the Kotlin test library.-->
+<!--            testImplementation("org.jetbrains.kotlin:kotlin-test")-->
+
+<!--            // Use the Kotlin JUnit integration.-->
+<!--            testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")-->
+<!--            testImplementation("org.junit.jupiter:junit-jupiter:5.5.2")-->
+
 
             <dependency>
                 <groupId>org.apache.arrow</groupId>
@@ -81,6 +111,16 @@
             <dependency>
                 <groupId>org.apache.arrow</groupId>
                 <artifactId>arrow-vector</artifactId>
+                <version>${arrow.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.arrow</groupId>
+                <artifactId>flight-core</artifactId>
+                <version>${arrow.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.arrow</groupId>
+                <artifactId>flight-grpc</artifactId>
                 <version>${arrow.version}</version>
             </dependency>
 
@@ -125,6 +165,12 @@
                 <groupId>junit</groupId>
                 <artifactId>junit</artifactId>
                 <version>4.13</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter</artifactId>
+                <version>5.5.2</version>
                 <scope>test</scope>
             </dependency>
         </dependencies>

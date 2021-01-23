@@ -96,6 +96,7 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
             let schema: Schema = convert_required!(scan.schema)?;
             let options = CsvReadOptions::new()
                 .schema(&schema)
+                .file_extension(&scan.file_extension)
                 .has_header(scan.has_header);
 
             let mut projection = None;

@@ -111,15 +111,16 @@ jobs:
   IntegrationTests:
     runs-on: ubuntu-latest
     steps:
+    - uses: actions/checkout@v2
     - name: Build images
-      run: cd dev && bash ./build-all.sh
+      run: bash dev/build-rust.sh
     - name: Build integration tests
       run: cd integration-tests/rust && cargo build
-#    - name: Build integration test stack
-#      run: cd integration-tests && docker-compose up -d
-#    - name: Wait for executors to start
-#      uses: jakejarvis/wait-action@master
-#      with:
-#        time: "20s"
-#    - name: Build integration tests
-#      run: cd integration-tests/rust && cargo run
+    - name: Build integration test stack
+      run: cd integration-tests && docker-compose up -d
+    - name: Wait for executors to start
+      uses: jakejarvis/wait-action@master
+      with:
+        time: "20s"
+    - name: Build integration tests
+      run: cd integration-tests/rust && cargo run

@@ -170,14 +170,16 @@ impl TableProvider for DFTableAdapter {
         _filters: &[Expr],
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
         Err(DataFusionError::NotImplemented(
-            "DFTableAdapter is only used for building the logical plan and cannot be executed".to_owned()))
+            "DFTableAdapter is only used for building the logical plan and cannot be executed"
+                .to_owned(),
+        ))
     }
 
     fn statistics(&self) -> Statistics {
         Statistics {
             num_rows: None,
             total_byte_size: None,
-            column_statistics: None
+            column_statistics: None,
         }
     }
 }

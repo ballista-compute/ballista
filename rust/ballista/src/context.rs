@@ -142,8 +142,7 @@ pub(crate) struct DFTableAdapter {
 }
 
 impl DFTableAdapter {
-    fn new(logical_plan: LogicalPlan,
-           plan: Arc<dyn ExecutionPlan>) -> Self {
+    fn new(logical_plan: LogicalPlan, plan: Arc<dyn ExecutionPlan>) -> Self {
         Self { logical_plan, plan }
     }
 }

@@ -17,14 +17,13 @@
 //! processes.
 
 use std::convert::TryInto;
-use std::sync::Arc;
 
 use crate::context::DFTableAdapter;
 use crate::serde::{empty_logical_plan_node, protobuf, BallistaError};
 
 use arrow::datatypes::{DataType, DateUnit, Schema};
 use datafusion::datasource::parquet::ParquetTable;
-use datafusion::datasource::{CsvFile, TableProvider};
+use datafusion::datasource::CsvFile;
 use datafusion::logical_plan::{Expr, JoinType, LogicalPlan};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::scalar::ScalarValue;
@@ -43,15 +42,21 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
                 ..
             } => {
                 let schema = source.schema();
-                let source= source.as_any().downcast_ref::<DFTableAdapter>().expect("Expected DFTableAdapter");
+
+                // unwrap the DFTableAdapter to get to the real TableProvider
+                let source = source
+                    .as_any()
+                    .downcast_ref::<DFTableAdapter>()
+                    .expect("Expected DFTableAdapter");
                 let source = match &source.logical_plan {
-                    LogicalPlan::TableScan {
-                        table_name, source, projection, projected_schema, filters
-                    } => {
-                        source.as_any()
+                    LogicalPlan::TableScan { source, .. } => source.as_any(),
+                    _ => {
+                        return Err(BallistaError::General(
+                            "Invalid LogicalPlan::TableScan".to_owned(),
+                        ))
                     }
-                    _ => panic!()
                 };
+
                 let columns = projected_schema
                     .fields()
                     .iter()

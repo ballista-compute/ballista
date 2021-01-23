@@ -20,17 +20,19 @@
     </properties>
 
     <modules>
+<!--        <module>client</module>-->
         <module>datatypes</module>
         <module>datasource</module>
+        <module>execution</module>
+<!--        <module>executor</module>-->
         <module>fuzzer</module>
 <!--        <module>jdbc</module>-->
         <module>logical-plan</module>
         <module>optimizer</module>
         <module>physical-plan</module>
-        <module>query-planner</module>
-        <!--
         <module>protobuf</module>
-        -->
+        <module>query-planner</module>
+        <module>sql</module>
     </modules>
 
     <build>
@@ -63,6 +65,19 @@
                         <id>test-compile</id>
                         <goals>
                             <goal>test-compile</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>kr.motd.maven</groupId>
+                <artifactId>os-maven-plugin</artifactId>
+                <version>1.6.1</version>
+                <executions>
+                    <execution>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>detect</goal>
                         </goals>
                     </execution>
                 </executions>

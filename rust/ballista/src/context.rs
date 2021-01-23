@@ -121,16 +121,31 @@ impl BallistaContext {
         let state = self.state.lock().unwrap();
         for (name, plan) in &state.tables {
             let plan = ctx.optimize(plan)?;
-            let plan = ctx.create_physical_plan(&plan)?;
-            ctx.register_table(name, Box::new(DFTableAdapter { plan }))
+            let execution_plan = ctx.create_physical_plan(&plan)?;
+            ctx.register_table(name, Box::new(DFTableAdapter::new(plan, execution_plan)))
         }
         let df = ctx.sql(sql)?;
         Ok(BallistaDataFrame::from(self.state.clone(), df))
     }
 }
 
-struct DFTableAdapter {
+/// This ugly adapter is needed because we use DataFusion's logical plan when building queries
+/// and when we register tables with DataFusion's `ExecutionContext` we need to provide a
+/// TableProvider which is effectively a wrapper around a physical plan. We need to be able to
+/// register tables so that we can create logical plans from SQL statements that reference these
+/// tables.
+pub(crate) struct DFTableAdapter {
+    /// DataFusion logical plan
+    pub logical_plan: LogicalPlan,
+    /// DataFusion execution plan
     plan: Arc<dyn ExecutionPlan>,
+}
+
+impl DFTableAdapter {
+    fn new(logical_plan: LogicalPlan,
+           plan: Arc<dyn ExecutionPlan>) -> Self {
+        Self { logical_plan, plan }
+    }
 }
 
 impl TableProvider for DFTableAdapter {

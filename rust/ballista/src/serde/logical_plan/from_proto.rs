@@ -20,7 +20,7 @@ use crate::error::BallistaError;
 use crate::serde::{proto_error, protobuf};
 
 use arrow::datatypes::{DataType, DateUnit, Field, Schema};
-use datafusion::logical_plan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator};
+use datafusion::logical_plan::{Expr, JoinType, LogicalPlan, LogicalPlanBuilder, Operator};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::physical_plan::csv::CsvReadOptions;
 use datafusion::scalar::ScalarValue;
@@ -185,6 +185,30 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
             let input: LogicalPlan = convert_box_required!(self.input)?;
             LogicalPlanBuilder::from(&input)
                 .limit(limit.limit as usize)?
+                .build()
+                .map_err(|e| e.into())
+        } else if let Some(join) = &self.join {
+            assert!(self.input.is_none(), "Received a LogicalPlanNode that contains a JoinNode and also a nested LogicalPlanNode");
+            let left_keys: Vec<&str> = join.left_join_column.iter().map(|i| i.as_str()).collect();
+            let right_keys: Vec<&str> = join.right_join_column.iter().map(|i| i.as_str()).collect();
+            let join_type = protobuf::JoinType::from_i32(join.join_type).ok_or_else(|| {
+                proto_error(format!(
+                    "Received a JoinNode message with unknwown JoinType {}",
+                    join.join_type
+                ))
+            })?;
+            let join_type = match join_type {
+                protobuf::JoinType::Inner => JoinType::Inner,
+                protobuf::JoinType::Left => JoinType::Left,
+                protobuf::JoinType::Right => JoinType::Right,
+            };
+            LogicalPlanBuilder::from(&convert_box_required!(join.left)?)
+                .join(
+                    &convert_box_required!(join.right)?,
+                    join_type,
+                    &left_keys,
+                    &right_keys,
+                )?
                 .build()
                 .map_err(|e| e.into())
         } else {

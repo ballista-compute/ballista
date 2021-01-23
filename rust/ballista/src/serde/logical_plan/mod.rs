@@ -117,7 +117,7 @@ mod roundtrip_tests {
                 schema: df_schema_ref.clone(),
                 name: String::from("TestName"),
                 location: String::from("employee.csv"),
-                file_type: file.clone(),
+                file_type: *file,
                 has_header: true,
             };
             roundtrip_test!(create_table_node);
@@ -158,6 +158,30 @@ mod roundtrip_tests {
 
         roundtrip_test!(plan);
         roundtrip_test!(verbose_plan);
+        Ok(())
+    }
+
+    #[test]
+    fn roundtrip_join() -> Result<()> {
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("first_name", DataType::Utf8, false),
+            Field::new("last_name", DataType::Utf8, false),
+            Field::new("state", DataType::Utf8, false),
+            Field::new("salary", DataType::Int32, false),
+        ]);
+
+        let scan_plan = LogicalPlanBuilder::empty(false).build().unwrap();
+        let plan = LogicalPlanBuilder::scan_csv(
+            "employee.csv",
+            CsvReadOptions::new().schema(&schema).has_header(true),
+            Some(vec![3, 4]),
+        )
+        .and_then(|plan| plan.join(&scan_plan, JoinType::Inner, &["id"], &["id"]))
+        .and_then(|plan| plan.build())
+        .unwrap();
+
+        roundtrip_test!(plan);
         Ok(())
     }
 

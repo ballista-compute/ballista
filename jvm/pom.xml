@@ -8,7 +8,7 @@
     <version>0.4.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
-    <name>Ballista</name>
+    <name>Ballista Distributed Compute</name>
     <url>https://github.com/ballista-compute/ballista</url>
 
     <properties>
@@ -22,6 +22,7 @@
     <modules>
         <module>datatypes</module>
         <module>datasource</module>
+        <module>logical-plan</module>
         <!--
         <module>protobuf</module>
         -->

@@ -5,7 +5,7 @@ authors = ["Andy Grove <andygrove73@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-ballista = { path="../../ballista" }
+ballista = { path="../../rust/ballista" }
 
 arrow = { git = "https://github.com/apache/arrow", rev="d613aa6" }
 arrow-flight = { git = "https://github.com/apache/arrow", rev="d613aa6" }

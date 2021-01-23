@@ -19,9 +19,20 @@ citizens without paying a penalty for serialization costs.
 
 ## Status
 
-With the release of Apache Arrow 3.0.0 there are many breaking changes in the Rust implementation and as a result it
-has been necessary to comment out much of the code in this repository and gradually get each Rust module working again
-with the 3.0.0 release.
+With the release of Apache Arrow 3.0.0 there were many breaking changes in the Rust implementation (for good reason) 
+and as a result it has been necessary to re-implement the Rust executor to some degree and this work is ongoing.
+
+The current plan is to release version 0.4.0 once the following items are completed.
+
+- [x] Compile the Rust implementation against Arrow 3.0.0
+- [ ] Get integration tests working against a single Rust executor
+- [ ] Get TPC-H benchmarks working against a single Rust executor
+- [ ] Re-implement distributed query execution
+- [ ] Update the JVM and Spark executors to use latest ballista.proto
+- [ ] Get integration tests and benchmarks running against the JVM and Spark executors
+
+To follow the progress of this work, please refer to the
+["This Week in Ballista"](https://ballistacompute.org/this-week-in-ballista/) blog.
 
 **For the latest stable version of Ballista, see [branch-0.3](https://github.com/ballista-compute/ballista/tree/branch-0.3)**.
 
@@ -64,7 +75,7 @@ in any programming language with minimal serialization overhead.
 
 The following examples should help illustrate the current capabilities of Ballista
 
-- [TPC-H Benchmark](https://github.com/ballista-compute/ballista/tree/main/rust/examples/tpch)
+- [TPC-H Benchmark](https://github.com/ballista-compute/ballista/tree/main/benchmarks/tpch)
 
 ## Releases
 

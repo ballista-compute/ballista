@@ -23,6 +23,8 @@
         <module>datatypes</module>
         <module>datasource</module>
         <module>logical-plan</module>
+        <module>fuzzer</module>
+        <module>physical-plan</module>
         <!--
         <module>protobuf</module>
         -->

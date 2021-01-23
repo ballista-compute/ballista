@@ -15,38 +15,38 @@ message LogicalExprNode {
   oneof ExprType {
     // column references
     string column_name = 10;
-
+    
     // alias
     AliasNode alias = 14;
-
+    
     // literals
     string literal_string = 20;
     int32 literal_int8 = 21;
     int32 literal_int16 = 22;
     int32 literal_int32 = 23;
     int64 literal_int64 = 24;
-
+    
     uint32 literal_uint8 = 25;
     uint32 literal_uint16 = 26;
     uint32 literal_uint32 = 27;
     uint64 literal_uint64 = 28;
-
+    
     float literal_f32 = 29;
     double literal_f64 = 30;
-
+    
     ArrowType literal_null = 31;
-
+    
     // binary expressions
     BinaryExprNode binary_expr = 40;
-
+    
     // aggregate expressions
     AggregateExprNode aggregate_expr = 50;
-
+    
     // null checks
     IsNull is_null_expr = 60;
     IsNotNull is_not_null_expr = 61;
     Not not_expr = 62;
-
+    
     BetweenNode between = 70;
     CaseNode case_ = 71;
     CastNode cast = 72;
@@ -135,21 +135,20 @@ message SortExprNode {
 
 // LogicalPlan is a nested type
 message LogicalPlanNode {
-
-  LogicalPlanNode input = 1;
-
-  CsvTableScanNode csv_scan = 10;
-  ParquetTableScanNode parquet_scan = 11;
-  ProjectionNode projection = 20;
-  SelectionNode selection = 21;
-  LimitNode limit = 22;
-  AggregateNode aggregate = 23;
-  JoinNode join = 24;
-  SortNode sort = 25;
-  RepartitionNode repartition = 26;
-  EmptyRelationNode empty_relation = 27;
-  CreateExternalTableNode create_external_table = 28;
-  ExplainNode explain = 29;
+  oneof LogicalPlanType {
+    CsvTableScanNode csv_scan = 10;
+    ParquetTableScanNode parquet_scan = 11;
+    ProjectionNode projection = 20;
+    SelectionNode selection = 21;
+    LimitNode limit = 22;
+    AggregateNode aggregate = 23;
+    JoinNode join = 24;
+    SortNode sort = 25;
+    RepartitionNode repartition = 26;
+    EmptyRelationNode empty_relation = 27;
+    CreateExternalTableNode create_external_table = 28;
+    ExplainNode explain = 29;
+  }
 }
 
 message ProjectionColumns {
@@ -176,59 +175,65 @@ message ParquetTableScanNode {
 }
 
 message ProjectionNode {
-  repeated LogicalExprNode expr = 1;
+  LogicalPlanNode input = 1;
+  repeated LogicalExprNode expr = 2;
 }
 
 message SelectionNode {
+  LogicalPlanNode input = 1;
   LogicalExprNode expr = 2;
 }
 
 message SortNode{
-    repeated LogicalExprNode expr = 1;
+  LogicalPlanNode input = 1;
+  repeated LogicalExprNode expr = 2;
 }
 
 message RepartitionNode{
-    oneof partition_method{
-        uint64 round_robin = 1;
-        HashRepartition hash = 2;
-    }
+  LogicalPlanNode input = 1;
+  oneof partition_method {
+    uint64 round_robin = 2;
+    HashRepartition hash = 3;
+  }
 }
 
 message HashRepartition{
-    repeated LogicalExprNode hash_expr = 2;
-    uint64 batch_size = 1;
+  repeated LogicalExprNode hash_expr = 2;
+  uint64 batch_size = 1;
 }
 
 message EmptyRelationNode{
-    bool produce_one_row = 1;
+  bool produce_one_row = 1;
 }
 
 message CreateExternalTableNode{
-    string name = 1;
-    string location = 2;
-    FileType file_type = 3;
-    bool has_header = 4;
-    Schema schema = 5;
+  string name = 1;
+  string location = 2;
+  FileType file_type = 3;
+  bool has_header = 4;
+  Schema schema = 5;
 }
 
 enum FileType{
-    NdJson = 0;
-    Parquet = 1;
-    CSV = 2;
+  NdJson = 0;
+  Parquet = 1;
+  CSV = 2;
 }
 
 message ExplainNode{
-    bool verbose = 1;
+  LogicalPlanNode input = 1;
+  bool verbose = 2;
 }
- 
+
 message DfField{
-    string qualifier = 2;
-    Field field = 1;
+  string qualifier = 2;
+  Field field = 1;
 }
 
 message AggregateNode {
-  repeated LogicalExprNode group_expr = 1;
-  repeated LogicalExprNode aggr_expr = 2;
+  LogicalPlanNode input = 1;
+  repeated LogicalExprNode group_expr = 2;
+  repeated LogicalExprNode aggr_expr = 3;
 }
 
 enum JoinType {
@@ -246,7 +251,8 @@ message JoinNode {
 }
 
 message LimitNode {
-  uint32 limit = 1;
+  LogicalPlanNode input = 1;
+  uint32 limit = 2;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -255,9 +261,9 @@ message LimitNode {
 
 // PhysicalPlanNode is a nested type
 message PhysicalPlanNode {
-
+  
   PhysicalPlanNode input = 1;
-
+  
   ScanExecNode scan = 10;
   ProjectionExecNode projection = 20;
   SelectionExecNode selection = 21;
@@ -274,7 +280,7 @@ message ScanExecNode {
   string file_format = 4; // parquet or csv
   bool has_header = 5; // csv specific
   uint32 batch_size = 6;
-
+  
   // partition filenames
   repeated string filename = 8;
 }
@@ -317,20 +323,20 @@ message LocalLimitExecNode {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 message KeyValuePair {
-    string key = 1;
-    string value = 2;
+  string key = 1;
+  string value = 2;
 }
 
 message Action {
   // interactive query
   LogicalPlanNode query = 1;
-
+  
   // Execute query and store resulting shuffle partition in memory
   Task task = 2;
-
+  
   // Fetch a shuffle partition from an executor
   ShuffleId fetch_shuffle = 3;
-
+  
   // configuration settings
   repeated KeyValuePair settings = 100;
 }
@@ -409,7 +415,7 @@ enum ArrowType {
   UNION = 25;
   DICTIONARY = 26;
   MAP = 27;
-
+  
   // this is a temporary hack until https://github.com/ballista-compute/ballista/issues/392 is implemented, and allows
   // us to continue to make progress with getting the TPC-H benchmarks working
   DATE32_DAY = 30;

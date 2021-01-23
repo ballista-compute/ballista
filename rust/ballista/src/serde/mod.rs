@@ -44,25 +44,6 @@ pub(crate) fn proto_error<S: Into<String>>(message: S) -> BallistaError {
     BallistaError::General(message.into())
 }
 
-/// Create an empty LogicalPlanNode
-pub fn empty_logical_plan_node() -> protobuf::LogicalPlanNode {
-    protobuf::LogicalPlanNode {
-        csv_scan: None,
-        parquet_scan: None,
-        input: None,
-        projection: None,
-        selection: None,
-        limit: None,
-        aggregate: None,
-        join: None,
-        sort: None,
-        repartition: None,
-        empty_relation: None,
-        explain: None,
-        create_external_table: None,
-    }
-}
-
 /// Create an empty PhysicalPlanNode
 pub fn empty_physical_plan_node() -> protobuf::PhysicalPlanNode {
     protobuf::PhysicalPlanNode {

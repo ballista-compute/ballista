@@ -25,6 +25,7 @@ use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::physical_plan::csv::CsvReadOptions;
 use datafusion::scalar::ScalarValue;
 use protobuf::logical_expr_node::ExprType;
+use protobuf::logical_plan_node::LogicalPlanType;
 
 // use uuid::Uuid;
 
@@ -52,170 +53,184 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<LogicalPlan, Self::Error> {
-        if let Some(projection) = &self.projection {
-            let input: LogicalPlan = convert_box_required!(self.input)?;
-            LogicalPlanBuilder::from(&input)
-                .project(
-                    projection
-                        .expr
-                        .iter()
-                        .map(|expr| expr.try_into())
-                        .collect::<Result<Vec<_>, _>>()?,
-                )?
-                .build()
-                .map_err(|e| e.into())
-        } else if let Some(selection) = &self.selection {
-            let input: LogicalPlan = convert_box_required!(self.input)?;
-            LogicalPlanBuilder::from(&input)
-                .filter(
-                    selection
-                        .expr
-                        .as_ref()
-                        .expect("expression required")
-                        .try_into()?,
-                )?
-                .build()
-                .map_err(|e| e.into())
-        } else if let Some(aggregate) = &self.aggregate {
-            let input: LogicalPlan = convert_box_required!(self.input)?;
-            let group_expr = aggregate
-                .group_expr
-                .iter()
-                .map(|expr| expr.try_into())
-                .collect::<Result<Vec<_>, _>>()?;
-            let aggr_expr = aggregate
-                .aggr_expr
-                .iter()
-                .map(|expr| expr.try_into())
-                .collect::<Result<Vec<_>, _>>()?;
-            LogicalPlanBuilder::from(&input)
-                .aggregate(group_expr, aggr_expr)?
-                .build()
-                .map_err(|e| e.into())
-        } else if let Some(scan) = &self.csv_scan {
-            let schema: Schema = convert_required!(scan.schema)?;
-            let options = CsvReadOptions::new()
-                .schema(&schema)
-                .delimiter(scan.delimiter.as_bytes()[0])
-                .file_extension(&scan.file_extension)
-                .has_header(scan.has_header);
-            let mut projection = None;
-            if let Some(column_names) = &scan.projection {
-                let column_indices = column_names
-                    .columns
-                    .iter()
-                    .map(|name| schema.index_of(name))
-                    .collect::<Result<Vec<usize>, _>>()?;
-                projection = Some(column_indices);
-            }
-
-            LogicalPlanBuilder::scan_csv(&scan.path, options, projection)?
-                .build()
-                .map_err(|e| e.into())
-        } else if let Some(scan) = &self.parquet_scan {
-            LogicalPlanBuilder::scan_parquet(&scan.path, None, 24)? //TODO projection, concurrency
-                .build()
-                .map_err(|e| e.into())
-        } else if let Some(sort) = &self.sort {
-            let input: LogicalPlan = convert_box_required!(self.input)?;
-            let sort_expr: Vec<Expr> = sort
-                .expr
-                .iter()
-                .map(|expr| expr.try_into())
-                .collect::<Result<Vec<Expr>, _>>()?;
-            LogicalPlanBuilder::from(&input)
-                .sort(sort_expr)?
-                .build()
-                .map_err(|e| e.into())
-        } else if let Some(repartition) = &self.repartition {
-            use datafusion::logical_plan::Partitioning;
-            let input: LogicalPlan = convert_box_required!(self.input)?;
-            use protobuf::repartition_node::PartitionMethod;
-            let pb_partition_method = repartition.partition_method.clone()
-                                                                            .ok_or_else(
-                                                                                || BallistaError::General(String::from("Protobuf deserialization error, RepartitionNode was missing required field 'partition_method'"))
-                                                                            )?;
-
-            let partitioning_scheme = match pb_partition_method {
-                PartitionMethod::Hash(protobuf::HashRepartition {
-                    hash_expr: pb_hash_expr,
-                    batch_size,
-                }) => Partitioning::Hash(
-                    pb_hash_expr
-                        .iter()
-                        .map(|pb_expr| pb_expr.try_into())
-                        .collect::<Result<Vec<_>, _>>()?,
-                    batch_size as usize,
-                ),
-                PartitionMethod::RoundRobin(batch_size) => {
-                    Partitioning::RoundRobinBatch(batch_size as usize)
-                }
-            };
-
-            LogicalPlanBuilder::from(&input)
-                .repartition(partitioning_scheme)?
-                .build()
-                .map_err(|e| e.into())
-        } else if let Some(empty_relation) = &self.empty_relation {
-            LogicalPlanBuilder::empty(empty_relation.produce_one_row)
-                .build()
-                .map_err(|e| e.into())
-        } else if let Some(create_extern_table) = &self.create_external_table {
-            let pb_schema = (create_extern_table.schema.clone())
-                                            .ok_or_else(
-                                                || BallistaError::General(String::from("Protobuf deserialization error, CreateExternalTableNode was missing required field schema."))
-                                            )?;
-
-            let pb_file_type: protobuf::FileType = create_extern_table.file_type.try_into()?;
-
-            Ok(LogicalPlan::CreateExternalTable {
-                schema: pb_schema.try_into()?,
-                name: create_extern_table.name.clone(),
-                location: create_extern_table.location.clone(),
-                file_type: pb_file_type.into(),
-                has_header: create_extern_table.has_header,
-            })
-        } else if let Some(explain) = &self.explain {
-            let input: LogicalPlan = convert_box_required!(self.input)?;
-            LogicalPlanBuilder::from(&input)
-                .explain(explain.verbose)?
-                .build()
-                .map_err(|e| e.into())
-        } else if let Some(limit) = &self.limit {
-            let input: LogicalPlan = convert_box_required!(self.input)?;
-            LogicalPlanBuilder::from(&input)
-                .limit(limit.limit as usize)?
-                .build()
-                .map_err(|e| e.into())
-        } else if let Some(join) = &self.join {
-            assert!(self.input.is_none(), "Received a LogicalPlanNode that contains a JoinNode and also a nested LogicalPlanNode");
-            let left_keys: Vec<&str> = join.left_join_column.iter().map(|i| i.as_str()).collect();
-            let right_keys: Vec<&str> = join.right_join_column.iter().map(|i| i.as_str()).collect();
-            let join_type = protobuf::JoinType::from_i32(join.join_type).ok_or_else(|| {
-                proto_error(format!(
-                    "Received a JoinNode message with unknwown JoinType {}",
-                    join.join_type
-                ))
-            })?;
-            let join_type = match join_type {
-                protobuf::JoinType::Inner => JoinType::Inner,
-                protobuf::JoinType::Left => JoinType::Left,
-                protobuf::JoinType::Right => JoinType::Right,
-            };
-            LogicalPlanBuilder::from(&convert_box_required!(join.left)?)
-                .join(
-                    &convert_box_required!(join.right)?,
-                    join_type,
-                    &left_keys,
-                    &right_keys,
-                )?
-                .build()
-                .map_err(|e| e.into())
-        } else {
-            Err(proto_error(format!(
+        let plan = self.logical_plan_type.as_ref().ok_or_else(|| {
+            proto_error(format!(
                 "logical_plan::from_proto() Unsupported logical plan '{:?}'",
                 self
-            )))
+            ))
+        })?;
+        match plan {
+            LogicalPlanType::Projection(projection) => {
+                let input: LogicalPlan = convert_box_required!(projection.input)?;
+                LogicalPlanBuilder::from(&input)
+                    .project(
+                        projection
+                            .expr
+                            .iter()
+                            .map(|expr| expr.try_into())
+                            .collect::<Result<Vec<_>, _>>()?,
+                    )?
+                    .build()
+                    .map_err(|e| e.into())
+            }
+            LogicalPlanType::Selection(selection) => {
+                let input: LogicalPlan = convert_box_required!(selection.input)?;
+                LogicalPlanBuilder::from(&input)
+                    .filter(
+                        selection
+                            .expr
+                            .as_ref()
+                            .expect("expression required")
+                            .try_into()?,
+                    )?
+                    .build()
+                    .map_err(|e| e.into())
+            }
+            LogicalPlanType::Aggregate(aggregate) => {
+                let input: LogicalPlan = convert_box_required!(aggregate.input)?;
+                let group_expr = aggregate
+                    .group_expr
+                    .iter()
+                    .map(|expr| expr.try_into())
+                    .collect::<Result<Vec<_>, _>>()?;
+                let aggr_expr = aggregate
+                    .aggr_expr
+                    .iter()
+                    .map(|expr| expr.try_into())
+                    .collect::<Result<Vec<_>, _>>()?;
+                LogicalPlanBuilder::from(&input)
+                    .aggregate(group_expr, aggr_expr)?
+                    .build()
+                    .map_err(|e| e.into())
+            }
+            LogicalPlanType::CsvScan(scan) => {
+                let schema: Schema = convert_required!(scan.schema)?;
+                let options = CsvReadOptions::new()
+                    .schema(&schema)
+                    .delimiter(scan.delimiter.as_bytes()[0])
+                    .file_extension(&scan.file_extension)
+                    .has_header(scan.has_header);
+
+                let mut projection = None;
+                if let Some(column_names) = &scan.projection {
+                    let column_indices = column_names
+                        .columns
+                        .iter()
+                        .map(|name| schema.index_of(name))
+                        .collect::<Result<Vec<usize>, _>>()?;
+                    projection = Some(column_indices);
+                }
+
+                LogicalPlanBuilder::scan_csv(&scan.path, options, projection)?
+                    .build()
+                    .map_err(|e| e.into())
+            }
+            LogicalPlanType::ParquetScan(scan) => {
+                LogicalPlanBuilder::scan_parquet(&scan.path, None, 24)? //TODO projection, concurrency
+                    .build()
+                    .map_err(|e| e.into())
+            }
+            LogicalPlanType::Sort(sort) => {
+                let input: LogicalPlan = convert_box_required!(sort.input)?;
+                let sort_expr: Vec<Expr> = sort
+                    .expr
+                    .iter()
+                    .map(|expr| expr.try_into())
+                    .collect::<Result<Vec<Expr>, _>>()?;
+                LogicalPlanBuilder::from(&input)
+                    .sort(sort_expr)?
+                    .build()
+                    .map_err(|e| e.into())
+            }
+            LogicalPlanType::Repartition(repartition) => {
+                use datafusion::logical_plan::Partitioning;
+                let input: LogicalPlan = convert_box_required!(repartition.input)?;
+                use protobuf::repartition_node::PartitionMethod;
+                let pb_partition_method = repartition.partition_method.clone()
+                    .ok_or_else(
+                        || BallistaError::General(String::from("Protobuf deserialization error, RepartitionNode was missing required field 'partition_method'"))
+                    )?;
+
+                let partitioning_scheme = match pb_partition_method {
+                    PartitionMethod::Hash(protobuf::HashRepartition {
+                        hash_expr: pb_hash_expr,
+                        batch_size,
+                    }) => Partitioning::Hash(
+                        pb_hash_expr
+                            .iter()
+                            .map(|pb_expr| pb_expr.try_into())
+                            .collect::<Result<Vec<_>, _>>()?,
+                        batch_size as usize,
+                    ),
+                    PartitionMethod::RoundRobin(batch_size) => {
+                        Partitioning::RoundRobinBatch(batch_size as usize)
+                    }
+                };
+
+                LogicalPlanBuilder::from(&input)
+                    .repartition(partitioning_scheme)?
+                    .build()
+                    .map_err(|e| e.into())
+            }
+            LogicalPlanType::EmptyRelation(empty_relation) => {
+                LogicalPlanBuilder::empty(empty_relation.produce_one_row)
+                    .build()
+                    .map_err(|e| e.into())
+            }
+            LogicalPlanType::CreateExternalTable(create_extern_table) => {
+                let pb_schema = (create_extern_table.schema.clone())
+                    .ok_or_else(
+                        || BallistaError::General(String::from("Protobuf deserialization error, CreateExternalTableNode was missing required field schema."))
+                    )?;
+
+                let pb_file_type: protobuf::FileType = create_extern_table.file_type.try_into()?;
+
+                Ok(LogicalPlan::CreateExternalTable {
+                    schema: pb_schema.try_into()?,
+                    name: create_extern_table.name.clone(),
+                    location: create_extern_table.location.clone(),
+                    file_type: pb_file_type.into(),
+                    has_header: create_extern_table.has_header,
+                })
+            }
+            LogicalPlanType::Explain(explain) => {
+                let input: LogicalPlan = convert_box_required!(explain.input)?;
+                LogicalPlanBuilder::from(&input)
+                    .explain(explain.verbose)?
+                    .build()
+                    .map_err(|e| e.into())
+            }
+            LogicalPlanType::Limit(limit) => {
+                let input: LogicalPlan = convert_box_required!(limit.input)?;
+                LogicalPlanBuilder::from(&input)
+                    .limit(limit.limit as usize)?
+                    .build()
+                    .map_err(|e| e.into())
+            }
+            LogicalPlanType::Join(join) => {
+                let left_keys: Vec<&str> = join.left_join_column.iter().map(|i| i.as_str()).collect();
+                let right_keys: Vec<&str> = join.right_join_column.iter().map(|i| i.as_str()).collect();
+                let join_type = protobuf::JoinType::from_i32(join.join_type).ok_or_else(|| {
+                    proto_error(format!(
+                        "Received a JoinNode message with unknwown JoinType {}",
+                        join.join_type
+                    ))
+                })?;
+                let join_type = match join_type {
+                    protobuf::JoinType::Inner => JoinType::Inner,
+                    protobuf::JoinType::Left => JoinType::Left,
+                    protobuf::JoinType::Right => JoinType::Right,
+                };
+                LogicalPlanBuilder::from(&convert_box_required!(join.left)?)
+                    .join(
+                        &convert_box_required!(join.right)?,
+                        join_type,
+                        &left_keys,
+                        &right_keys,
+                    )?
+                    .build()
+                    .map_err(|e| e.into())
+            },
         }
     }
 }

@@ -30,7 +30,7 @@ use datafusion::execution::context::ExecutionContext;
 use datafusion::logical_plan::{DFSchema, Expr, LogicalPlan, Partitioning};
 use datafusion::physical_plan::csv::CsvReadOptions;
 use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
-use log::info;
+use log::{debug, info};
 use std::any::Any;
 
 #[derive(Debug)]
@@ -193,9 +193,13 @@ impl BallistaDataFrame {
         };
         info!("Connecting to Ballista executor at {}:{}", host, port);
         let mut client = BallistaClient::try_new(&host, port).await?;
+        let plan = self.df.to_logical_plan();
+
+        debug!("Sending logical plan to executor: {:?}", plan);
+
         client
             .execute_action(&Action::InteractiveQuery {
-                plan: self.df.to_logical_plan(),
+                plan: plan,
                 settings: Default::default(),
             })
             .await

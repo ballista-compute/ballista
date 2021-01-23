@@ -37,8 +37,8 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
             LogicalPlan::TableScan {
                 table_name,
                 source,
-                projected_schema,
                 filters,
+                projection,
                 ..
             } => {
                 let schema = source.schema();
@@ -56,12 +56,18 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
                     Ok(source.as_any())
                 }?;
 
-                let columns = projected_schema
-                    .fields()
-                    .iter()
-                    .map(|f| f.name().to_owned())
-                    .collect();
-                let projection = Some(protobuf::ProjectionColumns { columns });
+                let projection = match projection {
+                    None => None,
+                    Some(columns) => {
+                        let column_names = columns
+                            .iter()
+                            .map(|i| schema.field(*i).name().to_owned())
+                            .collect();
+                        Some(protobuf::ProjectionColumns {
+                            columns: column_names,
+                        })
+                    }
+                };
                 let schema: protobuf::Schema = schema.as_ref().try_into()?;
 
                 let filters: Vec<protobuf::LogicalExprNode> = filters

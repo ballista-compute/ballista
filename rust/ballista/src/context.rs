@@ -14,7 +14,10 @@
 
 //! Distributed execution context.
 
+use std::any::Any;
 use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use crate::client::BallistaClient;
@@ -31,7 +34,6 @@ use datafusion::logical_plan::{DFSchema, Expr, LogicalPlan, Partitioning};
 use datafusion::physical_plan::csv::CsvReadOptions;
 use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
 use log::{debug, info};
-use std::any::Any;
 
 #[derive(Debug)]
 pub enum ClusterMeta {
@@ -80,17 +82,25 @@ impl BallistaContext {
 
     /// Create a DataFrame representing a Parquet table scan
     pub fn read_parquet(&self, path: &str) -> Result<BallistaDataFrame> {
+        // convert to absolute path because the executor likely has a different working directory
+        let path = PathBuf::from(path);
+        let path = fs::canonicalize(&path)?;
+
         // use local DataFusion context for now but later this might call the scheduler
         let mut ctx = ExecutionContext::new();
-        let df = ctx.read_parquet(path)?;
+        let df = ctx.read_parquet(path.to_str().unwrap())?;
         Ok(BallistaDataFrame::from(self.state.clone(), df))
     }
 
     /// Create a DataFrame representing a CSV table scan
     pub fn read_csv(&self, path: &str, options: CsvReadOptions) -> Result<BallistaDataFrame> {
+        // convert to absolute path because the executor likely has a different working directory
+        let path = PathBuf::from(path);
+        let path = fs::canonicalize(&path)?;
+
         // use local DataFusion context for now but later this might call the scheduler
         let mut ctx = ExecutionContext::new();
-        let df = ctx.read_csv(path, options)?;
+        let df = ctx.read_csv(path.to_str().unwrap(), options)?;
         Ok(BallistaDataFrame::from(self.state.clone(), df))
     }
 

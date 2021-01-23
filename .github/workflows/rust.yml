@@ -114,8 +114,8 @@ jobs:
     - uses: actions/checkout@v2
     - name: Build images
       run: bash dev/build-rust.sh
-    - name: Build integration tests
-      run: cd integration-tests/rust && cargo build
+    - name: Build benchmarks
+      run: cd benchmarks && cargo build
 #    - name: Build integration test stack
 #      run: cd integration-tests && docker-compose up -d
 #    - name: Wait for executors to start

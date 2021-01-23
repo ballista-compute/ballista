@@ -20,7 +20,7 @@ use std::convert::TryInto;
 
 use crate::serde::{empty_logical_plan_node, protobuf, BallistaError};
 
-use arrow::datatypes::{DataType, Schema};
+use arrow::datatypes::{DataType, DateUnit, Schema};
 use datafusion::datasource::parquet::ParquetTable;
 use datafusion::datasource::CsvFile;
 use datafusion::logical_plan::{Expr, JoinType, LogicalPlan};
@@ -556,6 +556,10 @@ fn to_proto_arrow_type(dt: &DataType) -> Result<protobuf::ArrowType, BallistaErr
         DataType::Float32 => Ok(protobuf::ArrowType::Float),
         DataType::Float64 => Ok(protobuf::ArrowType::Double),
         DataType::Utf8 => Ok(protobuf::ArrowType::Utf8),
+        DataType::Date32(unit) => match unit {
+            DateUnit::Day => Ok(protobuf::ArrowType::Date32Day),
+            DateUnit::Millisecond => Ok(protobuf::ArrowType::Date32Millisecond),
+        },
         DataType::Binary => Ok(protobuf::ArrowType::Binary),
         other => Err(BallistaError::General(format!(
             "logical_plan::to_proto() Unsupported data type {:?}",

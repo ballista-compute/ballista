@@ -19,7 +19,7 @@ use std::{convert::TryInto, unimplemented};
 use crate::error::BallistaError;
 use crate::serde::{proto_error, protobuf};
 
-use arrow::datatypes::{DataType, Field, Schema};
+use arrow::datatypes::{DataType, DateUnit, Field, Schema};
 use datafusion::logical_plan::{Expr, LogicalPlan, LogicalPlanBuilder, Operator};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::physical_plan::csv::CsvReadOptions;
@@ -389,6 +389,10 @@ fn from_proto_arrow_type(dt: i32) -> Result<DataType, BallistaError> {
         dt if dt == protobuf::ArrowType::Float as i32 => Ok(DataType::Float32),
         dt if dt == protobuf::ArrowType::Double as i32 => Ok(DataType::Float64),
         dt if dt == protobuf::ArrowType::Utf8 as i32 => Ok(DataType::Utf8),
+        dt if dt == protobuf::ArrowType::Date32Day as i32 => Ok(DataType::Date32(DateUnit::Day)),
+        dt if dt == protobuf::ArrowType::Date32Millisecond as i32 => {
+            Ok(DataType::Date32(DateUnit::Millisecond))
+        }
         dt if dt == protobuf::ArrowType::Binary as i32 => Ok(DataType::Binary),
         other => Err(BallistaError::General(format!(
             "Unsupported data type {:?}",

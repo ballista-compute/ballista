@@ -15,8 +15,7 @@ end-user documentation for a published release, please start with the [user guid
 
 ## Test Data
 
-- Where to find [NYC Taxi](nyctaxi.md) data.
-- How to generate [TPCH](tpch.md) data.
+- How to generate [TPC-H](../benchmarks/tpch) data.
 
 ## Testing
 
@@ -24,11 +23,8 @@ end-user documentation for a published release, please start with the [user guid
 
 ## Benchmarks
 
-The goal is to be able to run the complete [TPC-H](tpch.md) benchmark and use that for comparisons with other 
-distributed platforms, but Ballista can't support many of the queries yet.
-
-The [NYC Taxi](nyctaxi.md) data set can also be used for running some simple aggregate queries and is easier to get up and 
-running with because the source data can be downloaded from S3.
+The goal is to be able to run the complete [TPC-H](../benchmarks/tpch) benchmark and use that for comparisons with 
+other distributed platforms, but Ballista can't support many of the queries yet.
 
 ## Release
 

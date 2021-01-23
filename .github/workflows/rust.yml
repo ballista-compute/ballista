@@ -117,10 +117,12 @@ jobs:
     - name: Build benchmarks
       run: cd benchmarks/tpch && cargo build
 #    - name: Build integration test stack
-#      run: cd integration-tests && docker-compose up -d
+#      run: cd benchmarks/tpch && docker-compose up -d
 #    - name: Wait for executors to start
 #      uses: jakejarvis/wait-action@master
 #      with:
 #        time: "20s"
+#    - Generate TPC-H data
+#      run: cd benchmarks/tpch && ./tpch-gen.sh
 #    - name: Run integration tests
-#      run: cd integration-tests/rust && cargo run
+#      run: cd benchmarks/tpch && cargo run benchmark --host localhost --port 50051 --query 12 --path data --format tbl

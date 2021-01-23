@@ -1,5 +1,8 @@
 # TPC-H Benchmarks
 
+TPC-H is an industry standard benchmark for testing databases and query engines. A command-line tool is available that
+can generate the raw test data at any given scale factor (scale factor refers to the amount of data to be generated).
+
 ## Generating Test Data
 
 TPC-H data can be generated using the `tpch-gen.sh` script, which creates a Docker image containing the TPC-DS data

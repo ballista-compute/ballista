@@ -44,18 +44,17 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
                 let schema = source.schema();
 
                 // unwrap the DFTableAdapter to get to the real TableProvider
-                let source = source
-                    .as_any()
-                    .downcast_ref::<DFTableAdapter>()
-                    .expect("Expected DFTableAdapter");
-                let source = match &source.logical_plan {
-                    LogicalPlan::TableScan { source, .. } => source.as_any(),
-                    _ => {
-                        return Err(BallistaError::General(
+                let source = if let Some(adapter) = source.as_any().downcast_ref::<DFTableAdapter>()
+                {
+                    match &adapter.logical_plan {
+                        LogicalPlan::TableScan { source, .. } => Ok(source.as_any()),
+                        _ => Err(BallistaError::General(
                             "Invalid LogicalPlan::TableScan".to_owned(),
-                        ))
+                        )),
                     }
-                };
+                } else {
+                    Ok(source.as_any())
+                }?;
 
                 let columns = projected_schema
                     .fields()

@@ -126,7 +126,29 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
                     .map_err(|e| e.into())
             }
             LogicalPlanType::ParquetScan(scan) => {
-                LogicalPlanBuilder::scan_parquet(&scan.path, None, 24)? //TODO projection, concurrency
+                let projection = match scan.projection.as_ref() {
+                    None => None,
+                    Some(columns) => {
+                        let schema: Schema = convert_required!(scan.schema)?;
+                        let r: Result<Vec<usize>, _> = columns.columns
+                            .iter()
+                            .map(|col_name| schema
+                                .fields()
+                                .iter()
+                                .position(|field| field.name() == col_name)
+                                .ok_or_else(|| {
+                                    let column_names: Vec<&String> = schema.fields().iter().map(|f| f.name()).collect();
+                                    proto_error(format!(
+                                        "Parquet projection contains column name that is not present in schema. Column name: {}. Schema columns: {:?}",
+                                        col_name,
+                                        column_names))
+                                })
+                            )
+                            .collect();
+                        Some(r?)
+                    }
+                };
+                LogicalPlanBuilder::scan_parquet(&scan.path, projection, 24)? //TODO concurrency
                     .build()
                     .map_err(|e| e.into())
             }

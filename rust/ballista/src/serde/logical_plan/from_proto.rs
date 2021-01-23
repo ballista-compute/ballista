@@ -299,13 +299,19 @@ impl TryInto<Expr> for &protobuf::LogicalExprNode {
                 }
             }
             ExprType::AggregateExpr(expr) => {
-                let fun = match expr.aggr_function {
-                    f if f == protobuf::AggregateFunction::Min as i32 => AggregateFunction::Min,
-                    f if f == protobuf::AggregateFunction::Max as i32 => AggregateFunction::Max,
-                    f if f == protobuf::AggregateFunction::Sum as i32 => AggregateFunction::Sum,
-                    f if f == protobuf::AggregateFunction::Avg as i32 => AggregateFunction::Avg,
-                    f if f == protobuf::AggregateFunction::Count as i32 => AggregateFunction::Count,
-                    _ => unimplemented!(),
+                let aggr_function = protobuf::AggregateFunction::from_i32(expr.aggr_function)
+                    .ok_or_else(|| {
+                        proto_error(format!(
+                            "Received an unknown aggregate function: {}",
+                            expr.aggr_function
+                        ))
+                    })?;
+                let fun = match aggr_function {
+                    protobuf::AggregateFunction::Min => AggregateFunction::Min,
+                    protobuf::AggregateFunction::Max => AggregateFunction::Max,
+                    protobuf::AggregateFunction::Sum => AggregateFunction::Sum,
+                    protobuf::AggregateFunction::Avg => AggregateFunction::Avg,
+                    protobuf::AggregateFunction::Count => AggregateFunction::Count,
                 };
 
                 Ok(Expr::AggregateFunction {

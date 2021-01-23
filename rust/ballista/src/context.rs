@@ -199,7 +199,7 @@ impl BallistaDataFrame {
 
         client
             .execute_action(&Action::InteractiveQuery {
-                plan: plan,
+                plan,
                 settings: Default::default(),
             })
             .await

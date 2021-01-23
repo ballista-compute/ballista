@@ -117,7 +117,7 @@ async fn main() -> Result<()> {
     }
 }
 
-async fn benchmark(opt: BenchmarkOpt) -> Result<Vec<arrow::record_batch::RecordBatch>> {
+async fn benchmark(opt: BenchmarkOpt) -> Result<()> {
     println!("Running benchmarks with the following options: {:?}", opt);
 
     let mut settings = HashMap::new();
@@ -158,7 +158,6 @@ async fn benchmark(opt: BenchmarkOpt) -> Result<Vec<arrow::record_batch::RecordB
     }
 
     let mut millis = vec![];
-    let mut batches = vec![];
 
     // run benchmark
     for i in 0..opt.iterations {
@@ -166,6 +165,7 @@ async fn benchmark(opt: BenchmarkOpt) -> Result<Vec<arrow::record_batch::RecordB
         let sql = get_query_sql(opt.query)?;
         let df = ctx.sql(&sql)?;
 
+        let mut batches = vec![];
         let mut stream = df.collect().await?;
         while let Some(result) = stream.next().await {
             let batch = result?;
@@ -181,7 +181,7 @@ async fn benchmark(opt: BenchmarkOpt) -> Result<Vec<arrow::record_batch::RecordB
     let avg = millis.iter().sum::<f64>() / millis.len() as f64;
     println!("Query {} avg time: {:.2} ms", opt.query, avg);
 
-    Ok(batches)
+    Ok(())
 }
 
 fn get_query_sql(query: usize) -> Result<String> {

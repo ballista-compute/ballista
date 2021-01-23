@@ -17,6 +17,7 @@
 //! processes.
 
 use std::convert::TryInto;
+use std::str;
 
 use crate::context::DFTableAdapter;
 use crate::serde::{empty_logical_plan_node, protobuf, BallistaError};
@@ -87,13 +88,16 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
                     });
                     Ok(node)
                 } else if let Some(csv) = source.downcast_ref::<CsvFile>() {
+                    let delimiter = [csv.delimiter()];
+                    let delimiter = str::from_utf8(&delimiter)
+                        .map_err(|_| BallistaError::General("Invalid CSV delimiter".to_owned()))?;
                     node.csv_scan = Some(protobuf::CsvTableScanNode {
                         table_name: table_name.to_owned(),
                         path: csv.path().to_owned(),
                         projection,
                         schema: Some(schema),
                         has_header: csv.has_header(),
-                        delimiter: csv.delimiter().to_string(),
+                        delimiter: delimiter.to_string(),
                         file_extension: csv.file_extension().to_string(),
                         filters,
                     });

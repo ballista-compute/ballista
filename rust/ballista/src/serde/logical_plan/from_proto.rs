@@ -96,9 +96,9 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
             let schema: Schema = convert_required!(scan.schema)?;
             let options = CsvReadOptions::new()
                 .schema(&schema)
+                .delimiter(scan.delimiter.as_bytes()[0])
                 .file_extension(&scan.file_extension)
                 .has_header(scan.has_header);
-
             let mut projection = None;
             if let Some(column_names) = &scan.projection {
                 let column_indices = column_names

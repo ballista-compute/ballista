@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::convert::TryInto;
+
 use crate::error::{ballista_error, BallistaError};
 use crate::serde::protobuf;
-use crate::serde::scheduler::Action;
-use std::convert::TryInto;
+use crate::serde::protobuf::action::ActionType;
+use crate::serde::scheduler::{Action, QueryStageTask};
 
 impl TryInto<protobuf::Action> for Action {
     type Error = BallistaError;
@@ -37,18 +39,14 @@ impl TryInto<protobuf::Action> for Action {
                     .collect();
 
                 Ok(protobuf::Action {
-                    query: Some(plan_proto),
-                    task: None,
-                    fetch_shuffle: None,
+                    action_type: Some(ActionType::Query(plan_proto)),
                     settings,
                 })
             }
-            // Action::ExecuteTask(task) => Ok(protobuf::Action {
-            //     query: None,
-            //     task: Some(task.try_into()?),
-            //     fetch_shuffle: None,
-            //     settings: vec![],
-            // }),
+            Action::ExecuteQueryStage(task) => Ok(protobuf::Action {
+                action_type: Some(ActionType::Task(task.try_into()?)),
+                settings: vec![],
+            }),
             // Action::FetchShuffle(shuffle_id) => Ok(protobuf::Action {
             //     query: None,
             //     task: None,
@@ -57,5 +55,13 @@ impl TryInto<protobuf::Action> for Action {
             // }),
             _ => Err(ballista_error("scheduler::to_proto() unimplemented Action")),
         }
+    }
+}
+
+impl TryInto<protobuf::Task> for QueryStageTask {
+    type Error = BallistaError;
+
+    fn try_into(self) -> Result<protobuf::Task, Self::Error> {
+        unimplemented!()
     }
 }

@@ -16,53 +16,38 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 
 use crate::error::BallistaError;
+use crate::serde::protobuf::action::ActionType;
 use crate::serde::scheduler::Action;
 use crate::serde::{proto_error, protobuf};
 
 use datafusion::logical_plan::LogicalPlan;
 
-macro_rules! convert_required {
-    ($PB:expr) => {{
-        if let Some(field) = $PB.as_ref() {
-            field.try_into()
-        } else {
-            Err(proto_error("Missing required field in protobuf"))
-        }
-    }};
-}
-
-// macro_rules! convert_box_required {
-//     ($PB:expr) => {{
-//         if let Some(field) = $PB.as_ref() {
-//             field.as_ref().try_into()
-//         } else {
-//             Err(proto_error("Missing required field in protobuf"))
-//         }
-//     }};
-// }
-
 impl TryInto<Action> for protobuf::Action {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<Action, Self::Error> {
-        if self.query.is_some() {
-            let plan: LogicalPlan = convert_required!(self.query)?;
-            let mut settings = HashMap::new();
-            for setting in &self.settings {
-                settings.insert(setting.key.to_owned(), setting.value.to_owned());
+        match self.action_type {
+            Some(ActionType::Query(query)) => {
+                let plan: LogicalPlan = (&query).try_into()?;
+                let mut settings = HashMap::new();
+                for setting in &self.settings {
+                    settings.insert(setting.key.to_owned(), setting.value.to_owned());
+                }
+                Ok(Action::InteractiveQuery { plan, settings })
             }
-            Ok(Action::InteractiveQuery { plan, settings })
-        // } else if self.task.is_some() {
-        //     let task: ExecutionTask = convert_required!(self.task)?;
-        //     Ok(Action::Execute(task))
-        // } else if self.fetch_shuffle.is_some() {
-        //     let shuffle_id: ShuffleId = convert_required!(self.fetch_shuffle)?;
-        //     Ok(Action::FetchShuffle(shuffle_id))
-        } else {
-            Err(BallistaError::NotImplemented(format!(
-                "from_proto(Action) {:?}",
-                self
-            )))
+            Some(ActionType::Task(_)) => {
+                // //     let task: ExecutionTask = convert_required!(self.task)?;
+                // //     Ok(Action::Execute(task))
+                unimplemented!()
+            }
+            Some(ActionType::FetchShuffle(_)) => {
+                // //     let shuffle_id: ShuffleId = convert_required!(self.fetch_shuffle)?;
+                // //     Ok(Action::FetchShuffle(shuffle_id))
+                unimplemented!()
+            }
+            None => Err(BallistaError::General(
+                "from_proto(Action) missing action".to_owned(),
+            )),
         }
     }
 }

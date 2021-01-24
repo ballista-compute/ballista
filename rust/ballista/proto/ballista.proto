@@ -327,15 +327,17 @@ message KeyValuePair {
 }
 
 message Action {
-  // interactive query
-  LogicalPlanNode query = 1;
-  
-  // Execute query and store resulting shuffle partition in memory
-  Task task = 2;
-  
-  // Fetch a shuffle partition from an executor
-  ShuffleId fetch_shuffle = 3;
-  
+  oneof ActionType {
+    // interactive query
+    LogicalPlanNode query = 1;
+
+    // Execute query and store resulting shuffle partition in memory
+    Task task = 2;
+
+    // Fetch a shuffle partition from an executor
+    ShuffleId fetch_shuffle = 3;
+  }
+
   // configuration settings
   repeated KeyValuePair settings = 100;
 }

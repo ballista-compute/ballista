@@ -13,23 +13,23 @@
 
 ## Overview
 
-Ballista is a proof-of-concept distributed compute platform primarily implemented in Rust, using Apache Arrow as the 
-memory model. It is built on an architecture that allows other programming languages to be supported as first-class 
-citizens without paying a penalty for serialization costs.
+Ballista is a proof-of-concept distributed compute platform primarily implemented in Rust, powered by Apache Arrow. It 
+is built on an architecture that allows other programming languages (such as Python, C++, and Java) to be supported 
+as first-class citizens without paying a penalty for serialization costs.
 
 ## Status
 
 With the release of Apache Arrow 3.0.0 there were many breaking changes in the Rust implementation (for good reason) 
-and as a result it has been necessary to re-implement the Rust executor to some degree and this work is ongoing.
+and as a result it has been necessary to re-implement the Rust executor and this work is ongoing.
 
 The current plan is to release version 0.4.0 once the following items are completed.
 
 - [x] Compile the Rust implementation against Arrow 3.0.0
-- [ ] Get integration tests working against a single Rust executor
-- [ ] Get TPC-H benchmarks working against a single Rust executor
+- [x] Get TPC-H benchmarks working against a single Rust executor
+- [ ] Update the JVM project to use latest ballista.proto
+- [ ] Get TPC-H benchmarks working against the JVM Executor
+- [ ] Get TPC-H benchmarks working against the Spark Executor
 - [ ] Re-implement distributed query execution
-- [ ] Update the JVM and Spark executors to use latest ballista.proto
-- [ ] Get integration tests and benchmarks running against the JVM and Spark executors
 
 To follow the progress of this work, please refer to the
 ["This Week in Ballista"](https://ballistacompute.org/this-week-in-ballista/) blog.

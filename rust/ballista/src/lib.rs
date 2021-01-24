@@ -26,9 +26,6 @@ pub mod flight_service;
 pub mod k8s;
 pub mod memory_stream;
 pub mod prelude;
-pub mod query_stage;
-pub mod shuffle_hash_join;
-pub mod shuffle_write;
 pub mod utils;
 
 #[macro_use]

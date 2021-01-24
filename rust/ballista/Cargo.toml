@@ -10,6 +10,9 @@ edition = "2018"
 build = "build.rs"
 include = ["build.rs", "src/**/*", "Cargo.toml", "proto/ballista.proto"]
 
+[features]
+simd = ["datafusion/simd"]
+
 [dependencies]
 async-trait = "0.1.36"
 clap = "2"
@@ -29,9 +32,9 @@ tokio = { version = "0.2", features = ["full"] }
 tonic = "0.3"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 
-arrow = { git = "https://github.com/apache/arrow", rev="10f4ada", features = ["simd"]}
+arrow = { git = "https://github.com/apache/arrow", rev="10f4ada"}
 arrow-flight = { git = "https://github.com/apache/arrow", rev="10f4ada"}
-datafusion = { git = "https://github.com/apache/arrow", rev="10f4ada", features = ["simd"]}
+datafusion = { git = "https://github.com/apache/arrow", rev="10f4ada"}
 snmalloc-rs = {version = "0.2", features= ["cache-friendly"]}
 
 [dev-dependencies]

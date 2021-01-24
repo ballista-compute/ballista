@@ -106,7 +106,7 @@ impl ExecutionPlan for QueryStageExec {
             // TODO could we distribute the tasks via etcd rather than sending them directly to
             // executors? See https://github.com/ballista-compute/ballista/issues/382
 
-            let mut client = BallistaClient::try_new("localhost", 8000)
+            let mut client = BallistaClient::try_new("localhost", 50051)
                 .await
                 .map_err(|e| DataFusionError::Execution(format!("Ballista Error: {:?}", e)))?;
 

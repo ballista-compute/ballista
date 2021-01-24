@@ -18,20 +18,25 @@
 
 use std::sync::Arc;
 
+use crate::context::DFTableAdapter;
 use crate::error::{BallistaError, Result};
 use crate::query_stage::QueryStageExec;
 
-use crate::context::DFTableAdapter;
 use datafusion::execution::context::ExecutionContext;
+use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
+use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::ExecutionPlan;
 use uuid::Uuid;
 
-pub fn execute_distributed_query(execution_plan: Arc<dyn ExecutionPlan>) -> Result<()> {
+pub async fn execute_distributed_query(execution_plan: Arc<dyn ExecutionPlan>) -> Result<()> {
     let job_uuid = Uuid::new_v4();
+    pretty_print(execution_plan.clone(), 0);
     let execution_plan = optimize(&job_uuid, execution_plan)?;
+    pretty_print(execution_plan.clone(), 0);
 
-    println!("{:?}", execution_plan);
+    // execute a partition just to test this out
+    let stream = execution_plan.execute(0).await?;
 
     Ok(())
 }
@@ -40,6 +45,8 @@ pub fn optimize(
     job_uuid: &Uuid,
     execution_plan: Arc<dyn ExecutionPlan>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
+    println!("optimize: {:?}", execution_plan);
+
     // recurse down and replace children
     if execution_plan.children().is_empty() {
         return Ok(execution_plan.clone());
@@ -56,13 +63,29 @@ pub fn optimize(
     } else if let Some(merge) = execution_plan.as_any().downcast_ref::<MergeExec>() {
         let child = merge.children()[0].clone();
         Ok(Arc::new(QueryStageExec::try_new(*job_uuid, 0, child)?))
-    } else if let Some(_join) = execution_plan.as_any().downcast_ref::<MergeExec>() {
-        Err(BallistaError::NotImplemented(
-            "distributed joins not yet supported".to_owned(),
-        ))
+
+    // } else if let Some(_) = execution_plan.as_any().downcast_ref::<HashAggregateExec>() {
+    //     Err(BallistaError::NotImplemented(
+    //         "distributed HashAggregateExec not yet supported".to_owned(),
+    //     ))
+    } else if let Some(join) = execution_plan.as_any().downcast_ref::<HashJoinExec>() {
+        Ok(join.with_new_children(vec![
+            Arc::new(QueryStageExec::try_new(*job_uuid, 0, join.left().clone())?),
+            Arc::new(QueryStageExec::try_new(*job_uuid, 0, join.right().clone())?),
+        ])?)
     } else {
         Ok(execution_plan.with_new_children(children)?)
     }
+}
+
+fn pretty_print(plan: Arc<dyn ExecutionPlan>, indent: usize) {
+    for _ in 0..indent {
+        print!("  ");
+    }
+    println!("{:?}", plan);
+    plan.children()
+        .iter()
+        .for_each(|c| pretty_print(c.clone(), indent + 1));
 }
 
 #[cfg(test)]
@@ -74,12 +97,12 @@ mod tests {
     use datafusion::physical_plan::csv::CsvReadOptions;
     use std::collections::HashMap;
 
-    #[test]
-    fn test() -> Result<()> {
+    #[tokio::test]
+    async fn test() -> Result<()> {
         // assumes benchmark data is available
         let tpch_data = "../../benchmarks/tpch/data";
 
-        let ctx = BallistaContext::remote("", 1234, HashMap::new());
+        let ctx = BallistaContext::remote("localhost", 50051, HashMap::new());
 
         let tables = vec!["lineitem", "orders"];
         for table in &tables {
@@ -128,7 +151,7 @@ order by
         let df = ExecutionContext::new();
         let plan = df.optimize(&plan.to_logical_plan())?;
         let plan = df.create_physical_plan(&plan)?;
-        execute_distributed_query(plan)?;
+        execute_distributed_query(plan).await?;
 
         Ok(())
     }

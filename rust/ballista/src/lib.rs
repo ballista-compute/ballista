@@ -25,6 +25,7 @@ pub mod executor;
 pub mod flight_service;
 pub mod k8s;
 pub mod memory_stream;
+pub mod planner;
 pub mod prelude;
 pub mod query_stage;
 pub mod shuffle_hash_join;

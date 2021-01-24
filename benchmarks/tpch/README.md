@@ -27,6 +27,12 @@ cd $BALLISTA_HOME/rust/ballista
 RUST_LOG=info cargo run --release --bin executor
 ```
 
+You can add SIMD/snmalloc/LTO flags to improve speed (with longer build times):
+
+```
+RUSTFLAGS='-C target-cpu=native -C lto -C codegen-units=1 -C embed-bitcode' cargo run --release --bin executor --features "simd snmalloc" --target x86_64-unknown-linux-gnu
+```
+
 To start a Rust executor using Docker Compose:
 
 ```bash

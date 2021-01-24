@@ -104,7 +104,6 @@ dependencies = [
  "lazy_static",
  "lexical-core",
  "num",
- "packed_simd_2",
  "prettytable-rs",
  "rand",
  "regex",
@@ -210,7 +209,6 @@ dependencies = [
  "prost",
  "prost-build",
  "prost-types",
- "snmalloc-rs",
  "sqlparser",
  "structopt",
  "tempfile",
@@ -372,15 +370,6 @@ dependencies = [
  "textwrap",
  "unicode-width",
  "vec_map",
-]
-
-[[package]]
-name = "cmake"
-version = "0.1.45"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb6210b637171dfba4cda12e579ac6dc73f5165ad56133e5d72ef3131f320855"
-dependencies = [
- "cc",
 ]
 
 [[package]]
@@ -1228,12 +1217,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "89203f3fba0a3795506acaad8ebce3c80c0af93f994d5a1d7a0b1eeb23271929"
 
 [[package]]
-name = "libm"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fc7aa29613bd6a620df431842069224d8bc9011086b1db4c0e0cd47fa03ec9a"
-
-[[package]]
 name = "linked-hash-map"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1598,16 +1581,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dacdec97876ef3ede8c50efc429220641a0b11ba0048b4b0c357bccbc47c5204"
 dependencies = [
  "num-traits",
-]
-
-[[package]]
-name = "packed_simd_2"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3278e0492f961fd4ae70909f56b2723a7e8d01a228427294e19cdfdebda89a17"
-dependencies = [
- "cfg-if 0.1.10",
- "libm",
 ]
 
 [[package]]
@@ -2196,25 +2169,6 @@ name = "snap"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da73c8f77aebc0e40c300b93f0a5f1bece7a248a36eee287d4e095f35c7b7d6e"
-
-[[package]]
-name = "snmalloc-rs"
-version = "0.2.23"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ca2b691d643177b3cf6b3bc1660fa3c67c2597006ab7562127de095071a185b"
-dependencies = [
- "snmalloc-sys",
-]
-
-[[package]]
-name = "snmalloc-sys"
-version = "0.2.23"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fcd8358d1e04e4bad809685d49512cba2989871aa7ce223732f97f91501cb81"
-dependencies = [
- "cmake",
- "libc",
-]
 
 [[package]]
 name = "socket2"

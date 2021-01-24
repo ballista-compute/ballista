@@ -33,9 +33,9 @@ tokio = { version = "0.2", features = ["full"] }
 tonic = "0.3"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 
-arrow = { git = "https://github.com/apache/arrow", rev="10f4ada"}
-arrow-flight = { git = "https://github.com/apache/arrow", rev="10f4ada"}
-datafusion = { git = "https://github.com/apache/arrow", rev="10f4ada"}
+arrow = { git = "https://github.com/apache/arrow", rev="d613aa6"}
+arrow-flight = { git = "https://github.com/apache/arrow", rev="d613aa6"}
+datafusion = { git = "https://github.com/apache/arrow", rev="d613aa6"}
 snmalloc-rs = {version = "0.2", features= ["cache-friendly"], optional = true}
 
 [dev-dependencies]

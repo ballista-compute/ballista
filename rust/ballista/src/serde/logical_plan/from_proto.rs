@@ -427,6 +427,8 @@ impl TryInto<Expr> for &protobuf::LogicalExprNode {
 
 fn from_proto_binary_op(op: &str) -> Result<Operator, BallistaError> {
     match op {
+        "And" => Ok(Operator::And),
+        "Or" => Ok(Operator::Or),
         "Eq" => Ok(Operator::Eq),
         "NotEq" => Ok(Operator::NotEq),
         "LtEq" => Ok(Operator::LtEq),

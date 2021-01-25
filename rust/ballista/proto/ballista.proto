@@ -260,16 +260,15 @@ message LimitNode {
 
 // PhysicalPlanNode is a nested type
 message PhysicalPlanNode {
-  
-  PhysicalPlanNode input = 1;
-  
-  ScanExecNode scan = 10;
-  ProjectionExecNode projection = 20;
-  SelectionExecNode selection = 21;
-  GlobalLimitExecNode global_limit = 22;
-  LocalLimitExecNode local_limit = 23;
-  HashAggregateExecNode hash_aggregate = 30;
-  ShuffleReaderExecNode shuffle_reader = 40;
+  oneof PhysicalPlanType {
+    ScanExecNode scan = 10;
+    ProjectionExecNode projection = 20;
+    SelectionExecNode selection = 21;
+    GlobalLimitExecNode global_limit = 22;
+    LocalLimitExecNode local_limit = 23;
+    HashAggregateExecNode hash_aggregate = 30;
+    ShuffleReaderExecNode shuffle_reader = 40;
+  }
 }
 
 message ScanExecNode {
@@ -285,7 +284,8 @@ message ScanExecNode {
 }
 
 message ProjectionExecNode {
-  repeated LogicalExprNode expr = 1;
+  PhysicalPlanNode input = 1;
+  repeated LogicalExprNode expr = 2;
 }
 
 message SelectionExecNode {

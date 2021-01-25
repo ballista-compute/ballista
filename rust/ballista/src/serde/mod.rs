@@ -44,16 +44,24 @@ pub(crate) fn proto_error<S: Into<String>>(message: S) -> BallistaError {
     BallistaError::General(message.into())
 }
 
-/// Create an empty PhysicalPlanNode
-pub fn empty_physical_plan_node() -> protobuf::PhysicalPlanNode {
-    protobuf::PhysicalPlanNode {
-        scan: None,
-        input: None,
-        projection: None,
-        selection: None,
-        global_limit: None,
-        local_limit: None,
-        shuffle_reader: None,
-        hash_aggregate: None,
-    }
+#[macro_export]
+macro_rules! convert_required {
+    ($PB:expr) => {{
+        if let Some(field) = $PB.as_ref() {
+            field.try_into()
+        } else {
+            Err(proto_error("Missing required field in protobuf"))
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! convert_box_required {
+    ($PB:expr) => {{
+        if let Some(field) = $PB.as_ref() {
+            field.as_ref().try_into()
+        } else {
+            Err(proto_error("Missing required field in protobuf"))
+        }
+    }};
 }

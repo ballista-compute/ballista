@@ -19,7 +19,7 @@
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
-use crate::serde::{empty_physical_plan_node, protobuf, BallistaError};
+use crate::serde::{protobuf, BallistaError};
 
 use datafusion::physical_plan::csv::CsvExec;
 use datafusion::physical_plan::expressions::{
@@ -34,6 +34,8 @@ use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
+use protobuf::physical_plan_node::PhysicalPlanType;
+
 impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
     type Error = BallistaError;
 
@@ -41,27 +43,29 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
         let plan = self.as_any();
         if let Some(exec) = plan.downcast_ref::<ProjectionExec>() {
             let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
-            let mut node = empty_physical_plan_node();
-            node.input = Some(Box::new(input));
             let expr = exec
                 .expr()
                 .iter()
                 .map(|expr| expr.0.clone().try_into())
                 .collect::<Result<Vec<_>, Self::Error>>()?;
-            node.projection = Some(protobuf::ProjectionExecNode { expr });
-            Ok(node)
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: Some(PhysicalPlanType::Projection(Box::new(
+                    protobuf::ProjectionExecNode {
+                        input: Some(Box::new(input)),
+                        expr,
+                    },
+                ))),
+            })
         } else if let Some(exec) = plan.downcast_ref::<FilterExec>() {
-            let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
-            let mut node = empty_physical_plan_node();
-            node.input = Some(Box::new(input));
+            let _input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
             //         node.selection = Some(protobuf::SelectionExecNode {
             //             expr: Some(exec.as_ref().filter_expr.as_ref().try_into()?),
             //         });
-            Ok(node)
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: None,
+            })
         } else if let Some(exec) = plan.downcast_ref::<HashAggregateExec>() {
-            let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
-            let mut node = empty_physical_plan_node();
-            node.input = Some(Box::new(input));
+            let _input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
             //         node.hash_aggregate = Some(protobuf::HashAggregateExecNode {
             //             mode: match exec.mode {
             //                 AggregateMode::Partial => protobuf::AggregateMode::Partial,
@@ -80,19 +84,16 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
             //                 .map(|expr| expr.try_into())
             //                 .collect::<Result<Vec<_>, BallistaError>>()?,
             //         });
-            Ok(node)
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: None,
+            })
         } else if let Some(exec) = plan.downcast_ref::<HashJoinExec>() {
             let _left: protobuf::PhysicalPlanNode = exec.left().to_owned().try_into()?;
             let _right: protobuf::PhysicalPlanNode = exec.right().to_owned().try_into()?;
-            let node = empty_physical_plan_node();
-            Ok(node)
-        } else if let Some(exec) = plan.downcast_ref::<FilterExec>() {
-            let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
-            let mut node = empty_physical_plan_node();
-            node.input = Some(Box::new(input));
-            Ok(node)
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: None,
+            })
         } else if let Some(_exec) = plan.downcast_ref::<CsvExec>() {
-            let node = empty_physical_plan_node();
             //         node.scan = Some(protobuf::ScanExecNode {
             //             path: exec.path.clone(),
             //             filename: exec.filenames.clone(),
@@ -108,9 +109,10 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
             //             has_header: exec.has_header,
             //             batch_size: exec.batch_size as u32,
             //         });
-            Ok(node)
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: None,
+            })
         } else if let Some(_exec) = plan.downcast_ref::<ParquetExec>() {
-            let node = empty_physical_plan_node();
             //         node.scan = Some(protobuf::ScanExecNode {
             //             path: exec.path.clone(),
             //             filename: exec.filenames.clone(),
@@ -126,7 +128,9 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
             //             has_header: false,
             //             batch_size: exec.batch_size as u32,
             //         });
-            Ok(node)
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: None,
+            })
 
         //     PhysicalPlan::ShuffleReader(exec) => {
         //         let mut node = empty_physical_plan_node();

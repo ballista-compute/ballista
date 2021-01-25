@@ -18,6 +18,7 @@ use std::{convert::TryInto, unimplemented};
 
 use crate::error::BallistaError;
 use crate::serde::{proto_error, protobuf};
+use crate::{convert_box_required, convert_required};
 
 use arrow::datatypes::{DataType, DateUnit, Field, Schema};
 use datafusion::logical_plan::{Expr, JoinType, LogicalPlan, LogicalPlanBuilder, Operator};
@@ -28,26 +29,6 @@ use protobuf::logical_expr_node::ExprType;
 use protobuf::logical_plan_node::LogicalPlanType;
 
 // use uuid::Uuid;
-
-macro_rules! convert_required {
-    ($PB:expr) => {{
-        if let Some(field) = $PB.as_ref() {
-            field.try_into()
-        } else {
-            Err(proto_error("Missing required field in protobuf"))
-        }
-    }};
-}
-
-macro_rules! convert_box_required {
-    ($PB:expr) => {{
-        if let Some(field) = $PB.as_ref() {
-            field.as_ref().try_into()
-        } else {
-            Err(proto_error("Missing required field in protobuf"))
-        }
-    }};
-}
 
 impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
     type Error = BallistaError;
@@ -567,114 +548,6 @@ impl Into<datafusion::sql::parser::FileType> for protobuf::FileType {
         }
     }
 }
-
-// impl TryInto<PhysicalPlan> for &protobuf::PhysicalPlanNode {
-//     type Error = BallistaError;
-//
-//     fn try_into(self) -> Result<PhysicalPlan, Self::Error> {
-//         if let Some(selection) = &self.selection {
-//             let input: PhysicalPlan = convert_box_required!(self.input)?;
-//             match selection.expr {
-//                 Some(ref protobuf_expr) => {
-//                     let expr: Expr = protobuf_expr.try_into()?;
-//                     Ok(PhysicalPlan::Filter(Arc::new(FilterExec::new(
-//                         &input, &expr,
-//                     ))))
-//                 }
-//                 _ => Err(proto_error("from_proto: Selection expr missing")),
-//             }
-//         } else if let Some(projection) = &self.projection {
-//             let input: PhysicalPlan = convert_box_required!(self.input)?;
-//             let exprs = projection
-//                 .expr
-//                 .iter()
-//                 .map(|expr| expr.try_into())
-//                 .collect::<Result<Vec<_>, _>>()?;
-//             Ok(PhysicalPlan::Projection(Arc::new(ProjectionExec::try_new(
-//                 &exprs,
-//                 Arc::new(input),
-//             )?)))
-//         } else if let Some(aggregate) = &self.hash_aggregate {
-//             let input: PhysicalPlan = convert_box_required!(self.input)?;
-//             let mode = match aggregate.mode {
-//                 mode if mode == protobuf::AggregateMode::Partial as i32 => {
-//                     Ok(AggregateMode::Partial)
-//                 }
-//                 mode if mode == protobuf::AggregateMode::Final as i32 => Ok(AggregateMode::Final),
-//                 mode if mode == protobuf::AggregateMode::Complete as i32 => {
-//                     Ok(AggregateMode::Complete)
-//                 }
-//                 other => Err(proto_error(&format!(
-//                     "Unsupported aggregate mode '{}' for hash aggregate",
-//                     other
-//                 ))),
-//             }?;
-//             let group_expr = aggregate
-//                 .group_expr
-//                 .iter()
-//                 .map(|expr| expr.try_into())
-//                 .collect::<Result<Vec<_>, _>>()?;
-//             let aggr_expr = aggregate
-//                 .aggr_expr
-//                 .iter()
-//                 .map(|expr| expr.try_into())
-//                 .collect::<Result<Vec<_>, _>>()?;
-//             Ok(PhysicalPlan::HashAggregate(Arc::new(
-//                 HashAggregateExec::try_new(mode, group_expr, aggr_expr, Arc::new(input))?,
-//             )))
-//         } else if let Some(scan) = &self.scan {
-//             match scan.file_format.as_str() {
-//                 "csv" => {
-//                     let schema: Schema = convert_required!(scan.schema)?;
-//                     let options = CsvReadOptions::new()
-//                         .schema(&schema)
-//                         .has_header(scan.has_header);
-//                     let projection = scan.projection.iter().map(|n| *n as usize).collect();
-//
-//                     Ok(PhysicalPlan::CsvScan(Arc::new(CsvScanExec::try_new(
-//                         &scan.path,
-//                         scan.filename.clone(),
-//                         options,
-//                         Some(projection),
-//                         scan.batch_size as usize,
-//                     )?)))
-//                 }
-//                 "parquet" => {
-//                     let schema: Schema = convert_required!(scan.schema)?;
-//                     Ok(PhysicalPlan::ParquetScan(Arc::new(
-//                         ParquetScanExec::try_new(
-//                             &scan.path,
-//                             scan.filename.clone(),
-//                             Some(scan.projection.iter().map(|n| *n as usize).collect()),
-//                             scan.batch_size as usize,
-//                             Some(schema),
-//                         )?,
-//                     )))
-//                 }
-//                 other => Err(proto_error(&format!(
-//                     "Unsupported file format '{}' for file scan",
-//                     other
-//                 ))),
-//             }
-//         } else if let Some(shuffle_reader) = &self.shuffle_reader {
-//             let mut shuffle_ids = vec![];
-//             for s in &shuffle_reader.shuffle_id {
-//                 shuffle_ids.push(s.try_into()?);
-//             }
-//             Ok(PhysicalPlan::ShuffleReader(Arc::new(
-//                 ShuffleReaderExec::new(
-//                     Arc::new(convert_required!(shuffle_reader.schema)?),
-//                     shuffle_ids,
-//                 ),
-//             )))
-//         } else {
-//             Err(proto_error(&format!(
-//                 "Unsupported physical plan '{:?}'",
-//                 self
-//             )))
-//         }
-//     }
-// }
 
 fn parse_required_expr(p: &Option<Box<protobuf::LogicalExprNode>>) -> Result<Expr, BallistaError> {
     match p {

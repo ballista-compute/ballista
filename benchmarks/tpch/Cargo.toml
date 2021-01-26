@@ -1,0 +1,17 @@
+[package]
+name = "tpch"
+version = "0.4.0-SNAPSHOT"
+authors = ["Andy Grove <andygrove73@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+ballista = { path="../../rust/ballista" }
+
+arrow = "3.0.0"
+arrow-flight = "3.0.0"
+datafusion = "3.0.0"
+parquet = "3.0.0"
+
+env_logger = "0.8"
+tokio = { version = "0.2", features = ["full"] }
+structopt = "0.3"

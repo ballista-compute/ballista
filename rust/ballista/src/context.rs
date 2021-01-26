@@ -14,18 +14,26 @@
 
 //! Distributed execution context.
 
-use std::{collections::HashMap,
-          sync::{Arc, Mutex}};
+use std::any::Any;
+use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
-use crate::{client::BallistaClient,
-            error::{BallistaError, Result},
-            serde::scheduler::Action};
+use crate::client::BallistaClient;
+use crate::error::{BallistaError, Result};
+use crate::serde::scheduler::Action;
 
-use datafusion::{dataframe::DataFrame,
-                 execution::context::ExecutionContext,
-                 logical_plan::{DFSchema, Expr, LogicalPlan, Partitioning},
-                 physical_plan::{csv::CsvReadOptions, SendableRecordBatchStream}};
-use log::info;
+use arrow::datatypes::SchemaRef;
+use datafusion::dataframe::DataFrame;
+use datafusion::datasource::datasource::Statistics;
+use datafusion::datasource::TableProvider;
+use datafusion::error::{DataFusionError, Result as DFResult};
+use datafusion::execution::context::ExecutionContext;
+use datafusion::logical_plan::{DFSchema, Expr, LogicalPlan, Partitioning};
+use datafusion::physical_plan::csv::CsvReadOptions;
+use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
+use log::{debug, info};
 
 #[derive(Debug)]
 
@@ -38,6 +46,8 @@ pub enum ClusterMeta {
 pub struct BallistaContextState {
     /// Meta-data required for connecting to a scheduler instances in the cluster
     cluster_meta: ClusterMeta,
+    /// Tables that have been registered with this context
+    tables: HashMap<String, LogicalPlan>,
     /// General purpose settings
     settings:     HashMap<String, String>, /* map from shuffle id to executor uuid
                                             * shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
@@ -46,8 +56,11 @@ pub struct BallistaContextState {
 
 impl BallistaContextState {
     pub fn new(cluster_meta: ClusterMeta, settings: HashMap<String, String>) -> Self {
-
-        Self { cluster_meta, settings }
+        Self {
+            cluster_meta,
+            tables: HashMap::new(),
+            settings,
+        }
     }
 }
 
@@ -59,13 +72,11 @@ pub struct BallistaContext {
 
 impl BallistaContext {
     /// Create a context for executing queries against a remote Ballista executor instance
-
-    pub fn remote(host: &str, port: usize, settings: HashMap<&str, &str>) -> Self {
-
-        let meta = ClusterMeta::Direct { host: host.to_owned(), port };
-
-        let settings: HashMap<String, String> = settings.into_iter().map(|(k, v)| (k.to_owned(), v.to_owned())).collect();
-
+    pub fn remote(host: &str, port: usize, settings: HashMap<String, String>) -> Self {
+        let meta = ClusterMeta::Direct {
+            host: host.to_owned(),
+            port,
+        };
         let state = BallistaContextState::new(meta, settings);
 
         Self {
@@ -76,39 +87,106 @@ impl BallistaContext {
     /// Create a DataFrame representing a Parquet table scan
 
     pub fn read_parquet(&self, path: &str) -> Result<BallistaDataFrame> {
+        // convert to absolute path because the executor likely has a different working directory
+        let path = PathBuf::from(path);
+        let path = fs::canonicalize(&path)?;
 
         // use local DataFusion context for now but later this might call the scheduler
         let mut ctx = ExecutionContext::new();
-
-        let df = ctx.read_parquet(path)?;
-
+        let df = ctx.read_parquet(path.to_str().unwrap())?;
         Ok(BallistaDataFrame::from(self.state.clone(), df))
     }
 
     /// Create a DataFrame representing a CSV table scan
 
     pub fn read_csv(&self, path: &str, options: CsvReadOptions) -> Result<BallistaDataFrame> {
+        // convert to absolute path because the executor likely has a different working directory
+        let path = PathBuf::from(path);
+        let path = fs::canonicalize(&path)?;
 
         // use local DataFusion context for now but later this might call the scheduler
         let mut ctx = ExecutionContext::new();
-
-        let df = ctx.read_csv(path, options)?;
-
+        let df = ctx.read_csv(path.to_str().unwrap(), options)?;
         Ok(BallistaDataFrame::from(self.state.clone(), df))
     }
 
     /// Register a DataFrame as a table that can be referenced from a SQL query
+    pub fn register_table(&self, name: &str, table: &BallistaDataFrame) -> Result<()> {
+        let mut state = self.state.lock().unwrap();
+        state
+            .tables
+            .insert(name.to_owned(), table.to_logical_plan());
+        Ok(())
+    }
 
-    pub fn register_table(&self, _name: &str, _table: Arc<dyn DataFrame>) -> Result<()> {
+    pub fn register_csv(&self, name: &str, path: &str, options: CsvReadOptions) -> Result<()> {
+        let df = self.read_csv(path, options)?;
+        self.register_table(name, &df)
+    }
 
-        todo!()
+    pub fn register_parquet(&self, name: &str, path: &str) -> Result<()> {
+        let df = self.read_parquet(path)?;
+        self.register_table(name, &df)
     }
 
     /// Create a DataFrame from a SQL statement
+    pub fn sql(&self, sql: &str) -> Result<BallistaDataFrame> {
+        // use local DataFusion context for now but later this might call the scheduler
+        let mut ctx = ExecutionContext::new();
+        // register tables
+        let state = self.state.lock().unwrap();
+        for (name, plan) in &state.tables {
+            let plan = ctx.optimize(plan)?;
+            ctx.register_table(name, Box::new(DFTableAdapter::new(plan)))
+        }
+        let df = ctx.sql(sql)?;
+        Ok(BallistaDataFrame::from(self.state.clone(), df))
+    }
+}
 
-    pub fn sql(&self, _sql: &str) -> Result<BallistaDataFrame> {
+/// This ugly adapter is needed because we use DataFusion's logical plan when building queries
+/// and when we register tables with DataFusion's `ExecutionContext` we need to provide a
+/// TableProvider which is effectively a wrapper around a physical plan. We need to be able to
+/// register tables so that we can create logical plans from SQL statements that reference these
+/// tables.
+pub(crate) struct DFTableAdapter {
+    /// DataFusion logical plan
+    pub logical_plan: LogicalPlan,
+}
 
-        todo!()
+impl DFTableAdapter {
+    fn new(logical_plan: LogicalPlan) -> Self {
+        Self { logical_plan }
+    }
+}
+
+impl TableProvider for DFTableAdapter {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn schema(&self) -> SchemaRef {
+        self.logical_plan.schema().as_ref().to_owned().into()
+    }
+
+    fn scan(
+        &self,
+        _projection: &Option<Vec<usize>>,
+        _batch_size: usize,
+        _filters: &[Expr],
+    ) -> DFResult<Arc<dyn ExecutionPlan>> {
+        Err(DataFusionError::NotImplemented(
+            "DFTableAdapter is only used for building the logical plan and cannot be executed"
+                .to_owned(),
+        ))
+    }
+
+    fn statistics(&self) -> Statistics {
+        Statistics {
+            num_rows: None,
+            total_byte_size: None,
+            column_statistics: None,
+        }
     }
 }
 
@@ -142,10 +220,13 @@ impl BallistaDataFrame {
         info!("Connecting to Ballista executor at {}:{}", host, port);
 
         let mut client = BallistaClient::try_new(&host, port).await?;
+        let plan = self.df.to_logical_plan();
+
+        debug!("Sending logical plan to executor: {:?}", plan);
 
         client
             .execute_action(&Action::InteractiveQuery {
-                plan:     self.df.to_logical_plan(),
+                plan,
                 settings: Default::default(),
             })
             .await

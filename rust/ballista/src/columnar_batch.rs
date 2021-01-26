@@ -159,21 +159,8 @@ impl ColumnarValue {
     }
 
     pub fn memory_size(&self) -> usize {
-
-        //TODO delegate to Arrow once https://issues.apache.org/jira/browse/ARROW-9582 is
-        // implemented
         match self {
-            ColumnarValue::Columnar(array) => {
-
-                let mut size = 0;
-
-                for buffer in array.data().buffers() {
-
-                    size += buffer.capacity();
-                }
-
-                size
-            },
+            ColumnarValue::Columnar(array) => array.get_array_memory_size(),
             _ => 0,
         }
     }

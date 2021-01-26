@@ -11,5 +11,16 @@ services:
     ports:
       - "50051:50051"
     volumes:
-      - /mnt/tpch:/mnt/tpch
-
+      - ./data:/mnt/tpch
+#  ballista-jvm:
+#    image: ballistacompute/ballista-jvm:0.4.0-SNAPSHOT
+#    ports:
+#      - "50052:50051"
+#    volumes:
+#      - /mnt/nyctaxi:/mnt/nyctaxi
+#  ballista-spark:
+#    image: ballistacompute/ballista-spark:0.4.0-SNAPSHOT
+#    ports:
+#      - "50053:50051"
+#    volumes:
+#      - ./data:/mnt/tpch

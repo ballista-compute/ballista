@@ -455,13 +455,13 @@ message ScalarValue{
         ScalarListValue list_value = 37;
         ScalarType null_list_value = 39; 
 
-        BasicDatafusionScalarType null_value = 31;
+        PrimitiveScalarType null_value = 31;
     }
 }
 
 // Contains all valid datafusion scalar type except for 
 // List
-enum BasicDatafusionScalarType{
+enum PrimitiveScalarType{
     
     BOOL = 0;     // arrow::Type::BOOL
     UINT8 = 1;    // arrow::Type::UINT8
@@ -484,7 +484,7 @@ enum BasicDatafusionScalarType{
 
 message ScalarType{
     oneof datatype{
-        BasicDatafusionScalarType scalar = 1;
+        PrimitiveScalarType scalar = 1;
         ScalarListType list = 2;
     }
 }
@@ -492,7 +492,7 @@ message ScalarType{
 message ScalarListType{
     uint64 depth = 1;
     repeated string field_names = 3;
-    BasicDatafusionScalarType deepest_type = 2;
+    PrimitiveScalarType deepest_type = 2;
 }
 
 // Broke out into multiple message types so that type 

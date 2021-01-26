@@ -26,7 +26,7 @@ use datafusion::{datasource::parquet::ParquetTable, logical_plan::exprlist_to_fi
 use datafusion::datasource::CsvFile;
 use datafusion::logical_plan::{Expr, JoinType, LogicalPlan};
 use datafusion::physical_plan::aggregates::AggregateFunction;
-use protobuf::{BasicDatafusionScalarType, DateUnit, Field, ScalarListValue, ScalarType, arrow_type, logical_expr_node::ExprType, scalar_type};
+use protobuf::{PrimitiveScalarType, DateUnit, Field, ScalarListValue, ScalarType, arrow_type, logical_expr_node::ExprType, scalar_type};
 
 use super::super::proto_error;
 
@@ -345,34 +345,34 @@ fn is_valid_scalar_type_no_list_check(datatype: &arrow::datatypes::DataType)->bo
 impl TryFrom<&arrow::datatypes::DataType> for protobuf::scalar_type::Datatype{
     type Error = BallistaError;
     fn try_from(val: &arrow::datatypes::DataType)-> Result<Self, Self::Error>{
-        use protobuf::{List, BasicDatafusionScalarType};
+        use protobuf::{List, PrimitiveScalarType};
         use protobuf::Field;
         use protobuf::scalar_type;
         use arrow::datatypes::DateUnit;
         let scalar_value = match val{
-            DataType::Boolean => scalar_type::Datatype::Scalar(BasicDatafusionScalarType::Bool as i32),
-            DataType::Null => scalar_type::Datatype::Scalar(BasicDatafusionScalarType::Null as i32),
-            DataType::Int8 => scalar_type::Datatype::Scalar(BasicDatafusionScalarType::Int8 as i32),
-            DataType::Int16 =>  scalar_type::Datatype::Scalar(BasicDatafusionScalarType::Int16 as i32),
-            DataType::Int32 => scalar_type::Datatype::Scalar(BasicDatafusionScalarType::Int32 as i32),
-            DataType::Int64 => scalar_type::Datatype::Scalar(BasicDatafusionScalarType::Int64 as i32),
-            DataType::UInt8 => scalar_type::Datatype::Scalar(BasicDatafusionScalarType::Uint8 as i32),
-            DataType::UInt16 => scalar_type::Datatype::Scalar(BasicDatafusionScalarType::Uint16 as i32),
-            DataType::UInt32 => scalar_type::Datatype::Scalar(BasicDatafusionScalarType::Uint32 as i32),
-            DataType::UInt64 => scalar_type::Datatype::Scalar(BasicDatafusionScalarType::Uint64 as i32),
-            DataType::Float32 => scalar_type::Datatype::Scalar(BasicDatafusionScalarType::Float32 as i32),
-            DataType::Float64 => scalar_type::Datatype::Scalar(BasicDatafusionScalarType::Float64 as i32),
+            DataType::Boolean => scalar_type::Datatype::Scalar(PrimitiveScalarType::Bool as i32),
+            DataType::Null => scalar_type::Datatype::Scalar(PrimitiveScalarType::Null as i32),
+            DataType::Int8 => scalar_type::Datatype::Scalar(PrimitiveScalarType::Int8 as i32),
+            DataType::Int16 =>  scalar_type::Datatype::Scalar(PrimitiveScalarType::Int16 as i32),
+            DataType::Int32 => scalar_type::Datatype::Scalar(PrimitiveScalarType::Int32 as i32),
+            DataType::Int64 => scalar_type::Datatype::Scalar(PrimitiveScalarType::Int64 as i32),
+            DataType::UInt8 => scalar_type::Datatype::Scalar(PrimitiveScalarType::Uint8 as i32),
+            DataType::UInt16 => scalar_type::Datatype::Scalar(PrimitiveScalarType::Uint16 as i32),
+            DataType::UInt32 => scalar_type::Datatype::Scalar(PrimitiveScalarType::Uint32 as i32),
+            DataType::UInt64 => scalar_type::Datatype::Scalar(PrimitiveScalarType::Uint64 as i32),
+            DataType::Float32 => scalar_type::Datatype::Scalar(PrimitiveScalarType::Float32 as i32),
+            DataType::Float64 => scalar_type::Datatype::Scalar(PrimitiveScalarType::Float64 as i32),
             DataType::Date32(date_unit) =>  match  date_unit {
-                 DateUnit::Day => scalar_type::Datatype::Scalar(BasicDatafusionScalarType::Date32 as i32),
+                 DateUnit::Day => scalar_type::Datatype::Scalar(PrimitiveScalarType::Date32 as i32),
                     _ => return Err(proto_error("Found invalid date unit for scalar value, only DateUnit::Day is allowed")),
             },
             DataType::Time64(time_unit) => match time_unit{
-                arrow::datatypes::TimeUnit::Microsecond => scalar_type::Datatype::Scalar(BasicDatafusionScalarType::TimeMicrosecond as i32),
-                arrow::datatypes::TimeUnit::Nanosecond => scalar_type::Datatype::Scalar(BasicDatafusionScalarType::TimeNanosecond as i32),
+                arrow::datatypes::TimeUnit::Microsecond => scalar_type::Datatype::Scalar(PrimitiveScalarType::TimeMicrosecond as i32),
+                arrow::datatypes::TimeUnit::Nanosecond => scalar_type::Datatype::Scalar(PrimitiveScalarType::TimeNanosecond as i32),
                 _ => return Err(proto_error(format!("Found invalid time unit for scalar value, only TimeUnit::Microsecond and TimeUnit::Nanosecond are valid time units: {:?}", time_unit))),
             },
-            DataType::Utf8 => scalar_type::Datatype::Scalar(BasicDatafusionScalarType::Utf8 as i32),
-            DataType::LargeUtf8 => scalar_type::Datatype::Scalar(BasicDatafusionScalarType::LargeUtf8 as i32),
+            DataType::Utf8 => scalar_type::Datatype::Scalar(PrimitiveScalarType::Utf8 as i32),
+            DataType::LargeUtf8 => scalar_type::Datatype::Scalar(PrimitiveScalarType::LargeUtf8 as i32),
             DataType::List(field_type) => {
                 let mut field_names: Vec<String> = Vec::new(); 
                 let mut curr_field: &arrow::datatypes::Field = field_type.as_ref();
@@ -393,29 +393,29 @@ impl TryFrom<&arrow::datatypes::DataType> for protobuf::scalar_type::Datatype{
                 if !is_valid_scalar_type_no_list_check(deepest_datatype){
                     return Err(proto_error(format!("The list nested type {:?} is an invalid scalar type", curr_field)));
                 }
-                let pb_deepest_type: BasicDatafusionScalarType = match deepest_datatype{
-                    DataType::Boolean => BasicDatafusionScalarType::Bool,
-                    DataType::Int8 => BasicDatafusionScalarType::Int8,
-                    DataType::Int16 => BasicDatafusionScalarType::Int16,
-                    DataType::Int32 => BasicDatafusionScalarType::Int32,
-                    DataType::Int64 => BasicDatafusionScalarType::Int64,
-                    DataType::UInt8 => BasicDatafusionScalarType::Uint8,
-                    DataType::UInt16 => BasicDatafusionScalarType::Uint16,
-                    DataType::UInt32 => BasicDatafusionScalarType::Uint32,
-                    DataType::UInt64 => BasicDatafusionScalarType::Uint64,
-                    DataType::Float32 =>  BasicDatafusionScalarType::Float32,
-                    DataType::Float64 =>  BasicDatafusionScalarType::Float64,
-                    DataType::Date32(_) =>  BasicDatafusionScalarType::Date32,
+                let pb_deepest_type: PrimitiveScalarType = match deepest_datatype{
+                    DataType::Boolean => PrimitiveScalarType::Bool,
+                    DataType::Int8 => PrimitiveScalarType::Int8,
+                    DataType::Int16 => PrimitiveScalarType::Int16,
+                    DataType::Int32 => PrimitiveScalarType::Int32,
+                    DataType::Int64 => PrimitiveScalarType::Int64,
+                    DataType::UInt8 => PrimitiveScalarType::Uint8,
+                    DataType::UInt16 => PrimitiveScalarType::Uint16,
+                    DataType::UInt32 => PrimitiveScalarType::Uint32,
+                    DataType::UInt64 => PrimitiveScalarType::Uint64,
+                    DataType::Float32 =>  PrimitiveScalarType::Float32,
+                    DataType::Float64 =>  PrimitiveScalarType::Float64,
+                    DataType::Date32(_) =>  PrimitiveScalarType::Date32,
                     DataType::Time64(time_unit) =>{
                         match time_unit{
-                            arrow::datatypes::TimeUnit::Microsecond => BasicDatafusionScalarType::TimeMicrosecond,
-                            arrow::datatypes::TimeUnit::Nanosecond => BasicDatafusionScalarType::TimeNanosecond,
+                            arrow::datatypes::TimeUnit::Microsecond => PrimitiveScalarType::TimeMicrosecond,
+                            arrow::datatypes::TimeUnit::Nanosecond => PrimitiveScalarType::TimeNanosecond,
                             _=> unreachable!(),
                         }
                     },
                     
-                    DataType::Utf8 => BasicDatafusionScalarType::Utf8,
-                    DataType::LargeUtf8 => BasicDatafusionScalarType::LargeUtf8,
+                    DataType::Utf8 => PrimitiveScalarType::Utf8,
+                    DataType::LargeUtf8 => PrimitiveScalarType::LargeUtf8,
                     _=> unreachable!()
                 };
                 protobuf::scalar_type::Datatype::List(protobuf::ScalarListType{
@@ -438,22 +438,22 @@ impl TryFrom<&datafusion::scalar::ScalarValue> for protobuf::ScalarValue{
     type Error = BallistaError;
     fn try_from(val: &datafusion::scalar::ScalarValue)->Result<protobuf::ScalarValue, Self::Error>{
         use protobuf::scalar_value::Value;
-        use protobuf::BasicDatafusionScalarType;
+        use protobuf::PrimitiveScalarType;
         use datafusion::scalar;
         Ok(match val{
-            scalar::ScalarValue::Boolean(val) => create_proto_scalar(val, BasicDatafusionScalarType::Bool, |s| Value::BoolValue(*s) ),
-            scalar::ScalarValue::Float32(val) => create_proto_scalar(val, BasicDatafusionScalarType::Float32, |s| Value::Float32Value(*s) ),
-            scalar::ScalarValue::Float64(val) => create_proto_scalar(val, BasicDatafusionScalarType::Float64, |s| Value::Float64Value(*s) ),
-            scalar::ScalarValue::Int8(val) => create_proto_scalar(val, BasicDatafusionScalarType::Int8, |s| Value::Int8Value(*s as i32) ),
-            scalar::ScalarValue::Int16(val) => create_proto_scalar(val, BasicDatafusionScalarType::Int16, |s| Value::Int16Value(*s as i32) ),
-            scalar::ScalarValue::Int32(val) => create_proto_scalar(val, BasicDatafusionScalarType::Int32, |s| Value::Int32Value(*s) ),
-            scalar::ScalarValue::Int64(val) => create_proto_scalar(val, BasicDatafusionScalarType::Int64, |s| Value::Int64Value(*s) ),
-            scalar::ScalarValue::UInt8(val) => create_proto_scalar(val, BasicDatafusionScalarType::Uint8, |s| Value::Uint8Value(*s as u32) ),
-            scalar::ScalarValue::UInt16(val) => create_proto_scalar(val, BasicDatafusionScalarType::Uint16, |s| Value::Uint16Value(*s as u32) ),
-            scalar::ScalarValue::UInt32(val) => create_proto_scalar(val, BasicDatafusionScalarType::Uint32, |s| Value::Uint32Value(*s ) ),
-            scalar::ScalarValue::UInt64(val) => create_proto_scalar(val, BasicDatafusionScalarType::Uint64, |s| Value::Uint64Value(*s) ),
-            scalar::ScalarValue::Utf8(val) => create_proto_scalar(val, BasicDatafusionScalarType::Utf8, |s| Value::Utf8Value(s.to_owned()) ),
-            scalar::ScalarValue::LargeUtf8(val) => create_proto_scalar(val, BasicDatafusionScalarType::LargeUtf8, |s| Value::LargeUtf8Value(s.to_owned())),
+            scalar::ScalarValue::Boolean(val) => create_proto_scalar(val, PrimitiveScalarType::Bool, |s| Value::BoolValue(*s) ),
+            scalar::ScalarValue::Float32(val) => create_proto_scalar(val, PrimitiveScalarType::Float32, |s| Value::Float32Value(*s) ),
+            scalar::ScalarValue::Float64(val) => create_proto_scalar(val, PrimitiveScalarType::Float64, |s| Value::Float64Value(*s) ),
+            scalar::ScalarValue::Int8(val) => create_proto_scalar(val, PrimitiveScalarType::Int8, |s| Value::Int8Value(*s as i32) ),
+            scalar::ScalarValue::Int16(val) => create_proto_scalar(val, PrimitiveScalarType::Int16, |s| Value::Int16Value(*s as i32) ),
+            scalar::ScalarValue::Int32(val) => create_proto_scalar(val, PrimitiveScalarType::Int32, |s| Value::Int32Value(*s) ),
+            scalar::ScalarValue::Int64(val) => create_proto_scalar(val, PrimitiveScalarType::Int64, |s| Value::Int64Value(*s) ),
+            scalar::ScalarValue::UInt8(val) => create_proto_scalar(val, PrimitiveScalarType::Uint8, |s| Value::Uint8Value(*s as u32) ),
+            scalar::ScalarValue::UInt16(val) => create_proto_scalar(val, PrimitiveScalarType::Uint16, |s| Value::Uint16Value(*s as u32) ),
+            scalar::ScalarValue::UInt32(val) => create_proto_scalar(val, PrimitiveScalarType::Uint32, |s| Value::Uint32Value(*s ) ),
+            scalar::ScalarValue::UInt64(val) => create_proto_scalar(val, PrimitiveScalarType::Uint64, |s| Value::Uint64Value(*s) ),
+            scalar::ScalarValue::Utf8(val) => create_proto_scalar(val, PrimitiveScalarType::Utf8, |s| Value::Utf8Value(s.to_owned()) ),
+            scalar::ScalarValue::LargeUtf8(val) => create_proto_scalar(val, PrimitiveScalarType::LargeUtf8, |s| Value::LargeUtf8Value(s.to_owned())),
             scalar::ScalarValue::List(value, datatype) => {
                 println!("Current datatype of list: {:?}", datatype);
                 match value{
@@ -514,9 +514,9 @@ impl TryFrom<&datafusion::scalar::ScalarValue> for protobuf::ScalarValue{
                     }
                 }
             },
-            datafusion::scalar::ScalarValue::Date32(val) => create_proto_scalar(val, BasicDatafusionScalarType::Date32, |s| Value::Date32Value(*s) ),
-            datafusion::scalar::ScalarValue::TimeMicrosecond(val) => create_proto_scalar(val, BasicDatafusionScalarType::TimeMicrosecond, |s| Value::TimeMicrosecondValue(*s) ),
-            datafusion::scalar::ScalarValue::TimeNanosecond(val) => create_proto_scalar(val, BasicDatafusionScalarType::TimeNanosecond, |s| Value::TimeNanosecondValue(*s) ),
+            datafusion::scalar::ScalarValue::Date32(val) => create_proto_scalar(val, PrimitiveScalarType::Date32, |s| Value::Date32Value(*s) ),
+            datafusion::scalar::ScalarValue::TimeMicrosecond(val) => create_proto_scalar(val, PrimitiveScalarType::TimeMicrosecond, |s| Value::TimeMicrosecondValue(*s) ),
+            datafusion::scalar::ScalarValue::TimeNanosecond(val) => create_proto_scalar(val, PrimitiveScalarType::TimeNanosecond, |s| Value::TimeNanosecondValue(*s) ),
         })
     }
 }
@@ -760,7 +760,7 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
 
 fn create_proto_scalar<I, T: FnOnce(&I) -> protobuf::scalar_value::Value>(
     v: &Option<I>,
-    null_arrow_type: protobuf::BasicDatafusionScalarType,
+    null_arrow_type: protobuf::PrimitiveScalarType,
     constructor: T,
 ) -> protobuf::ScalarValue {
     protobuf::ScalarValue{
@@ -774,7 +774,7 @@ fn create_proto_scalar<I, T: FnOnce(&I) -> protobuf::scalar_value::Value>(
 
 fn create_proto_scalar_expr_node<I, T: FnOnce(&I) -> protobuf::scalar_value::Value>(
     v: &Option<I>,
-    null_arrow_type: protobuf::BasicDatafusionScalarType,
+    null_arrow_type: protobuf::PrimitiveScalarType,
     constructor: T,
 ) -> protobuf::LogicalExprNode {
     use protobuf::logical_expr_node::ExprType;
@@ -816,61 +816,61 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
             }
             Expr::Literal(value) => match value {
                 ScalarValue::Utf8(s) => Ok(
-                    create_proto_scalar_expr_node(s, protobuf::BasicDatafusionScalarType::Utf8, |s| {
+                    create_proto_scalar_expr_node(s, protobuf::PrimitiveScalarType::Utf8, |s| {
                         Value::Utf8Value(s.to_owned())} 
                     )),
 
                     ScalarValue::LargeUtf8(s)=> Ok(
-                        create_proto_scalar_expr_node(s, protobuf::BasicDatafusionScalarType::LargeUtf8, |s| {
+                        create_proto_scalar_expr_node(s, protobuf::PrimitiveScalarType::LargeUtf8, |s| {
                             Value::LargeUtf8Value(s.to_owned())} 
                         )),
                 ScalarValue::Int8(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::BasicDatafusionScalarType::Int8, |s| {
+                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Int8, |s| {
                         Value::Int8Value(*s as i32)} 
                     )),
                 ScalarValue::Int16(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::BasicDatafusionScalarType::Int16, |s| {
+                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Int16, |s| {
                         Value::Int16Value(*s as i32)} 
                     )),
                 ScalarValue::Int32(n) =>Ok(
-                    create_proto_scalar_expr_node(n, protobuf::BasicDatafusionScalarType::Int32, |s| {
+                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Int32, |s| {
                         Value::Int32Value(*s)} 
                     )),
                 ScalarValue::Int64(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::BasicDatafusionScalarType::Int64, |s| {
+                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Int64, |s| {
                         Value::Int64Value(*s)} 
                     )),
                 ScalarValue::UInt8(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::BasicDatafusionScalarType::Uint8, |s| {
+                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Uint8, |s| {
                         Value::Uint8Value(*s as u32)} 
                     )),
                 ScalarValue::UInt16(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::BasicDatafusionScalarType::Uint16, |s| {
+                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Uint16, |s| {
                         Value::Uint16Value(*s as u32)} 
                     )),
                 ScalarValue::UInt32(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::BasicDatafusionScalarType::Uint32, |s| {
+                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Uint32, |s| {
                         Value::Uint32Value(*s)} 
                     )),
                 ScalarValue::UInt64(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::BasicDatafusionScalarType::Uint64, |s| {
+                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Uint64, |s| {
                         Value::Uint64Value(*s )} 
                     )),
                 ScalarValue::Float32(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::BasicDatafusionScalarType::Float32, |s| {
+                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Float32, |s| {
                         Value::Float32Value(*s )} 
                     )),
                 ScalarValue::Float64(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::BasicDatafusionScalarType::Float64, |s| {
+                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Float64, |s| {
                         Value::Float64Value(*s )} 
                     )),
                 ScalarValue::Date32(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::BasicDatafusionScalarType::Date32, |s| {
+                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Date32, |s| {
                         Value::Date32Value(*s )} 
                     )),
                 
                 ScalarValue::Boolean(b) => Ok(
-                    create_proto_scalar_expr_node(b, protobuf::BasicDatafusionScalarType::Bool, |s|{
+                    create_proto_scalar_expr_node(b, protobuf::PrimitiveScalarType::Bool, |s|{
                         Value::BoolValue(*s)
                     })
                 ),
@@ -904,12 +904,12 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                     })
                 },
                 ScalarValue::TimeMicrosecond(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::BasicDatafusionScalarType::TimeMicrosecond, |s|{
+                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::TimeMicrosecond, |s|{
                         Value::TimeMicrosecondValue(*s)
                     })
                 ),
                 ScalarValue::TimeNanosecond(n) =>Ok(
-                    create_proto_scalar_expr_node(n, protobuf::BasicDatafusionScalarType::TimeNanosecond, |s|{
+                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::TimeNanosecond, |s|{
                         Value::TimeNanosecondValue(*s)
                     })
                 ),

@@ -571,7 +571,7 @@ pub mod scalar_value {
         ListValue(super::ScalarListValue),
         #[prost(message, tag="39")]
         NullListValue(super::ScalarType),
-        #[prost(enumeration="super::BasicDatafusionScalarType", tag="31")]
+        #[prost(enumeration="super::PrimitiveScalarType", tag="31")]
         NullValue(i32),
     }
 }
@@ -583,7 +583,7 @@ pub struct ScalarType {
 pub mod scalar_type {
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Datatype {
-        #[prost(enumeration="super::BasicDatafusionScalarType", tag="1")]
+        #[prost(enumeration="super::PrimitiveScalarType", tag="1")]
         Scalar(i32),
         #[prost(message, tag="2")]
         List(super::ScalarListType),
@@ -595,7 +595,7 @@ pub struct ScalarListType {
     pub depth: u64,
     #[prost(string, repeated, tag="3")]
     pub field_names: ::std::vec::Vec<std::string::String>,
-    #[prost(enumeration="BasicDatafusionScalarType", tag="2")]
+    #[prost(enumeration="PrimitiveScalarType", tag="2")]
     pub deepest_type: i32,
 }
 /// Broke out into multiple message types so that type 
@@ -748,7 +748,7 @@ pub enum IntervalUnit {
 /// List
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
-pub enum BasicDatafusionScalarType {
+pub enum PrimitiveScalarType {
     /// arrow::Type::BOOL
     Bool = 0,
     /// arrow::Type::UINT8

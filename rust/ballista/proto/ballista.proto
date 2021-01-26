@@ -436,7 +436,8 @@ message ScalarListValue{
 message ScalarValue{
     oneof value{
         bool   bool_value = 35;
-        string string_value = 20;
+        string utf8_value = 20;
+        string large_utf8_value = 40;
         int32  int8_value = 21;
         int32  int16_value = 22;
         int32  int32_value = 23;
@@ -461,6 +462,7 @@ message ScalarValue{
 // Contains all valid datafusion scalar type except for 
 // List
 enum BasicDatafusionScalarType{
+    
     BOOL = 0;     // arrow::Type::BOOL
     UINT8 = 1;    // arrow::Type::UINT8
     INT8 = 2;     // arrow::Type::INT8
@@ -477,13 +479,20 @@ enum BasicDatafusionScalarType{
     DATE32 = 13;
     TIME_MICROSECOND = 14;
     TIME_NANOSECOND = 15;
+    NULL = 16;
 }
 
 message ScalarType{
     oneof datatype{
         BasicDatafusionScalarType scalar = 1;
-        List list = 2;
+        ScalarListType list = 2;
     }
+}
+
+message ScalarListType{
+    uint64 depth = 1;
+    repeated string field_names = 3;
+    BasicDatafusionScalarType deepest_type = 2;
 }
 
 // Broke out into multiple message types so that type 
@@ -491,7 +500,7 @@ message ScalarType{
 //All types that are of the empty message types contain no additional metadata
 // about the type
 message ArrowType{
-    oneof type{
+    oneof arrow_type_enum{
         EmptyMessage NONE = 1;     // arrow::Type::NA
         EmptyMessage BOOL =  2;     // arrow::Type::BOOL
         EmptyMessage UINT8 = 3;    // arrow::Type::UINT8

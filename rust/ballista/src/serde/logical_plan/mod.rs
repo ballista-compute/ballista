@@ -21,10 +21,10 @@ mod roundtrip_tests {
 
     use super::super::{super::error::Result, protobuf};
     use arrow::datatypes::{DataType, Field, Schema};
+    use protobuf::arrow_type;
     use core::panic;
-    use datafusion::{logical_plan::{Expr, LogicalPlan, LogicalPlanBuilder},
-                     physical_plan::csv::CsvReadOptions,
-                     prelude::*};
+    use crate::error::BallistaError;
+    use datafusion::{logical_plan::{Expr, LogicalPlan, LogicalPlanBuilder}, physical_plan::csv::CsvReadOptions, prelude::*, scalar::ScalarValue};
     use std::convert::TryInto;
 
     //Given a identity of a LogicalPlan converts it to protobuf and back, using debug formatting to test equality.
@@ -102,6 +102,465 @@ mod roundtrip_tests {
 
         Ok(())
     }
+
+    fn new_box_field(name: &str, dt: DataType, nullable: bool)->Box<arrow::datatypes::Field>{
+        Box::new(arrow::datatypes::Field::new(name, dt, nullable))
+    }
+
+    #[test]
+    fn scalar_values_error_serialization() -> Result<()>{
+        use datafusion::scalar::ScalarValue;
+        use arrow::datatypes::DataType;
+        let should_fail_on_seralize: Vec<ScalarValue> = vec![
+            //Should fail due to inconsistent types 
+            ScalarValue::List(Some(
+                vec![
+                    ScalarValue::Int16(None),
+                    ScalarValue::Float32(Some(32.0)),
+                ]
+            ),
+            DataType::List(new_box_field("item", DataType::Int16, true))),
+
+            ScalarValue::List(Some(
+                vec![
+                    ScalarValue::Float32(None),
+                    ScalarValue::Float32(Some(32.0)),
+                ]
+            ),
+            DataType::List(new_box_field("item", DataType::Int16, true))),
+            ScalarValue::List(
+                Some(vec![
+                    ScalarValue::List(None, DataType::List( new_box_field("level2", DataType::Float32,true))),
+                    ScalarValue::List(Some(vec![
+                        ScalarValue::Float32(Some(-213.1)),
+                        ScalarValue::Float32(None),
+                        ScalarValue::Float32(Some(5.5)),
+                        ScalarValue::Float32(Some(2.0)),
+                        ScalarValue::Float32(Some(1.0)),
+                    ]), DataType::List(new_box_field("level2", DataType::Float32, true))),
+                    ScalarValue::List(None, DataType::List(new_box_field("lists are typed inconsistently", DataType::Int16, true))),
+                ]),
+                DataType::List(
+                    new_box_field(
+                        "level1", 
+                        DataType::List(
+                            new_box_field(
+                                "level2", 
+                                DataType::Float32,
+                                true)
+                            ), 
+                        true)
+                )
+            ),
+        ];
+
+        for test_case in should_fail_on_seralize.into_iter(){
+            let res: Result<protobuf::ScalarValue> = (&test_case).try_into();
+            match res {
+                Ok(val) => return Err(BallistaError::General(format!("The value {:?} should not have been able to serialize. Serialized to :{:?}", test_case, val))),
+                Err(_) => (),
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn round_trip_scalar_values()->Result<()>{
+        use datafusion::scalar::ScalarValue;
+        use arrow::datatypes::DataType;
+        let should_pass: Vec<ScalarValue> = vec![
+            ScalarValue::Boolean(None),
+            ScalarValue::Float32(None),
+            ScalarValue::Float64(None),
+            ScalarValue::Int8(None),
+            ScalarValue::Int16(None),
+            ScalarValue::Int32(None),
+            ScalarValue::Int64(None),
+            ScalarValue::UInt8(None),
+            ScalarValue::UInt16(None),
+            ScalarValue::UInt32(None),
+            ScalarValue::UInt64(None),
+            ScalarValue::Utf8(None),
+            ScalarValue::LargeUtf8(None),
+            ScalarValue::List(None, DataType::Boolean),
+            ScalarValue::Date32(None),
+            ScalarValue::TimeMicrosecond(None),
+            ScalarValue::TimeNanosecond(None),
+
+            ScalarValue::Boolean(Some(true)),
+            ScalarValue::Boolean(Some(false)),
+            ScalarValue::Float32(Some(1.0)),
+            ScalarValue::Float32(Some(f32::MAX)),
+            ScalarValue::Float32(Some(f32::MIN)),
+            ScalarValue::Float32(Some(-2000.0)),
+            ScalarValue::Float64(Some(1.0)),
+            ScalarValue::Float64(Some(f64::MAX)),
+            ScalarValue::Float64(Some(f64::MIN)),
+            ScalarValue::Float64(Some(-2000.0)),
+            ScalarValue::Int8(Some(i8::MIN)),
+            ScalarValue::Int8(Some(i8::MAX)),
+            ScalarValue::Int8(Some(0)),
+            ScalarValue::Int8(Some(-15)),
+            ScalarValue::Int16(Some(i16::MIN)),
+            ScalarValue::Int16(Some(i16::MAX)),
+            ScalarValue::Int16(Some(0)),
+            ScalarValue::Int16(Some(-15)),
+            
+            ScalarValue::Int32(Some(i32::MIN)),
+            ScalarValue::Int32(Some(i32::MAX)),
+            ScalarValue::Int32(Some(0)),
+            ScalarValue::Int32(Some(-15)),
+            ScalarValue::Int64(Some(i64::MIN)),
+            ScalarValue::Int64(Some(i64::MAX)),
+            ScalarValue::Int64(Some(0)),
+            ScalarValue::Int64(Some(-15)),
+            ScalarValue::UInt8(Some(u8::MAX)),
+            ScalarValue::UInt8(Some(0)),
+            ScalarValue::UInt16(Some(u16::MAX)),
+            ScalarValue::UInt16(Some(0)),            
+            ScalarValue::UInt32(Some(u32::MAX)),
+            ScalarValue::UInt32(Some(0)),
+            ScalarValue::UInt64(Some(u64::MAX)),
+            ScalarValue::UInt64(Some(0)),
+            ScalarValue::Utf8(Some(String::from("Test string   "))),
+            ScalarValue::LargeUtf8(Some(String::from("Test Large utf8"))),
+            ScalarValue::Date32(Some(0)),
+            ScalarValue::Date32(Some(i32::MAX)),
+            ScalarValue::TimeNanosecond(Some(0)),
+            ScalarValue::TimeNanosecond(Some(i64::MAX)),
+            ScalarValue::TimeMicrosecond(Some(0)),
+            ScalarValue::TimeMicrosecond(Some(i64::MAX)),
+            ScalarValue::TimeMicrosecond(None),
+
+
+
+
+            ScalarValue::List(Some(vec![
+                ScalarValue::Float32(Some(-213.1)),
+                ScalarValue::Float32(None),
+                ScalarValue::Float32(Some(5.5)),
+                ScalarValue::Float32(Some(2.0)),
+                ScalarValue::Float32(Some(1.0)),
+            ]), DataType::List(new_box_field("level1", DataType::Float32, true))),
+            ScalarValue::List(
+                Some(vec![
+                    ScalarValue::List(None, DataType::List( new_box_field("level2", DataType::Float32,true))),
+                    ScalarValue::List(Some(vec![
+                        ScalarValue::Float32(Some(-213.1)),
+                        ScalarValue::Float32(None),
+                        ScalarValue::Float32(Some(5.5)),
+                        ScalarValue::Float32(Some(2.0)),
+                        ScalarValue::Float32(Some(1.0)),
+                    ]), DataType::List(new_box_field("level2", DataType::Float32, true))),
+                ]),
+                DataType::List(
+                    new_box_field(
+                        "level1", 
+                        DataType::List(
+                            new_box_field(
+                                "level2", 
+                                DataType::Float32,
+                                true)
+                            ), 
+                        true)
+                )
+            ),
+
+            
+        ];
+
+        
+        for test_case in should_pass.into_iter(){
+            let proto: protobuf::ScalarValue = (&test_case).try_into()?;
+            let _roundtrip: ScalarValue = (&proto).try_into()?;
+        }
+
+        
+        Ok(())
+    }
+
+
+    #[test]
+    fn round_trip_scalar_types() -> Result<()>{
+        use arrow::datatypes::DataType;
+        use arrow::datatypes::{DateUnit, TimeUnit, IntervalUnit};
+        let should_pass: Vec<DataType> = vec![
+            DataType::Boolean,
+            DataType::Int8,
+            DataType::Int16,
+            DataType::Int32,
+            DataType::Int64,
+            DataType::UInt8,
+            DataType::UInt16,
+            DataType::UInt32,
+            DataType::UInt64,
+            DataType::Float32,
+            DataType::Float64,
+
+            DataType::Date32(DateUnit::Day),
+            DataType::Time64(TimeUnit::Microsecond),
+            DataType::Time64(TimeUnit::Nanosecond),
+            DataType::Utf8,
+            DataType::LargeUtf8,
+
+            //Recursive list tests
+            DataType::List(new_box_field("Level1", DataType::Boolean, true)),
+            DataType::List(new_box_field("Level1", 
+                DataType::List(
+                    new_box_field("Level2",
+                     DataType::Date32(DateUnit::Day),
+                      true)
+                )
+            , true)),
+        ];
+
+
+
+        let should_fail: Vec<DataType> = vec![
+            DataType::Null,
+            DataType::Float16,
+            //Add more timestamp tests
+            DataType::Timestamp(TimeUnit::Millisecond, None),
+
+            DataType::Date32(DateUnit::Millisecond),
+            DataType::Date64(DateUnit::Day),
+            DataType::Date64(DateUnit::Millisecond),
+            DataType::Time32(TimeUnit::Second),
+            DataType::Time32(TimeUnit::Millisecond),
+            DataType::Time32(TimeUnit::Microsecond),
+            DataType::Time32(TimeUnit::Nanosecond),
+            DataType::Time64(TimeUnit::Second),
+            DataType::Time64(TimeUnit::Millisecond),
+            DataType::Duration(TimeUnit::Second),
+            DataType::Duration(TimeUnit::Millisecond),
+            DataType::Duration(TimeUnit::Microsecond),
+            DataType::Duration(TimeUnit::Nanosecond),
+            DataType::Interval(IntervalUnit::YearMonth),
+            DataType::Interval(IntervalUnit::DayTime),
+            DataType::Binary,
+            DataType::FixedSizeBinary(0),
+            DataType::FixedSizeBinary(1234),
+            DataType::FixedSizeBinary(-432),
+            DataType::LargeBinary,
+            DataType::Decimal(1345,5431),
+
+            //Recursive list tests
+            DataType::List(new_box_field("Level1", DataType::Binary, true)),
+            DataType::List(new_box_field("Level1", 
+                DataType::List(
+                    new_box_field("Level2",
+                     DataType::FixedSizeBinary(53),
+                      false)
+                )
+            , true)),
+
+
+            //Fixed size lists
+            DataType::FixedSizeList(new_box_field("Level1", DataType::Binary, true),4),
+            DataType::FixedSizeList(new_box_field("Level1", 
+                DataType::List(
+                    new_box_field("Level2",
+                     DataType::FixedSizeBinary(53),
+                      false)
+                )
+            , true), 41),
+
+
+            //Struct Testing
+            DataType::Struct(vec![Field::new("nullable", DataType::Boolean, false), Field::new("name", DataType::Utf8, false), Field::new("datatype", DataType::Binary, false)]),
+            DataType::Struct(vec![
+                    Field::new("nullable", DataType::Boolean, false), 
+                    Field::new("name", DataType::Utf8, false), 
+                    Field::new("datatype", DataType::Binary, false),
+                    Field::new("nested_struct", DataType::Struct(
+                        vec![Field::new("nullable", DataType::Boolean, false),
+                         Field::new("name", DataType::Utf8, false), 
+                         Field::new("datatype", DataType::Binary, false)]
+                    ),true)]),
+
+            DataType::Union(vec![Field::new("nullable", DataType::Boolean, false), Field::new("name", DataType::Utf8, false), Field::new("datatype", DataType::Binary, false)]),
+            DataType::Union(vec![
+                    Field::new("nullable", DataType::Boolean, false), 
+                    Field::new("name", DataType::Utf8, false), 
+                    Field::new("datatype", DataType::Binary, false),
+                    Field::new("nested_struct", DataType::Struct(
+                        vec![Field::new("nullable", DataType::Boolean, false),
+                            Field::new("name", DataType::Utf8, false), 
+                            Field::new("datatype", DataType::Binary, false)]
+                    ),true)]),
+
+
+            DataType::Dictionary(Box::new(DataType::Utf8), Box::new(DataType::Struct(vec![Field::new("nullable", DataType::Boolean, false), Field::new("name", DataType::Utf8, false), Field::new("datatype", DataType::Binary, false)]))),
+            DataType::Dictionary(Box::new(DataType::Decimal(10, 50)),           Box::new(  DataType::FixedSizeList(new_box_field("Level1", DataType::Binary, true),4))),
+        ];
+
+        for test_case in should_pass.into_iter(){
+            let proto: protobuf::ScalarType = (&test_case).try_into()?;
+            let roundtrip: DataType = (&proto).try_into()?;
+            assert_eq!(format!("{:?}", test_case), format!("{:?}", roundtrip));
+        }
+
+        let mut success: Vec<DataType> = Vec::new(); 
+        for test_case in should_fail.into_iter(){
+            let proto: Result<protobuf::ScalarType> = (&test_case).try_into();
+            if !proto.is_err(){
+                success.push(test_case)
+            }
+        }
+        if success.len() > 0{
+            return Err(BallistaError::General(format!("The following items which should have ressulted in an error completed successfully: {:?}", success)));
+        }
+        Ok(())
+
+
+    }
+
+
+    #[test]
+    fn round_trip_datatype()->Result<()>{
+        use arrow::datatypes::DataType;
+        use arrow::datatypes::{IntervalUnit, DateUnit, TimeUnit};
+        let test_cases: Vec<DataType> = vec![
+            DataType::Null,
+            DataType::Boolean,
+            DataType::Int8,
+            DataType::Int16,
+            DataType::Int32,
+            DataType::Int64,
+            DataType::UInt8,
+            DataType::UInt16,
+            DataType::UInt32,
+            DataType::UInt64,
+            DataType::Float16,
+            DataType::Float32,
+            DataType::Float64,
+            //Add more timestamp tests
+            DataType::Timestamp(TimeUnit::Millisecond, None),
+
+            DataType::Date32(DateUnit::Day),
+            DataType::Date32(DateUnit::Millisecond),
+            DataType::Date64(DateUnit::Day),
+            DataType::Date64(DateUnit::Millisecond),
+            DataType::Time32(TimeUnit::Second),
+            DataType::Time32(TimeUnit::Millisecond),
+            DataType::Time32(TimeUnit::Microsecond),
+            DataType::Time32(TimeUnit::Nanosecond),
+            DataType::Time64(TimeUnit::Second),
+            DataType::Time64(TimeUnit::Millisecond),
+            DataType::Time64(TimeUnit::Microsecond),
+            DataType::Time64(TimeUnit::Nanosecond),
+            DataType::Duration(TimeUnit::Second),
+            DataType::Duration(TimeUnit::Millisecond),
+            DataType::Duration(TimeUnit::Microsecond),
+            DataType::Duration(TimeUnit::Nanosecond),
+            DataType::Interval(IntervalUnit::YearMonth),
+            DataType::Interval(IntervalUnit::DayTime),
+            DataType::Binary,
+            DataType::FixedSizeBinary(0),
+            DataType::FixedSizeBinary(1234),
+            DataType::FixedSizeBinary(-432),
+            DataType::LargeBinary,
+            DataType::Utf8,
+            DataType::LargeUtf8,
+            DataType::Decimal(1345,5431),
+
+            //Recursive list tests
+            DataType::List(new_box_field("Level1", DataType::Binary, true)),
+            DataType::List(new_box_field("Level1", 
+                DataType::List(
+                    new_box_field("Level2",
+                     DataType::FixedSizeBinary(53),
+                      false)
+                )
+            , true)),
+
+
+            //Fixed size lists
+            DataType::FixedSizeList(new_box_field("Level1", DataType::Binary, true),4),
+            DataType::FixedSizeList(new_box_field("Level1", 
+                DataType::List(
+                    new_box_field("Level2",
+                     DataType::FixedSizeBinary(53),
+                      false)
+                )
+            , true), 41),
+
+
+            //Struct Testing
+            DataType::Struct(vec![Field::new("nullable", DataType::Boolean, false), Field::new("name", DataType::Utf8, false), Field::new("datatype", DataType::Binary, false)]),
+            DataType::Struct(vec![
+                    Field::new("nullable", DataType::Boolean, false), 
+                    Field::new("name", DataType::Utf8, false), 
+                    Field::new("datatype", DataType::Binary, false),
+                    Field::new("nested_struct", DataType::Struct(
+                        vec![Field::new("nullable", DataType::Boolean, false),
+                         Field::new("name", DataType::Utf8, false), 
+                         Field::new("datatype", DataType::Binary, false)]
+                    ),true)]),
+
+            DataType::Union(vec![Field::new("nullable", DataType::Boolean, false), Field::new("name", DataType::Utf8, false), Field::new("datatype", DataType::Binary, false)]),
+            DataType::Union(vec![
+                    Field::new("nullable", DataType::Boolean, false), 
+                    Field::new("name", DataType::Utf8, false), 
+                    Field::new("datatype", DataType::Binary, false),
+                    Field::new("nested_struct", DataType::Struct(
+                        vec![Field::new("nullable", DataType::Boolean, false),
+                            Field::new("name", DataType::Utf8, false), 
+                            Field::new("datatype", DataType::Binary, false)]
+                    ),true)]),
+
+
+            DataType::Dictionary(Box::new(DataType::Utf8), Box::new(DataType::Struct(vec![Field::new("nullable", DataType::Boolean, false), Field::new("name", DataType::Utf8, false), Field::new("datatype", DataType::Binary, false)]))),
+            DataType::Dictionary(Box::new(DataType::Decimal(10, 50)),           Box::new(  DataType::FixedSizeList(new_box_field("Level1", DataType::Binary, true),4))),
+      
+
+        ];
+
+
+        for test_case in test_cases.into_iter(){
+            let proto: protobuf::ArrowType = (&test_case).into();
+            let roundtrip: DataType = (&proto).try_into()?;
+            assert_eq!(format!("{:?}", test_case), format!("{:?}", roundtrip));
+        }
+        Ok(())
+    }
+    
+
+    #[test]
+    fn roundtrip_null_scalar_values()->Result<()>{
+        use datafusion::scalar::ScalarValue;
+        use arrow::datatypes::Field;
+        use arrow::datatypes::DataType;
+        let test_types =vec![
+            ScalarValue::Boolean(None),
+            ScalarValue::Float32(None),
+            ScalarValue::Float64(None),
+            ScalarValue::Int8(None),
+            ScalarValue::Int16(None),
+            ScalarValue::Int32(None),
+            ScalarValue::Int64(None),
+            ScalarValue::UInt8(None),
+            ScalarValue::UInt16(None),
+            ScalarValue::UInt32(None),
+            ScalarValue::UInt64(None),
+            ScalarValue::Utf8(None),
+            ScalarValue::LargeUtf8(None),
+            ScalarValue::Date32(None),
+            ScalarValue::TimeMicrosecond(None),
+            ScalarValue::TimeNanosecond(None),
+            //ScalarValue::List(None, DataType::Boolean)
+            ];
+        
+        for test_case in test_types.into_iter(){
+            let proto_scalar: protobuf::ScalarValue =  (&test_case).try_into()?;
+            let returned_scalar: datafusion::scalar::ScalarValue = (&proto_scalar).try_into()?;
+            assert_eq!(format!("{:?}", &test_case), format!("{:?}", returned_scalar));
+        }
+
+        Ok(())
+   
+    }
+
 
     #[test]
 

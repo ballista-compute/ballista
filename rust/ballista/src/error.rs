@@ -42,6 +42,12 @@ pub enum BallistaError {
     // TonicError(tonic::status::Status)
 }
 
+impl<T> Into<Result<T>> for BallistaError{
+    fn into(self)->Result<T>{
+        Err(self)
+    }
+}
+
 pub fn ballista_error(message: &str) -> BallistaError {
 
     BallistaError::General(message.to_owned())

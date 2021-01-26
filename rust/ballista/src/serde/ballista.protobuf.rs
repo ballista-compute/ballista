@@ -528,7 +528,7 @@ pub struct ScalarListValue {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ScalarValue {
-    #[prost(oneof="scalar_value::Value", tags="35, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 32, 33, 34, 37, 39, 31")]
+    #[prost(oneof="scalar_value::Value", tags="35, 20, 40, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 32, 33, 34, 37, 39, 31")]
     pub value: ::std::option::Option<scalar_value::Value>,
 }
 pub mod scalar_value {
@@ -537,7 +537,9 @@ pub mod scalar_value {
         #[prost(bool, tag="35")]
         BoolValue(bool),
         #[prost(string, tag="20")]
-        StringValue(std::string::String),
+        Utf8Value(std::string::String),
+        #[prost(string, tag="40")]
+        LargeUtf8Value(std::string::String),
         #[prost(int32, tag="21")]
         Int8Value(i32),
         #[prost(int32, tag="22")]
@@ -584,8 +586,17 @@ pub mod scalar_type {
         #[prost(enumeration="super::BasicDatafusionScalarType", tag="1")]
         Scalar(i32),
         #[prost(message, tag="2")]
-        List(super::List),
+        List(super::ScalarListType),
     }
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ScalarListType {
+    #[prost(uint64, tag="1")]
+    pub depth: u64,
+    #[prost(string, repeated, tag="3")]
+    pub field_names: ::std::vec::Vec<std::string::String>,
+    #[prost(enumeration="BasicDatafusionScalarType", tag="2")]
+    pub deepest_type: i32,
 }
 /// Broke out into multiple message types so that type 
 /// metadata did not need to be in separate message
@@ -593,12 +604,12 @@ pub mod scalar_type {
 /// about the type
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ArrowType {
-    #[prost(oneof="arrow_type::Type", tags="1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 32, 15, 16, 31, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30")]
-    pub r#type: ::std::option::Option<arrow_type::Type>,
+    #[prost(oneof="arrow_type::ArrowTypeEnum", tags="1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 32, 15, 16, 31, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30")]
+    pub arrow_type_enum: ::std::option::Option<arrow_type::ArrowTypeEnum>,
 }
 pub mod arrow_type {
     #[derive(Clone, PartialEq, ::prost::Oneof)]
-    pub enum Type {
+    pub enum ArrowTypeEnum {
         /// arrow::Type::NA
         #[prost(message, tag="1")]
         None(super::EmptyMessage),
@@ -758,4 +769,5 @@ pub enum BasicDatafusionScalarType {
     Date32 = 13,
     TimeMicrosecond = 14,
     TimeNanosecond = 15,
+    Null = 16,
 }

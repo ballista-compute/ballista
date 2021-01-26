@@ -146,32 +146,37 @@ pub struct SortExprNode {
 /// LogicalPlan is a nested type
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct LogicalPlanNode {
-    #[prost(message, optional, boxed, tag="1")]
-    pub input: ::std::option::Option<::std::boxed::Box<LogicalPlanNode>>,
-    #[prost(message, optional, tag="10")]
-    pub csv_scan: ::std::option::Option<CsvTableScanNode>,
-    #[prost(message, optional, tag="11")]
-    pub parquet_scan: ::std::option::Option<ParquetTableScanNode>,
-    #[prost(message, optional, tag="20")]
-    pub projection: ::std::option::Option<ProjectionNode>,
-    #[prost(message, optional, tag="21")]
-    pub selection: ::std::option::Option<SelectionNode>,
-    #[prost(message, optional, tag="22")]
-    pub limit: ::std::option::Option<LimitNode>,
-    #[prost(message, optional, tag="23")]
-    pub aggregate: ::std::option::Option<AggregateNode>,
-    #[prost(message, optional, boxed, tag="24")]
-    pub join: ::std::option::Option<::std::boxed::Box<JoinNode>>,
-    #[prost(message, optional, tag="25")]
-    pub sort: ::std::option::Option<SortNode>,
-    #[prost(message, optional, tag="26")]
-    pub repartition: ::std::option::Option<RepartitionNode>,
-    #[prost(message, optional, tag="27")]
-    pub empty_relation: ::std::option::Option<EmptyRelationNode>,
-    #[prost(message, optional, tag="28")]
-    pub create_external_table: ::std::option::Option<CreateExternalTableNode>,
-    #[prost(message, optional, tag="29")]
-    pub explain: ::std::option::Option<ExplainNode>,
+    #[prost(oneof="logical_plan_node::LogicalPlanType", tags="10, 11, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29")]
+    pub logical_plan_type: ::std::option::Option<logical_plan_node::LogicalPlanType>,
+}
+pub mod logical_plan_node {
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum LogicalPlanType {
+        #[prost(message, tag="10")]
+        CsvScan(super::CsvTableScanNode),
+        #[prost(message, tag="11")]
+        ParquetScan(super::ParquetTableScanNode),
+        #[prost(message, tag="20")]
+        Projection(Box<super::ProjectionNode>),
+        #[prost(message, tag="21")]
+        Selection(Box<super::SelectionNode>),
+        #[prost(message, tag="22")]
+        Limit(Box<super::LimitNode>),
+        #[prost(message, tag="23")]
+        Aggregate(Box<super::AggregateNode>),
+        #[prost(message, tag="24")]
+        Join(Box<super::JoinNode>),
+        #[prost(message, tag="25")]
+        Sort(Box<super::SortNode>),
+        #[prost(message, tag="26")]
+        Repartition(Box<super::RepartitionNode>),
+        #[prost(message, tag="27")]
+        EmptyRelation(super::EmptyRelationNode),
+        #[prost(message, tag="28")]
+        CreateExternalTable(super::CreateExternalTableNode),
+        #[prost(message, tag="29")]
+        Explain(Box<super::ExplainNode>),
+    }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ProjectionColumns {
@@ -212,30 +217,38 @@ pub struct ParquetTableScanNode {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ProjectionNode {
-    #[prost(message, repeated, tag="1")]
+    #[prost(message, optional, boxed, tag="1")]
+    pub input: ::std::option::Option<::std::boxed::Box<LogicalPlanNode>>,
+    #[prost(message, repeated, tag="2")]
     pub expr: ::std::vec::Vec<LogicalExprNode>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SelectionNode {
+    #[prost(message, optional, boxed, tag="1")]
+    pub input: ::std::option::Option<::std::boxed::Box<LogicalPlanNode>>,
     #[prost(message, optional, tag="2")]
     pub expr: ::std::option::Option<LogicalExprNode>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SortNode {
-    #[prost(message, repeated, tag="1")]
+    #[prost(message, optional, boxed, tag="1")]
+    pub input: ::std::option::Option<::std::boxed::Box<LogicalPlanNode>>,
+    #[prost(message, repeated, tag="2")]
     pub expr: ::std::vec::Vec<LogicalExprNode>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RepartitionNode {
-    #[prost(oneof="repartition_node::PartitionMethod", tags="1, 2")]
+    #[prost(message, optional, boxed, tag="1")]
+    pub input: ::std::option::Option<::std::boxed::Box<LogicalPlanNode>>,
+    #[prost(oneof="repartition_node::PartitionMethod", tags="2, 3")]
     pub partition_method: ::std::option::Option<repartition_node::PartitionMethod>,
 }
 pub mod repartition_node {
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum PartitionMethod {
-        #[prost(uint64, tag="1")]
+        #[prost(uint64, tag="2")]
         RoundRobin(u64),
-        #[prost(message, tag="2")]
+        #[prost(message, tag="3")]
         Hash(super::HashRepartition),
     }
 }
@@ -266,7 +279,9 @@ pub struct CreateExternalTableNode {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ExplainNode {
-    #[prost(bool, tag="1")]
+    #[prost(message, optional, boxed, tag="1")]
+    pub input: ::std::option::Option<::std::boxed::Box<LogicalPlanNode>>,
+    #[prost(bool, tag="2")]
     pub verbose: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -278,9 +293,11 @@ pub struct DfField {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AggregateNode {
-    #[prost(message, repeated, tag="1")]
-    pub group_expr: ::std::vec::Vec<LogicalExprNode>,
+    #[prost(message, optional, boxed, tag="1")]
+    pub input: ::std::option::Option<::std::boxed::Box<LogicalPlanNode>>,
     #[prost(message, repeated, tag="2")]
+    pub group_expr: ::std::vec::Vec<LogicalExprNode>,
+    #[prost(message, repeated, tag="3")]
     pub aggr_expr: ::std::vec::Vec<LogicalExprNode>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -298,7 +315,9 @@ pub struct JoinNode {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct LimitNode {
-    #[prost(uint32, tag="1")]
+    #[prost(message, optional, boxed, tag="1")]
+    pub input: ::std::option::Option<::std::boxed::Box<LogicalPlanNode>>,
+    #[prost(uint32, tag="2")]
     pub limit: u32,
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -308,22 +327,27 @@ pub struct LimitNode {
 /// PhysicalPlanNode is a nested type
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PhysicalPlanNode {
-    #[prost(message, optional, boxed, tag="1")]
-    pub input: ::std::option::Option<::std::boxed::Box<PhysicalPlanNode>>,
-    #[prost(message, optional, tag="10")]
-    pub scan: ::std::option::Option<ScanExecNode>,
-    #[prost(message, optional, tag="20")]
-    pub projection: ::std::option::Option<ProjectionExecNode>,
-    #[prost(message, optional, tag="21")]
-    pub selection: ::std::option::Option<SelectionExecNode>,
-    #[prost(message, optional, tag="22")]
-    pub global_limit: ::std::option::Option<GlobalLimitExecNode>,
-    #[prost(message, optional, tag="23")]
-    pub local_limit: ::std::option::Option<LocalLimitExecNode>,
-    #[prost(message, optional, tag="30")]
-    pub hash_aggregate: ::std::option::Option<HashAggregateExecNode>,
-    #[prost(message, optional, tag="40")]
-    pub shuffle_reader: ::std::option::Option<ShuffleReaderExecNode>,
+    #[prost(oneof="physical_plan_node::PhysicalPlanType", tags="10, 20, 21, 22, 23, 30, 40")]
+    pub physical_plan_type: ::std::option::Option<physical_plan_node::PhysicalPlanType>,
+}
+pub mod physical_plan_node {
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum PhysicalPlanType {
+        #[prost(message, tag="10")]
+        Scan(super::ScanExecNode),
+        #[prost(message, tag="20")]
+        Projection(Box<super::ProjectionExecNode>),
+        #[prost(message, tag="21")]
+        Selection(super::SelectionExecNode),
+        #[prost(message, tag="22")]
+        GlobalLimit(super::GlobalLimitExecNode),
+        #[prost(message, tag="23")]
+        LocalLimit(super::LocalLimitExecNode),
+        #[prost(message, tag="30")]
+        HashAggregate(super::HashAggregateExecNode),
+        #[prost(message, tag="40")]
+        ShuffleReader(super::ShuffleReaderExecNode),
+    }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ScanExecNode {
@@ -347,7 +371,9 @@ pub struct ScanExecNode {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ProjectionExecNode {
-    #[prost(message, repeated, tag="1")]
+    #[prost(message, optional, boxed, tag="1")]
+    pub input: ::std::option::Option<::std::boxed::Box<PhysicalPlanNode>>,
+    #[prost(message, repeated, tag="2")]
     pub expr: ::std::vec::Vec<LogicalExprNode>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -701,7 +727,6 @@ pub enum AggregateFunction {
     Sum = 2,
     Avg = 3,
     Count = 4,
-    CountDistinct = 5,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]

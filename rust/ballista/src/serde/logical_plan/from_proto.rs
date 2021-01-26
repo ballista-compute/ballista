@@ -14,7 +14,7 @@
 
 //! Serde code to convert from protocol buffers to Rust data structures.
 
-use std::{convert::TryInto, unimplemented};
+use std::{convert::{TryInto, From},unimplemented};
 
 use crate::error::BallistaError;
 use crate::serde::{proto_error, protobuf};
@@ -25,8 +25,9 @@ use datafusion::logical_plan::{Expr, JoinType, LogicalPlan, LogicalPlanBuilder, 
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::physical_plan::csv::CsvReadOptions;
 use datafusion::scalar::ScalarValue;
-use protobuf::logical_expr_node::ExprType;
+use protobuf::{logical_expr_node::ExprType, scalar_type};
 use protobuf::logical_plan_node::LogicalPlanType;
+use scalar_type::Datatype;
 
 // use uuid::Uuid;
 
@@ -263,6 +264,7 @@ impl TryInto<datafusion::logical_plan::DFSchemaRef> for protobuf::Schema {
 impl TryInto<arrow::datatypes::DataType> for &protobuf::scalar_type::Datatype{
     type Error = BallistaError;
     fn try_into(self)->Result<arrow::datatypes::DataType, Self::Error>{
+        use protobuf::scalar_type::Datatype;
         Ok(match self{
             Datatype::Scalar(scalar_type) => {
                 let pb_scalar_enum = protobuf::PrimitiveScalarType::from_i32(*scalar_type)
@@ -297,6 +299,7 @@ impl TryInto<arrow::datatypes::DataType> for &protobuf::arrow_type::ArrowTypeEnu
     type Error = BallistaError;
     fn try_into(self) -> Result<arrow::datatypes::DataType, Self::Error> {
         use arrow::datatypes::DataType;
+        use protobuf::arrow_type;
         Ok(match self{
             arrow_type::ArrowTypeEnum::None(_) => DataType::Null,
             arrow_type::ArrowTypeEnum::Bool(_) => DataType::Boolean,
@@ -388,8 +391,9 @@ impl Into<arrow::datatypes::DataType> for protobuf::PrimitiveScalarType{
 }
 
 //Does not typecheck lists
-fn typechecked_scalar_value_conversion(tested_type: &protobuf::scalar_value::Value, required_type: PrimitiveScalarType)->Result<datafusion::scalar::ScalarValue, BallistaError>{
+fn typechecked_scalar_value_conversion(tested_type: &protobuf::scalar_value::Value, required_type: protobuf::PrimitiveScalarType)->Result<datafusion::scalar::ScalarValue, BallistaError>{
     use protobuf::scalar_value::Value;
+    use protobuf::PrimitiveScalarType;
     Ok(match (tested_type, &required_type){
         (Value::BoolValue(v), PrimitiveScalarType::Bool) => ScalarValue::Boolean(Some(*v)),
         (Value::Int8Value(v), PrimitiveScalarType::Int8)=> ScalarValue::Int8(Some(*v as i8)),
@@ -444,6 +448,7 @@ impl TryInto<datafusion::scalar::ScalarValue> for &protobuf::scalar_value::Value
     type Error = BallistaError;
     fn try_into(self) -> Result<datafusion::scalar::ScalarValue, Self::Error> {
         use datafusion::scalar::ScalarValue;
+        use protobuf::PrimitiveScalarType;
         let scalar = match self{
             protobuf::scalar_value::Value::BoolValue(v) => ScalarValue::Boolean(Some(*v)),
             protobuf::scalar_value::Value::Utf8Value(v) => ScalarValue::Utf8(Some(v.to_owned())),
@@ -473,6 +478,8 @@ impl TryInto<datafusion::scalar::ScalarValue> for &protobuf::scalar_value::Value
 impl TryInto<datafusion::scalar::ScalarValue> for &protobuf::ScalarListValue{
     type Error = BallistaError;
     fn try_into(self) -> Result<datafusion::scalar::ScalarValue, Self::Error> {
+        use protobuf::scalar_type::Datatype;
+        use protobuf::PrimitiveScalarType;
         let protobuf::ScalarListValue{datatype, values} = self;
         let pb_scalar_type = datatype.as_ref().ok_or_else(|| proto_error("Protobuf deserialization error: ScalarListValue messsage missing required field 'datatype'"))?;
         let scalar_type = pb_scalar_type.datatype.as_ref().ok_or_else(|| proto_error("Protobuf deserialization error: ScalarListValue.Datatype messsage missing required field 'datatype'"))?;
@@ -520,6 +527,7 @@ impl TryInto<datafusion::scalar::ScalarValue> for &protobuf::ScalarListValue{
 impl TryInto<arrow::datatypes::DataType> for &protobuf::ScalarListType{
     type Error = BallistaError;
     fn try_into(self) -> Result<arrow::datatypes::DataType, Self::Error> {
+        use protobuf::PrimitiveScalarType;
         let protobuf::ScalarListType{depth, deepest_type, field_names} = self;
         let mut name_idx = field_names.len() - 1;
         let mut curr_type = arrow::datatypes::DataType::List(Box::new(
@@ -541,7 +549,7 @@ impl TryInto<arrow::datatypes::DataType> for &protobuf::ScalarListType{
     }
 }
 
-impl TryInto<datafusion::scalar::ScalarValue> for PrimitiveScalarType{
+impl TryInto<datafusion::scalar::ScalarValue> for protobuf::PrimitiveScalarType{
     type Error = BallistaError;
     fn try_into(self) -> Result<datafusion::scalar::ScalarValue, Self::Error> {
         use datafusion::scalar::ScalarValue;
@@ -862,6 +870,19 @@ impl TryInto<Schema> for &protobuf::Schema {
     }
 }
 
+
+impl TryInto<arrow::datatypes::Field> for &protobuf::Field{
+    type Error = BallistaError;
+    fn try_into(self) -> Result<arrow::datatypes::Field, Self::Error> {
+        let pb_datatype= self.arrow_type.as_ref().ok_or_else(|| proto_error("Protobuf deserialization error: Field message missing required field 'arrow_type'"))?;
+        
+        Ok(arrow::datatypes::Field::new(
+             &self.name[..],
+             pb_datatype.as_ref().try_into()?,
+             self.nullable,
+        ))
+    }
+}
 
 
 use std::convert::TryFrom;

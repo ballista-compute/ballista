@@ -16,12 +16,11 @@
 //! buffer format, allowing DataFusion logical plans to be serialized and transmitted between
 //! processes.
 
-use std::{boxed, convert::TryInto};
+use std::{boxed, convert::{TryInto, TryFrom}};
 
-use crate::{serde::{empty_logical_plan_node, protobuf, BallistaError}};
-
-use arrow::{datatypes::{DataType, Schema}};
-use arrow_type::ArrowTypeEnum;
+use crate::{context::DFTableAdapter, serde::protobuf};
+use crate::error::BallistaError;
+use arrow::datatypes::{DataType, Schema};
 use datafusion::{datasource::parquet::ParquetTable, logical_plan::exprlist_to_fields};
 use datafusion::datasource::CsvFile;
 use datafusion::logical_plan::{Expr, JoinType, LogicalPlan};
@@ -104,6 +103,8 @@ impl protobuf::TimeUnit{
         }
     }
 }
+
+
 
 
 impl From<&arrow::datatypes::Field> for protobuf::Field{
@@ -303,7 +304,6 @@ impl From<&arrow::datatypes::DataType> for protobuf::arrow_type::ArrowTypeEnum{
     }
 }
 
-use std::convert::TryFrom;
 
 //Does not check if list subtypes are valid
 fn is_valid_scalar_type_no_list_check(datatype: &arrow::datatypes::DataType)->bool{
@@ -351,7 +351,6 @@ impl TryFrom<&arrow::datatypes::DataType> for protobuf::scalar_type::Datatype{
         use arrow::datatypes::DateUnit;
         let scalar_value = match val{
             DataType::Boolean => scalar_type::Datatype::Scalar(PrimitiveScalarType::Bool as i32),
-            DataType::Null => scalar_type::Datatype::Scalar(PrimitiveScalarType::Null as i32),
             DataType::Int8 => scalar_type::Datatype::Scalar(PrimitiveScalarType::Int8 as i32),
             DataType::Int16 =>  scalar_type::Datatype::Scalar(PrimitiveScalarType::Int16 as i32),
             DataType::Int32 => scalar_type::Datatype::Scalar(PrimitiveScalarType::Int32 as i32),
@@ -364,12 +363,12 @@ impl TryFrom<&arrow::datatypes::DataType> for protobuf::scalar_type::Datatype{
             DataType::Float64 => scalar_type::Datatype::Scalar(PrimitiveScalarType::Float64 as i32),
             DataType::Date32(date_unit) =>  match  date_unit {
                  DateUnit::Day => scalar_type::Datatype::Scalar(PrimitiveScalarType::Date32 as i32),
-                    _ => return Err(proto_error("Found invalid date unit for scalar value, only DateUnit::Day is allowed")),
+                    _ => Err(proto_error("Found invalid date unit for scalar value, only DateUnit::Day is allowed"))?,
             },
             DataType::Time64(time_unit) => match time_unit{
                 arrow::datatypes::TimeUnit::Microsecond => scalar_type::Datatype::Scalar(PrimitiveScalarType::TimeMicrosecond as i32),
                 arrow::datatypes::TimeUnit::Nanosecond => scalar_type::Datatype::Scalar(PrimitiveScalarType::TimeNanosecond as i32),
-                _ => return Err(proto_error(format!("Found invalid time unit for scalar value, only TimeUnit::Microsecond and TimeUnit::Nanosecond are valid time units: {:?}", time_unit))),
+                _ =>  Err(proto_error(format!("Found invalid time unit for scalar value, only TimeUnit::Microsecond and TimeUnit::Nanosecond are valid time units: {:?}", time_unit)))?,
             },
             DataType::Utf8 => scalar_type::Datatype::Scalar(PrimitiveScalarType::Utf8 as i32),
             DataType::LargeUtf8 => scalar_type::Datatype::Scalar(PrimitiveScalarType::LargeUtf8 as i32),
@@ -410,13 +409,13 @@ impl TryFrom<&arrow::datatypes::DataType> for protobuf::scalar_type::Datatype{
                         match time_unit{
                             arrow::datatypes::TimeUnit::Microsecond => PrimitiveScalarType::TimeMicrosecond,
                             arrow::datatypes::TimeUnit::Nanosecond => PrimitiveScalarType::TimeNanosecond,
-                            _=> unreachable!(),
+                            _=> return Err(proto_error(format!("Found invalid time unit for scalar value, only TimeUnit::Microsecond and TimeUnit::Nanosecond are valid time units: {:?}", time_unit))),
                         }
                     },
                     
                     DataType::Utf8 => PrimitiveScalarType::Utf8,
                     DataType::LargeUtf8 => PrimitiveScalarType::LargeUtf8,
-                    _=> unreachable!()
+                    _=> Err(proto_error(format!("Error converting to Datatype to scalar type, {:?} is invalid as a datafusion scalar.", val)))?,
                 };
                 protobuf::scalar_type::Datatype::List(protobuf::ScalarListType{
                     field_names,
@@ -424,7 +423,25 @@ impl TryFrom<&arrow::datatypes::DataType> for protobuf::scalar_type::Datatype{
                     deepest_type: pb_deepest_type as i32,
                 })
             },
-            _ => Err(proto_error(format!("Error converting to Datatype to scalar type, {:?} is invalid as a datafusion scalar.", val)))?, 
+            DataType::Null|
+            DataType::Float16|
+            DataType::Timestamp(_,_)|
+            DataType::Date64(_)|
+            DataType::Time32(_)|
+            DataType::Duration(_)|
+            DataType::Interval(_)|
+            DataType::Binary|
+            DataType::FixedSizeBinary(_)|
+            DataType::LargeBinary|
+            DataType::FixedSizeList(_,_)|
+            DataType::LargeList(_)|
+            DataType::Struct(_)|
+            DataType::Union(_)|
+            DataType::Dictionary(_,_)|
+            DataType::Decimal(_,_) => Err(proto_error(format!("Error converting to Datatype to scalar type, {:?} is invalid as a datafusion scalar.", val)))?, 
+            
+             
+            
         };
         Ok(scalar_value)
     }
@@ -474,8 +491,9 @@ impl TryFrom<&datafusion::scalar::ScalarValue> for protobuf::ScalarValue{
                             let type_checked_values: Vec<protobuf::ScalarValue> = values.iter()
                                                                                     .map(|scalar|
                                                                                         match (scalar, scalar_type){
-                                                                                            (scalar::ScalarValue::List(_,list_datatype), arrow::datatypes::DataType::List(field)) => {
+                                                                                            (scalar::ScalarValue::List(_,arrow::datatypes::DataType::List(list_field)), arrow::datatypes::DataType::List(field)) => {
                                                                                                 let scalar_datatype = field.data_type();
+                                                                                                let list_datatype = list_field.data_type();
                                                                                                 if std::mem::discriminant(list_datatype) != std::mem::discriminant(scalar_datatype){
                                                                                                     return Err(proto_error(format!("Protobuf serialization error: Lists with inconsistent typing {:?} and {:?} found within list", list_datatype, scalar_datatype)));
                                                                                                 }
@@ -525,6 +543,7 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<protobuf::LogicalPlanNode, Self::Error> {
+        use protobuf::logical_plan_node::LogicalPlanType;
         match self {
             LogicalPlan::TableScan {
                 table_name,
@@ -581,7 +600,7 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
                     })
                 } else if let Some(csv) = source.downcast_ref::<CsvFile>() {
                     let delimiter = [csv.delimiter()];
-                    let delimiter = str::from_utf8(&delimiter)
+                    let delimiter = std::str::from_utf8(&delimiter)
                         .map_err(|_| BallistaError::General("Invalid CSV delimiter".to_owned()))?;
                     Ok(protobuf::LogicalPlanNode {
                         logical_plan_type: Some(LogicalPlanType::CsvScan(

@@ -572,7 +572,6 @@ impl TryInto<datafusion::scalar::ScalarValue> for &protobuf::ScalarValue{
                     .map(|val| val.try_into())
                     .collect::<Result<Vec<_>,_>>()?;
                 let scalar_type: arrow::datatypes::DataType = pb_scalar_type.try_into()?;
-                let datatype : arrow::datatypes::DataType = pb_scalar_type.try_into()?; 
                 ScalarValue::List(Some(typechecked_values), scalar_type)
             },
             protobuf::scalar_value::Value::NullListValue(v) => {

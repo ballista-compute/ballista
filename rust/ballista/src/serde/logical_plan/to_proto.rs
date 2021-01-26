@@ -772,23 +772,6 @@ fn create_proto_scalar<I, T: FnOnce(&I) -> protobuf::scalar_value::Value>(
 
 
 
-fn create_proto_scalar_expr_node<I, T: FnOnce(&I) -> protobuf::scalar_value::Value>(
-    v: &Option<I>,
-    null_arrow_type: protobuf::PrimitiveScalarType,
-    constructor: T,
-) -> protobuf::LogicalExprNode {
-    use protobuf::logical_expr_node::ExprType;
-    let val = v.as_ref()
-        .map(constructor)
-        .unwrap_or(
-        protobuf::scalar_value::Value::NullValue(null_arrow_type as i32)
-        );
-        protobuf::LogicalExprNode{
-            expr_type: Some(ExprType::Literal(protobuf::ScalarValue{
-                value: Some(val),
-            }))
-        }
-}
 
 
 impl TryInto<protobuf::LogicalExprNode> for &Expr {
@@ -814,105 +797,13 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                 };
                 Ok(expr)
             }
-            Expr::Literal(value) => match value {
-                ScalarValue::Utf8(s) => Ok(
-                    create_proto_scalar_expr_node(s, protobuf::PrimitiveScalarType::Utf8, |s| {
-                        Value::Utf8Value(s.to_owned())} 
-                    )),
-
-                    ScalarValue::LargeUtf8(s)=> Ok(
-                        create_proto_scalar_expr_node(s, protobuf::PrimitiveScalarType::LargeUtf8, |s| {
-                            Value::LargeUtf8Value(s.to_owned())} 
-                        )),
-                ScalarValue::Int8(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Int8, |s| {
-                        Value::Int8Value(*s as i32)} 
-                    )),
-                ScalarValue::Int16(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Int16, |s| {
-                        Value::Int16Value(*s as i32)} 
-                    )),
-                ScalarValue::Int32(n) =>Ok(
-                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Int32, |s| {
-                        Value::Int32Value(*s)} 
-                    )),
-                ScalarValue::Int64(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Int64, |s| {
-                        Value::Int64Value(*s)} 
-                    )),
-                ScalarValue::UInt8(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Uint8, |s| {
-                        Value::Uint8Value(*s as u32)} 
-                    )),
-                ScalarValue::UInt16(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Uint16, |s| {
-                        Value::Uint16Value(*s as u32)} 
-                    )),
-                ScalarValue::UInt32(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Uint32, |s| {
-                        Value::Uint32Value(*s)} 
-                    )),
-                ScalarValue::UInt64(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Uint64, |s| {
-                        Value::Uint64Value(*s )} 
-                    )),
-                ScalarValue::Float32(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Float32, |s| {
-                        Value::Float32Value(*s )} 
-                    )),
-                ScalarValue::Float64(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Float64, |s| {
-                        Value::Float64Value(*s )} 
-                    )),
-                ScalarValue::Date32(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::Date32, |s| {
-                        Value::Date32Value(*s )} 
-                    )),
-                
-                ScalarValue::Boolean(b) => Ok(
-                    create_proto_scalar_expr_node(b, protobuf::PrimitiveScalarType::Bool, |s|{
-                        Value::BoolValue(*s)
-                    })
-                ),
-                
-                ScalarValue::List(list,  datatype) => {
-                    let list_scalar_value: protobuf::scalar_value::Value = match list{
-                        None => {
-                             protobuf::scalar_value::Value::NullListValue(protobuf::ScalarType::try_from(datatype)?)
-                        },
-                        //TODO add type checks on outbound list values
-                        Some(value)=>{
-                            let scalar_values: Vec<protobuf::ScalarValue> = value.iter()
-                                .map(|scalar| scalar.try_into())
-                                .collect::<Result<Vec<_>, _>>()?;
-
-                            protobuf::scalar_value::Value::ListValue(
-                                protobuf::ScalarListValue{
-                                    datatype: Some(protobuf::ScalarType::try_from(datatype)?),
-                                    values: scalar_values,
-                                }
-                            )
-                        }
-                    };
-
-                    Ok(protobuf::LogicalExprNode{
-                        expr_type: Some(protobuf::logical_expr_node::ExprType::Literal(
-                            protobuf::ScalarValue{
-                                value: Some(list_scalar_value),
-                            }
-                        ))
-                    })
-                },
-                ScalarValue::TimeMicrosecond(n) => Ok(
-                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::TimeMicrosecond, |s|{
-                        Value::TimeMicrosecondValue(*s)
-                    })
-                ),
-                ScalarValue::TimeNanosecond(n) =>Ok(
-                    create_proto_scalar_expr_node(n, protobuf::PrimitiveScalarType::TimeNanosecond, |s|{
-                        Value::TimeNanosecondValue(*s)
-                    })
-                ),
+            Expr::Literal(value) => {
+                let pb_value: protobuf::ScalarValue = value.try_into()?;
+                Ok(
+                    protobuf::LogicalExprNode{
+                        expr_type: Some(ExprType::Literal(pb_value))
+                    }
+                )
             },
             Expr::BinaryExpr { left, op, right } => {
                 let binary_expr = Box::new(protobuf::BinaryExprNode {
@@ -1085,20 +976,13 @@ impl TryInto<protobuf::Schema> for &Schema {
             columns: self
                 .fields()
                 .iter()
-                .map(|field| {
-                    let proto =protobuf::ArrowType::from(field.data_type());
-                    protobuf::Field{
-                        name: field.name().to_owned(),
-                        arrow_type: Some(Box::new(proto.into())),
-                        nullable: field.is_nullable(),
-                        children: vec![],
-                    }
-                    
-                })
+                .map(protobuf::Field::from)
                 .collect::<Vec<_>>(),
         })
     }
 }
+
+
 
 impl TryFrom<&arrow::datatypes::DataType> for protobuf::ScalarType{
     type Error =  BallistaError;

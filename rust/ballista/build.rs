@@ -14,8 +14,6 @@
 
 fn main() -> Result<(), String> {
     println!("cargo:rerun-if-changed=proto/ballista.proto");
-    prost_build::Config::new()
-        .out_dir("src/serde/")
-        .compile_protos(&["proto/ballista.proto"], &["proto"])
+    prost_build::compile_protos(&["proto/ballista.proto"], &["proto"])
         .map_err(|e| format!("protobuf compilation failed: {}", e))
 }

@@ -16,13 +16,17 @@
 
 use std::{pin::Pin, sync::Arc};
 
-use crate::{executor::BallistaExecutor,
-            serde::{decode_protobuf, scheduler::Action as BallistaAction},
-            utils::write_stream_to_disk};
+use crate::{
+    executor::BallistaExecutor,
+    serde::{decode_protobuf, scheduler::Action as BallistaAction},
+    utils::write_stream_to_disk,
+};
 
 use arrow::error::ArrowError;
-use arrow_flight::{flight_service_server::FlightService, Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo, HandshakeRequest,
-                   HandshakeResponse, PutResult, SchemaResult, Ticket};
+use arrow_flight::{
+    flight_service_server::FlightService, Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo, HandshakeRequest, HandshakeResponse,
+    PutResult, SchemaResult, Ticket,
+};
 use datafusion::{error::DataFusionError, execution::context::ExecutionContext, physical_plan::collect};
 use futures::{Stream, StreamExt};
 use log::{debug, info};
@@ -38,7 +42,6 @@ pub struct BallistaFlightService {
 
 impl BallistaFlightService {
     pub fn new(executor: Arc<BallistaExecutor>) -> Self {
-
         Self { executor }
     }
 }
@@ -57,7 +60,6 @@ impl FlightService for BallistaFlightService {
     type ListFlightsStream = BoxedFlightStream<FlightInfo>;
 
     async fn do_get(&self, request: Request<Ticket>) -> Result<Response<Self::DoGetStream>, Status> {
-
         let ticket = request.into_inner();
         info!("Received do_get request");
 
@@ -84,7 +86,6 @@ impl FlightService for BallistaFlightService {
                 let results = collect(plan.clone()).await.map_err(|e| from_datafusion_err(&e))?;
 
                 if results.is_empty() {
-
                     return Err(Status::internal("There were no results from ticket"));
                 }
                 debug!("Received {} record batches", results.len());
@@ -101,7 +102,6 @@ impl FlightService for BallistaFlightService {
                 let mut batches: Vec<Result<FlightData, Status>> = results
                     .iter()
                     .flat_map(|batch| {
-
                         let (flight_dictionaries, flight_batch) = arrow_flight::utils::flight_data_from_arrow_batch(batch, &options);
 
                         flight_dictionaries.into_iter().chain(std::iter::once(flight_batch)).map(Ok)
@@ -114,9 +114,8 @@ impl FlightService for BallistaFlightService {
                 let output = futures::stream::iter(flights);
 
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
-            },
+            }
             BallistaAction::ExecuteQueryStage(stage) => {
-
                 // TODO this is work-in-progress / experimental
 
                 // the goal here is to execute a partial query - the query will be send to
@@ -138,44 +137,37 @@ impl FlightService for BallistaFlightService {
 
                 //TODO return summary of the query stage execution
                 Err(Status::unimplemented("ExecuteQueryStage"))
-            },
+            }
             BallistaAction::FetchShuffle(_) => {
-
                 // once query stage execution is implemented, it will be necessary to implement
                 // this part so that the results can be collected, either by another query stage
                 // or by the client fetching the results
 
                 Err(Status::unimplemented("FetchShuffle"))
-            },
+            }
         }
     }
 
     async fn get_schema(&self, _request: Request<FlightDescriptor>) -> Result<Response<SchemaResult>, Status> {
-
         Err(Status::unimplemented("get_schema"))
     }
 
     async fn get_flight_info(&self, _request: Request<FlightDescriptor>) -> Result<Response<FlightInfo>, Status> {
-
         Err(Status::unimplemented("get_flight_info"))
     }
 
     async fn handshake(&self, _request: Request<Streaming<HandshakeRequest>>) -> Result<Response<Self::HandshakeStream>, Status> {
-
         Err(Status::unimplemented("handshake"))
     }
 
     async fn list_flights(&self, _request: Request<Criteria>) -> Result<Response<Self::ListFlightsStream>, Status> {
-
         Err(Status::unimplemented("list_flights"))
     }
 
     async fn do_put(&self, request: Request<Streaming<FlightData>>) -> Result<Response<Self::DoPutStream>, Status> {
-
         let mut request = request.into_inner();
 
         while let Some(data) = request.next().await {
-
             let _data = data?;
         }
 
@@ -183,7 +175,6 @@ impl FlightService for BallistaFlightService {
     }
 
     async fn do_action(&self, request: Request<Action>) -> Result<Response<Self::DoActionStream>, Status> {
-
         let action = request.into_inner();
 
         let _action = decode_protobuf(&action.body.to_vec()).map_err(|e| from_ballista_err(&e))?;
@@ -192,27 +183,22 @@ impl FlightService for BallistaFlightService {
     }
 
     async fn list_actions(&self, _request: Request<Empty>) -> Result<Response<Self::ListActionsStream>, Status> {
-
         Err(Status::unimplemented("list_actions"))
     }
 
     async fn do_exchange(&self, _request: Request<Streaming<FlightData>>) -> Result<Response<Self::DoExchangeStream>, Status> {
-
         Err(Status::unimplemented("do_exchange"))
     }
 }
 
 fn from_arrow_err(e: &ArrowError) -> Status {
-
     Status::internal(format!("ArrowError: {:?}", e))
 }
 
 fn from_ballista_err(e: &crate::error::BallistaError) -> Status {
-
     Status::internal(format!("Ballista Error: {:?}", e))
 }
 
 fn from_datafusion_err(e: &DataFusionError) -> Status {
-
     Status::internal(format!("DataFusion Error: {:?}", e))
 }

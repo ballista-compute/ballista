@@ -14,19 +14,18 @@
 
 use std::{collections::HashMap, convert::TryInto};
 
-use crate::{error::BallistaError,
-            serde::{proto_error, protobuf, scheduler::Action}};
+use crate::{
+    error::BallistaError,
+    serde::{proto_error, protobuf, scheduler::Action},
+};
 
 use datafusion::logical_plan::LogicalPlan;
 
 macro_rules! convert_required {
     ($PB:expr) => {{
-
         if let Some(field) = $PB.as_ref() {
-
             field.try_into()
         } else {
-
             Err(proto_error("Missing required field in protobuf"))
         }
     }};
@@ -46,15 +45,12 @@ impl TryInto<Action> for protobuf::Action {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<Action, Self::Error> {
-
         if self.query.is_some() {
-
             let plan: LogicalPlan = convert_required!(self.query)?;
 
             let mut settings = HashMap::new();
 
             for setting in &self.settings {
-
                 settings.insert(setting.key.to_owned(), setting.value.to_owned());
             }
 
@@ -66,7 +62,6 @@ impl TryInto<Action> for protobuf::Action {
         //     let shuffle_id: ShuffleId = convert_required!(self.fetch_shuffle)?;
         //     Ok(Action::FetchShuffle(shuffle_id))
         } else {
-
             Err(BallistaError::NotImplemented(format!("from_proto(Action) {:?}", self)))
         }
     }

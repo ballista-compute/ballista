@@ -17,9 +17,11 @@
 use std::sync::Arc;
 
 use arrow_flight::flight_service_server::FlightServiceServer;
-use ballista::{executor::{BallistaExecutor, DiscoveryMode, ExecutorConfig},
-               flight_service::BallistaFlightService,
-               BALLISTA_VERSION};
+use ballista::{
+    executor::{BallistaExecutor, DiscoveryMode, ExecutorConfig},
+    flight_service::BallistaFlightService,
+    BALLISTA_VERSION,
+};
 use clap::arg_enum;
 use log::info;
 use structopt::StructOpt;
@@ -65,7 +67,6 @@ struct Opt {
 #[tokio::main]
 
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-
     env_logger::init();
 
     let opt = Opt::from_args();

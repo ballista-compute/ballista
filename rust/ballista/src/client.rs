@@ -14,12 +14,18 @@
 
 //! Client API for sending requests to executors.
 
-use std::{convert::{TryFrom, TryInto},
-          sync::Arc};
+use std::{
+    convert::{TryFrom, TryInto},
+    sync::Arc,
+};
 
-use crate::{error::{ballista_error, BallistaError, Result},
-            serde::{protobuf::{self},
-                    scheduler::Action}};
+use crate::{
+    error::{ballista_error, BallistaError, Result},
+    serde::{
+        protobuf::{self},
+        scheduler::Action,
+    },
+};
 
 use crate::memory_stream::MemoryStream;
 use arrow::datatypes::Schema;
@@ -39,7 +45,6 @@ impl BallistaClient {
     /// host and port
 
     pub async fn try_new(host: &str, port: usize) -> Result<Self> {
-
         let addr = format!("http://{}:{}", host, port);
 
         let flight_client = FlightServiceClient::connect(addr)
@@ -52,9 +57,8 @@ impl BallistaClient {
     /// Execute a logical query plan and retrieve the results
 
     pub async fn execute_query(&mut self, plan: &LogicalPlan) -> Result<SendableRecordBatchStream> {
-
         let action = Action::InteractiveQuery {
-            plan:     plan.to_owned(),
+            plan: plan.to_owned(),
             settings: HashMap::new(),
         };
 
@@ -64,7 +68,6 @@ impl BallistaClient {
     /// Execute an action and retrieve the results
 
     pub async fn execute_action(&mut self, action: &Action) -> Result<SendableRecordBatchStream> {
-
         let serialized_action: protobuf::Action = action.to_owned().try_into()?;
 
         let mut buf: Vec<u8> = Vec::with_capacity(serialized_action.encoded_len());
@@ -83,7 +86,6 @@ impl BallistaClient {
         // the schema should be the first message returned, else client should error
         match stream.message().await.map_err(|e| BallistaError::General(format!("{:?}", e)))? {
             Some(flight_data) => {
-
                 // convert FlightData to a stream
                 let schema = Arc::new(Schema::try_from(&flight_data)?);
 
@@ -93,14 +95,13 @@ impl BallistaClient {
                 let mut batches = vec![];
 
                 while let Some(flight_data) = stream.message().await.map_err(|e| BallistaError::General(format!("{:?}", e)))? {
-
                     let batch = flight_data_to_arrow_batch(&flight_data, schema.clone(), &[])?;
 
                     batches.push(batch);
                 }
 
                 Ok(Box::pin(MemoryStream::try_new(batches, schema, None)?))
-            },
+            }
             None => Err(ballista_error("Did not receive schema batch from flight server")),
         }
     }

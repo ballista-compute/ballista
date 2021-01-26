@@ -49,9 +49,9 @@ pub struct BallistaContextState {
     /// Tables that have been registered with this context
     tables: HashMap<String, LogicalPlan>,
     /// General purpose settings
-    settings:     HashMap<String, String>, /* map from shuffle id to executor uuid
-                                            * shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
-                                            * config: ExecutorConfig */
+    settings: HashMap<String, String>, /* map from shuffle id to executor uuid
+                                        * shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
+                                        * config: ExecutorConfig */
 }
 
 impl BallistaContextState {
@@ -73,10 +73,7 @@ pub struct BallistaContext {
 impl BallistaContext {
     /// Create a context for executing queries against a remote Ballista executor instance
     pub fn remote(host: &str, port: usize, settings: HashMap<String, String>) -> Self {
-        let meta = ClusterMeta::Direct {
-            host: host.to_owned(),
-            port,
-        };
+        let meta = ClusterMeta::Direct { host: host.to_owned(), port };
         let state = BallistaContextState::new(meta, settings);
 
         Self {
@@ -113,9 +110,7 @@ impl BallistaContext {
     /// Register a DataFrame as a table that can be referenced from a SQL query
     pub fn register_table(&self, name: &str, table: &BallistaDataFrame) -> Result<()> {
         let mut state = self.state.lock().unwrap();
-        state
-            .tables
-            .insert(name.to_owned(), table.to_logical_plan());
+        state.tables.insert(name.to_owned(), table.to_logical_plan());
         Ok(())
     }
 
@@ -169,15 +164,9 @@ impl TableProvider for DFTableAdapter {
         self.logical_plan.schema().as_ref().to_owned().into()
     }
 
-    fn scan(
-        &self,
-        _projection: &Option<Vec<usize>>,
-        _batch_size: usize,
-        _filters: &[Expr],
-    ) -> DFResult<Arc<dyn ExecutionPlan>> {
+    fn scan(&self, _projection: &Option<Vec<usize>>, _batch_size: usize, _filters: &[Expr]) -> DFResult<Arc<dyn ExecutionPlan>> {
         Err(DataFusionError::NotImplemented(
-            "DFTableAdapter is only used for building the logical plan and cannot be executed"
-                .to_owned(),
+            "DFTableAdapter is only used for building the logical plan and cannot be executed".to_owned(),
         ))
     }
 
@@ -197,19 +186,16 @@ pub struct BallistaDataFrame {
     /// Ballista context state
     state: Arc<Mutex<BallistaContextState>>,
     /// DataFusion DataFrame representing logical query plan
-    df:    Arc<dyn DataFrame>,
+    df: Arc<dyn DataFrame>,
 }
 
 impl BallistaDataFrame {
     pub fn from(state: Arc<Mutex<BallistaContextState>>, df: Arc<dyn DataFrame>) -> Self {
-
         Self { state, df }
     }
 
     pub async fn collect(&self) -> Result<SendableRecordBatchStream> {
-
         let (host, port) = {
-
             let state = self.state.lock().unwrap();
 
             match &state.cluster_meta {
@@ -233,22 +219,18 @@ impl BallistaDataFrame {
     }
 
     pub fn select_columns(&self, columns: Vec<&str>) -> Result<BallistaDataFrame> {
-
         Ok(Self::from(self.state.clone(), self.df.select_columns(columns).map_err(BallistaError::from)?))
     }
 
     pub fn select(&self, expr: Vec<Expr>) -> Result<BallistaDataFrame> {
-
         Ok(Self::from(self.state.clone(), self.df.select(expr).map_err(BallistaError::from)?))
     }
 
     pub fn filter(&self, expr: Expr) -> Result<BallistaDataFrame> {
-
         Ok(Self::from(self.state.clone(), self.df.filter(expr).map_err(BallistaError::from)?))
     }
 
     pub fn aggregate(&self, group_expr: Vec<Expr>, aggr_expr: Vec<Expr>) -> Result<BallistaDataFrame> {
-
         Ok(Self::from(
             self.state.clone(),
             self.df.aggregate(group_expr, aggr_expr).map_err(BallistaError::from)?,
@@ -256,12 +238,10 @@ impl BallistaDataFrame {
     }
 
     pub fn limit(&self, n: usize) -> Result<BallistaDataFrame> {
-
         Ok(Self::from(self.state.clone(), self.df.limit(n).map_err(BallistaError::from)?))
     }
 
     pub fn sort(&self, expr: Vec<Expr>) -> Result<BallistaDataFrame> {
-
         Ok(Self::from(self.state.clone(), self.df.sort(expr).map_err(BallistaError::from)?))
     }
 
@@ -271,7 +251,6 @@ impl BallistaDataFrame {
     // &right_cols).map_err(BallistaError::from)?)) }
 
     pub fn repartition(&self, partitioning_scheme: Partitioning) -> Result<BallistaDataFrame> {
-
         Ok(Self::from(
             self.state.clone(),
             self.df.repartition(partitioning_scheme).map_err(BallistaError::from)?,
@@ -279,17 +258,14 @@ impl BallistaDataFrame {
     }
 
     pub fn schema(&self) -> &DFSchema {
-
         self.df.schema()
     }
 
     pub fn to_logical_plan(&self) -> LogicalPlan {
-
         self.df.to_logical_plan()
     }
 
     pub fn explain(&self, verbose: bool) -> Result<BallistaDataFrame> {
-
         Ok(Self::from(self.state.clone(), self.df.explain(verbose).map_err(BallistaError::from)?))
     }
 }

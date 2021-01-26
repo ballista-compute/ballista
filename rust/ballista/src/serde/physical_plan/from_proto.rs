@@ -30,12 +30,10 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<Arc<dyn ExecutionPlan>, Self::Error> {
-        let plan = self.physical_plan_type.as_ref().ok_or_else(|| {
-            proto_error(format!(
-                "physical_plan::from_proto() Unsupported physical plan '{:?}'",
-                self
-            ))
-        })?;
+        let plan = self
+            .physical_plan_type
+            .as_ref()
+            .ok_or_else(|| proto_error(format!("physical_plan::from_proto() Unsupported physical plan '{:?}'", self)))?;
         match plan {
             PhysicalPlanType::Projection(projection) => {
                 let input: Arc<dyn ExecutionPlan> = convert_box_required!(projection.input)?;

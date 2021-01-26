@@ -25,15 +25,12 @@ use prost::Message;
 #[allow(clippy::all)]
 #[path = "./ballista.protobuf.rs"]
 pub mod protobuf;
- 
- 
 
 pub mod logical_plan;
 pub mod physical_plan;
 pub mod scheduler;
 
 pub(crate) fn decode_protobuf(bytes: &[u8]) -> Result<BallistaAction, BallistaError> {
-
     let mut buf = Cursor::new(bytes);
 
     protobuf::Action::decode(&mut buf)
@@ -42,7 +39,6 @@ pub(crate) fn decode_protobuf(bytes: &[u8]) -> Result<BallistaAction, BallistaEr
 }
 
 pub(crate) fn proto_error<S: Into<String>>(message: S) -> BallistaError {
-
     BallistaError::General(message.into())
 }
 

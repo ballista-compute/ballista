@@ -24,7 +24,6 @@ const CLUSTER_LABEL_KEY: &str = "ballista-cluster";
 /// Get a list of executor nodes in a cluster by listing pods in the stateful set.
 
 pub async fn k8s_get_executors(namespace: &str, cluster_name: &str) -> Result<Vec<ExecutorMeta>, BallistaError> {
-
     use api::core::v1::Pod;
 
     let client = kube::client::Client::try_default().await?;
@@ -38,21 +37,14 @@ pub async fn k8s_get_executors(namespace: &str, cluster_name: &str) -> Result<Ve
         .await?;
 
     for pod in &pods {
-
         if let Some(pod_meta) = pod.metadata.as_ref() {
-
             if let Some(pod_name) = pod_meta.name.as_ref() {
-
                 if let Some(pod_spec) = pod.spec.as_ref() {
-
                     if !pod_spec.containers.is_empty() {
-
                         let host = format!("{}.{}.{}", pod_name, cluster_name, namespace,);
 
                         if let Some(port) = pod_spec.containers[0].ports.as_ref() {
-
                             if !port.is_empty() {
-
                                 executors.push(ExecutorMeta {
                                     id: pod_name.to_owned(),
                                     host,

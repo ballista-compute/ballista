@@ -14,8 +14,10 @@
 
 //! Ballista Prelude (common imports)
 
-pub use crate::{client::BallistaClient,
-                context::BallistaContext,
-                error::{BallistaError, Result}};
+pub use crate::{
+    client::BallistaClient,
+    context::BallistaContext,
+    error::{BallistaError, Result},
+};
 
 pub use futures::StreamExt;

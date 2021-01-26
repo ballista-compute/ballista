@@ -13,7 +13,6 @@
 // limitations under the License.
 
 fn main() -> Result<(), String> {
-
     println!("cargo:rerun-if-changed=proto/ballista.proto");
     prost_build::Config::new()
         .out_dir("src/serde/")

@@ -14,9 +14,11 @@
 
 //! Ballista error types
 
-use std::{error::Error,
-          fmt::{Display, Formatter},
-          io, result};
+use std::{
+    error::Error,
+    fmt::{Display, Formatter},
+    io, result,
+};
 
 use arrow::error::ArrowError;
 use datafusion::error::DataFusionError;
@@ -42,48 +44,42 @@ pub enum BallistaError {
     // TonicError(tonic::status::Status)
 }
 
-impl<T> Into<Result<T>> for BallistaError{
-    fn into(self)->Result<T>{
+impl<T> Into<Result<T>> for BallistaError {
+    fn into(self) -> Result<T> {
         Err(self)
     }
 }
 
 pub fn ballista_error(message: &str) -> BallistaError {
-
     BallistaError::General(message.to_owned())
 }
 
 impl From<String> for BallistaError {
     fn from(e: String) -> Self {
-
         BallistaError::General(e)
     }
 }
 
 impl From<ArrowError> for BallistaError {
     fn from(e: ArrowError) -> Self {
-
         BallistaError::ArrowError(e)
     }
 }
 
 impl From<parser::ParserError> for BallistaError {
     fn from(e: parser::ParserError) -> Self {
-
         BallistaError::SqlError(e)
     }
 }
 
 impl From<DataFusionError> for BallistaError {
     fn from(e: DataFusionError) -> Self {
-
         BallistaError::DataFusionError(e)
     }
 }
 
 impl From<io::Error> for BallistaError {
     fn from(e: io::Error) -> Self {
-
         BallistaError::IoError(e)
     }
 }
@@ -102,21 +98,18 @@ impl From<io::Error> for BallistaError {
 
 impl From<kube::error::Error> for BallistaError {
     fn from(e: kube::error::Error) -> Self {
-
         BallistaError::KubeAPIError(e)
     }
 }
 
 impl From<k8s_openapi::RequestError> for BallistaError {
     fn from(e: k8s_openapi::RequestError) -> Self {
-
         BallistaError::KubeAPIRequestError(e)
     }
 }
 
 impl From<k8s_openapi::ResponseError> for BallistaError {
     fn from(e: k8s_openapi::ResponseError) -> Self {
-
         BallistaError::KubeAPIResponseError(e)
     }
 }
@@ -129,7 +122,6 @@ impl From<k8s_openapi::ResponseError> for BallistaError {
 
 impl Display for BallistaError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-
         match self {
             BallistaError::NotImplemented(ref desc) => write!(f, "Not implemented: {}", desc),
             BallistaError::General(ref desc) => write!(f, "General error: {}", desc),

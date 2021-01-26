@@ -22,7 +22,6 @@ use std::collections::HashMap;
 #[tokio::main]
 
 async fn main() -> Result<()> {
-
     let path = "/mnt/tpch/parquet-sf100-partitioned/customer/";
 
     let ctx = BallistaContext::remote("localhost", 50051, HashMap::new());
@@ -30,7 +29,6 @@ async fn main() -> Result<()> {
     let mut stream = ctx.read_parquet(path)?.limit(10)?.collect().await?;
 
     while let Some(result) = stream.next().await {
-
         let batch = result?;
 
         println!("{:?}", batch)

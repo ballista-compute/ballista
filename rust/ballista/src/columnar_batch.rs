@@ -17,9 +17,11 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::error::{ballista_error, Result};
 
-use arrow::{array::ArrayRef,
-            datatypes::{DataType, Schema},
-            record_batch::RecordBatch};
+use arrow::{
+    array::ArrayRef,
+    datatypes::{DataType, Schema},
+    record_batch::RecordBatch,
+};
 use datafusion::scalar::ScalarValue;
 
 pub type MaybeColumnarBatch = Result<Option<ColumnarBatch>>;
@@ -29,13 +31,12 @@ pub type MaybeColumnarBatch = Result<Option<ColumnarBatch>>;
 #[derive(Debug, Clone)]
 
 pub struct ColumnarBatch {
-    schema:  Arc<Schema>,
+    schema: Arc<Schema>,
     columns: HashMap<String, ColumnarValue>,
 }
 
 impl ColumnarBatch {
     pub fn from_arrow(batch: &RecordBatch) -> Self {
-
         let columns = batch
             .columns()
             .iter()
@@ -50,7 +51,6 @@ impl ColumnarBatch {
     }
 
     pub fn from_values(values: &[ColumnarValue], schema: &Schema) -> Self {
-
         let columns = schema.fields().iter().enumerate().map(|(i, f)| (f.name().clone(), values[i].clone())).collect();
 
         Self {
@@ -60,20 +60,17 @@ impl ColumnarBatch {
     }
 
     pub fn to_arrow(&self) -> Result<RecordBatch> {
-
         let arrays = self
             .schema
             .fields()
             .iter()
             .map(|c| {
-
                 match self.column(c.name())? {
                     ColumnarValue::Columnar(array) => Ok(array.clone()),
                     ColumnarValue::Scalar(_, _) => {
-
                         // note that this can be implemented easily if needed
                         Err(ballista_error("Cannot convert scalar value to Arrow array"))
-                    },
+                    }
                 }
             })
             .collect::<Result<Vec<_>>>()?;
@@ -82,27 +79,22 @@ impl ColumnarBatch {
     }
 
     pub fn schema(&self) -> Arc<Schema> {
-
         self.schema.clone()
     }
 
     pub fn num_columns(&self) -> usize {
-
         self.columns.len()
     }
 
     pub fn num_rows(&self) -> usize {
-
         self.columns[self.schema.field(0).name()].len()
     }
 
     pub fn column(&self, name: &str) -> Result<&ColumnarValue> {
-
         Ok(&self.columns[name])
     }
 
     pub fn memory_size(&self) -> usize {
-
         self.columns.values().map(|c| c.memory_size()).sum()
     }
 }
@@ -118,7 +110,6 @@ pub enum ColumnarValue {
 
 impl ColumnarValue {
     pub fn len(&self) -> usize {
-
         match self {
             ColumnarValue::Scalar(_, n) => *n,
             ColumnarValue::Columnar(array) => array.len(),
@@ -126,12 +117,10 @@ impl ColumnarValue {
     }
 
     pub fn is_empty(&self) -> bool {
-
         self.len() == 0
     }
 
     pub fn data_type(&self) -> &DataType {
-
         match self {
             ColumnarValue::Columnar(array) => array.data_type(),
             ColumnarValue::Scalar(value, _) => match value {
@@ -151,7 +140,6 @@ impl ColumnarValue {
     }
 
     pub fn to_arrow(&self) -> ArrayRef {
-
         match self {
             ColumnarValue::Columnar(array) => array.clone(),
             ColumnarValue::Scalar(value, n) => value.to_array_of_size(*n),

@@ -28,20 +28,19 @@ use futures::Stream;
 
 pub struct MemoryStream {
     /// Vector of record batches
-    data:       Vec<RecordBatch>,
+    data: Vec<RecordBatch>,
     /// Schema representing the data
-    schema:     SchemaRef,
+    schema: SchemaRef,
     /// Optional projection for which columns to load
     projection: Option<Vec<usize>>,
     /// Index into the data
-    index:      usize,
+    index: usize,
 }
 
 impl MemoryStream {
     /// Create an iterator for a vector of record batches
 
     pub fn try_new(data: Vec<RecordBatch>, schema: SchemaRef, projection: Option<Vec<usize>>) -> Result<Self> {
-
         Ok(Self {
             data,
             schema,
@@ -55,9 +54,7 @@ impl Stream for MemoryStream {
     type Item = Result<RecordBatch>;
 
     fn poll_next(mut self: std::pin::Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-
         Poll::Ready(if self.index < self.data.len() {
-
             self.index += 1;
 
             let batch = &self.data[self.index - 1];
@@ -71,13 +68,11 @@ impl Stream for MemoryStream {
                 None => Some(Ok(batch.clone())),
             }
         } else {
-
             None
         })
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-
         (self.data.len(), Some(self.data.len()))
     }
 }
@@ -86,7 +81,6 @@ impl RecordBatchStream for MemoryStream {
     /// Get the schema
 
     fn schema(&self) -> SchemaRef {
-
         self.schema.clone()
     }
 }

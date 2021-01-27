@@ -21,17 +21,23 @@ use std::sync::Arc;
 
 use crate::serde::{protobuf, BallistaError};
 
-use datafusion::physical_plan::csv::CsvExec;
-use datafusion::physical_plan::expressions::{
-    BinaryExpr, CaseExpr, CastExpr, Column, InListExpr, IsNotNullExpr, IsNullExpr, Literal,
-    NegativeExpr, NotExpr,
-};
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::functions::ScalarFunctionExpr;
 use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
 use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::projection::ProjectionExec;
+use datafusion::physical_plan::{
+    csv::CsvExec,
+    limit::{GlobalLimitExec, LocalLimitExec},
+};
+use datafusion::physical_plan::{
+    empty::EmptyExec,
+    expressions::{
+        BinaryExpr, CaseExpr, CastExpr, Column, InListExpr, IsNotNullExpr, IsNullExpr, Literal,
+        NegativeExpr, NotExpr,
+    },
+};
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
 use protobuf::physical_plan_node::PhysicalPlanType;
@@ -111,6 +117,34 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
             //         });
             Ok(protobuf::PhysicalPlanNode {
                 physical_plan_type: None,
+            })
+        } else if let Some(limit) = plan.downcast_ref::<GlobalLimitExec>() {
+            let input: protobuf::PhysicalPlanNode = limit.input().to_owned().try_into()?;
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: Some(PhysicalPlanType::GlobalLimit(Box::new(
+                    protobuf::GlobalLimitExecNode {
+                        input: Some(Box::new(input)),
+                        limit: limit.limit() as u32,
+                    },
+                ))),
+            })
+        } else if let Some(limit) = plan.downcast_ref::<LocalLimitExec>() {
+            let input: protobuf::PhysicalPlanNode = limit.input().to_owned().try_into()?;
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: Some(PhysicalPlanType::LocalLimit(Box::new(
+                    protobuf::LocalLimitExecNode {
+                        input: Some(Box::new(input)),
+                        limit: limit.limit() as u32,
+                    },
+                ))),
+            })
+        } else if let Some(empty) = plan.downcast_ref::<EmptyExec>() {
+            let schema = empty.schema().as_ref().try_into()?;
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: Some(PhysicalPlanType::Empty(protobuf::EmptyExecNode {
+                    produce_one_row: empty.produce_one_row(),
+                    schema: Some(schema),
+                })),
             })
         } else if let Some(_exec) = plan.downcast_ref::<ParquetExec>() {
             //         node.scan = Some(protobuf::ScanExecNode {

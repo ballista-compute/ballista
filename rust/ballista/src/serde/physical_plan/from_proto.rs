@@ -17,12 +17,16 @@
 use std::sync::Arc;
 use std::{convert::TryInto, unimplemented};
 
-use datafusion::physical_plan::projection::ProjectionExec;
+use datafusion::physical_plan::{
+    empty::EmptyExec,
+    limit::{GlobalLimitExec, LocalLimitExec},
+    projection::ProjectionExec,
+};
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
-use crate::convert_box_required;
 use crate::error::BallistaError;
 use crate::serde::{proto_error, protobuf};
+use crate::{convert_box_required, convert_required};
 
 use protobuf::physical_plan_node::PhysicalPlanType;
 
@@ -46,7 +50,26 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Arc::new(ProjectionExec::try_new(exprs, input)?))
             }
-            _ => unimplemented!(),
+            PhysicalPlanType::Scan(_) => unimplemented!(),
+            PhysicalPlanType::Selection(_) => unimplemented!(),
+            PhysicalPlanType::GlobalLimit(limit) => {
+                let input: Arc<dyn ExecutionPlan> = convert_box_required!(limit.input)?;
+                Ok(Arc::new(GlobalLimitExec::new(
+                    input,
+                    limit.limit as usize,
+                    0,
+                ))) // TODO: concurrency param doesn't seem to be used in datafusion. not sure how to fill this in
+            }
+            PhysicalPlanType::LocalLimit(limit) => {
+                let input: Arc<dyn ExecutionPlan> = convert_box_required!(limit.input)?;
+                Ok(Arc::new(LocalLimitExec::new(input, limit.limit as usize)))
+            }
+            PhysicalPlanType::HashAggregate(_) => unimplemented!(),
+            PhysicalPlanType::ShuffleReader(_) => unimplemented!(),
+            PhysicalPlanType::Empty(empty) => {
+                let schema = Arc::new(convert_required!(empty.schema)?);
+                Ok(Arc::new(EmptyExec::new(empty.produce_one_row, schema)))
+            }
         }
     }
 }

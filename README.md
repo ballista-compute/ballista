@@ -25,11 +25,8 @@ and as a result it has been necessary to re-implement the Rust executor and this
 The current plan is to release version 0.4.0 once the following items are completed.
 
 - [x] Compile the Rust implementation against Arrow 3.0.0
-- [x] Get TPC-H benchmarks working against a single Rust executor
-- [ ] Update the JVM project to use latest ballista.proto
-- [ ] Get TPC-H benchmarks working against the JVM Executor
-- [ ] Get TPC-H benchmarks working against the Spark Executor
-- [ ] Re-implement distributed query execution
+- [x] Get TPC-H benchmarks working against a single Ballista executor
+- [ ] Get TPC-H benchmarks working with distributed execution against a Ballista cluster
 
 To follow the progress of this work, please refer to the
 ["This Week in Ballista"](https://ballistacompute.org/this-week-in-ballista/) blog.

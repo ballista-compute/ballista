@@ -17,9 +17,6 @@
 use std::sync::Arc;
 
 use crate::error::Result;
-use crate::scheduler::etcd::EtcdClient;
-use crate::scheduler::k8s::KubernetesClient;
-use crate::scheduler::standalone::StandaloneClient;
 use crate::scheduler::SchedulerClient;
 
 use arrow::record_batch::RecordBatch;
@@ -35,38 +32,19 @@ static ALLOC: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
 
 #[derive(Debug, Clone)]
 pub struct ExecutorConfig {
-    pub(crate) discovery_mode: DiscoveryMode,
     pub(crate) host: String,
     pub(crate) port: usize,
     pub(crate) concurrent_tasks: usize,
 }
 
 impl ExecutorConfig {
-    pub fn new(
-        discovery_mode: DiscoveryMode,
-        host: &str,
-        port: usize,
-        concurrent_tasks: usize,
-    ) -> Self {
+    pub fn new(host: &str, port: usize, concurrent_tasks: usize) -> Self {
         Self {
-            discovery_mode,
             host: host.to_owned(),
             port,
             concurrent_tasks,
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub enum DiscoveryMode {
-    Etcd {
-        etcd_urls: String,
-    },
-    Kubernetes {
-        namespace: String,
-        cluster_name: String,
-    },
-    Standalone,
 }
 
 #[allow(dead_code)]
@@ -75,27 +53,7 @@ pub struct BallistaExecutor {
 }
 
 impl BallistaExecutor {
-    pub fn new(config: ExecutorConfig) -> Self {
-        let uuid = Uuid::new_v4();
-
-        let scheduler: Arc<dyn SchedulerClient> = match &config.discovery_mode {
-            DiscoveryMode::Etcd { etcd_urls } => Arc::new(EtcdClient::new(
-                etcd_urls,
-                "default",
-                &uuid,
-                &config.host,
-                config.port,
-            )),
-            DiscoveryMode::Kubernetes {
-                namespace,
-                cluster_name,
-            } => Arc::new(KubernetesClient::new(
-                namespace.as_str(),
-                cluster_name.as_str(),
-            )),
-            DiscoveryMode::Standalone => Arc::new(StandaloneClient {}),
-        };
-
+    pub fn new(_uuid: &Uuid, _config: ExecutorConfig, scheduler: Arc<dyn SchedulerClient>) -> Self {
         Self { scheduler }
     }
 

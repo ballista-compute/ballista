@@ -17,13 +17,18 @@
 use std::sync::Arc;
 
 use arrow_flight::flight_service_server::FlightServiceServer;
-use ballista::executor::{BallistaExecutor, DiscoveryMode, ExecutorConfig};
+use ballista::executor::{BallistaExecutor, ExecutorConfig};
 use ballista::flight_service::BallistaFlightService;
+use ballista::scheduler::etcd::EtcdClient;
+use ballista::scheduler::k8s::KubernetesClient;
+use ballista::scheduler::standalone::StandaloneClient;
+use ballista::scheduler::SchedulerClient;
 use ballista::BALLISTA_VERSION;
 use clap::arg_enum;
 use log::info;
 use structopt::StructOpt;
 use tonic::transport::Server;
+use uuid::Uuid;
 
 arg_enum! {
     #[derive(Debug)]
@@ -42,13 +47,32 @@ struct Opt {
     #[structopt(short, long, possible_values = &Mode::variants(), case_insensitive = true, default_value = "Standalone")]
     mode: Mode,
 
+    /// Namespace for the ballista cluster that this executor will join.
+    #[structopt(long)]
+    namespace: Option<String>,
+
     /// etcd urls for use when discovery mode is `etcd`
     #[structopt(long)]
     etcd_urls: Option<String>,
 
+    /// Registrar host to register with when discovery mode is `standalone`. This is optional
+    /// because it is currently possible to run in standalone mode with a single executor and
+    /// no registrar.
+    #[structopt(long)]
+    registrar_host: Option<String>,
+
+    /// Registrar port to register with when discovery mode is `standalone`. This is optional
+    /// because it is currently possible to run in standalone mode with a single executor and
+    /// no registrar.
+    #[structopt(long)]
+    registrar_port: Option<usize>,
+
+    /// Local host name or IP address to bind to
     #[structopt(long)]
     bind_host: Option<String>,
 
+    /// Host name or IP address to register with scheduler so that other executors
+    /// can connect to this executor
     #[structopt(long)]
     external_host: Option<String>,
 
@@ -65,30 +89,48 @@ struct Opt {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
+    // parse command-line arguments
     let opt = Opt::from_args();
-
-    let mode = match opt.mode {
-        Mode::Etcd => {
-            let etcd_urls = opt.etcd_urls.as_deref().unwrap_or("localhost:2379");
-            DiscoveryMode::Etcd {
-                etcd_urls: etcd_urls.to_owned(),
-            }
-        }
-        Mode::Standalone => DiscoveryMode::Standalone,
-        _ => unimplemented!(),
-    };
-
+    let namespace = opt.bind_host.as_deref().unwrap_or("ballista");
     let external_host = opt.external_host.as_deref().unwrap_or("localhost");
     let bind_host = opt.bind_host.as_deref().unwrap_or("0.0.0.0");
     let port = opt.port;
 
-    let config = ExecutorConfig::new(mode, &external_host, port, opt.concurrent_tasks);
-    info!("Running with config: {:?}", config);
-
     let addr = format!("{}:{}", bind_host, port);
     let addr = addr.parse()?;
 
-    let executor = Arc::new(BallistaExecutor::new(config));
+    let config = ExecutorConfig::new(&external_host, port, opt.concurrent_tasks);
+    info!("Running with config: {:?}", config);
+
+    // assign this executor a unique ID
+    let uuid = Uuid::new_v4();
+
+    let scheduler: Arc<dyn SchedulerClient> = match opt.mode {
+        Mode::Etcd => {
+            let etcd_urls = opt.etcd_urls.as_deref().unwrap_or("localhost:2379");
+            Arc::new(EtcdClient::new(
+                &etcd_urls,
+                &namespace,
+                &uuid,
+                &external_host,
+                port,
+            ))
+        }
+        Mode::Standalone => {
+            let registrar_host = opt.registrar_host.as_deref().unwrap_or("localhost");
+            let registrar_port = opt.registrar_port.unwrap_or(50051);
+            Arc::new(StandaloneClient::new(
+                &registrar_host,
+                registrar_port,
+                &uuid,
+                &external_host,
+                port,
+            ))
+        }
+        Mode::K8s => Arc::new(KubernetesClient::new(&namespace, &namespace)),
+    };
+
+    let executor = Arc::new(BallistaExecutor::new(&uuid, config, scheduler));
     let service = BallistaFlightService::new(executor);
     let server = FlightServiceServer::new(service);
     info!(

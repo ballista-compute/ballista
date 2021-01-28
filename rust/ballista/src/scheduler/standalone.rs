@@ -12,17 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::error::Result;
+use crate::error::{BallistaError, Result};
 use crate::scheduler::SchedulerClient;
 use crate::serde::scheduler::ExecutorMeta;
 
 use async_trait::async_trait;
+use uuid::Uuid;
 
 pub struct StandaloneClient {}
+
+impl StandaloneClient {
+    pub fn new(
+        _registrar_url: &str,
+        _registrar_port: usize,
+        _executor_uuid: &Uuid,
+        _executor_host: &str,
+        _executor_port: usize,
+    ) -> Self {
+        //TODO start thread that will periodically register this executor with the registrar
+        // using protobuf messages and client.rs to send them
+
+        Self {}
+    }
+}
 
 #[async_trait]
 impl SchedulerClient for StandaloneClient {
     async fn get_executors(&self) -> Result<Vec<ExecutorMeta>> {
-        unimplemented!()
+        //TODO connect to registrar to get a list of executors in this cluster using
+        // protobuf messages and client.rs to send them
+        Err(BallistaError::NotImplemented(
+            "SchedulerClient.get_executors".to_owned(),
+        ))
     }
 }

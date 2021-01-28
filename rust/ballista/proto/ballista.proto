@@ -269,6 +269,7 @@ message PhysicalPlanNode {
     LocalLimitExecNode local_limit = 23;
     HashAggregateExecNode hash_aggregate = 30;
     ShuffleReaderExecNode shuffle_reader = 40;
+    SortExecNode sort = 50;
   }
 }
 
@@ -323,6 +324,12 @@ message GlobalLimitExecNode {
 message LocalLimitExecNode {
   PhysicalPlanNode input = 1;
   uint32 limit = 2;
+}
+
+message SortExecNode {
+  PhysicalPlanNode input = 1;
+  repeated LogicalExprNode expr = 2;
+  uint32 concurrency = 3;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

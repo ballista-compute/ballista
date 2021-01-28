@@ -18,6 +18,8 @@ use std::sync::Arc;
 use std::{convert::TryInto, unimplemented};
 
 use datafusion::physical_plan::projection::ProjectionExec;
+use datafusion::physical_plan::sort::{SortExec, SortOptions};
+use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
 use crate::convert_box_required;
@@ -45,6 +47,36 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     .map(|expr| expr.try_into().map(|e| (e, "unused".to_string())))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Arc::new(ProjectionExec::try_new(exprs, input)?))
+            }
+            PhysicalPlanType::Sort(sort) => {
+                let input: Arc<dyn ExecutionPlan> = convert_box_required!(sort.input)?;
+                let exprs = sort
+                    .expr
+                    .iter()
+                    .map(|expr| {
+                        let expr = expr.expr_type.as_ref().ok_or(
+                            proto_error(format!(
+                                "physical_plan::from_proto() Unexpected expr {:?}",
+                                self)))?;
+                        if let protobuf::logical_expr_node::ExprType::Sort(sort_expr) = expr {
+                            let expr = sort_expr.expr.as_ref().ok_or(
+                                proto_error(format!(
+                                    "physical_plan::from_proto() Unexpected sort expr {:?}",
+                                    self)))?.as_ref();
+                            Ok(PhysicalSortExpr {
+                                expr: expr.try_into()?,
+                                options: SortOptions {
+                                    descending: !sort_expr.asc,
+                                    nulls_first: sort_expr.nulls_first,
+                                }
+                            })
+                        } else {
+                            Err(BallistaError::General(format!(
+                                "physical_plan::from_proto() {:?}", self)))
+                        }
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(Arc::new(SortExec::try_new(exprs, input, sort.concurrency as usize)?))
             }
             _ => unimplemented!(),
         }

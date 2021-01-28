@@ -138,6 +138,20 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                     },
                 ))),
             })
+
+        } else if let Some(hashJoin) = plan.downcast_ref::<HashJoinExec>() {
+            let _left: protobuf::PhysicalPlanNode = hashJoin.left().to_owned().try_into()?;
+            let _right: protobuf::PhysicalPlanNode = hashJoin.right().to_owned().try_into()?;
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: Some(PhysicalPlanType::HashJoin(Box::new(
+                    protobuf::HashJoinExecNode {
+                        left: Some(Box::new(_left)),
+                        right: Some(Box::new(_right)),
+                        on: hashJoin.on(),
+                        join_type: hashJoin.join_type(),
+                    },
+                ))),
+            })
         } else if let Some(empty) = plan.downcast_ref::<EmptyExec>() {
             let schema = empty.schema().as_ref().try_into()?;
             Ok(protobuf::PhysicalPlanNode {

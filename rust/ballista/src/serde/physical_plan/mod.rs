@@ -18,16 +18,19 @@ pub mod to_proto;
 #[cfg(test)]
 mod roundtrip_tests {
     use std::{convert::TryInto, sync::Arc};
+    use datafusion::physical_plan::hash_utils::JoinType;
 
     use arrow::datatypes::Schema;
     use datafusion::physical_plan::{
         empty::EmptyExec,
         limit::{GlobalLimitExec, LocalLimitExec},
+        hash_join::HashJoinExec,
         ExecutionPlan,
     };
 
     use super::super::super::error::Result;
     use super::super::protobuf;
+    use futures::io::Empty;
 
     fn roundtrip_test(exec_plan: Arc<dyn ExecutionPlan>) -> Result<()> {
         let proto: protobuf::PhysicalPlanNode = exec_plan.clone().try_into()?;
@@ -58,6 +61,16 @@ mod roundtrip_tests {
             Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
             25,
             0,
+        )))
+    }
+
+    #[test]
+    fn roundtrip_hash_join() -> Result<()> {
+        roundtrip_test(Arc::new(HashJoinExec::try_new(
+            Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
+            Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
+            &vec!["", ""],
+            &JoinType::Inner,
         )))
     }
 }

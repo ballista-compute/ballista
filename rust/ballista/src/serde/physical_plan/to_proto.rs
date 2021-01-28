@@ -93,12 +93,6 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
             Ok(protobuf::PhysicalPlanNode {
                 physical_plan_type: None,
             })
-        } else if let Some(exec) = plan.downcast_ref::<HashJoinExec>() {
-            let _left: protobuf::PhysicalPlanNode = exec.left().to_owned().try_into()?;
-            let _right: protobuf::PhysicalPlanNode = exec.right().to_owned().try_into()?;
-            Ok(protobuf::PhysicalPlanNode {
-                physical_plan_type: None,
-            })
         } else if let Some(_exec) = plan.downcast_ref::<CsvExec>() {
             //         node.scan = Some(protobuf::ScanExecNode {
             //             path: exec.path.clone(),
@@ -139,16 +133,16 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                 ))),
             })
 
-        } else if let Some(hashJoin) = plan.downcast_ref::<HashJoinExec>() {
-            let _left: protobuf::PhysicalPlanNode = hashJoin.left().to_owned().try_into()?;
-            let _right: protobuf::PhysicalPlanNode = hashJoin.right().to_owned().try_into()?;
+        } else if let Some(exec) = plan.downcast_ref::<HashJoinExec>() {
+            let _left: protobuf::PhysicalPlanNode = exec.left().to_owned().try_into()?;
+            let _right: protobuf::PhysicalPlanNode = exec.right().to_owned().try_into()?;
             Ok(protobuf::PhysicalPlanNode {
                 physical_plan_type: Some(PhysicalPlanType::HashJoin(Box::new(
                     protobuf::HashJoinExecNode {
                         left: Some(Box::new(_left)),
                         right: Some(Box::new(_right)),
-                        on: hashJoin.on(),
-                        join_type: hashJoin.join_type(),
+                        on: exec.on().to_vec(),
+                        join_type: exec.join_type(),
                     },
                 ))),
             })

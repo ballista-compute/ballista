@@ -65,7 +65,11 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                 Ok(Arc::new(LocalLimitExec::new(input, limit.limit as usize)))
             }
             PhysicalPlanType::HashAggregate(_) => unimplemented!(),
-            PhysicalPlanType::HashJoin(_) => unimplemented!(),
+            PhysicalPlanType::HashJoin(_) => {
+                //let _left: Arc<dyn ExecutionPlan> = convert_box_required!(exec.left)?;
+                //let _right: Arc<dyn ExecutionPlan> = convert_box_required!(exec.left)?;
+                unimplemented!()
+            },
             PhysicalPlanType::ShuffleReader(_) => unimplemented!(),
             PhysicalPlanType::Empty(empty) => {
                 let schema = Arc::new(convert_required!(empty.schema)?);

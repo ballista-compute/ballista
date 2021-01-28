@@ -14,24 +14,26 @@
 
 //! Client API for sending requests to executors.
 
+use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
 use crate::error::{ballista_error, BallistaError, Result};
-use crate::serde::protobuf::{self};
-use crate::serde::scheduler::Action;
-
 use crate::memory_stream::MemoryStream;
+use crate::serde::protobuf::{self};
+use crate::serde::scheduler::{Action, ExecutePartition, ExecutePartitionResult};
+
+use arrow::array::StringArray;
 use arrow::datatypes::Schema;
 use arrow_flight::flight_service_client::FlightServiceClient;
 use arrow_flight::utils::flight_data_to_arrow_batch;
 use arrow_flight::Ticket;
 use datafusion::logical_plan::LogicalPlan;
-use datafusion::physical_plan::SendableRecordBatchStream;
+use datafusion::physical_plan::common::collect;
+use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
 use prost::Message;
-use std::collections::HashMap;
 
-/// Client for sending actions to Ballista executors.
+/// Client for interacting with Ballista executors.
 pub struct BallistaClient {
     flight_client: FlightServiceClient<tonic::transport::channel::Channel>,
 }
@@ -55,6 +57,44 @@ impl BallistaClient {
             settings: HashMap::new(),
         };
         self.execute_action(&action).await
+    }
+
+    /// Execute one partition of a physical query plan against the executor
+    pub async fn execute_partition(
+        &mut self,
+        plan: Arc<dyn ExecutionPlan>,
+        partition_id: usize,
+    ) -> Result<ExecutePartitionResult> {
+        let action = Action::ExecutePartition(ExecutePartition {
+            job_uuid: Default::default(),
+            stage_id: 0,
+            partition_id,
+            plan,
+            shuffle_locations: Default::default(),
+        });
+        let stream = self.execute_action(&action).await?;
+        let batches = collect(stream).await?;
+
+        if batches.len() != 1 {
+            return Err(BallistaError::General(
+                "execute_partition received wrong number of result batches".to_owned(),
+            ));
+        }
+
+        let batch = &batches[0];
+        if batch.num_rows() != 1 {
+            return Err(BallistaError::General(
+                "execute_partition received wrong number of rows".to_owned(),
+            ));
+        }
+
+        let path = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .expect("execute_partition expected column 0 to be a StringArray");
+
+        Ok(ExecutePartitionResult::new(path.value(0)))
     }
 
     /// Execute an action and retrieve the results

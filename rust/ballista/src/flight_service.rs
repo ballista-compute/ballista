@@ -22,15 +22,16 @@ use crate::serde::decode_protobuf;
 use crate::serde::scheduler::Action as BallistaAction;
 use crate::utils::write_stream_to_disk;
 
+use arrow::array::{ArrayRef, StringBuilder};
+use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::error::ArrowError;
+use arrow::record_batch::RecordBatch;
 use arrow_flight::{
     flight_service_server::FlightService, Action, ActionType, Criteria, Empty, FlightData,
     FlightDescriptor, FlightInfo, HandshakeRequest, HandshakeResponse, PutResult, SchemaResult,
     Ticket,
 };
 use datafusion::error::DataFusionError;
-use datafusion::execution::context::ExecutionContext;
-use datafusion::physical_plan::collect;
 use futures::{Stream, StreamExt};
 use log::{debug, info};
 use tempfile::TempDir;
@@ -71,74 +72,36 @@ impl FlightService for BallistaFlightService {
 
         match &action {
             BallistaAction::InteractiveQuery { plan, .. } => {
-                info!("Running interactive query");
-                debug!("Logical plan: {:?}", plan);
-                // execute with DataFusion for now until distributed execution is in place
-                let ctx = ExecutionContext::new();
-
-                // create the query plan
-                let plan = ctx
-                    .optimize(&plan)
-                    .and_then(|plan| {
-                        debug!("Optimized logical plan: {:?}", plan);
-                        ctx.create_physical_plan(&plan)
-                    })
-                    .map_err(|e| from_datafusion_err(&e))?;
-
-                debug!("Physical plan: {:?}", plan);
-                // execute the query
-                let results = collect(plan.clone())
+                let results = self
+                    .executor
+                    .execute_logical_plan(&plan)
                     .await
-                    .map_err(|e| from_datafusion_err(&e))?;
+                    .map_err(|e| from_ballista_err(&e))?;
+
                 if results.is_empty() {
                     return Err(Status::internal("There were no results from ticket"));
                 }
                 debug!("Received {} record batches", results.len());
 
-                // add an initial FlightData message that sends schema
-                let options = arrow::ipc::writer::IpcWriteOptions::default();
-                let schema = plan.schema();
-                let schema_flight_data =
-                    arrow_flight::utils::flight_data_from_arrow_schema(schema.as_ref(), &options);
+                let df_schema = plan.schema();
+                let arrow_schema: Schema = df_schema.clone().as_ref().clone().into();
 
-                let mut flights: Vec<Result<FlightData, Status>> = vec![Ok(schema_flight_data)];
-
-                let mut batches: Vec<Result<FlightData, Status>> = results
-                    .iter()
-                    .flat_map(|batch| {
-                        let (flight_dictionaries, flight_batch) =
-                            arrow_flight::utils::flight_data_from_arrow_batch(batch, &options);
-                        flight_dictionaries
-                            .into_iter()
-                            .chain(std::iter::once(flight_batch))
-                            .map(Ok)
-                    })
-                    .collect();
-
-                // append batch vector to schema vector, so that the first message sent is the schema
-                flights.append(&mut batches);
-
+                let flights = create_flight_data(Arc::new(arrow_schema), results);
                 let output = futures::stream::iter(flights);
-
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
-            BallistaAction::ExecuteQueryStage(stage) => {
-                // TODO this is work-in-progress / experimental
-
-                // the goal here is to execute a partial query - the query will be send to
-                // multiple executors, with each executor executing a number of partitions
-                // and the results will be persisted to disk to reduce memory pressure and
-                // allow the results to be streamed to other executors in future query stages
-
-                //TODO should not be a temp dir but a configured dir so that the user has control
-                // over which drive to use (e.g. choosing NVMe or RAID)
+            BallistaAction::ExecutePartition(partition) => {
                 let work_dir = TempDir::new()?;
-                let path = work_dir.path().to_str().unwrap();
+                let mut path = work_dir.into_path();
+                path.push(&format!("{}", partition.job_uuid));
+                path.push(&format!("{}", partition.stage_id));
+                path.push(&format!("{}", partition.partition_id));
+                let path = path.to_str().unwrap();
 
                 // execute the query partition
-                let mut stream = stage
+                let mut stream = partition
                     .plan
-                    .execute(stage.partition_id)
+                    .execute(partition.partition_id)
                     .await
                     .map_err(|e| from_datafusion_err(&e))?;
 
@@ -147,15 +110,21 @@ impl FlightService for BallistaFlightService {
                     .await
                     .map_err(|e| from_arrow_err(&e))?;
 
-                //TODO return summary of the query stage execution
-                Err(Status::unimplemented("ExecuteQueryStage"))
-            }
-            BallistaAction::FetchShuffle(_) => {
-                // once query stage execution is implemented, it will be necessary to implement
-                // this part so that the results can be collected, either by another query stage
-                // or by the client fetching the results
+                // build result set with summary of the partition execution status
+                let mut c0 = StringBuilder::new(1);
+                c0.append_value(&path).unwrap();
+                let path: ArrayRef = Arc::new(c0.finish());
 
-                Err(Status::unimplemented("FetchShuffle"))
+                let schema = Arc::new(Schema::new(vec![Field::new("path", DataType::Utf8, false)]));
+
+                let results = vec![RecordBatch::try_new(schema.clone(), vec![path]).unwrap()];
+                let flights = create_flight_data(schema, results);
+                let output = futures::stream::iter(flights);
+                Ok(Response::new(Box::pin(output) as Self::DoGetStream))
+            }
+            BallistaAction::FetchPartition(_) => {
+                // fetch a partition that was previously executed by this executor
+                Err(Status::unimplemented("FetchPartition"))
             }
         }
     }
@@ -221,6 +190,36 @@ impl FlightService for BallistaFlightService {
     ) -> Result<Response<Self::DoExchangeStream>, Status> {
         Err(Status::unimplemented("do_exchange"))
     }
+}
+
+/// Convert a result set into flight data
+fn create_flight_data(
+    schema: SchemaRef,
+    results: Vec<RecordBatch>,
+) -> Vec<Result<FlightData, Status>> {
+    // add an initial FlightData message that sends schema
+    let options = arrow::ipc::writer::IpcWriteOptions::default();
+    let schema_flight_data =
+        arrow_flight::utils::flight_data_from_arrow_schema(schema.as_ref(), &options);
+
+    let mut flights: Vec<Result<FlightData, Status>> = vec![Ok(schema_flight_data)];
+
+    let mut batches: Vec<Result<FlightData, Status>> = results
+        .iter()
+        .flat_map(|batch| {
+            let (flight_dictionaries, flight_batch) =
+                arrow_flight::utils::flight_data_from_arrow_batch(batch, &options);
+            flight_dictionaries
+                .into_iter()
+                .chain(std::iter::once(flight_batch))
+                .map(Ok)
+        })
+        .collect();
+
+    // append batch vector to schema vector, so that the first message sent is the schema
+    flights.append(&mut batches);
+
+    flights
 }
 
 fn from_arrow_err(e: &ArrowError) -> Status {

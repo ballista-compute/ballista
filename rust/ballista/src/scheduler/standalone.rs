@@ -12,20 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Ballista Distributed Compute
+use crate::error::Result;
+use crate::scheduler::SchedulerClient;
+use crate::serde::scheduler::ExecutorMeta;
 
-pub const BALLISTA_VERSION: &str = env!("CARGO_PKG_VERSION");
+use async_trait::async_trait;
 
-pub mod client;
-pub mod columnar_batch;
-pub mod context;
-pub mod error;
-pub mod executor;
-pub mod flight_service;
-pub mod memory_stream;
-pub mod prelude;
-pub mod scheduler;
-pub mod utils;
+pub struct StandaloneClient {}
 
-#[macro_use]
-pub mod serde;
+#[async_trait]
+impl SchedulerClient for StandaloneClient {
+    async fn get_executors(&self) -> Result<Vec<ExecutorMeta>> {
+        unimplemented!()
+    }
+}

@@ -68,17 +68,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opt = Opt::from_args();
 
     let mode = match opt.mode {
-        Mode::K8s => DiscoveryMode::Kubernetes,
-        Mode::Etcd => DiscoveryMode::Etcd,
+        Mode::Etcd => {
+            let etcd_urls = opt.etcd_urls.as_deref().unwrap_or("localhost:2379");
+            DiscoveryMode::Etcd {
+                etcd_urls: etcd_urls.to_owned(),
+            }
+        }
         Mode::Standalone => DiscoveryMode::Standalone,
+        _ => unimplemented!(),
     };
 
     let external_host = opt.external_host.as_deref().unwrap_or("localhost");
     let bind_host = opt.bind_host.as_deref().unwrap_or("0.0.0.0");
-    let etcd_urls = opt.etcd_urls.as_deref().unwrap_or("localhost:2379");
     let port = opt.port;
 
-    let config = ExecutorConfig::new(mode, &external_host, port, &etcd_urls, opt.concurrent_tasks);
+    let config = ExecutorConfig::new(mode, &external_host, port, opt.concurrent_tasks);
     info!("Running with config: {:?}", config);
 
     let addr = format!("{}:{}", bind_host, port);

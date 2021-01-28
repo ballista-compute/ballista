@@ -12,20 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Ballista Distributed Compute
+//! Support for distributed schedulers, such as Kubernetes
 
-pub const BALLISTA_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub mod etcd;
+pub mod k8s;
+pub mod standalone;
 
-pub mod client;
-pub mod columnar_batch;
-pub mod context;
-pub mod error;
-pub mod executor;
-pub mod flight_service;
-pub mod memory_stream;
-pub mod prelude;
-pub mod scheduler;
-pub mod utils;
+use crate::error::Result;
+use crate::serde::scheduler::ExecutorMeta;
 
-#[macro_use]
-pub mod serde;
+use async_trait::async_trait;
+
+/// Client API that an executor can use to interact with the cluster
+#[async_trait]
+pub trait SchedulerClient: Sync + Send {
+    /// Get a list of executors in the cluster
+    async fn get_executors(&self) -> Result<Vec<ExecutorMeta>>;
+}

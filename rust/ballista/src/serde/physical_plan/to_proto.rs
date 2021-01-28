@@ -205,7 +205,6 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                     protobuf::SortExecNode {
                         input: Some(Box::new(input)),
                         expr,
-                        concurrency: 1,
                     }
                 ))),
             })

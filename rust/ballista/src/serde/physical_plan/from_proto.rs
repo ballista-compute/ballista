@@ -100,9 +100,9 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                         }
                     })
                     .collect::<Result<Vec<_>, _>>()?;
-                Ok(Arc::new(SortExec::try_new(exprs, input, sort.concurrency as usize)?))
+                // Update concurrency here in the future
+                Ok(Arc::new(SortExec::try_new(exprs, input, 1)?))
             }
-            _ => unimplemented!(),
         }
     }
 }

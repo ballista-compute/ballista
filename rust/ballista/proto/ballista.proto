@@ -329,7 +329,6 @@ message LocalLimitExecNode {
 message SortExecNode {
   PhysicalPlanNode input = 1;
   repeated LogicalExprNode expr = 2;
-  uint32 concurrency = 3;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

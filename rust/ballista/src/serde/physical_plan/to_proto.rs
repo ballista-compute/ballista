@@ -27,6 +27,7 @@ use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
 use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::projection::ProjectionExec;
+use datafusion::physical_plan::sort::SortExec;
 use datafusion::physical_plan::{
     csv::CsvExec,
     limit::{GlobalLimitExec, LocalLimitExec},
@@ -38,7 +39,6 @@ use datafusion::physical_plan::{
         NegativeExpr, NotExpr,
     },
 };
-use datafusion::physical_plan::sort::SortExec;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
 use protobuf::physical_plan_node::PhysicalPlanType;
@@ -194,9 +194,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                         nulls_first: expr.options.nulls_first,
                     });
                     Ok(protobuf::LogicalExprNode {
-                        expr_type: Some(protobuf::logical_expr_node::ExprType::Sort(
-                            sort_expr,
-                        )),
+                        expr_type: Some(protobuf::logical_expr_node::ExprType::Sort(sort_expr)),
                     })
                 })
                 .collect::<Result<Vec<_>, Self::Error>>()?;
@@ -205,7 +203,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                     protobuf::SortExecNode {
                         input: Some(Box::new(input)),
                         expr,
-                    }
+                    },
                 ))),
             })
         } else {

@@ -41,7 +41,7 @@ datafusion = "3.0.0"
 [dev-dependencies]
 
 [build-dependencies]
-prost-build = { version = "0.6.1" }
+tonic-build = { version = "0.3", features = ["prost", "transport"], default-features = false }
 
 [[bin]]
 name = "executor"

@@ -12,37 +12,66 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::time::Duration;
+
 use crate::error::{BallistaError, Result};
 use crate::scheduler::SchedulerClient;
+use crate::serde::protobuf::scheduler_grpc_client::SchedulerGrpcClient;
+use crate::serde::protobuf::{GetExecutorMetadataParams, RegisterExecutorParams};
 use crate::serde::scheduler::ExecutorMeta;
 
 use async_trait::async_trait;
-use uuid::Uuid;
+use log::warn;
+use tonic::transport::Channel;
 
-pub struct StandaloneClient {}
+pub struct StandaloneClient {
+    client: SchedulerGrpcClient<Channel>,
+}
 
 impl StandaloneClient {
-    pub fn new(
-        _registrar_url: &str,
-        _registrar_port: usize,
-        _executor_uuid: &Uuid,
-        _executor_host: &str,
-        _executor_port: usize,
-    ) -> Self {
-        //TODO start thread that will periodically register this executor with the registrar
-        // using protobuf messages and client.rs to send them
+    pub async fn try_new(
+        registrar_url: String,
+        registrar_port: usize,
+        executor_meta: ExecutorMeta,
+    ) -> Result<Self> {
+        let endpoint = format!("http://{}:{}", registrar_url, registrar_port);
+        let client = SchedulerGrpcClient::connect(endpoint).await?;
+        tokio::spawn(Self::refresh_loop(client.clone(), executor_meta));
 
-        Self {}
+        Ok(Self { client })
+    }
+
+    async fn refresh_loop(mut client: SchedulerGrpcClient<Channel>, executor_meta: ExecutorMeta) {
+        loop {
+            let result = client
+                .register_executor(RegisterExecutorParams {
+                    metadata: Some(executor_meta.clone().into()),
+                })
+                .await;
+            if let Err(e) = result {
+                warn!("Received error when trying to register executor: {}", e);
+            }
+
+            tokio::time::delay_for(Duration::from_secs(15)).await;
+        }
     }
 }
 
 #[async_trait]
 impl SchedulerClient for StandaloneClient {
     async fn get_executors(&self) -> Result<Vec<ExecutorMeta>> {
-        //TODO connect to registrar to get a list of executors in this cluster using
-        // protobuf messages and client.rs to send them
-        Err(BallistaError::NotImplemented(
-            "SchedulerClient.get_executors".to_owned(),
-        ))
+        Ok(self
+            .client
+            .clone()
+            .get_executors_metadata(GetExecutorMetadataParams {})
+            .await
+            .map_err(|e| {
+                BallistaError::General(format!("Grpc error while getting executor metadata: {}", e))
+            })?
+            .into_inner()
+            .metadata
+            .into_iter()
+            .map(ExecutorMeta::from)
+            .collect())
     }
 }

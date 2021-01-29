@@ -39,7 +39,7 @@ pub enum BallistaError {
     KubeAPIError(kube::error::Error),
     KubeAPIRequestError(k8s_openapi::RequestError),
     KubeAPIResponseError(k8s_openapi::ResponseError),
-    // TonicError(tonic::status::Status)
+    TonicError(tonic::transport::Error),
 }
 
 pub fn ballista_error(message: &str) -> BallistaError {
@@ -106,6 +106,12 @@ impl From<k8s_openapi::ResponseError> for BallistaError {
     }
 }
 
+impl From<tonic::transport::Error> for BallistaError {
+    fn from(e: tonic::transport::Error) -> Self {
+        BallistaError::TonicError(e)
+    }
+}
+
 // impl From<tonic::status::Status> for BallistaError {
 //     fn from(e: tonic::status::Status) -> Self {
 //         BallistaError::TonicError(e)
@@ -130,6 +136,7 @@ impl Display for BallistaError {
             BallistaError::KubeAPIResponseError(ref desc) => {
                 write!(f, "KubeAPI response error: {}", desc)
             }
+            BallistaError::TonicError(desc) => write!(f, "Tonic error: {}", desc),
         }
     }
 }

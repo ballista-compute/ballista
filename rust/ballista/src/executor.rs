@@ -24,7 +24,6 @@ use datafusion::execution::context::ExecutionContext;
 use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::collect;
 use log::{debug, info};
-use uuid::Uuid;
 
 #[cfg(feature = "snmalloc")]
 #[global_allocator]
@@ -33,12 +32,12 @@ static ALLOC: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
 #[derive(Debug, Clone)]
 pub struct ExecutorConfig {
     pub(crate) host: String,
-    pub(crate) port: usize,
+    pub(crate) port: u16,
     pub(crate) concurrent_tasks: usize,
 }
 
 impl ExecutorConfig {
-    pub fn new(host: &str, port: usize, concurrent_tasks: usize) -> Self {
+    pub fn new(host: &str, port: u16, concurrent_tasks: usize) -> Self {
         Self {
             host: host.to_owned(),
             port,
@@ -53,7 +52,7 @@ pub struct BallistaExecutor {
 }
 
 impl BallistaExecutor {
-    pub fn new(_uuid: &Uuid, _config: ExecutorConfig, scheduler: Arc<dyn SchedulerClient>) -> Self {
+    pub fn new(_config: ExecutorConfig, scheduler: Arc<dyn SchedulerClient>) -> Self {
         Self { scheduler }
     }
 

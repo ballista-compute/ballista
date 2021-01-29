@@ -19,6 +19,8 @@ use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::ExecutionPlan;
 use uuid::Uuid;
 
+use super::protobuf;
+
 pub mod from_proto;
 pub mod to_proto;
 
@@ -62,7 +64,27 @@ impl ShuffleId {
 pub struct ExecutorMeta {
     pub id: String,
     pub host: String,
-    pub port: usize,
+    pub port: u16,
+}
+
+impl Into<protobuf::ExecutorMetadata> for ExecutorMeta {
+    fn into(self) -> protobuf::ExecutorMetadata {
+        protobuf::ExecutorMetadata {
+            id: self.id,
+            host: self.host,
+            port: self.port as u32,
+        }
+    }
+}
+
+impl From<protobuf::ExecutorMetadata> for ExecutorMeta {
+    fn from(meta: protobuf::ExecutorMetadata) -> Self {
+        Self {
+            id: meta.id,
+            host: meta.host,
+            port: meta.port as u16,
+        }
+    }
 }
 
 /// Task that can be sent to an executor to execute one stage of a query and write

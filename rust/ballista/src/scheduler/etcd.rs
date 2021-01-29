@@ -23,7 +23,6 @@ use crate::serde::scheduler::ExecutorMeta;
 use async_trait::async_trait;
 use etcd_client::{Client, GetOptions, PutOptions};
 use log::{debug, warn};
-use uuid::Uuid;
 
 pub struct EtcdClient {
     etcd_urls: String,
@@ -31,19 +30,14 @@ pub struct EtcdClient {
 }
 
 impl EtcdClient {
-    pub fn new(etcd_urls: &str, cluster_name: &str, uuid: &Uuid, host: &str, port: usize) -> Self {
-        let _etcd_urls = etcd_urls.to_owned();
-        let _cluster_name = cluster_name.to_owned();
-        let uuid = uuid.to_owned();
-        let host = host.to_owned();
-
+    pub fn new(etcd_urls: String, cluster_name: String, executor_meta: ExecutorMeta) -> Self {
         // Start a thread that will register the executor with etcd periodically
-        tokio::spawn(async move {
-            main_loop(&_etcd_urls, &_cluster_name, &uuid, &host, port).await;
-        });
+        tokio::spawn(main_loop(
+            etcd_urls.to_owned(),
+            cluster_name.to_owned(),
+            executor_meta,
+        ));
 
-        let etcd_urls = etcd_urls.to_owned();
-        let cluster_name = cluster_name.to_owned();
         Self {
             etcd_urls,
             cluster_name,
@@ -51,14 +45,14 @@ impl EtcdClient {
     }
 }
 
-async fn main_loop(etcd_urls: &str, cluster_name: &str, uuid: &Uuid, host: &str, port: usize) {
+async fn main_loop(etcd_urls: String, cluster_name: String, executor_meta: ExecutorMeta) {
     loop {
         match Client::connect([&etcd_urls], None).await {
             Ok(mut client) => {
                 debug!("Connected to etcd at {} ok", etcd_urls);
                 let lease_time_seconds = 60;
-                let key = format!("/ballista/{}/{}", cluster_name, &uuid);
-                let value = format!("{}:{}", host, port);
+                let key = format!("/ballista/{}/{}", cluster_name, executor_meta.id);
+                let value = format!("{}:{}", executor_meta.host, executor_meta.port);
                 match client.lease_grant(lease_time_seconds, None).await {
                     Ok(lease) => {
                         let options = PutOptions::new().with_lease(lease.id());
@@ -96,7 +90,7 @@ impl SchedulerClient for EtcdClient {
                     if host_port.len() == 2 {
                         let host = &host_port[0];
                         let port = &host_port[1];
-                        if let Ok(port) = port.to_string().parse::<usize>() {
+                        if let Ok(port) = port.to_string().parse::<u16>() {
                             execs.push(ExecutorMeta {
                                 id: executor_id.to_owned(),
                                 host: host.to_string(),

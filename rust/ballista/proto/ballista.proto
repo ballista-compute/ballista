@@ -375,6 +375,31 @@ message ShuffleId {
   uint32 partition_id = 4;
 }
 
+message ExecutorMetadata {
+  string id = 1;
+  string host = 2;
+  uint32 port = 3;
+}
+
+message GetExecutorMetadataParams {}
+
+message GetExecutorMetadataResult {
+  repeated ExecutorMetadata metadata = 1;
+}
+
+message RegisterExecutorParams {
+  ExecutorMetadata metadata = 1;
+}
+
+message RegisterExecutorResult {}
+
+
+service SchedulerGrpc {
+  rpc GetExecutorsMetadata (GetExecutorMetadataParams) returns (GetExecutorMetadataResult) {}
+
+  rpc RegisterExecutor (RegisterExecutorParams) returns (RegisterExecutorResult) {}
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Arrow Data Types
 ///////////////////////////////////////////////////////////////////////////////////////////////////

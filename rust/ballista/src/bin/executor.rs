@@ -17,13 +17,16 @@
 use std::sync::Arc;
 
 use arrow_flight::flight_service_server::FlightServiceServer;
-use ballista::executor::{BallistaExecutor, ExecutorConfig};
 use ballista::flight_service::BallistaFlightService;
 use ballista::scheduler::etcd::EtcdClient;
 use ballista::scheduler::k8s::KubernetesClient;
 use ballista::scheduler::standalone::StandaloneClient;
 use ballista::scheduler::SchedulerClient;
 use ballista::BALLISTA_VERSION;
+use ballista::{
+    executor::{BallistaExecutor, ExecutorConfig},
+    serde::scheduler::ExecutorMeta,
+};
 use clap::arg_enum;
 use log::info;
 use structopt::StructOpt;
@@ -78,7 +81,7 @@ struct Opt {
 
     /// bind port
     #[structopt(short, long, default_value = "50051")]
-    port: usize,
+    port: u16,
 
     /// max concurrent tasks
     #[structopt(short, long, default_value = "4")]
@@ -91,8 +94,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // parse command-line arguments
     let opt = Opt::from_args();
-    let namespace = opt.bind_host.as_deref().unwrap_or("ballista");
-    let external_host = opt.external_host.as_deref().unwrap_or("localhost");
+    let namespace = opt.namespace.unwrap_or_else(|| "ballista".to_owned());
+    let external_host = opt.external_host.unwrap_or_else(|| "localhost".to_owned());
     let bind_host = opt.bind_host.as_deref().unwrap_or("0.0.0.0");
     let port = opt.port;
 
@@ -102,35 +105,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = ExecutorConfig::new(&external_host, port, opt.concurrent_tasks);
     info!("Running with config: {:?}", config);
 
-    // assign this executor a unique ID
-    let uuid = Uuid::new_v4();
+    let executor_meta = ExecutorMeta {
+        id: Uuid::new_v4().to_string(), // assign this executor a unique ID
+        host: external_host,
+        port,
+    };
 
     let scheduler: Arc<dyn SchedulerClient> = match opt.mode {
         Mode::Etcd => {
-            let etcd_urls = opt.etcd_urls.as_deref().unwrap_or("localhost:2379");
-            Arc::new(EtcdClient::new(
-                &etcd_urls,
-                &namespace,
-                &uuid,
-                &external_host,
-                port,
-            ))
+            let etcd_urls = opt.etcd_urls.unwrap_or_else(|| "localhost:2379".to_owned());
+            Arc::new(EtcdClient::new(etcd_urls, namespace, executor_meta))
         }
         Mode::Standalone => {
-            let registrar_host = opt.registrar_host.as_deref().unwrap_or("localhost");
+            let registrar_host = opt.registrar_host.unwrap_or_else(|| "localhost".to_owned());
             let registrar_port = opt.registrar_port.unwrap_or(50051);
-            Arc::new(StandaloneClient::new(
-                &registrar_host,
-                registrar_port,
-                &uuid,
-                &external_host,
-                port,
-            ))
+            Arc::new(
+                StandaloneClient::try_new(registrar_host, registrar_port, executor_meta).await?,
+            )
         }
-        Mode::K8s => Arc::new(KubernetesClient::new(&namespace, &namespace)),
+        Mode::K8s => Arc::new(KubernetesClient::new(namespace.to_owned(), namespace)),
     };
 
-    let executor = Arc::new(BallistaExecutor::new(&uuid, config, scheduler));
+    let executor = Arc::new(BallistaExecutor::new(config, scheduler));
     let service = BallistaFlightService::new(executor);
     let server = FlightServiceServer::new(service);
     info!(

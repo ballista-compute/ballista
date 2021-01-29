@@ -204,7 +204,6 @@ dependencies = [
  "kube",
  "log",
  "prost",
- "prost-build",
  "prost-types",
  "snmalloc-rs",
  "sqlparser",
@@ -212,6 +211,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tonic",
+ "tonic-build",
  "uuid",
 ]
 

@@ -78,15 +78,16 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     .expr
                     .iter()
                     .map(|expr| {
-                        let expr = expr.expr_type.as_ref().ok_or(
+                        let expr = expr.expr_type.as_ref().ok_or_else(|| {
                             proto_error(format!(
-                                "physical_plan::from_proto() Unexpected expr {:?}",
-                                self)))?;
+                                "physical_plan::from_proto() Unexpected expr {:?}", self))
+                        })?;
                         if let protobuf::logical_expr_node::ExprType::Sort(sort_expr) = expr {
-                            let expr = sort_expr.expr.as_ref().ok_or(
+                            let expr = sort_expr.expr.as_ref().ok_or_else(|| {
                                 proto_error(format!(
                                     "physical_plan::from_proto() Unexpected sort expr {:?}",
-                                    self)))?.as_ref();
+                                    self))
+                            })?.as_ref();
                             Ok(PhysicalSortExpr {
                                 expr: expr.try_into()?,
                                 options: SortOptions {

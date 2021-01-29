@@ -17,12 +17,18 @@
 use std::sync::Arc;
 use std::{convert::TryInto, unimplemented};
 
-use datafusion::physical_plan::projection::ProjectionExec;
+use datafusion::physical_plan::{
+    empty::EmptyExec,
+    expressions::PhysicalSortExpr,
+    limit::{GlobalLimitExec, LocalLimitExec},
+    projection::ProjectionExec,
+    sort::{SortExec, SortOptions},
+};
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
-use crate::convert_box_required;
 use crate::error::BallistaError;
 use crate::serde::{proto_error, protobuf};
+use crate::{convert_box_required, convert_required};
 
 use protobuf::physical_plan_node::PhysicalPlanType;
 
@@ -44,7 +50,67 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Arc::new(ProjectionExec::try_new(exprs, input)?))
             }
-            _ => unimplemented!(),
+            PhysicalPlanType::Scan(_) => unimplemented!(),
+            PhysicalPlanType::Selection(_) => unimplemented!(),
+            PhysicalPlanType::GlobalLimit(limit) => {
+                let input: Arc<dyn ExecutionPlan> = convert_box_required!(limit.input)?;
+                Ok(Arc::new(GlobalLimitExec::new(
+                    input,
+                    limit.limit as usize,
+                    0,
+                ))) // TODO: concurrency param doesn't seem to be used in datafusion. not sure how to fill this in
+            }
+            PhysicalPlanType::LocalLimit(limit) => {
+                let input: Arc<dyn ExecutionPlan> = convert_box_required!(limit.input)?;
+                Ok(Arc::new(LocalLimitExec::new(input, limit.limit as usize)))
+            }
+            PhysicalPlanType::HashAggregate(_) => unimplemented!(),
+            PhysicalPlanType::ShuffleReader(_) => unimplemented!(),
+            PhysicalPlanType::Empty(empty) => {
+                let schema = Arc::new(convert_required!(empty.schema)?);
+                Ok(Arc::new(EmptyExec::new(empty.produce_one_row, schema)))
+            }
+            PhysicalPlanType::Sort(sort) => {
+                let input: Arc<dyn ExecutionPlan> = convert_box_required!(sort.input)?;
+                let exprs = sort
+                    .expr
+                    .iter()
+                    .map(|expr| {
+                        let expr = expr.expr_type.as_ref().ok_or_else(|| {
+                            proto_error(format!(
+                                "physical_plan::from_proto() Unexpected expr {:?}",
+                                self
+                            ))
+                        })?;
+                        if let protobuf::logical_expr_node::ExprType::Sort(sort_expr) = expr {
+                            let expr = sort_expr
+                                .expr
+                                .as_ref()
+                                .ok_or_else(|| {
+                                    proto_error(format!(
+                                        "physical_plan::from_proto() Unexpected sort expr {:?}",
+                                        self
+                                    ))
+                                })?
+                                .as_ref();
+                            Ok(PhysicalSortExpr {
+                                expr: expr.try_into()?,
+                                options: SortOptions {
+                                    descending: !sort_expr.asc,
+                                    nulls_first: sort_expr.nulls_first,
+                                },
+                            })
+                        } else {
+                            Err(BallistaError::General(format!(
+                                "physical_plan::from_proto() {:?}",
+                                self
+                            )))
+                        }
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                // Update concurrency here in the future
+                Ok(Arc::new(SortExec::try_new(exprs, input, 1)?))
+            }
         }
     }
 }

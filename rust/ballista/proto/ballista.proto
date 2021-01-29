@@ -255,12 +255,14 @@ message LimitNode {
 message PhysicalPlanNode {
   oneof PhysicalPlanType {
     ScanExecNode scan = 10;
+    EmptyExecNode empty = 11;
     ProjectionExecNode projection = 20;
     SelectionExecNode selection = 21;
     GlobalLimitExecNode global_limit = 22;
     LocalLimitExecNode local_limit = 23;
     HashAggregateExecNode hash_aggregate = 30;
     ShuffleReaderExecNode shuffle_reader = 40;
+    SortExecNode sort = 50;
   }
 }
 
@@ -274,6 +276,11 @@ message ScanExecNode {
   
   // partition filenames
   repeated string filename = 8;
+}
+
+message EmptyExecNode {
+  bool produce_one_row = 1;
+  Schema schema = 2;
 }
 
 message ProjectionExecNode {
@@ -303,11 +310,18 @@ message ShuffleReaderExecNode {
 }
 
 message GlobalLimitExecNode {
-  uint32 limit = 1;
+  PhysicalPlanNode input = 1;
+  uint32 limit = 2;
 }
 
 message LocalLimitExecNode {
-  uint32 limit = 1;
+  PhysicalPlanNode input = 1;
+  uint32 limit = 2;
+}
+
+message SortExecNode {
+  PhysicalPlanNode input = 1;
+  repeated LogicalExprNode expr = 2;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

@@ -104,7 +104,37 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
             //             has_header: exec.has_header,
             //             batch_size: exec.batch_size as u32,
             //         });
-            Ok(protobuf::PhysicalPlanNode { physical_plan_type: None })
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: None,
+            })
+        } else if let Some(limit) = plan.downcast_ref::<GlobalLimitExec>() {
+            let input: protobuf::PhysicalPlanNode = limit.input().to_owned().try_into()?;
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: Some(PhysicalPlanType::GlobalLimit(Box::new(
+                    protobuf::GlobalLimitExecNode {
+                        input: Some(Box::new(input)),
+                        limit: limit.limit() as u32,
+                    },
+                ))),
+            })
+        } else if let Some(limit) = plan.downcast_ref::<LocalLimitExec>() {
+            let input: protobuf::PhysicalPlanNode = limit.input().to_owned().try_into()?;
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: Some(PhysicalPlanType::LocalLimit(Box::new(
+                    protobuf::LocalLimitExecNode {
+                        input: Some(Box::new(input)),
+                        limit: limit.limit() as u32,
+                    },
+                ))),
+            })
+        } else if let Some(empty) = plan.downcast_ref::<EmptyExec>() {
+            let schema = empty.schema().as_ref().try_into()?;
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: Some(PhysicalPlanType::Empty(protobuf::EmptyExecNode {
+                    produce_one_row: empty.produce_one_row(),
+                    schema: Some(schema),
+                })),
+            })
         } else if let Some(_exec) = plan.downcast_ref::<ParquetExec>() {
             //         node.scan = Some(protobuf::ScanExecNode {
             //             path: exec.path.clone(),
@@ -138,6 +168,30 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
         //         });
         //         Ok(node)
         //     }
+        } else if let Some(exec) = plan.downcast_ref::<SortExec>() {
+            let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
+            let expr = exec
+                .expr()
+                .iter()
+                .map(|expr| {
+                    let sort_expr = Box::new(protobuf::SortExprNode {
+                        expr: Some(Box::new(expr.expr.to_owned().try_into()?)),
+                        asc: !expr.options.descending,
+                        nulls_first: expr.options.nulls_first,
+                    });
+                    Ok(protobuf::LogicalExprNode {
+                        expr_type: Some(protobuf::logical_expr_node::ExprType::Sort(sort_expr)),
+                    })
+                })
+                .collect::<Result<Vec<_>, Self::Error>>()?;
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: Some(PhysicalPlanType::Sort(Box::new(
+                    protobuf::SortExecNode {
+                        input: Some(Box::new(input)),
+                        expr,
+                    },
+                ))),
+            })
         } else {
             Err(BallistaError::General(format!("physical plan to_proto {:?}", self)))
         }

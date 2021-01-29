@@ -33,9 +33,9 @@ pub enum Action {
         settings: HashMap<String, String>,
     },
     /// Execute a query and store the results in memory
-    ExecuteQueryStage(QueryStageTask),
+    ExecutePartition(ExecutePartition),
     /// Collect a shuffle partition
-    FetchShuffle(ShuffleId),
+    FetchPartition(ShuffleId),
 }
 
 /// Unique identifier for the output shuffle partition of an operator.
@@ -69,8 +69,7 @@ pub struct ExecutorMeta {
 /// Task that can be sent to an executor to execute one stage of a query and write
 /// results out to disk
 #[derive(Debug, Clone)]
-
-pub struct QueryStageTask {
+pub struct ExecutePartition {
     /// Unique ID representing this query execution
     pub(crate) job_uuid: Uuid,
     /// Unique ID representing this query stage within the overall query
@@ -84,7 +83,7 @@ pub struct QueryStageTask {
     pub(crate) shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
 }
 
-impl QueryStageTask {
+impl ExecutePartition {
     pub fn new(
         job_uuid: Uuid,
         stage_id: usize,
@@ -103,5 +102,22 @@ impl QueryStageTask {
 
     pub fn key(&self) -> String {
         format!("{}.{}.{}", self.job_uuid, self.stage_id, self.partition_id)
+    }
+}
+
+pub struct ExecutePartitionResult {
+    /// Path containing results for this partition
+    path: String,
+}
+
+impl ExecutePartitionResult {
+    pub fn new(path: &str) -> Self {
+        Self {
+            path: path.to_owned(),
+        }
+    }
+
+    pub fn path(&self) -> &str {
+        &self.path
     }
 }

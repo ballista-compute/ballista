@@ -1,19 +1,8 @@
-# Ballista JVM Libraries
+# Ballista JVM Components
 
-This project contains the following components:
+The Ballista JVM Query Engine has now moved to the [ballista-jvm](https://github.com/ballista-compute/ballista-jvm) repository.
 
-- Ballista JVM Query Engine
-- Ballista JDBC Driver for executing queries against a Ballista cluster
-- Ballista Spark V2 Data Source that allows Spark to execute queries against a Ballista cluster
+This repository will contain the following JVM components in the future:
 
-## Installing Locally
-
-```bash
-./gradlew publishToMavenLocal
-``` 
-
-## Sample Data
-
-```bash
-wget https://nyc-tlc.s3.amazonaws.com/trip+data/yellow_tripdata_2019-12.csv
-```
+- Ballista JDBC Driver
+- Ballista Java UDF Executor

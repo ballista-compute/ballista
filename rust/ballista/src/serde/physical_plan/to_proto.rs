@@ -26,6 +26,10 @@ use crate::serde::{protobuf, BallistaError};
 use datafusion::physical_plan::{
     csv::CsvExec,
     expressions::{BinaryExpr, CaseExpr, CastExpr, Column, InListExpr, IsNotNullExpr, IsNullExpr, Literal, NegativeExpr, NotExpr},
+    sort::SortExec,
+    empty::EmptyExec,
+    limit::LocalLimitExec,
+    limit::GlobalLimitExec,
     filter::FilterExec,
     functions::ScalarFunctionExpr,
     hash_aggregate::HashAggregateExec,

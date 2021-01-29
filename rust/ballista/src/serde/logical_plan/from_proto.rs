@@ -204,30 +204,27 @@ impl TryInto<arrow::datatypes::DataType> for &protobuf::scalar_type::Datatype {
         use protobuf::scalar_type::Datatype;
         Ok(match self {
             Datatype::Scalar(scalar_type) => {
-                let pb_scalar_enum = protobuf::PrimitiveScalarType::from_i32(*scalar_type)
-                    .ok_or_else(|| proto_error("Protobuf deserialization error, scalar_type::Datatype missing was provided invalid enum variant"))?;
+                let pb_scalar_enum = protobuf::PrimitiveScalarType::from_i32(*scalar_type).ok_or_else(|| {
+                    proto_error(format!(
+                        "Protobuf deserialization error, scalar_type::Datatype missing was provided invalid enum variant: {}",
+                        *scalar_type
+                    ))
+                })?;
                 pb_scalar_enum.into()
             }
-            Datatype::List(protobuf::ScalarListType {
-                depth,
-                deepest_type,
-                field_names,
-            }) => {
-                if *depth != (field_names.len() - 1) as u64 {
-                    return Err(proto_error(format!(
-                        "Protobuf deserialization error, found {} field names should be {}",
-                        field_names.len(),
-                        depth + 1
-                    )));
+            Datatype::List(protobuf::ScalarListType { deepest_type, field_names }) => {
+                if field_names.is_empty() {
+                    return Err(proto_error(
+                        "Protobuf deserialization error: found no field names in ScalarListType message which requires at least one",
+                    ));
                 }
                 let pb_scalar_type = protobuf::PrimitiveScalarType::from_i32(*deepest_type)
-                    .ok_or_else(|| proto_error("Protobuf deserialization error: invalid i32 for scalar enum"))?;
-                let mut field_name_idx = field_names.len() - 1;
-                let mut scalar_type =
-                    arrow::datatypes::DataType::List(Box::new(Field::new(&field_names[field_names.len() - 1][..], pb_scalar_type.into(), true)));
-                for _ in 0..*depth {
-                    field_name_idx = field_name_idx - 1;
-                    let new_datatype = arrow::datatypes::DataType::List(Box::new(Field::new(&field_names[field_name_idx][..], scalar_type, true)));
+                    .ok_or_else(|| proto_error(format!("Protobuf deserialization error: invalid i32 for scalar enum: {}", *deepest_type)))?;
+                //Because length is checked above it is safe to unwrap .last()
+                let mut scalar_type = arrow::datatypes::DataType::List(Box::new(Field::new(field_names.last().unwrap().as_str(), pb_scalar_type.into(), true)));
+                //Iterate over field names in reverse order except for the last item in the vector
+                for name in field_names.iter().rev().skip(1) {
+                    let new_datatype = arrow::datatypes::DataType::List(Box::new(Field::new(name.as_str(), scalar_type, true)));
                     scalar_type = new_datatype;
                 }
                 scalar_type
@@ -466,13 +463,16 @@ impl TryInto<datafusion::scalar::ScalarValue> for &protobuf::ScalarListValue {
                     .collect::<Result<Vec<_>, _>>()?;
                 datafusion::scalar::ScalarValue::List(Some(typechecked_values), leaf_scalar_type.into())
             }
-            Datatype::List(protobuf::ScalarListType {
-                depth,
-                deepest_type,
-                field_names,
-            }) => {
+            Datatype::List(list_type) => {
+                let protobuf::ScalarListType { deepest_type, field_names } = &list_type;
                 let leaf_type = PrimitiveScalarType::from_i32(*deepest_type).ok_or_else(|| proto_error("Error converting i32 to basic scalar type"))?;
-                let typechecked_values: Vec<datafusion::scalar::ScalarValue> = if *depth == 0 {
+                let depth = field_names.len();
+
+                let typechecked_values: Vec<datafusion::scalar::ScalarValue> = if depth == 0 {
+                    return Err(proto_error(
+                        "Protobuf deserialization error, ScalarListType had no field names, requires at least one",
+                    ));
+                } else if depth == 1 {
                     values
                         .iter()
                         .map(|protobuf::ScalarValue { value: opt_value }| {
@@ -493,17 +493,12 @@ impl TryInto<datafusion::scalar::ScalarValue> for &protobuf::ScalarListValue {
                         })
                         .collect::<Result<Vec<_>, _>>()?
                 };
-                let temp_slt = protobuf::ScalarListType {
-                    depth: *depth,
-                    deepest_type: *deepest_type,
-                    field_names: field_names.clone(),
-                };
                 datafusion::scalar::ScalarValue::List(
                     match typechecked_values.len() {
                         0 => None,
                         _ => Some(typechecked_values),
                     },
-                    (&temp_slt).try_into()?,
+                    list_type.try_into()?,
                 )
             }
         };
@@ -515,23 +510,26 @@ impl TryInto<arrow::datatypes::DataType> for &protobuf::ScalarListType {
     type Error = BallistaError;
     fn try_into(self) -> Result<arrow::datatypes::DataType, Self::Error> {
         use protobuf::PrimitiveScalarType;
-        let protobuf::ScalarListType {
-            depth,
-            deepest_type,
-            field_names,
-        } = self;
-        let mut name_idx = field_names.len() - 1;
+        let protobuf::ScalarListType { deepest_type, field_names } = self;
+
+        let depth = field_names.len();
+        if depth == 0 {
+            return Err(proto_error(
+                "Protobuf deserialization error: Found a ScalarListType message with no field names, at least one is required",
+            ));
+        }
+
         let mut curr_type = arrow::datatypes::DataType::List(Box::new(Field::new(
-            &field_names[name_idx][..],
+            //Since checked vector is not empty above this is safe to unwrap
+            field_names.last().unwrap(),
             PrimitiveScalarType::from_i32(*deepest_type)
                 .ok_or_else(|| proto_error("Could not convert to datafusion scalar type"))?
                 .into(),
             true,
         )));
-        name_idx -= 1;
-        for _ in (0..*depth).rev() {
-            let temp_curr_type = arrow::datatypes::DataType::List(Box::new(Field::new(&field_names[name_idx][..], curr_type, true)));
-            name_idx -= 1;
+        //Iterates over field names in reverse order except for the last item in the vector
+        for name in field_names.iter().rev().skip(1) {
+            let temp_curr_type = arrow::datatypes::DataType::List(Box::new(Field::new(name, curr_type, true)));
             curr_type = temp_curr_type;
         }
         Ok(curr_type)
@@ -543,7 +541,7 @@ impl TryInto<datafusion::scalar::ScalarValue> for protobuf::PrimitiveScalarType 
     fn try_into(self) -> Result<datafusion::scalar::ScalarValue, Self::Error> {
         use datafusion::scalar::ScalarValue;
         Ok(match self {
-            protobuf::PrimitiveScalarType::Null => Err(proto_error("Untyped null is an invalid scalar value"))?,
+            protobuf::PrimitiveScalarType::Null => return Err(proto_error("Untyped null is an invalid scalar value")),
             protobuf::PrimitiveScalarType::Bool => ScalarValue::Boolean(None),
             protobuf::PrimitiveScalarType::Uint8 => ScalarValue::UInt8(None),
             protobuf::PrimitiveScalarType::Int8 => ScalarValue::Int8(None),
@@ -735,39 +733,7 @@ impl TryInto<arrow::datatypes::DataType> for &protobuf::ScalarType {
             .datatype
             .as_ref()
             .ok_or_else(|| proto_error("ScalarType message missing required field 'datatype'"))?;
-        let scalar_type: arrow::datatypes::DataType = match pb_scalartype {
-            protobuf::scalar_type::Datatype::Scalar(scalar_type_i32) => {
-                let scalar_type = protobuf::PrimitiveScalarType::from_i32(*scalar_type_i32)
-                    .ok_or_else(|| proto_error("Protobuf deserialization error: invalid i32 for scalar enum"))?;
-                scalar_type.into()
-            }
-            protobuf::scalar_type::Datatype::List(protobuf::ScalarListType {
-                depth,
-                deepest_type,
-                field_names,
-            }) => {
-                if *depth != (field_names.len() - 1) as u64 {
-                    return Err(proto_error(format!(
-                        "Protobuf deserialization error, found {} field names should be {}",
-                        field_names.len(),
-                        depth + 1
-                    )));
-                }
-                let pb_scalar_type = protobuf::PrimitiveScalarType::from_i32(*deepest_type)
-                    .ok_or_else(|| proto_error("Protobuf deserialization error: invalid i32 for scalar enum"))?;
-                let mut field_name_idx = field_names.len() - 1;
-                let mut scalar_type = arrow::datatypes::DataType::List(Box::new(Field::new(&field_names[field_name_idx][..], pb_scalar_type.into(), true)));
-
-                for _ in 0..*depth {
-                    field_name_idx = field_name_idx - 1;
-                    let temp_scalar_type = arrow::datatypes::DataType::List(Box::new(Field::new(&field_names[field_name_idx][..], scalar_type, true)));
-                    scalar_type = temp_scalar_type;
-                }
-                scalar_type
-            }
-        };
-
-        Ok(scalar_type)
+        pb_scalartype.try_into()
     }
 }
 // impl TryInto<ExecutionTask> for &protobuf::Task {
@@ -833,11 +799,11 @@ impl TryInto<Schema> for &protobuf::Schema {
                     .arrow_type
                     .as_ref()
                     .ok_or_else(|| proto_error("Protobuf deserialization error: Field message was missing required field 'arrow_type'"));
-                let pb_arrow_type: &Box<protobuf::ArrowType> = match pb_arrow_type_res {
+                let pb_arrow_type: &protobuf::ArrowType = match pb_arrow_type_res {
                     Ok(res) => res,
                     Err(e) => return Err(e),
                 };
-                Ok(Field::new(&c.name, pb_arrow_type.as_ref().try_into()?, c.nullable))
+                Ok(Field::new(&c.name, pb_arrow_type.try_into()?, c.nullable))
             })
             .collect::<Result<Vec<_>, _>>()?;
         Ok(Schema::new(fields))
@@ -852,7 +818,11 @@ impl TryInto<arrow::datatypes::Field> for &protobuf::Field {
             .as_ref()
             .ok_or_else(|| proto_error("Protobuf deserialization error: Field message missing required field 'arrow_type'"))?;
 
-        Ok(arrow::datatypes::Field::new(&self.name[..], pb_datatype.as_ref().try_into()?, self.nullable))
+        Ok(arrow::datatypes::Field::new(
+            self.name.as_str(),
+            pb_datatype.as_ref().try_into()?,
+            self.nullable,
+        ))
     }
 }
 

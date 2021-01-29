@@ -305,14 +305,8 @@ fn is_valid_scalar_type_no_list_check(datatype: &arrow::datatypes::DataType) -> 
         | DataType::Float64
         | DataType::LargeUtf8
         | DataType::Utf8 => true,
-        DataType::Date32(date_unit) => match date_unit {
-            arrow::datatypes::DateUnit::Day => true,
-            _ => false,
-        },
-        DataType::Time64(time_unit) => match time_unit {
-            arrow::datatypes::TimeUnit::Microsecond | arrow::datatypes::TimeUnit::Nanosecond => true,
-            _ => false,
-        },
+        DataType::Date32(date_unit) => matches!(date_unit, arrow::datatypes::DateUnit::Day),
+        DataType::Time64(time_unit) => matches!(time_unit, arrow::datatypes::TimeUnit::Microsecond | arrow::datatypes::TimeUnit::Nanosecond),
 
         DataType::List(_) => true,
         _ => false,
@@ -340,15 +334,17 @@ impl TryFrom<&arrow::datatypes::DataType> for protobuf::scalar_type::Datatype {
             DataType::Float64 => scalar_type::Datatype::Scalar(PrimitiveScalarType::Float64 as i32),
             DataType::Date32(date_unit) => match date_unit {
                 DateUnit::Day => scalar_type::Datatype::Scalar(PrimitiveScalarType::Date32 as i32),
-                _ => Err(proto_error("Found invalid date unit for scalar value, only DateUnit::Day is allowed"))?,
+                _ => return Err(proto_error("Found invalid date unit for scalar value, only DateUnit::Day is allowed")),
             },
             DataType::Time64(time_unit) => match time_unit {
                 arrow::datatypes::TimeUnit::Microsecond => scalar_type::Datatype::Scalar(PrimitiveScalarType::TimeMicrosecond as i32),
                 arrow::datatypes::TimeUnit::Nanosecond => scalar_type::Datatype::Scalar(PrimitiveScalarType::TimeNanosecond as i32),
-                _ => Err(proto_error(format!(
-                    "Found invalid time unit for scalar value, only TimeUnit::Microsecond and TimeUnit::Nanosecond are valid time units: {:?}",
-                    time_unit
-                )))?,
+                _ => {
+                    return Err(proto_error(format!(
+                        "Found invalid time unit for scalar value, only TimeUnit::Microsecond and TimeUnit::Nanosecond are valid time units: {:?}",
+                        time_unit
+                    )))
+                }
             },
             DataType::Utf8 => scalar_type::Datatype::Scalar(PrimitiveScalarType::Utf8 as i32),
             DataType::LargeUtf8 => scalar_type::Datatype::Scalar(PrimitiveScalarType::LargeUtf8 as i32),
@@ -356,14 +352,12 @@ impl TryFrom<&arrow::datatypes::DataType> for protobuf::scalar_type::Datatype {
                 let mut field_names: Vec<String> = Vec::new();
                 let mut curr_field: &arrow::datatypes::Field = field_type.as_ref();
                 field_names.push(curr_field.name().to_owned());
-                let mut depth: u64 = 0;
                 //For each nested field check nested datatype, since datafusion scalars only support recursive lists with a leaf scalar type
                 // any other compound types are errors.
 
                 while let DataType::List(nested_field_type) = curr_field.data_type() {
                     curr_field = nested_field_type.as_ref();
                     field_names.push(curr_field.name().to_owned());
-                    depth = depth + 1;
                     if !is_valid_scalar_type_no_list_check(curr_field.data_type()) {
                         return Err(proto_error(format!("{:?} is an invalid scalar type", curr_field)));
                     }
@@ -398,14 +392,15 @@ impl TryFrom<&arrow::datatypes::DataType> for protobuf::scalar_type::Datatype {
 
                     DataType::Utf8 => PrimitiveScalarType::Utf8,
                     DataType::LargeUtf8 => PrimitiveScalarType::LargeUtf8,
-                    _ => Err(proto_error(format!(
-                        "Error converting to Datatype to scalar type, {:?} is invalid as a datafusion scalar.",
-                        val
-                    )))?,
+                    _ => {
+                        return Err(proto_error(format!(
+                            "Error converting to Datatype to scalar type, {:?} is invalid as a datafusion scalar.",
+                            val
+                        )))
+                    }
                 };
                 protobuf::scalar_type::Datatype::List(protobuf::ScalarListType {
                     field_names,
-                    depth,
                     deepest_type: pb_deepest_type as i32,
                 })
             }
@@ -424,10 +419,12 @@ impl TryFrom<&arrow::datatypes::DataType> for protobuf::scalar_type::Datatype {
             | DataType::Struct(_)
             | DataType::Union(_)
             | DataType::Dictionary(_, _)
-            | DataType::Decimal(_, _) => Err(proto_error(format!(
-                "Error converting to Datatype to scalar type, {:?} is invalid as a datafusion scalar.",
-                val
-            )))?,
+            | DataType::Decimal(_, _) => {
+                return Err(proto_error(format!(
+                    "Error converting to Datatype to scalar type, {:?} is invalid as a datafusion scalar.",
+                    val
+                )))
+            }
         };
         Ok(scalar_value)
     }
@@ -457,7 +454,7 @@ impl TryFrom<&datafusion::scalar::ScalarValue> for protobuf::ScalarValue {
                 println!("Current datatype of list: {:?}", datatype);
                 match value {
                     Some(values) => {
-                        if values.len() == 0 {
+                        if values.is_empty() {
                             protobuf::ScalarValue {
                                 value: Some(protobuf::scalar_value::Value::ListValue(protobuf::ScalarListValue {
                                     datatype: Some(datatype.try_into()?),

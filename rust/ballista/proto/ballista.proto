@@ -495,7 +495,6 @@ message ScalarType{
 }
 
 message ScalarListType{
-    uint64 depth = 1;
     repeated string field_names = 3;
     PrimitiveScalarType deepest_type = 2;
 }

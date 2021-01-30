@@ -71,7 +71,10 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
             PhysicalPlanType::HashJoin(hashjoin) => {
                 let _left: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.left)?;
                 let _right: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.left)?;
-                let _on: Vec<(String, String)> = hashjoin.on; //??
+                let _on: Vec<(String, String)> = hashjoin.on
+                    .iter()
+                    .map(|col| (col.left.clone(), col.right.clone()))
+                    .collect();
                 let join_type = protobuf::JoinType::from_i32(hashjoin.join_type).ok_or_else(|| {
                     proto_error(format!(
                         "Received a HashJoinNode message with unknown JoinType {}",

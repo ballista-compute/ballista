@@ -140,8 +140,8 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
             let _on: Vec<protobuf::JoinOn> = exec.on()
                 .iter()
                 .map(|tple| protobuf::JoinOn {
-                    col1: tple.0.to_owned(),
-                    col2: tple.1.to_owned(),
+                    left: tple.0.to_owned(),
+                    right: tple.1.to_owned(),
                 }).collect();
             let _join_type = match exec.join_type() {
                 JoinType::Inner => protobuf::JoinType::Inner,

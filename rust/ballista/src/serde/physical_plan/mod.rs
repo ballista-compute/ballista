@@ -69,8 +69,8 @@ mod roundtrip_tests {
         roundtrip_test(Arc::new(HashJoinExec::try_new(
             Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
             Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
-            &[("col1".to_string(), "col2".to_string())],
+            &[("".to_string(), "".to_string()), ("".to_string(), "".to_string())],
             &JoinType::Inner,
-        ).unwrap()))
+        )?))
     }
 }

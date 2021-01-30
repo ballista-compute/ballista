@@ -294,8 +294,8 @@ message HashJoinExecNode {
 }
 
 message JoinOn {
-   string col1 = 1;
-   string col2 = 2;
+   string left = 1;
+   string right = 2;
 }
 
 

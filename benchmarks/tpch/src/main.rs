@@ -25,7 +25,7 @@ use std::time::Instant;
 
 extern crate ballista;
 
-use arrow::datatypes::{DataType, DateUnit, Field, Schema};
+use arrow::datatypes::{DataType, Field, Schema};
 use arrow::util::pretty;
 use ballista::prelude::*;
 use datafusion::prelude::*;
@@ -318,7 +318,7 @@ fn get_schema(table: &str) -> Schema {
             Field::new("o_custkey", DataType::Int32, false),
             Field::new("o_orderstatus", DataType::Utf8, false),
             Field::new("o_totalprice", DataType::Float64, false),
-            Field::new("o_orderdate", DataType::Date32(DateUnit::Day), false),
+            Field::new("o_orderdate", DataType::Date32, false),
             Field::new("o_orderpriority", DataType::Utf8, false),
             Field::new("o_clerk", DataType::Utf8, false),
             Field::new("o_shippriority", DataType::Int32, false),
@@ -336,9 +336,9 @@ fn get_schema(table: &str) -> Schema {
             Field::new("l_tax", DataType::Float64, false),
             Field::new("l_returnflag", DataType::Utf8, false),
             Field::new("l_linestatus", DataType::Utf8, false),
-            Field::new("l_shipdate", DataType::Date32(DateUnit::Day), false),
-            Field::new("l_commitdate", DataType::Date32(DateUnit::Day), false),
-            Field::new("l_receiptdate", DataType::Date32(DateUnit::Day), false),
+            Field::new("l_shipdate", DataType::Date32, false),
+            Field::new("l_commitdate", DataType::Date32, false),
+            Field::new("l_receiptdate", DataType::Date32, false),
             Field::new("l_shipinstruct", DataType::Utf8, false),
             Field::new("l_shipmode", DataType::Utf8, false),
             Field::new("l_comment", DataType::Utf8, false),

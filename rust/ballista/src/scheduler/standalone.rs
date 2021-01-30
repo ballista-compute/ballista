@@ -12,66 +12,94 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::time::Duration;
+use crate::error::{ballista_error, Result};
+use crate::scheduler::ConfigBackendClient;
 
-use crate::error::{BallistaError, Result};
-use crate::scheduler::SchedulerClient;
-use crate::serde::protobuf::scheduler_grpc_client::SchedulerGrpcClient;
-use crate::serde::protobuf::{GetExecutorMetadataParams, RegisterExecutorParams};
-use crate::serde::scheduler::ExecutorMeta;
-
-use async_trait::async_trait;
 use log::warn;
-use tonic::transport::Channel;
 
+#[derive(Clone)]
 pub struct StandaloneClient {
-    client: SchedulerGrpcClient<Channel>,
+    db: sled::Db,
 }
 
 impl StandaloneClient {
-    pub async fn try_new(
-        registrar_url: String,
-        registrar_port: usize,
-        executor_meta: ExecutorMeta,
-    ) -> Result<Self> {
-        let endpoint = format!("http://{}:{}", registrar_url, registrar_port);
-        let client = SchedulerGrpcClient::connect(endpoint).await?;
-        tokio::spawn(Self::refresh_loop(client.clone(), executor_meta));
-
-        Ok(Self { client })
-    }
-
-    async fn refresh_loop(mut client: SchedulerGrpcClient<Channel>, executor_meta: ExecutorMeta) {
-        loop {
-            let result = client
-                .register_executor(RegisterExecutorParams {
-                    metadata: Some(executor_meta.clone().into()),
-                })
-                .await;
-            if let Err(e) = result {
-                warn!("Received error when trying to register executor: {}", e);
-            }
-
-            tokio::time::delay_for(Duration::from_secs(15)).await;
-        }
+    // TODO: accept file path
+    pub fn new(db: sled::Db) -> Self {
+        Self { db }
     }
 }
 
-#[async_trait]
-impl SchedulerClient for StandaloneClient {
-    async fn get_executors(&self) -> Result<Vec<ExecutorMeta>> {
+#[tonic::async_trait]
+impl ConfigBackendClient for StandaloneClient {
+    async fn get(&mut self, key: &str) -> Result<Vec<u8>> {
         Ok(self
-            .client
-            .clone()
-            .get_executors_metadata(GetExecutorMetadataParams {})
-            .await
+            .db
+            .get(key)
+            .map_err(|e| ballista_error(&format!("sled error {:?}", e)))?
+            .map(|v| v.to_vec())
+            .unwrap_or_default())
+    }
+
+    async fn get_from_prefix(&mut self, prefix: &str) -> Result<Vec<Vec<u8>>> {
+        Ok(self
+            .db
+            .scan_prefix(prefix)
+            .map(|v| v.map(|(_key, value)| value.to_vec()))
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|e| ballista_error(&format!("sled error {:?}", e)))?)
+    }
+
+    async fn put(&mut self, key: String, value: Vec<u8>) -> Result<()> {
+        self.db
+            .insert(key, value)
             .map_err(|e| {
-                BallistaError::General(format!("Grpc error while getting executor metadata: {}", e))
-            })?
-            .into_inner()
-            .metadata
-            .into_iter()
-            .map(ExecutorMeta::from)
-            .collect())
+                warn!("sled insert failed: {}", e);
+                ballista_error("sled insert failed")
+            })
+            .map(|_| ())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::scheduler::ConfigBackendClient;
+
+    use super::StandaloneClient;
+    use std::result::Result;
+
+    fn create_instance() -> Result<StandaloneClient, Box<dyn std::error::Error>> {
+        Ok(StandaloneClient::new(
+            sled::Config::new().temporary(true).open()?,
+        ))
+    }
+
+    #[tokio::test]
+    async fn put_read() -> Result<(), Box<dyn std::error::Error>> {
+        let mut client = create_instance()?;
+        let key = "key";
+        let value = "value".as_bytes();
+        client.put(key.to_owned(), value.to_vec()).await?;
+        assert_eq!(client.get(key).await?, value);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn read_empty() -> Result<(), Box<dyn std::error::Error>> {
+        let mut client = create_instance()?;
+        let key = "key";
+        let empty: &[u8] = &[];
+        assert_eq!(client.get(key).await?, empty);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn read_prefix() -> Result<(), Box<dyn std::error::Error>> {
+        let mut client = create_instance()?;
+        let key = "key";
+        let value = "value".as_bytes();
+        client.put(format!("{}/1", key), value.to_vec()).await?;
+        client.put(format!("{}/2", key), value.to_vec()).await?;
+        assert_eq!(client.get_from_prefix(key).await?, vec![value, value]);
+        Ok(())
     }
 }

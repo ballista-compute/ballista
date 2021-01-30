@@ -14,16 +14,14 @@
 
 //! Core executor logic for executing queries and storing results in memory.
 
-use std::sync::Arc;
-
-use crate::error::Result;
-use crate::scheduler::SchedulerClient;
+use crate::{error::Result, serde::protobuf::scheduler_grpc_client::SchedulerGrpcClient};
 
 use arrow::record_batch::RecordBatch;
 use datafusion::execution::context::ExecutionContext;
 use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::collect;
 use log::{debug, info};
+use tonic::transport::Channel;
 
 #[cfg(feature = "snmalloc")]
 #[global_allocator]
@@ -48,11 +46,11 @@ impl ExecutorConfig {
 
 #[allow(dead_code)]
 pub struct BallistaExecutor {
-    scheduler: Arc<dyn SchedulerClient>,
+    scheduler: SchedulerGrpcClient<Channel>,
 }
 
 impl BallistaExecutor {
-    pub fn new(_config: ExecutorConfig, scheduler: Arc<dyn SchedulerClient>) -> Self {
+    pub fn new(_config: ExecutorConfig, scheduler: SchedulerGrpcClient<Channel>) -> Self {
         Self { scheduler }
     }
 

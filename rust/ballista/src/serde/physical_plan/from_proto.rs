@@ -18,6 +18,7 @@ use std::sync::Arc;
 use std::{convert::TryInto, unimplemented};
 
 use datafusion::physical_plan::{
+    coalesce_batches::CoalesceBatchesExec,
     empty::EmptyExec,
     expressions::PhysicalSortExpr,
     limit::{GlobalLimitExec, LocalLimitExec},
@@ -54,7 +55,13 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
             }
             PhysicalPlanType::Scan(_) => unimplemented!(),
             PhysicalPlanType::Selection(_) => unimplemented!(),
-            PhysicalPlanType::CoalesceBatches(_) => unimplemented!(),
+            PhysicalPlanType::CoalesceBatches(coalesce_batches) => {
+                let input: Arc<dyn ExecutionPlan> = convert_box_required!(coalesce_batches.input)?;
+                Ok(Arc::new(CoalesceBatchesExec::new(
+                    input,
+                    coalesce_batches.target_batch_size as usize,
+                )))
+            }
             PhysicalPlanType::GlobalLimit(limit) => {
                 let input: Arc<dyn ExecutionPlan> = convert_box_required!(limit.input)?;
                 Ok(Arc::new(GlobalLimitExec::new(

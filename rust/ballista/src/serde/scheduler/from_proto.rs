@@ -18,9 +18,10 @@ use std::convert::TryInto;
 use crate::error::BallistaError;
 use crate::serde::protobuf;
 use crate::serde::protobuf::action::ActionType;
-use crate::serde::scheduler::Action;
+use crate::serde::scheduler::{Action, ExecutePartition, PartitionId};
 
 use datafusion::logical_plan::LogicalPlan;
+use uuid::Uuid;
 
 impl TryInto<Action> for protobuf::Action {
     type Error = BallistaError;
@@ -37,6 +38,23 @@ impl TryInto<Action> for protobuf::Action {
                     }
                 }
                 Ok(Action::InteractiveQuery { plan, settings })
+            }
+            Some(ActionType::ExecutePartition(partition)) => {
+                // TODO remove unwraps
+                Ok(Action::ExecutePartition(ExecutePartition::new(
+                    Uuid::parse_str(&partition.job_uuid).unwrap(),
+                    partition.stage_id as usize,
+                    partition.partition_id as usize,
+                    partition.plan.as_ref().unwrap().try_into()?,
+                    HashMap::new(),
+                )))
+            }
+            Some(ActionType::FetchPartition(partition)) => {
+                Ok(Action::FetchPartition(PartitionId::new(
+                    Uuid::parse_str(&partition.job_uuid).unwrap(),
+                    partition.stage_id as usize,
+                    partition.partition_id as usize,
+                )))
             }
             _ => Err(BallistaError::General(
                 "scheduler::from_proto(Action) invalid or missing action".to_owned(),

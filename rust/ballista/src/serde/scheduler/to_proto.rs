@@ -45,8 +45,8 @@ impl TryInto<protobuf::Action> for Action {
                 action_type: Some(ActionType::ExecutePartition(partition.try_into()?)),
                 settings: vec![],
             }),
-            Action::FetchPartition(partition) => Ok(protobuf::Action {
-                action_type: Some(ActionType::FetchPartition(partition.try_into()?)),
+            Action::FetchPartition(partition_id) => Ok(protobuf::Action {
+                action_type: Some(ActionType::FetchPartition(partition_id.try_into()?)),
                 settings: vec![],
             }),
         }

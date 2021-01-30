@@ -66,10 +66,15 @@ mod roundtrip_tests {
 
     #[test]
     fn roundtrip_hash_join() -> Result<()> {
+        use arrow::datatypes::{Field, DataType, Schema};
+         let field_a = Field::new("col", DataType::Int64, false);
+         let schema_left = Schema::new(vec![field_a.clone()]);
+         let schema_right = Schema::new(vec![field_a.clone()]);
+
         roundtrip_test(Arc::new(HashJoinExec::try_new(
-            Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
-            Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
-            &[("".to_string(), "".to_string()), ("".to_string(), "".to_string())],
+            Arc::new(EmptyExec::new(false, Arc::new(schema_left))),
+            Arc::new(EmptyExec::new(false, Arc::new(schema_right))),
+            &[("col".to_string(), "col".to_string())],
             &JoinType::Inner,
         )?))
     }

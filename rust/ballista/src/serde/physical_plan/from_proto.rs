@@ -26,7 +26,6 @@ use datafusion::physical_plan::{
 
 };
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
-use datafusion::physical_plan::hash_utils::JoinOn;
 use crate::error::BallistaError;
 use crate::serde::{proto_error, protobuf};
 use crate::{convert_box_required, convert_required};

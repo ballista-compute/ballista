@@ -181,6 +181,24 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                     },
                 )),
             })
+        // } else if let Some(exec) = plan.downcast_ref::<ParquetExec>() {
+        //     Ok(protobuf::PhysicalPlanNode {
+        //         physical_plan_type: Some(protobuf::ScanExecNode {
+        //             path: exec.path().clone(),
+        //             filename: exec.filenames().clone(),
+        //             projection: exec
+        //                 .projection()
+        //                 .as_ref()
+        //                 .unwrap()
+        //                 .iter()
+        //                 .map(|n| *n as u32)
+        //                 .collect(),
+        //             file_format: "parquet".to_owned(),
+        //             schema: Some(exec.parquet_schema.as_ref().try_into()?),
+        //             has_header: false,
+        //             batch_size: exec.batch_size as u32,
+        //         })
+        //     })
 
         //     PhysicalPlan::ShuffleReader(exec) => {
         //         let mut node = empty_physical_plan_node();

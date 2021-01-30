@@ -21,7 +21,7 @@ use std::sync::Arc;
 use crate::error::{ballista_error, BallistaError, Result};
 use crate::memory_stream::MemoryStream;
 use crate::serde::protobuf::{self};
-use crate::serde::scheduler::{Action, ExecutePartition, ExecutePartitionResult, PartitionMeta};
+use crate::serde::scheduler::{Action, ExecutePartition, ExecutePartitionResult, PartitionId};
 
 use arrow::array::StringArray;
 use arrow::datatypes::Schema;
@@ -108,7 +108,7 @@ impl BallistaClient {
         stage_id: usize,
         partition_id: usize,
     ) -> Result<Vec<RecordBatch>> {
-        let action = Action::FetchPartition(PartitionMeta::new(
+        let action = Action::FetchPartition(PartitionId::new(
             job_uuid.to_owned(),
             stage_id,
             partition_id,

@@ -360,11 +360,10 @@ message Action {
 message ExecutePartition {
   string job_uuid = 1;
   uint32 stage_id = 2;
-  uint32 task_id = 3;
-  uint32 partition_id = 4;
-  PhysicalPlanNode plan = 5;
+  uint32 partition_id = 3;
+  PhysicalPlanNode plan = 4;
   // The task could need to read partitions from other executors
-  repeated PartitionLocation partition_location = 6;
+  repeated PartitionLocation partition_location = 5;
 }
 
 // Mapping from partition id to executor id

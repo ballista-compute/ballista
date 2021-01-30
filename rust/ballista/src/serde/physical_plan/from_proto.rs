@@ -54,6 +54,7 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
             }
             PhysicalPlanType::Scan(_) => unimplemented!(),
             PhysicalPlanType::Selection(_) => unimplemented!(),
+            PhysicalPlanType::CoalesceBatches(_) => unimplemented!(),
             PhysicalPlanType::GlobalLimit(limit) => {
                 let input: Arc<dyn ExecutionPlan> = convert_box_required!(limit.input)?;
                 Ok(Arc::new(GlobalLimitExec::new(

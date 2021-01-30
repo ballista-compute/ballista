@@ -21,6 +21,7 @@ use std::sync::Arc;
 
 use crate::serde::{protobuf, BallistaError};
 
+use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::functions::ScalarFunctionExpr;
 use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
@@ -146,6 +147,17 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                     produce_one_row: empty.produce_one_row(),
                     schema: Some(schema),
                 })),
+            })
+        } else if let Some(coalesce_batches) = plan.downcast_ref::<CoalesceBatchesExec>() {
+            let input: protobuf::PhysicalPlanNode =
+                coalesce_batches.input().to_owned().try_into()?;
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: Some(PhysicalPlanType::CoalesceBatches(Box::new(
+                    protobuf::CoalesceBatchesExecNode {
+                        input: Some(Box::new(input)),
+                        target_batch_size: coalesce_batches.target_batch_size() as u32,
+                    },
+                ))),
             })
         } else if let Some(_exec) = plan.downcast_ref::<ParquetExec>() {
             //         node.scan = Some(protobuf::ScanExecNode {

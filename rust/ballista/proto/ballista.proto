@@ -270,6 +270,7 @@ message PhysicalPlanNode {
     HashAggregateExecNode hash_aggregate = 30;
     ShuffleReaderExecNode shuffle_reader = 40;
     SortExecNode sort = 50;
+    CoalesceBatchesExecNode coalesce_batches = 51;
   }
 }
 
@@ -329,6 +330,11 @@ message LocalLimitExecNode {
 message SortExecNode {
   PhysicalPlanNode input = 1;
   repeated LogicalExprNode expr = 2;
+}
+
+message CoalesceBatchesExecNode {
+  PhysicalPlanNode input = 1;
+  uint32 target_batch_size = 2;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

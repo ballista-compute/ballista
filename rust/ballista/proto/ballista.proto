@@ -364,17 +364,13 @@ message ExecutePartition {
   repeated PartitionLocation partition_location = 6;
 }
 
-// Mapping from shuffle id to executor id
+// Mapping from partition id to executor id
 message PartitionLocation {
-  string job_uuid = 1;
-  uint32 stage_id = 2;
-  uint32 partition_id = 4;
-  string executor_id = 5;
-  string executor_host = 6;
-  uint32 executor_port = 7;
+  PartitionId partition_id = 1;
+  ExecutorMetadata executor_meta = 2;
 }
 
-// Mapping from shuffle id to executor id
+// Unique identifier for a materialized partition of data
 message PartitionId {
   string job_uuid = 1;
   uint32 stage_id = 2;

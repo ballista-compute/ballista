@@ -31,6 +31,7 @@ use datafusion::physical_plan::{
     csv::CsvExec,
     limit::{GlobalLimitExec, LocalLimitExec},
 };
+use datafusion::physical_plan::hash_utils::JoinType;
 use datafusion::physical_plan::{
     empty::EmptyExec,
     expressions::{
@@ -136,13 +137,24 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
         } else if let Some(exec) = plan.downcast_ref::<HashJoinExec>() {
             let _left: protobuf::PhysicalPlanNode = exec.left().to_owned().try_into()?;
             let _right: protobuf::PhysicalPlanNode = exec.right().to_owned().try_into()?;
+            exec.on().iter().map(|on|)
+            let _on = protobuf::JoinOn {
+                col1: exec.on().iter().map(|on| on.0.to_owned()).collect(),
+                col2: exec.on().iter().map(|on| on.1.to_owned()).collect(),
+            };
+
+            let _join_type = match exec.join_type() {
+                JoinType::Inner => protobuf::JoinType::Inner,
+                JoinType::Left => protobuf::JoinType::Left,
+                JoinType::Right => protobuf::JoinType::Right,
+            };
             Ok(protobuf::PhysicalPlanNode {
                 physical_plan_type: Some(PhysicalPlanType::HashJoin(Box::new(
                     protobuf::HashJoinExecNode {
                         left: Some(Box::new(_left)),
                         right: Some(Box::new(_right)),
-                        on: exec.on().to_vec(),
-                        join_type: exec.join_type(),
+                        on: Some(_on),
+                        join_type: _join_type.into(),
                     },
                 ))),
             })

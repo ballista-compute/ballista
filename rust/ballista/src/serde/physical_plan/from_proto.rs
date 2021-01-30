@@ -16,14 +16,17 @@
 
 use std::sync::Arc;
 use std::{convert::TryInto, unimplemented};
+use datafusion::physical_plan::hash_utils::JoinType;
 
 use datafusion::physical_plan::{
     empty::EmptyExec,
     limit::{GlobalLimitExec, LocalLimitExec},
     projection::ProjectionExec,
+    hash_join::HashJoinExec,
+
 };
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
-
+use datafusion::physical_plan::hash_utils::JoinOn;
 use crate::error::BallistaError;
 use crate::serde::{proto_error, protobuf};
 use crate::{convert_box_required, convert_required};
@@ -65,10 +68,24 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                 Ok(Arc::new(LocalLimitExec::new(input, limit.limit as usize)))
             }
             PhysicalPlanType::HashAggregate(_) => unimplemented!(),
-            PhysicalPlanType::HashJoin(_) => {
-                //let _left: Arc<dyn ExecutionPlan> = convert_box_required!(exec.left)?;
-                //let _right: Arc<dyn ExecutionPlan> = convert_box_required!(exec.left)?;
-                unimplemented!()
+            PhysicalPlanType::HashJoin(hashjoin) => {
+                let _left: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.left)?;
+                let _right: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.left)?;
+                let _on: Vec<(String, String)> = convert_required!(hashjoin.on)?; //
+                let join_type = protobuf::JoinType::from_i32(hashjoin.join_type).ok_or_else(|| {
+                    proto_error(format!(
+                        "Received a HashJoinNode message with unknown JoinType {}",
+                        hashjoin.join_type
+                    ))
+                })?;
+                let join_type = match join_type {
+                    protobuf::JoinType::Inner => JoinType::Inner,
+                    protobuf::JoinType::Left => JoinType::Left,
+                    protobuf::JoinType::Right => JoinType::Right,
+                };
+                Ok(Arc::new(
+                    HashJoinExec::try_new(_left, _right, &[], &join_type)?))
+
             },
             PhysicalPlanType::ShuffleReader(_) => unimplemented!(),
             PhysicalPlanType::Empty(empty) => {

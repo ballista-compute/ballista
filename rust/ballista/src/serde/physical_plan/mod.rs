@@ -71,6 +71,6 @@ mod roundtrip_tests {
             Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
             &[("col1".to_string(), "col2".to_string())],
             &JoinType::Inner,
-        )))
+        ).unwrap()))
     }
 }

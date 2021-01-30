@@ -288,8 +288,9 @@ message ScanExecNode {
 message HashJoinExecNode {
   PhysicalPlanNode left = 1;
   PhysicalPlanNode right = 2;
-  repeated JoinOn on = 3;
+  JoinOn on = 3;
   JoinType join_type = 4;
+
 }
 
 message JoinOn {

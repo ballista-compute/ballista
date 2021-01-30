@@ -312,7 +312,7 @@ message HashAggregateExecNode {
 }
 
 message ShuffleReaderExecNode {
-  repeated ShuffleId shuffle_id = 1;
+  repeated PartitionId shuffle_id = 1;
   Schema schema = 2;
 }
 
@@ -341,31 +341,31 @@ message KeyValuePair {
 }
 
 message Action {
-  // interactive query
+  // Execute a logical query plan
   LogicalPlanNode query = 1;
   
-  // Execute query and store resulting shuffle partition in memory
-  Task task = 2;
+  // Execute one partition of a physical query plan
+  ExecutePartition execute_partition = 2;
   
-  // Fetch a shuffle partition from an executor
-  ShuffleId fetch_shuffle = 3;
+  // Fetch a partition from an executor
+  PartitionId fetch_partition = 3;
   
   // configuration settings
   repeated KeyValuePair settings = 100;
 }
 
-message Task {
+message ExecutePartition {
   string job_uuid = 1;
   uint32 stage_id = 2;
   uint32 task_id = 3;
   uint32 partition_id = 4;
   PhysicalPlanNode plan = 5;
-  // The task could need to read shuffle output from another task
-  repeated ShuffleLocation shuffle_loc = 6;
+  // The task could need to read partitions from other executors
+  repeated PartitionLocation partition_location = 6;
 }
 
 // Mapping from shuffle id to executor id
-message ShuffleLocation {
+message PartitionLocation {
   string job_uuid = 1;
   uint32 stage_id = 2;
   uint32 partition_id = 4;
@@ -375,7 +375,7 @@ message ShuffleLocation {
 }
 
 // Mapping from shuffle id to executor id
-message ShuffleId {
+message PartitionId {
   string job_uuid = 1;
   uint32 stage_id = 2;
   uint32 partition_id = 4;

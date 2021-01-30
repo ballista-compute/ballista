@@ -38,21 +38,21 @@ impl TryInto<protobuf::Action> for Action {
 
                 Ok(protobuf::Action {
                     query: Some(plan_proto),
-                    task: None,
-                    fetch_shuffle: None,
+                    execute_partition: None,
+                    fetch_partition: None,
                     settings,
                 })
             }
-            // Action::ExecuteTask(task) => Ok(protobuf::Action {
+            // Action::ExecutePartition(partition) => Ok(protobuf::Action {
             //     query: None,
-            //     task: Some(task.try_into()?),
-            //     fetch_shuffle: None,
+            //     execute_partition: Some(partition.try_into()?),
+            //     fetch_partition: None,
             //     settings: vec![],
             // }),
-            // Action::FetchShuffle(shuffle_id) => Ok(protobuf::Action {
+            // Action::FetchPartition(partition) => Ok(protobuf::Action {
             //     query: None,
-            //     task: None,
-            //     fetch_shuffle: Some(shuffle_id.try_into()?),
+            //     execute_partition: None,
+            //     fetch_partition: Some(partition.try_into()?),
             //     settings: vec![],
             // }),
             _ => Err(ballista_error("scheduler::to_proto() unimplemented Action")),

@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-fn main() -> Result<(), String> {
-    println!("cargo:rerun-if-changed=proto/ballista.proto");
-    tonic_build::configure()
-        .compile(&["proto/ballista.proto"], &["proto"])
-        .map_err(|e| format!("protobuf compilation failed: {}", e))
-}
+//! Distributed query planning and execution
+//!
+//! This code is EXPERIMENTAL and still under development
+
+pub mod planner;
+pub mod query_stage;

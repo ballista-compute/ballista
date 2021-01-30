@@ -21,17 +21,14 @@ use std::sync::Arc;
 
 use crate::serde::{protobuf, BallistaError};
 
+use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::functions::ScalarFunctionExpr;
 use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
 use datafusion::physical_plan::hash_join::HashJoinExec;
-use datafusion::physical_plan::parquet::ParquetExec;
+use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
 use datafusion::physical_plan::projection::ProjectionExec;
-use datafusion::physical_plan::{
-    csv::CsvExec,
-    limit::{GlobalLimitExec, LocalLimitExec},
-};
-use datafusion::physical_plan::hash_utils::JoinType;
+use datafusion::physical_plan::sort::SortExec;
 use datafusion::physical_plan::{
     empty::EmptyExec,
     expressions::{
@@ -94,25 +91,6 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
             Ok(protobuf::PhysicalPlanNode {
                 physical_plan_type: None,
             })
-        } else if let Some(_exec) = plan.downcast_ref::<CsvExec>() {
-            //         node.scan = Some(protobuf::ScanExecNode {
-            //             path: exec.path.clone(),
-            //             filename: exec.filenames.clone(),
-            //             projection: exec
-            //                 .projection
-            //                 .as_ref()
-            //                 .unwrap()
-            //                 .iter()
-            //                 .map(|n| *n as u32)
-            //                 .collect(),
-            //             file_format: "csv".to_owned(),
-            //             schema: Some(exec.original_schema().as_ref().try_into()?),
-            //             has_header: exec.has_header,
-            //             batch_size: exec.batch_size as u32,
-            //         });
-            Ok(protobuf::PhysicalPlanNode {
-                physical_plan_type: None,
-            })
         } else if let Some(limit) = plan.downcast_ref::<GlobalLimitExec>() {
             let input: protobuf::PhysicalPlanNode = limit.input().to_owned().try_into()?;
             Ok(protobuf::PhysicalPlanNode {
@@ -166,25 +144,35 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                     schema: Some(schema),
                 })),
             })
-        } else if let Some(_exec) = plan.downcast_ref::<ParquetExec>() {
-            //         node.scan = Some(protobuf::ScanExecNode {
-            //             path: exec.path.clone(),
-            //             filename: exec.filenames.clone(),
-            //             projection: exec
-            //                 .projection
-            //                 .as_ref()
-            //                 .unwrap()
-            //                 .iter()
-            //                 .map(|n| *n as u32)
-            //                 .collect(),
-            //             file_format: "parquet".to_owned(),
-            //             schema: Some(exec.parquet_schema.as_ref().try_into()?),
-            //             has_header: false,
-            //             batch_size: exec.batch_size as u32,
-            //         });
+        } else if let Some(coalesce_batches) = plan.downcast_ref::<CoalesceBatchesExec>() {
+            let input: protobuf::PhysicalPlanNode =
+                coalesce_batches.input().to_owned().try_into()?;
             Ok(protobuf::PhysicalPlanNode {
-                physical_plan_type: None,
+                physical_plan_type: Some(PhysicalPlanType::CoalesceBatches(Box::new(
+                    protobuf::CoalesceBatchesExecNode {
+                        input: Some(Box::new(input)),
+                        target_batch_size: coalesce_batches.target_batch_size() as u32,
+                    },
+                ))),
             })
+        // } else if let Some(exec) = plan.downcast_ref::<ParquetExec>() {
+        //     Ok(protobuf::PhysicalPlanNode {
+        //         physical_plan_type: Some(protobuf::ScanExecNode {
+        //             path: exec.path().clone(),
+        //             filename: exec.filenames().clone(),
+        //             projection: exec
+        //                 .projection()
+        //                 .as_ref()
+        //                 .unwrap()
+        //                 .iter()
+        //                 .map(|n| *n as u32)
+        //                 .collect(),
+        //             file_format: "parquet".to_owned(),
+        //             schema: Some(exec.parquet_schema.as_ref().try_into()?),
+        //             has_header: false,
+        //             batch_size: exec.batch_size as u32,
+        //         })
+        //     })
 
         //     PhysicalPlan::ShuffleReader(exec) => {
         //         let mut node = empty_physical_plan_node();
@@ -201,9 +189,33 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
         //         });
         //         Ok(node)
         //     }
+        } else if let Some(exec) = plan.downcast_ref::<SortExec>() {
+            let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
+            let expr = exec
+                .expr()
+                .iter()
+                .map(|expr| {
+                    let sort_expr = Box::new(protobuf::SortExprNode {
+                        expr: Some(Box::new(expr.expr.to_owned().try_into()?)),
+                        asc: !expr.options.descending,
+                        nulls_first: expr.options.nulls_first,
+                    });
+                    Ok(protobuf::LogicalExprNode {
+                        expr_type: Some(protobuf::logical_expr_node::ExprType::Sort(sort_expr)),
+                    })
+                })
+                .collect::<Result<Vec<_>, Self::Error>>()?;
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: Some(PhysicalPlanType::Sort(Box::new(
+                    protobuf::SortExecNode {
+                        input: Some(Box::new(input)),
+                        expr,
+                    },
+                ))),
+            })
         } else {
             Err(BallistaError::General(format!(
-                "physical plan to_proto {:?}",
+                "physical plan to_proto unsupported plan {:?}",
                 self
             )))
         }

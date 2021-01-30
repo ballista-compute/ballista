@@ -17,15 +17,25 @@ to the `.gitignore` file.
 
 ## Running the Benchmarks
 
-To run the benchmarks it is necessary to have at least one Ballista executor running. The goal is that the benchmarks
-can be run against either the Rust, JVM, or Spark executor, but currently only the Rust executor is supported.
+To run the benchmarks it is necessary to have at least one Ballista scheduler and one Ballista executor running.
 
-To start a Rust executor from source:
+To run the scheduler from source:
+
+```bash
+cd $BALLISTA_HOME/rust/ballista
+RUST_LOG=info cargo run --release --bin scheduler
+```
+
+By default the scheduler will bind to `0.0.0.0` and listen on port 50050.
+
+To run the executor from source:
 
 ```bash
 cd $BALLISTA_HOME/rust/ballista
 RUST_LOG=info cargo run --release --bin executor
 ```
+
+By default the executor will bind to `0.0.0.0` and listen on port 50051.
 
 You can add SIMD/snmalloc/LTO flags to improve speed (with longer build times):
 
@@ -33,7 +43,7 @@ You can add SIMD/snmalloc/LTO flags to improve speed (with longer build times):
 RUST_LOG=info RUSTFLAGS='-C target-cpu=native -C lto -C codegen-units=1 -C embed-bitcode' cargo run --release --bin executor --features "simd snmalloc" --target x86_64-unknown-linux-gnu
 ```
 
-To start a Rust executor using Docker Compose:
+To start a Rust scheduler and executor using Docker Compose:
 
 ```bash
 cd $BALLISTA_HOME

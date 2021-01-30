@@ -16,53 +16,49 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 
 use crate::error::BallistaError;
-use crate::serde::scheduler::Action;
-use crate::serde::{proto_error, protobuf};
+use crate::serde::protobuf;
+use crate::serde::protobuf::action::ActionType;
+use crate::serde::scheduler::{Action, ExecutePartition, PartitionId};
 
 use datafusion::logical_plan::LogicalPlan;
-
-macro_rules! convert_required {
-    ($PB:expr) => {{
-        if let Some(field) = $PB.as_ref() {
-            field.try_into()
-        } else {
-            Err(proto_error("Missing required field in protobuf"))
-        }
-    }};
-}
-
-// macro_rules! convert_box_required {
-//     ($PB:expr) => {{
-//         if let Some(field) = $PB.as_ref() {
-//             field.as_ref().try_into()
-//         } else {
-//             Err(proto_error("Missing required field in protobuf"))
-//         }
-//     }};
-// }
+use uuid::Uuid;
 
 impl TryInto<Action> for protobuf::Action {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<Action, Self::Error> {
-        if self.query.is_some() {
-            let plan: LogicalPlan = convert_required!(self.query)?;
-            let mut settings = HashMap::new();
-            for setting in &self.settings {
-                settings.insert(setting.key.to_owned(), setting.value.to_owned());
+        match self.action_type {
+            Some(ActionType::Query(query)) => {
+                let mut settings = HashMap::new();
+                let plan: LogicalPlan = (&query).try_into()?;
+                for setting in &self.settings {
+                    settings.insert(setting.key.to_owned(), setting.value.to_owned());
+                    for setting in &self.settings {
+                        settings.insert(setting.key.to_owned(), setting.value.to_owned());
+                    }
+                }
+                Ok(Action::InteractiveQuery { plan, settings })
             }
-            Ok(Action::InteractiveQuery { plan, settings })
-        // } else if self.task.is_some() {
-        //     let task: ExecutionTask = convert_required!(self.task)?;
-        //     Ok(Action::Execute(task))
-        // } else if self.fetch_shuffle.is_some() {
-        //     let shuffle_id: ShuffleId = convert_required!(self.fetch_shuffle)?;
-        //     Ok(Action::FetchShuffle(shuffle_id))
-        } else {
-            Err(BallistaError::NotImplemented(format!(
-                "from_proto(Action) {:?}",
-                self
-            )))
+            Some(ActionType::ExecutePartition(partition)) => {
+                // TODO remove unwraps
+                Ok(Action::ExecutePartition(ExecutePartition::new(
+                    Uuid::parse_str(&partition.job_uuid).unwrap(),
+                    partition.stage_id as usize,
+                    partition.partition_id as usize,
+                    partition.plan.as_ref().unwrap().try_into()?,
+                    HashMap::new(),
+                )))
+            }
+            Some(ActionType::FetchPartition(partition)) => {
+                Ok(Action::FetchPartition(PartitionId::new(
+                    Uuid::parse_str(&partition.job_uuid).unwrap(),
+                    partition.stage_id as usize,
+                    partition.partition_id as usize,
+                )))
+            }
+            _ => Err(BallistaError::General(
+                "scheduler::from_proto(Action) invalid or missing action".to_owned(),
+            )),
         }
     }
 }

@@ -26,8 +26,11 @@ kube = "0.35"
 log = "0.4"
 prost = "0.6"
 prost-types = "0.6"
-sqlparser = "0.7"
+serde = "1"
+serde_json = "1"
+sled = "0.34"
 snmalloc-rs = {version = "0.2", features= ["cache-friendly"], optional = true}
+sqlparser = "0.7"
 structopt = "0.3"
 tempfile = "3"
 tokio = { version = "0.2", features = ["full"] }
@@ -41,7 +44,7 @@ datafusion = "3.0.0"
 [dev-dependencies]
 
 [build-dependencies]
-prost-build = { version = "0.6.1" }
+tonic-build = { version = "0.3", features = ["prost", "transport"], default-features = false }
 
 [[bin]]
 name = "executor"

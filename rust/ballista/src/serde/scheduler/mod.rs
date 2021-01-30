@@ -17,7 +17,10 @@ use std::sync::Arc;
 
 use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::ExecutionPlan;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+use super::protobuf;
 
 pub mod from_proto;
 pub mod to_proto;
@@ -36,18 +39,18 @@ pub enum Action {
     /// Execute a query and store the results in memory
     ExecutePartition(ExecutePartition),
     /// Collect a shuffle partition
-    FetchPartition(ShuffleId),
+    FetchPartition(PartitionId),
 }
 
-/// Unique identifier for the output shuffle partition of an operator.
+/// Unique identifier for the output partition of an operator.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ShuffleId {
+pub struct PartitionId {
     pub(crate) job_uuid: Uuid,
     pub(crate) stage_id: usize,
     pub(crate) partition_id: usize,
 }
 
-impl ShuffleId {
+impl PartitionId {
     pub fn new(job_uuid: Uuid, stage_id: usize, partition_id: usize) -> Self {
         Self {
             job_uuid,
@@ -58,11 +61,31 @@ impl ShuffleId {
 }
 
 /// Meta-data for an executor, used when fetching shuffle partitions from other executors
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutorMeta {
     pub id: String,
     pub host: String,
-    pub port: usize,
+    pub port: u16,
+}
+
+impl Into<protobuf::ExecutorMetadata> for ExecutorMeta {
+    fn into(self) -> protobuf::ExecutorMetadata {
+        protobuf::ExecutorMetadata {
+            id: self.id,
+            host: self.host,
+            port: self.port as u32,
+        }
+    }
+}
+
+impl From<protobuf::ExecutorMetadata> for ExecutorMeta {
+    fn from(meta: protobuf::ExecutorMetadata) -> Self {
+        Self {
+            id: meta.id,
+            host: meta.host,
+            port: meta.port as u16,
+        }
+    }
 }
 
 /// Task that can be sent to an executor to execute one stage of a query and write
@@ -79,7 +102,7 @@ pub struct ExecutePartition {
     /// The physical plan for this query stage
     pub(crate) plan: Arc<dyn ExecutionPlan>,
     /// Location of shuffle partitions that this query stage may depend on
-    pub(crate) shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
+    pub(crate) shuffle_locations: HashMap<PartitionId, ExecutorMeta>,
 }
 
 impl ExecutePartition {
@@ -88,7 +111,7 @@ impl ExecutePartition {
         stage_id: usize,
         partition_id: usize,
         plan: Arc<dyn ExecutionPlan>,
-        shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
+        shuffle_locations: HashMap<PartitionId, ExecutorMeta>,
     ) -> Self {
         Self {
             job_uuid,
@@ -104,6 +127,7 @@ impl ExecutePartition {
     }
 }
 
+#[derive(Debug)]
 pub struct ExecutePartitionResult {
     /// Path containing results for this partition
     path: String,

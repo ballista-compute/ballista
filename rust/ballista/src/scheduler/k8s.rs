@@ -14,6 +14,7 @@
 
 //! Ballista k8s cluster management utilities
 
+/*
 use crate::error::BallistaError;
 use crate::scheduler::SchedulerClient;
 use crate::serde::scheduler::ExecutorMeta;
@@ -29,10 +30,10 @@ pub struct KubernetesClient {
 }
 
 impl KubernetesClient {
-    pub fn new(namespace: &str, cluster_name: &str) -> Self {
+    pub fn new(namespace: String, cluster_name: String) -> Self {
         Self {
-            namespace: namespace.to_owned(),
-            cluster_name: cluster_name.to_owned(),
+            namespace,
+            cluster_name,
         }
     }
 }
@@ -68,7 +69,7 @@ impl SchedulerClient for KubernetesClient {
                                     executors.push(ExecutorMeta {
                                         id: pod_name.to_owned(),
                                         host,
-                                        port: port[0].container_port as usize,
+                                        port: port[0].container_port as u16,
                                     });
                                 }
                             }
@@ -80,3 +81,4 @@ impl SchedulerClient for KubernetesClient {
         Ok(executors)
     }
 }
+*/

@@ -21,10 +21,11 @@ use std::sync::Arc;
 use crate::error::{ballista_error, BallistaError, Result};
 use crate::memory_stream::MemoryStream;
 use crate::serde::protobuf::{self};
-use crate::serde::scheduler::{Action, ExecutePartition, ExecutePartitionResult};
+use crate::serde::scheduler::{Action, ExecutePartition, ExecutePartitionResult, PartitionId};
 
 use arrow::array::StringArray;
 use arrow::datatypes::Schema;
+use arrow::record_batch::RecordBatch;
 use arrow_flight::flight_service_client::FlightServiceClient;
 use arrow_flight::utils::flight_data_to_arrow_batch;
 use arrow_flight::Ticket;
@@ -32,6 +33,7 @@ use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
 use prost::Message;
+use uuid::Uuid;
 
 /// Client for interacting with Ballista executors.
 pub struct BallistaClient {
@@ -62,12 +64,14 @@ impl BallistaClient {
     /// Execute one partition of a physical query plan against the executor
     pub async fn execute_partition(
         &mut self,
-        plan: Arc<dyn ExecutionPlan>,
+        job_uuid: Uuid,
+        stage_id: usize,
         partition_id: usize,
+        plan: Arc<dyn ExecutionPlan>,
     ) -> Result<ExecutePartitionResult> {
         let action = Action::ExecutePartition(ExecutePartition {
-            job_uuid: Default::default(),
-            stage_id: 0,
+            job_uuid,
+            stage_id,
             partition_id,
             plan,
             shuffle_locations: Default::default(),
@@ -95,6 +99,24 @@ impl BallistaClient {
             .expect("execute_partition expected column 0 to be a StringArray");
 
         Ok(ExecutePartitionResult::new(path.value(0)))
+    }
+
+    /// Fetch a partition from an executor
+    pub async fn fetch_partition(
+        &mut self,
+        job_uuid: &Uuid,
+        stage_id: usize,
+        partition_id: usize,
+    ) -> Result<Vec<RecordBatch>> {
+        let action = Action::FetchPartition(PartitionId::new(
+            job_uuid.to_owned(),
+            stage_id,
+            partition_id,
+        ));
+        let stream = self.execute_action(&action).await?;
+        Ok(collect(stream)
+            .await
+            .map_err(|e| BallistaError::General(format!("{:?}", e)))?)
     }
 
     /// Execute an action and retrieve the results

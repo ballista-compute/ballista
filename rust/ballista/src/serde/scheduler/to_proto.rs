@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::error::{ballista_error, BallistaError};
-use crate::serde::protobuf;
-use crate::serde::scheduler::Action;
 use std::convert::TryInto;
+
+use crate::error::BallistaError;
+use crate::serde::protobuf;
+use crate::serde::protobuf::action::ActionType;
+use crate::serde::scheduler::{Action, ExecutePartition, PartitionId};
 
 impl TryInto<protobuf::Action> for Action {
     type Error = BallistaError;
@@ -26,8 +28,6 @@ impl TryInto<protobuf::Action> for Action {
                 ref plan,
                 ref settings,
             } => {
-                let plan_proto: protobuf::LogicalPlanNode = plan.try_into()?;
-
                 let settings = settings
                     .iter()
                     .map(|e| protobuf::KeyValuePair {
@@ -37,25 +37,40 @@ impl TryInto<protobuf::Action> for Action {
                     .collect();
 
                 Ok(protobuf::Action {
-                    query: Some(plan_proto),
-                    task: None,
-                    fetch_shuffle: None,
+                    action_type: Some(ActionType::Query(plan.try_into()?)),
                     settings,
                 })
             }
-            // Action::ExecuteTask(task) => Ok(protobuf::Action {
-            //     query: None,
-            //     task: Some(task.try_into()?),
-            //     fetch_shuffle: None,
-            //     settings: vec![],
-            // }),
-            // Action::FetchShuffle(shuffle_id) => Ok(protobuf::Action {
-            //     query: None,
-            //     task: None,
-            //     fetch_shuffle: Some(shuffle_id.try_into()?),
-            //     settings: vec![],
-            // }),
-            _ => Err(ballista_error("scheduler::to_proto() unimplemented Action")),
+            Action::ExecutePartition(partition) => Ok(protobuf::Action {
+                action_type: Some(ActionType::ExecutePartition(partition.try_into()?)),
+                settings: vec![],
+            }),
+            Action::FetchPartition(partition_id) => Ok(protobuf::Action {
+                action_type: Some(ActionType::FetchPartition(partition_id.try_into()?)),
+                settings: vec![],
+            }),
         }
+    }
+}
+
+impl TryInto<protobuf::ExecutePartition> for ExecutePartition {
+    type Error = BallistaError;
+
+    fn try_into(self) -> Result<protobuf::ExecutePartition, Self::Error> {
+        Ok(protobuf::ExecutePartition {
+            job_uuid: self.job_uuid.to_string(),
+            stage_id: self.stage_id as u32,
+            partition_id: self.partition_id as u32,
+            plan: Some(self.plan.try_into()?),
+            partition_location: vec![],
+        })
+    }
+}
+
+impl TryInto<protobuf::PartitionId> for PartitionId {
+    type Error = BallistaError;
+
+    fn try_into(self) -> Result<protobuf::PartitionId, Self::Error> {
+        unimplemented!()
     }
 }

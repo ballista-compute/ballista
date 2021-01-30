@@ -77,9 +77,9 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
             }
             PhysicalPlanType::HashAggregate(_) => unimplemented!(),
             PhysicalPlanType::HashJoin(hashjoin) => {
-                let _left: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.left)?;
-                let _right: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.left)?;
-                let _on: Vec<(String, String)> = hashjoin.on
+                let left: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.left)?;
+                let right: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.right)?;
+                let on: Vec<(String, String)> = hashjoin.on
                     .iter()
                     .map(|col| (col.left.clone(), col.right.clone()))
                     .collect();
@@ -95,7 +95,7 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     protobuf::JoinType::Right => JoinType::Right,
                 };
                 Ok(Arc::new(
-                    HashJoinExec::try_new(_left, _right, &_on, &join_type)?))
+                    HashJoinExec::try_new(left, right, &on, &join_type)?))
 
             },
             PhysicalPlanType::ShuffleReader(_) => unimplemented!(),

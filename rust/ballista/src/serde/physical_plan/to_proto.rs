@@ -114,15 +114,15 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
             })
 
         } else if let Some(exec) = plan.downcast_ref::<HashJoinExec>() {
-            let _left: protobuf::PhysicalPlanNode = exec.left().to_owned().try_into()?;
-            let _right: protobuf::PhysicalPlanNode = exec.right().to_owned().try_into()?;
-            let _on: Vec<protobuf::JoinOn> = exec.on()
+            let left: protobuf::PhysicalPlanNode = exec.left().to_owned().try_into()?;
+            let right: protobuf::PhysicalPlanNode = exec.right().to_owned().try_into()?;
+            let on: Vec<protobuf::JoinOn> = exec.on()
                 .iter()
-                .map(|tple| protobuf::JoinOn {
-                    left: tple.0.to_owned(),
-                    right: tple.1.to_owned(),
+                .map(|tuple| protobuf::JoinOn {
+                    left: tuple.0.to_owned(),
+                    right: tuple.1.to_owned(),
                 }).collect();
-            let _join_type = match exec.join_type() {
+            let join_type = match exec.join_type() {
                 JoinType::Inner => protobuf::JoinType::Inner,
                 JoinType::Left => protobuf::JoinType::Left,
                 JoinType::Right => protobuf::JoinType::Right,
@@ -130,10 +130,10 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
             Ok(protobuf::PhysicalPlanNode {
                 physical_plan_type: Some(PhysicalPlanType::HashJoin(Box::new(
                     protobuf::HashJoinExecNode {
-                        left: Some(Box::new(_left)),
-                        right: Some(Box::new(_right)),
-                        on: _on,
-                        join_type: _join_type.into(),
+                        left: Some(Box::new(left)),
+                        right: Some(Box::new(right)),
+                        on: on,
+                        join_type: join_type.into(),
                     },
                 ))),
             })

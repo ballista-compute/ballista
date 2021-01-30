@@ -38,18 +38,18 @@ pub enum Action {
     /// Execute a query and store the results in memory
     ExecutePartition(ExecutePartition),
     /// Collect a shuffle partition
-    FetchPartition(ShuffleId),
+    FetchPartition(PartitionMeta),
 }
 
 /// Unique identifier for the output shuffle partition of an operator.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ShuffleId {
+pub struct PartitionMeta {
     pub(crate) job_uuid: Uuid,
     pub(crate) stage_id: usize,
     pub(crate) partition_id: usize,
 }
 
-impl ShuffleId {
+impl PartitionMeta {
     pub fn new(job_uuid: Uuid, stage_id: usize, partition_id: usize) -> Self {
         Self {
             job_uuid,
@@ -101,7 +101,7 @@ pub struct ExecutePartition {
     /// The physical plan for this query stage
     pub(crate) plan: Arc<dyn ExecutionPlan>,
     /// Location of shuffle partitions that this query stage may depend on
-    pub(crate) shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
+    pub(crate) shuffle_locations: HashMap<PartitionMeta, ExecutorMeta>,
 }
 
 impl ExecutePartition {
@@ -110,7 +110,7 @@ impl ExecutePartition {
         stage_id: usize,
         partition_id: usize,
         plan: Arc<dyn ExecutionPlan>,
-        shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
+        shuffle_locations: HashMap<PartitionMeta, ExecutorMeta>,
     ) -> Self {
         Self {
             job_uuid,

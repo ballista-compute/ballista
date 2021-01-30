@@ -14,23 +14,23 @@
 
 //! Serde code to convert from protocol buffers to Rust data structures.
 
+use datafusion::physical_plan::hash_utils::JoinType;
 use std::sync::Arc;
 use std::{convert::TryInto, unimplemented};
-use datafusion::physical_plan::hash_utils::JoinType;
 
+use crate::error::BallistaError;
+use crate::serde::{proto_error, protobuf};
+use crate::{convert_box_required, convert_required};
 use datafusion::physical_plan::{
     coalesce_batches::CoalesceBatchesExec,
     empty::EmptyExec,
     expressions::PhysicalSortExpr,
+    hash_join::HashJoinExec,
     limit::{GlobalLimitExec, LocalLimitExec},
     projection::ProjectionExec,
-    hash_join::HashJoinExec,
     sort::{SortExec, SortOptions},
 };
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
-use crate::error::BallistaError;
-use crate::serde::{proto_error, protobuf};
-use crate::{convert_box_required, convert_required};
 
 use protobuf::physical_plan_node::PhysicalPlanType;
 
@@ -79,25 +79,27 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
             PhysicalPlanType::HashJoin(hashjoin) => {
                 let left: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.left)?;
                 let right: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.right)?;
-                let on: Vec<(String, String)> = hashjoin.on
+                let on: Vec<(String, String)> = hashjoin
+                    .on
                     .iter()
                     .map(|col| (col.left.clone(), col.right.clone()))
                     .collect();
-                let join_type = protobuf::JoinType::from_i32(hashjoin.join_type).ok_or_else(|| {
-                    proto_error(format!(
-                        "Received a HashJoinNode message with unknown JoinType {}",
-                        hashjoin.join_type
-                    ))
-                })?;
+                let join_type =
+                    protobuf::JoinType::from_i32(hashjoin.join_type).ok_or_else(|| {
+                        proto_error(format!(
+                            "Received a HashJoinNode message with unknown JoinType {}",
+                            hashjoin.join_type
+                        ))
+                    })?;
                 let join_type = match join_type {
                     protobuf::JoinType::Inner => JoinType::Inner,
                     protobuf::JoinType::Left => JoinType::Left,
                     protobuf::JoinType::Right => JoinType::Right,
                 };
-                Ok(Arc::new(
-                    HashJoinExec::try_new(left, right, &on, &join_type)?))
-
-            },
+                Ok(Arc::new(HashJoinExec::try_new(
+                    left, right, &on, &join_type,
+                )?))
+            }
             PhysicalPlanType::ShuffleReader(_) => unimplemented!(),
             PhysicalPlanType::Empty(empty) => {
                 let schema = Arc::new(convert_required!(empty.schema)?);

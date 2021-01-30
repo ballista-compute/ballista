@@ -17,14 +17,14 @@ pub mod to_proto;
 
 #[cfg(test)]
 mod roundtrip_tests {
-    use std::{convert::TryInto, sync::Arc};
     use datafusion::physical_plan::hash_utils::JoinType;
+    use std::{convert::TryInto, sync::Arc};
 
     use arrow::datatypes::Schema;
     use datafusion::physical_plan::{
         empty::EmptyExec,
-        limit::{GlobalLimitExec, LocalLimitExec},
         hash_join::HashJoinExec,
+        limit::{GlobalLimitExec, LocalLimitExec},
         ExecutionPlan,
     };
 
@@ -65,10 +65,10 @@ mod roundtrip_tests {
 
     #[test]
     fn roundtrip_hash_join() -> Result<()> {
-        use arrow::datatypes::{Field, DataType, Schema};
-         let field_a = Field::new("col", DataType::Int64, false);
-         let schema_left = Schema::new(vec![field_a.clone()]);
-         let schema_right = Schema::new(vec![field_a.clone()]);
+        use arrow::datatypes::{DataType, Field, Schema};
+        let field_a = Field::new("col", DataType::Int64, false);
+        let schema_left = Schema::new(vec![field_a.clone()]);
+        let schema_right = Schema::new(vec![field_a.clone()]);
 
         roundtrip_test(Arc::new(HashJoinExec::try_new(
             Arc::new(EmptyExec::new(false, Arc::new(schema_left))),

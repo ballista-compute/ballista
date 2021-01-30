@@ -457,9 +457,4 @@ enum ArrowType {
   UNION = 25;
   DICTIONARY = 26;
   MAP = 27;
-  
-  // this is a temporary hack until https://github.com/ballista-compute/ballista/issues/392 is implemented, and allows
-  // us to continue to make progress with getting the TPC-H benchmarks working
-  DATE32_DAY = 30;
-  DATE32_MILLISECOND = 31;
 }

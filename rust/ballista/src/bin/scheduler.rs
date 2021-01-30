@@ -1,5 +1,6 @@
 use std::net::SocketAddr;
 
+use ballista::BALLISTA_VERSION;
 use ballista::{
     scheduler::{
         etcd::EtcdClient, standalone::StandaloneClient, ConfigBackendClient, SchedulerServer,
@@ -7,6 +8,7 @@ use ballista::{
     serde::protobuf::scheduler_grpc_server::SchedulerGrpcServer,
 };
 use clap::arg_enum;
+use log::info;
 use structopt::StructOpt;
 use tonic::transport::Server;
 
@@ -38,7 +40,7 @@ struct Opt {
     bind_host: String,
 
     /// bind port
-    #[structopt(short, long, default_value = "50051")]
+    #[structopt(short, long, default_value = "50050")]
     port: u16,
 }
 
@@ -47,6 +49,10 @@ async fn start_server<T: ConfigBackendClient + Send + Sync + 'static>(
     namespace: String,
     addr: SocketAddr,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    info!(
+        "Ballista v{} Scheduler listening on {:?}",
+        BALLISTA_VERSION, addr
+    );
     let server = SchedulerGrpcServer::new(SchedulerServer::new(config_backend, namespace));
     Ok(Server::builder().add_service(server).serve(addr).await?)
 }

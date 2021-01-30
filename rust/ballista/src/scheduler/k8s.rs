@@ -14,6 +14,7 @@
 
 //! Ballista k8s cluster management utilities
 
+/*
 use crate::error::BallistaError;
 use crate::scheduler::SchedulerClient;
 use crate::serde::scheduler::ExecutorMeta;
@@ -80,3 +81,4 @@ impl SchedulerClient for KubernetesClient {
         Ok(executors)
     }
 }
+*/

@@ -18,45 +18,24 @@ use std::sync::Arc;
 
 use arrow_flight::flight_service_server::FlightServiceServer;
 use ballista::flight_service::BallistaFlightService;
-use ballista::scheduler::etcd::EtcdClient;
-use ballista::scheduler::k8s::KubernetesClient;
-use ballista::scheduler::standalone::StandaloneClient;
-use ballista::scheduler::SchedulerClient;
+use ballista::serde::protobuf::scheduler_grpc_client::SchedulerGrpcClient;
 use ballista::BALLISTA_VERSION;
 use ballista::{
     executor::{BallistaExecutor, ExecutorConfig},
     serde::scheduler::ExecutorMeta,
 };
-use clap::arg_enum;
 use log::info;
 use structopt::StructOpt;
 use tonic::transport::Server;
 use uuid::Uuid;
 
-arg_enum! {
-    #[derive(Debug)]
-    enum Mode {
-        K8s,
-        Etcd,
-        Standalone
-    }
-}
-
 /// Ballista Rust Executor
 #[derive(StructOpt, Debug)]
 #[structopt(name = "basic")]
 struct Opt {
-    /// discovery mode
-    #[structopt(short, long, possible_values = &Mode::variants(), case_insensitive = true, default_value = "Standalone")]
-    mode: Mode,
-
     /// Namespace for the ballista cluster that this executor will join.
     #[structopt(long)]
     namespace: Option<String>,
-
-    /// etcd urls for use when discovery mode is `etcd`
-    #[structopt(long)]
-    etcd_urls: Option<String>,
 
     /// Registrar host to register with when discovery mode is `standalone`. This is optional
     /// because it is currently possible to run in standalone mode with a single executor and
@@ -67,8 +46,8 @@ struct Opt {
     /// Registrar port to register with when discovery mode is `standalone`. This is optional
     /// because it is currently possible to run in standalone mode with a single executor and
     /// no registrar.
-    #[structopt(long)]
-    registrar_port: Option<usize>,
+    #[structopt(long, default_value = "50050")]
+    registrar_port: u16,
 
     /// Local host name or IP address to bind to
     #[structopt(long)]
@@ -94,7 +73,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // parse command-line arguments
     let opt = Opt::from_args();
-    let namespace = opt.namespace.unwrap_or_else(|| "ballista".to_owned());
+    let _namespace = opt.namespace.unwrap_or_else(|| "ballista".to_owned());
     let external_host = opt.external_host.unwrap_or_else(|| "localhost".to_owned());
     let bind_host = opt.bind_host.as_deref().unwrap_or("0.0.0.0");
     let port = opt.port;
@@ -102,30 +81,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = format!("{}:{}", bind_host, port);
     let addr = addr.parse()?;
 
+    let registrar_host = opt.registrar_host.unwrap_or_else(|| "localhost".to_owned());
+    let registrar_port = opt.registrar_port;
+
     let config = ExecutorConfig::new(&external_host, port, opt.concurrent_tasks);
     info!("Running with config: {:?}", config);
 
-    let executor_meta = ExecutorMeta {
+    let _executor_meta = ExecutorMeta {
         id: Uuid::new_v4().to_string(), // assign this executor a unique ID
         host: external_host,
         port,
     };
 
-    let scheduler: Arc<dyn SchedulerClient> = match opt.mode {
-        Mode::Etcd => {
-            let etcd_urls = opt.etcd_urls.unwrap_or_else(|| "localhost:2379".to_owned());
-            Arc::new(EtcdClient::new(etcd_urls, namespace, executor_meta))
-        }
-        Mode::Standalone => {
-            let registrar_host = opt.registrar_host.unwrap_or_else(|| "localhost".to_owned());
-            let registrar_port = opt.registrar_port.unwrap_or(50051);
-            Arc::new(
-                StandaloneClient::try_new(registrar_host, registrar_port, executor_meta).await?,
-            )
-        }
-        Mode::K8s => Arc::new(KubernetesClient::new(namespace.to_owned(), namespace)),
-    };
-
+    let scheduler =
+        SchedulerGrpcClient::connect(format!("http://{}:{}", registrar_host, registrar_port))
+            .await?;
+    // TODO: register metadata
     let executor = Arc::new(BallistaExecutor::new(config, scheduler));
     let service = BallistaFlightService::new(executor);
     let server = FlightServiceServer::new(service);

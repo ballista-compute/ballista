@@ -14,97 +14,67 @@
 
 //! Support for etcd discovery mechanism.
 
-use std::time::Duration;
-
 use crate::error::{ballista_error, Result};
-use crate::scheduler::SchedulerClient;
-use crate::serde::scheduler::ExecutorMeta;
+use crate::scheduler::ConfigBackendClient;
 
-use async_trait::async_trait;
-use etcd_client::{Client, GetOptions, PutOptions};
-use log::{debug, warn};
+use etcd_client::{GetOptions, PutOptions};
+use log::warn;
 
+#[derive(Clone)]
 pub struct EtcdClient {
-    etcd_urls: String,
-    cluster_name: String,
+    etcd: etcd_client::Client,
 }
 
 impl EtcdClient {
-    pub fn new(etcd_urls: String, cluster_name: String, executor_meta: ExecutorMeta) -> Self {
-        // Start a thread that will register the executor with etcd periodically
-        tokio::spawn(main_loop(
-            etcd_urls.to_owned(),
-            cluster_name.to_owned(),
-            executor_meta,
-        ));
-
-        Self {
-            etcd_urls,
-            cluster_name,
-        }
+    pub fn new(etcd: etcd_client::Client) -> Self {
+        Self { etcd }
     }
 }
 
-async fn main_loop(etcd_urls: String, cluster_name: String, executor_meta: ExecutorMeta) {
-    loop {
-        match Client::connect([&etcd_urls], None).await {
-            Ok(mut client) => {
-                debug!("Connected to etcd at {} ok", etcd_urls);
-                let lease_time_seconds = 60;
-                let key = format!("/ballista/{}/{}", cluster_name, executor_meta.id);
-                let value = format!("{}:{}", executor_meta.host, executor_meta.port);
-                match client.lease_grant(lease_time_seconds, None).await {
-                    Ok(lease) => {
-                        let options = PutOptions::new().with_lease(lease.id());
-                        match client.put(key.clone(), value.clone(), Some(options)).await {
-                            Ok(_) => debug!("Registered with etcd as {}.", key),
-                            Err(e) => warn!("etcd put failed: {:?}", e.to_string()),
-                        }
-                    }
-                    Err(e) => warn!("etcd lease grant failed: {:?}", e.to_string()),
-                }
-            }
-            Err(e) => warn!("Failed to connect to etcd {:?}", e.to_string()),
-        }
-        tokio::time::delay_for(Duration::from_secs(15)).await;
+#[tonic::async_trait]
+impl ConfigBackendClient for EtcdClient {
+    async fn get(&mut self, key: &str) -> Result<Vec<u8>> {
+        Ok(self
+            .etcd
+            .get(key, None)
+            .await
+            .map_err(|e| ballista_error(&format!("etcd error {:?}", e)))?
+            .kvs()
+            .get(0)
+            .map(|kv| kv.value().to_owned())
+            .unwrap_or_default())
     }
-}
 
-#[async_trait]
-impl SchedulerClient for EtcdClient {
-    async fn get_executors(&self) -> Result<Vec<ExecutorMeta>> {
-        match Client::connect([&self.etcd_urls], None).await {
-            Ok(mut client) => {
-                debug!("get_executor_ids got client");
-                let key = format!("/ballista/{}", &self.cluster_name);
-                let resp = client
-                    .get(key, Some(GetOptions::new().with_all_keys()))
+    async fn get_from_prefix(&mut self, prefix: &str) -> Result<Vec<Vec<u8>>> {
+        Ok(self
+            .etcd
+            .get(prefix, Some(GetOptions::new().with_prefix()))
+            .await
+            .map_err(|e| ballista_error(&format!("etcd error {:?}", e)))?
+            .kvs()
+            .iter()
+            .map(|kv| kv.value().to_owned())
+            .collect())
+    }
+
+    async fn put(&mut self, key: String, value: Vec<u8>) -> Result<()> {
+        let lease_time_seconds = 60;
+        match self.etcd.lease_grant(lease_time_seconds, None).await {
+            Ok(lease) => {
+                let options = PutOptions::new().with_lease(lease.id());
+                self.etcd
+                    .put(key.clone(), value.clone(), Some(options))
                     .await
-                    .map_err(|e| ballista_error(&format!("etcd error {:?}", e)))?;
-
-                let mut execs = vec![];
-                for kv in resp.kvs() {
-                    let executor_id = kv.key_str().expect("etcd - empty string in map key");
-                    let host_port = kv.value_str().expect("etcd - empty string in map value");
-                    let host_port: Vec<_> = host_port.split(':').collect();
-                    if host_port.len() == 2 {
-                        let host = &host_port[0];
-                        let port = &host_port[1];
-                        if let Ok(port) = port.to_string().parse::<u16>() {
-                            execs.push(ExecutorMeta {
-                                id: executor_id.to_owned(),
-                                host: host.to_string(),
-                                port,
-                            });
-                        }
-                    }
-                }
-                Ok(execs)
+                    .map_err(|e| {
+                        warn!("etcd put failed: {}", e);
+                        ballista_error("etcd put failed")
+                    })
+                    .map(|_| ())
             }
-            Err(e) => Err(ballista_error(&format!(
-                "Failed to connect to etcd {:?}",
-                e.to_string()
-            ))),
+            Err(e) => {
+                warn!("etcd lease grant failed: {:?}", e.to_string());
+                Err(ballista_error("etcd lease grant failed"))
+            }
         }
     }
 }

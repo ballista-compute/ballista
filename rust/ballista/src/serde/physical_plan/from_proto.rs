@@ -71,7 +71,7 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
             PhysicalPlanType::HashJoin(hashjoin) => {
                 let _left: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.left)?;
                 let _right: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.left)?;
-                let _on: Vec<(String, String)> = convert_required!(hashjoin.on)?; //
+                let _on: Vec<(String, String)> = hashjoin.on; //??
                 let join_type = protobuf::JoinType::from_i32(hashjoin.join_type).ok_or_else(|| {
                     proto_error(format!(
                         "Received a HashJoinNode message with unknown JoinType {}",
@@ -84,7 +84,7 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     protobuf::JoinType::Right => JoinType::Right,
                 };
                 Ok(Arc::new(
-                    HashJoinExec::try_new(_left, _right, &[], &join_type)?))
+                    HashJoinExec::try_new(_left, _right, &_on, &join_type)?))
 
             },
             PhysicalPlanType::ShuffleReader(_) => unimplemented!(),

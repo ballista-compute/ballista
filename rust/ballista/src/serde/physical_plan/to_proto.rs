@@ -137,12 +137,12 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
         } else if let Some(exec) = plan.downcast_ref::<HashJoinExec>() {
             let _left: protobuf::PhysicalPlanNode = exec.left().to_owned().try_into()?;
             let _right: protobuf::PhysicalPlanNode = exec.right().to_owned().try_into()?;
-            exec.on().iter().map(|on|)
-            let _on = protobuf::JoinOn {
-                col1: exec.on().iter().map(|on| on.0.to_owned()).collect(),
-                col2: exec.on().iter().map(|on| on.1.to_owned()).collect(),
-            };
-
+            let _on: Vec<protobuf::JoinOn> = exec.on()
+                .iter()
+                .map(|tple| protobuf::JoinOn {
+                    col1: tple.0.to_owned(),
+                    col2: tple.1.to_owned(),
+                }).collect();
             let _join_type = match exec.join_type() {
                 JoinType::Inner => protobuf::JoinType::Inner,
                 JoinType::Left => protobuf::JoinType::Left,
@@ -153,7 +153,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                     protobuf::HashJoinExecNode {
                         left: Some(Box::new(_left)),
                         right: Some(Box::new(_right)),
-                        on: Some(_on),
+                        on: _on,
                         join_type: _join_type.into(),
                     },
                 ))),

@@ -27,6 +27,7 @@ use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
 use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::projection::ProjectionExec;
+use datafusion::physical_plan::sort::SortExec;
 use datafusion::physical_plan::{
     csv::CsvExec,
     limit::{GlobalLimitExec, LocalLimitExec},
@@ -181,6 +182,30 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
         //         });
         //         Ok(node)
         //     }
+        } else if let Some(exec) = plan.downcast_ref::<SortExec>() {
+            let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
+            let expr = exec
+                .expr()
+                .iter()
+                .map(|expr| {
+                    let sort_expr = Box::new(protobuf::SortExprNode {
+                        expr: Some(Box::new(expr.expr.to_owned().try_into()?)),
+                        asc: !expr.options.descending,
+                        nulls_first: expr.options.nulls_first,
+                    });
+                    Ok(protobuf::LogicalExprNode {
+                        expr_type: Some(protobuf::logical_expr_node::ExprType::Sort(sort_expr)),
+                    })
+                })
+                .collect::<Result<Vec<_>, Self::Error>>()?;
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: Some(PhysicalPlanType::Sort(Box::new(
+                    protobuf::SortExecNode {
+                        input: Some(Box::new(input)),
+                        expr,
+                    },
+                ))),
+            })
         } else {
             Err(BallistaError::General(format!(
                 "physical plan to_proto {:?}",

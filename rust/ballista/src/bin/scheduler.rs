@@ -66,7 +66,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match opt.config_backend {
         ConfigBackend::Etcd => {
-            let client = EtcdClient::new(etcd_client::Client::connect(&[opt.etcd_urls], None).await?);
+            let client =
+                EtcdClient::new(etcd_client::Client::connect(&[opt.etcd_urls], None).await?);
             start_server(client, namespace, addr).await?;
         }
         ConfigBackend::Standalone => {

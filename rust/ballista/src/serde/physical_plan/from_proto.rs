@@ -19,8 +19,10 @@ use std::{convert::TryInto, unimplemented};
 
 use datafusion::physical_plan::{
     empty::EmptyExec,
+    expressions::PhysicalSortExpr,
     limit::{GlobalLimitExec, LocalLimitExec},
     projection::ProjectionExec,
+    sort::{SortExec, SortOptions},
 };
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
@@ -69,6 +71,47 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
             PhysicalPlanType::Empty(empty) => {
                 let schema = Arc::new(convert_required!(empty.schema)?);
                 Ok(Arc::new(EmptyExec::new(empty.produce_one_row, schema)))
+            }
+            PhysicalPlanType::Sort(sort) => {
+                let input: Arc<dyn ExecutionPlan> = convert_box_required!(sort.input)?;
+                let exprs = sort
+                    .expr
+                    .iter()
+                    .map(|expr| {
+                        let expr = expr.expr_type.as_ref().ok_or_else(|| {
+                            proto_error(format!(
+                                "physical_plan::from_proto() Unexpected expr {:?}",
+                                self
+                            ))
+                        })?;
+                        if let protobuf::logical_expr_node::ExprType::Sort(sort_expr) = expr {
+                            let expr = sort_expr
+                                .expr
+                                .as_ref()
+                                .ok_or_else(|| {
+                                    proto_error(format!(
+                                        "physical_plan::from_proto() Unexpected sort expr {:?}",
+                                        self
+                                    ))
+                                })?
+                                .as_ref();
+                            Ok(PhysicalSortExpr {
+                                expr: expr.try_into()?,
+                                options: SortOptions {
+                                    descending: !sort_expr.asc,
+                                    nulls_first: sort_expr.nulls_first,
+                                },
+                            })
+                        } else {
+                            Err(BallistaError::General(format!(
+                                "physical_plan::from_proto() {:?}",
+                                self
+                            )))
+                        }
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                // Update concurrency here in the future
+                Ok(Arc::new(SortExec::try_new(exprs, input, 1)?))
             }
         }
     }

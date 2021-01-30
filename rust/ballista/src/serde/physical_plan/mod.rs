@@ -30,7 +30,6 @@ mod roundtrip_tests {
 
     use super::super::super::error::Result;
     use super::super::protobuf;
-    use futures::io::Empty;
 
     fn roundtrip_test(exec_plan: Arc<dyn ExecutionPlan>) -> Result<()> {
         let proto: protobuf::PhysicalPlanNode = exec_plan.clone().try_into()?;

@@ -261,7 +261,8 @@ message LimitNode {
 // PhysicalPlanNode is a nested type
 message PhysicalPlanNode {
   oneof PhysicalPlanType {
-    ScanExecNode scan = 10;
+    ParquetScanExecNode parquet_scan = 1;
+    CsvScanExecNode csv_scan = 2;
     EmptyExecNode empty = 11;
     ProjectionExecNode projection = 20;
     SelectionExecNode selection = 21;
@@ -274,13 +275,19 @@ message PhysicalPlanNode {
   }
 }
 
-message ScanExecNode {
+message ParquetScanExecNode {
+  repeated string filename = 1;
+  repeated uint32 projection = 2;
+}
+
+message CsvScanExecNode {
   string path = 1;
   repeated uint32 projection = 2;
   Schema schema = 3;
-  string file_format = 4; // parquet or csv
-  bool has_header = 5; // csv specific
+  string file_extension = 4;
+  bool has_header = 5;
   uint32 batch_size = 6;
+  string delimiter = 7;
   
   // partition filenames
   repeated string filename = 8;

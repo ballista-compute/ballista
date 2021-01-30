@@ -53,7 +53,8 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Arc::new(ProjectionExec::try_new(exprs, input)?))
             }
-            PhysicalPlanType::Scan(_) => unimplemented!(),
+            PhysicalPlanType::CsvScan(_) => unimplemented!(),
+            PhysicalPlanType::ParquetScan(_) => unimplemented!(),
             PhysicalPlanType::Selection(_) => unimplemented!(),
             PhysicalPlanType::CoalesceBatches(coalesce_batches) => {
                 let input: Arc<dyn ExecutionPlan> = convert_box_required!(coalesce_batches.input)?;

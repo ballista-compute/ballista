@@ -19,14 +19,17 @@
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
+use crate::error::ballista_error;
 use crate::serde::{protobuf, BallistaError};
 
 use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
+use datafusion::physical_plan::csv::CsvExec;
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::functions::ScalarFunctionExpr;
 use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
 use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
+use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::sort::SortExec;
 use datafusion::physical_plan::{
@@ -97,25 +100,6 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
             Ok(protobuf::PhysicalPlanNode {
                 physical_plan_type: None,
             })
-        //   } else if let Some(_exec) = plan.downcast_ref::<CsvExec>() {
-        //         node.scan = Some(protobuf::ScanExecNode {
-        //             path: exec.path.clone(),
-        //             filename: exec.filenames.clone(),
-        //             projection: exec
-        //                 .projection
-        //                 .as_ref()
-        //                 .unwrap()
-        //                 .iter()
-        //                 .map(|n| *n as u32)
-        //                 .collect(),
-        //             file_format: "csv".to_owned(),
-        //             schema: Some(exec.original_schema().as_ref().try_into()?),
-        //             has_header: exec.has_header,
-        //             batch_size: exec.batch_size as u32,
-        //         });
-        //    Ok(protobuf::PhysicalPlanNode {
-        //          physical_plan_type: None,
-        //      })
         } else if let Some(limit) = plan.downcast_ref::<GlobalLimitExec>() {
             let input: protobuf::PhysicalPlanNode = limit.input().to_owned().try_into()?;
             Ok(protobuf::PhysicalPlanNode {
@@ -155,24 +139,48 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                     },
                 ))),
             })
-        // } else if let Some(exec) = plan.downcast_ref::<ParquetExec>() {
-        //     Ok(protobuf::PhysicalPlanNode {
-        //         physical_plan_type: Some(protobuf::ScanExecNode {
-        //             path: exec.path().clone(),
-        //             filename: exec.filenames().clone(),
-        //             projection: exec
-        //                 .projection()
-        //                 .as_ref()
-        //                 .unwrap()
-        //                 .iter()
-        //                 .map(|n| *n as u32)
-        //                 .collect(),
-        //             file_format: "parquet".to_owned(),
-        //             schema: Some(exec.parquet_schema.as_ref().try_into()?),
-        //             has_header: false,
-        //             batch_size: exec.batch_size as u32,
-        //         })
-        //     })
+        } else if let Some(_exec) = plan.downcast_ref::<CsvExec>() {
+            // Cannot get underlying schema through public DataFusion API
+            // blocked by https://issues.apache.org/jira/browse/ARROW-11440
+            Err(ballista_error(
+                "physical_plan::to_proto() not implemented for CsvExec",
+            ))
+
+        //   Ok(protobuf::PhysicalPlanNode {
+        //       physical_plan_type: Some(PhysicalPlanType::CsvScan(protobuf::CsvScanExecNode {
+        //           path: exec.path().to_owned(),
+        //           filename: exec.filenames().to_vec(),
+        //           projection: exec
+        //               .projection()
+        //               .as_ref()
+        //               .iter()
+        //               .map(|n| *n as u32)
+        //               .collect(),
+        //           file_extension: exec.file_extension().to_owned(),
+        //           schema: Some(exec.original_schema().as_ref().try_into()?),
+        //           has_header: exec.has_header(),
+        //           // delimiter: exec.delimiter(),
+        //           batch_size: exec.batch_size as u32,
+        //       }))
+        } else if let Some(exec) = plan.downcast_ref::<ParquetExec>() {
+            let filenames = exec
+                .partitions()
+                .iter()
+                .flat_map(|part| part.filenames().to_owned())
+                .collect();
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: Some(PhysicalPlanType::ParquetScan(
+                    protobuf::ParquetScanExecNode {
+                        filename: filenames,
+                        projection: exec
+                            .projection()
+                            .as_ref()
+                            .iter()
+                            .map(|n| *n as u32)
+                            .collect(),
+                    },
+                )),
+            })
 
         //     PhysicalPlan::ShuffleReader(exec) => {
         //         let mut node = empty_physical_plan_node();

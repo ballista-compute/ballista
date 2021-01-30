@@ -1,5 +1,8 @@
+//! Ballista Rust scheduler binary.
+
 use std::net::SocketAddr;
 
+use anyhow::{Context, Result};
 use ballista::BALLISTA_VERSION;
 use ballista::{
     scheduler::{
@@ -48,17 +51,21 @@ async fn start_server<T: ConfigBackendClient + Send + Sync + 'static>(
     config_backend: T,
     namespace: String,
     addr: SocketAddr,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<()> {
     info!(
         "Ballista v{} Scheduler listening on {:?}",
         BALLISTA_VERSION, addr
     );
     let server = SchedulerGrpcServer::new(SchedulerServer::new(config_backend, namespace));
-    Ok(Server::builder().add_service(server).serve(addr).await?)
+    Ok(Server::builder()
+        .add_service(server)
+        .serve(addr)
+        .await
+        .context("Could not start grpc server")?)
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<()> {
     env_logger::init();
 
     // parse command-line arguments
@@ -72,13 +79,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match opt.config_backend {
         ConfigBackend::Etcd => {
-            let client =
-                EtcdClient::new(etcd_client::Client::connect(&[opt.etcd_urls], None).await?);
+            let etcd = etcd_client::Client::connect(&[opt.etcd_urls], None)
+                .await
+                .context("Could not connect to etcd")?;
+            let client = EtcdClient::new(etcd);
             start_server(client, namespace, addr).await?;
         }
         ConfigBackend::Standalone => {
             // TODO: Use a real file and make path is configurable
-            let client = StandaloneClient::new(sled::Config::new().temporary(true).open()?);
+            let client = StandaloneClient::try_new_temporary()
+                .context("Could not create standalone config backend")?;
             start_server(client, namespace, addr).await?;
         }
     };

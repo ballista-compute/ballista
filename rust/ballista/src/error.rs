@@ -76,6 +76,15 @@ impl From<io::Error> for BallistaError {
     }
 }
 
+impl From<sled::Error> for BallistaError {
+    fn from(e: sled::Error) -> Self {
+        match e {
+            sled::Error::Io(io) => BallistaError::IoError(io),
+            _ => BallistaError::General(format!("{}", e)),
+        }
+    }
+}
+
 // impl From<reqwest::Error> for BallistaError {
 //     fn from(e: reqwest::Error) -> Self {
 //         BallistaError::ReqwestError(e)

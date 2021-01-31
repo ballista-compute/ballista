@@ -265,7 +265,7 @@ mod roundtrip_tests {
     #[test]
     fn round_trip_scalar_types() -> Result<()> {
         use arrow::datatypes::DataType;
-        use arrow::datatypes::{DateUnit, IntervalUnit, TimeUnit};
+        use arrow::datatypes::{IntervalUnit, TimeUnit};
         let should_pass: Vec<DataType> = vec![
             DataType::Boolean,
             DataType::Int8,
@@ -278,7 +278,7 @@ mod roundtrip_tests {
             DataType::UInt64,
             DataType::Float32,
             DataType::Float64,
-            DataType::Date32(DateUnit::Day),
+            DataType::Date32,
             DataType::Time64(TimeUnit::Microsecond),
             DataType::Time64(TimeUnit::Nanosecond),
             DataType::Utf8,
@@ -287,7 +287,7 @@ mod roundtrip_tests {
             DataType::List(new_box_field("Level1", DataType::Boolean, true)),
             DataType::List(new_box_field(
                 "Level1",
-                DataType::List(new_box_field("Level2", DataType::Date32(DateUnit::Day), true)),
+                DataType::List(new_box_field("Level2", DataType::Date32, true)),
                 true,
             )),
         ];
@@ -297,9 +297,7 @@ mod roundtrip_tests {
             DataType::Float16,
             //Add more timestamp tests
             DataType::Timestamp(TimeUnit::Millisecond, None),
-            DataType::Date32(DateUnit::Millisecond),
-            DataType::Date64(DateUnit::Day),
-            DataType::Date64(DateUnit::Millisecond),
+            DataType::Date64,
             DataType::Time32(TimeUnit::Second),
             DataType::Time32(TimeUnit::Millisecond),
             DataType::Time32(TimeUnit::Microsecond),
@@ -409,7 +407,7 @@ mod roundtrip_tests {
     #[test]
     fn round_trip_datatype() -> Result<()> {
         use arrow::datatypes::DataType;
-        use arrow::datatypes::{DateUnit, IntervalUnit, TimeUnit};
+        use arrow::datatypes::{ IntervalUnit, TimeUnit};
         let test_cases: Vec<DataType> = vec![
             DataType::Null,
             DataType::Boolean,
@@ -426,10 +424,8 @@ mod roundtrip_tests {
             DataType::Float64,
             //Add more timestamp tests
             DataType::Timestamp(TimeUnit::Millisecond, None),
-            DataType::Date32(DateUnit::Day),
-            DataType::Date32(DateUnit::Millisecond),
-            DataType::Date64(DateUnit::Day),
-            DataType::Date64(DateUnit::Millisecond),
+            DataType::Date32,
+            DataType::Date64,
             DataType::Time32(TimeUnit::Second),
             DataType::Time32(TimeUnit::Millisecond),
             DataType::Time32(TimeUnit::Microsecond),

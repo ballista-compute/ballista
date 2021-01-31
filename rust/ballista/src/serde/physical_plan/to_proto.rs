@@ -16,10 +16,7 @@
 //! buffer format, allowing DataFusion logical plans to be serialized and transmitted between
 //! processes.
 
-use std::{
-    convert::{TryFrom, TryInto},
-    sync::Arc,
-};
+use std::{convert::{TryFrom, TryInto}, sync::Arc};
 
 use crate::serde::{protobuf, BallistaError};
 
@@ -35,17 +32,11 @@ use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::sort::SortExec;
 use datafusion::physical_plan::{
-    empty::EmptyExec,
-    limit::LocalLimitExec,
-    limit::GlobalLimitExec,
-    filter::FilterExec,
-    functions::ScalarFunctionExpr,
-    hash_aggregate::HashAggregateExec,
-    hash_join::HashJoinExec,
-    parquet::ParquetExec,
-    projection::ProjectionExec,
     ExecutionPlan, PhysicalExpr,
 };
+
+use datafusion::physical_plan::empty::EmptyExec;
+use datafusion::physical_plan::expressions::{Column, Literal, BinaryExpr, CaseExpr, CastExpr,NotExpr, IsNotNullExpr, IsNullExpr, InListExpr, NegativeExpr};
 
 use protobuf::physical_plan_node::PhysicalPlanType;
 

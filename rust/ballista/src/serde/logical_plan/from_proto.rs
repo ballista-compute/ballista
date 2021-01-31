@@ -30,7 +30,6 @@ use datafusion::physical_plan::csv::CsvReadOptions;
 use datafusion::scalar::ScalarValue;
 use protobuf::logical_plan_node::LogicalPlanType;
 use protobuf::{logical_expr_node::ExprType, scalar_type};
-use scalar_type::Datatype;
 
 // use uuid::Uuid;
 
@@ -287,8 +286,8 @@ impl TryInto<arrow::datatypes::DataType> for &protobuf::arrow_type::ArrowTypeEnu
             arrow_type::ArrowTypeEnum::Binary(_) => DataType::Binary,
             arrow_type::ArrowTypeEnum::FixedSizeBinary(size) => DataType::FixedSizeBinary(*size),
             arrow_type::ArrowTypeEnum::LargeBinary(_) => DataType::LargeBinary,
-            arrow_type::ArrowTypeEnum::Date32(date_unit) => DataType::Date32(protobuf::DateUnit::from_i32_to_arrow(*date_unit)?),
-            arrow_type::ArrowTypeEnum::Date64(date_unit) => DataType::Date64(protobuf::DateUnit::from_i32_to_arrow(*date_unit)?),
+            arrow_type::ArrowTypeEnum::Date32(_) => DataType::Date32,
+            arrow_type::ArrowTypeEnum::Date64(_) => DataType::Date64,
             arrow_type::ArrowTypeEnum::Duration(time_unit) => DataType::Duration(protobuf::TimeUnit::from_i32_to_arrow(*time_unit)?),
             arrow_type::ArrowTypeEnum::Timestamp(protobuf::Timestamp { time_unit, timezone }) => DataType::Timestamp(
                 protobuf::TimeUnit::from_i32_to_arrow(*time_unit)?,
@@ -348,6 +347,7 @@ impl TryInto<arrow::datatypes::DataType> for &protobuf::arrow_type::ArrowTypeEnu
                 let value_datatype: DataType = pb_value_datatype.as_ref().try_into()?;
                 DataType::Dictionary(Box::new(key_datatype), Box::new(value_datatype))
             }
+            
         })
     }
 }
@@ -369,7 +369,7 @@ impl Into<arrow::datatypes::DataType> for protobuf::PrimitiveScalarType {
             protobuf::PrimitiveScalarType::Float64 => DataType::Float64,
             protobuf::PrimitiveScalarType::Utf8 => DataType::Utf8,
             protobuf::PrimitiveScalarType::LargeUtf8 => DataType::LargeUtf8,
-            protobuf::PrimitiveScalarType::Date32 => DataType::Date32(arrow::datatypes::DateUnit::Day),
+            protobuf::PrimitiveScalarType::Date32 => DataType::Date32,
             protobuf::PrimitiveScalarType::TimeMicrosecond => DataType::Time64(arrow::datatypes::TimeUnit::Microsecond),
             protobuf::PrimitiveScalarType::TimeNanosecond => DataType::Time64(arrow::datatypes::TimeUnit::Nanosecond),
             protobuf::PrimitiveScalarType::Null => DataType::Null,

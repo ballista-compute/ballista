@@ -25,7 +25,6 @@ use crate::context::DFTableAdapter;
 use crate::serde::{protobuf, BallistaError};
 
 use arrow::datatypes::{DataType, Schema};
-use datafusion::datasource::parquet::ParquetTable;
 use datafusion::datasource::CsvFile;
 use datafusion::logical_plan::{Expr, JoinType, LogicalPlan};
 use datafusion::physical_plan::aggregates::AggregateFunction;
@@ -54,6 +53,7 @@ impl protobuf::IntervalUnit {
         }
     }
 }
+    /* Arrow changed dates to no longer have date unit
 
 impl protobuf::DateUnit {
     pub fn from_arrow_date_unit(val: &arrow::datatypes::DateUnit) -> Self {
@@ -62,7 +62,6 @@ impl protobuf::DateUnit {
             arrow::datatypes::DateUnit::Millisecond => protobuf::DateUnit::DateMillisecond,
         }
     }
-
     pub fn from_i32_to_arrow(date_unit_i32: i32) -> Result<arrow::datatypes::DateUnit, BallistaError> {
         let pb_date_unit = protobuf::DateUnit::from_i32(date_unit_i32);
         use arrow::datatypes::DateUnit;
@@ -74,7 +73,8 @@ impl protobuf::DateUnit {
             None => Err(proto_error("Error converting i32 to DateUnit: Passed invalid variant")),
         }
     }
-}
+    
+}*/
 
 impl protobuf::TimeUnit {
     pub fn from_arrow_time_unit(val: &arrow::datatypes::TimeUnit) -> Self {
@@ -146,8 +146,8 @@ impl TryInto<arrow::datatypes::DataType> for &protobuf::ArrowType {
             protobuf::arrow_type::ArrowTypeEnum::Binary(_) => DataType::Binary,
             protobuf::arrow_type::ArrowTypeEnum::FixedSizeBinary(size) => DataType::FixedSizeBinary(*size),
             protobuf::arrow_type::ArrowTypeEnum::LargeBinary(_) => DataType::LargeBinary,
-            protobuf::arrow_type::ArrowTypeEnum::Date32(date_unit_i32) => DataType::Date32(protobuf::DateUnit::from_i32_to_arrow(*date_unit_i32)?),
-            protobuf::arrow_type::ArrowTypeEnum::Date64(date_unit_i32) => DataType::Date64(protobuf::DateUnit::from_i32_to_arrow(*date_unit_i32)?),
+            protobuf::arrow_type::ArrowTypeEnum::Date32(_) => DataType::Date32,
+            protobuf::arrow_type::ArrowTypeEnum::Date64(_) => DataType::Date64,
             protobuf::arrow_type::ArrowTypeEnum::Duration(time_unit_i32) => DataType::Duration(protobuf::TimeUnit::from_i32_to_arrow(*time_unit_i32)?),
             protobuf::arrow_type::ArrowTypeEnum::Timestamp(timestamp) => DataType::Timestamp(
                 protobuf::TimeUnit::from_i32_to_arrow(timestamp.time_unit)?,
@@ -252,8 +252,8 @@ impl From<&arrow::datatypes::DataType> for protobuf::arrow_type::ArrowTypeEnum {
                 time_unit: protobuf::TimeUnit::from_arrow_time_unit(time_unit) as i32,
                 timezone: timezone.to_owned().unwrap_or_else(String::new),
             }),
-            DataType::Date32(date_unit) => ArrowTypeEnum::Date32(protobuf::DateUnit::from_arrow_date_unit(date_unit) as i32),
-            DataType::Date64(date_unit) => ArrowTypeEnum::Date64(protobuf::DateUnit::from_arrow_date_unit(date_unit) as i32),
+            DataType::Date32 => ArrowTypeEnum::Date32(EmptyMessage{}),
+            DataType::Date64 => ArrowTypeEnum::Date64(EmptyMessage{}),
             DataType::Time32(time_unit) => ArrowTypeEnum::Time32(protobuf::TimeUnit::from_arrow_time_unit(time_unit) as i32),
             DataType::Time64(time_unit) => ArrowTypeEnum::Time64(protobuf::TimeUnit::from_arrow_time_unit(time_unit) as i32),
             DataType::Duration(time_unit) => ArrowTypeEnum::Duration(protobuf::TimeUnit::from_arrow_time_unit(time_unit) as i32),
@@ -306,8 +306,8 @@ fn is_valid_scalar_type_no_list_check(datatype: &arrow::datatypes::DataType) -> 
         | DataType::Float32
         | DataType::Float64
         | DataType::LargeUtf8
-        | DataType::Utf8 => true,
-        DataType::Date32(date_unit) => matches!(date_unit, arrow::datatypes::DateUnit::Day),
+        | DataType::Utf8
+        | DataType::Date32 => true,
         DataType::Time64(time_unit) => matches!(time_unit, arrow::datatypes::TimeUnit::Microsecond | arrow::datatypes::TimeUnit::Nanosecond),
 
         DataType::List(_) => true,
@@ -318,7 +318,6 @@ fn is_valid_scalar_type_no_list_check(datatype: &arrow::datatypes::DataType) -> 
 impl TryFrom<&arrow::datatypes::DataType> for protobuf::scalar_type::Datatype {
     type Error = BallistaError;
     fn try_from(val: &arrow::datatypes::DataType) -> Result<Self, Self::Error> {
-        use arrow::datatypes::DateUnit;
         use protobuf::scalar_type;
         use protobuf::Field;
         use protobuf::{List, PrimitiveScalarType};
@@ -334,10 +333,7 @@ impl TryFrom<&arrow::datatypes::DataType> for protobuf::scalar_type::Datatype {
             DataType::UInt64 => scalar_type::Datatype::Scalar(PrimitiveScalarType::Uint64 as i32),
             DataType::Float32 => scalar_type::Datatype::Scalar(PrimitiveScalarType::Float32 as i32),
             DataType::Float64 => scalar_type::Datatype::Scalar(PrimitiveScalarType::Float64 as i32),
-            DataType::Date32(date_unit) => match date_unit {
-                DateUnit::Day => scalar_type::Datatype::Scalar(PrimitiveScalarType::Date32 as i32),
-                _ => return Err(proto_error("Found invalid date unit for scalar value, only DateUnit::Day is allowed")),
-            },
+            DataType::Date32 => scalar_type::Datatype::Scalar(PrimitiveScalarType::Date32 as i32),
             DataType::Time64(time_unit) => match time_unit {
                 arrow::datatypes::TimeUnit::Microsecond => scalar_type::Datatype::Scalar(PrimitiveScalarType::TimeMicrosecond as i32),
                 arrow::datatypes::TimeUnit::Nanosecond => scalar_type::Datatype::Scalar(PrimitiveScalarType::TimeNanosecond as i32),
@@ -380,7 +376,7 @@ impl TryFrom<&arrow::datatypes::DataType> for protobuf::scalar_type::Datatype {
                     DataType::UInt64 => PrimitiveScalarType::Uint64,
                     DataType::Float32 => PrimitiveScalarType::Float32,
                     DataType::Float64 => PrimitiveScalarType::Float64,
-                    DataType::Date32(_) => PrimitiveScalarType::Date32,
+                    DataType::Date32 => PrimitiveScalarType::Date32,
                     DataType::Time64(time_unit) => match time_unit {
                         arrow::datatypes::TimeUnit::Microsecond => PrimitiveScalarType::TimeMicrosecond,
                         arrow::datatypes::TimeUnit::Nanosecond => PrimitiveScalarType::TimeNanosecond,
@@ -409,7 +405,7 @@ impl TryFrom<&arrow::datatypes::DataType> for protobuf::scalar_type::Datatype {
             DataType::Null
             | DataType::Float16
             | DataType::Timestamp(_, _)
-            | DataType::Date64(_)
+            | DataType::Date64
             | DataType::Time32(_)
             | DataType::Duration(_)
             | DataType::Interval(_)

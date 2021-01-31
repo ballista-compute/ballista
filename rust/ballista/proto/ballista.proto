@@ -588,8 +588,8 @@ message ArrowType{
         EmptyMessage BINARY =15 ;
         int32 FIXED_SIZE_BINARY =16 ;
         EmptyMessage LARGE_BINARY = 31;
-        DateUnit DATE32 =17 ;
-        DateUnit DATE64 =18 ;
+        EmptyMessage DATE32 =17 ;
+        EmptyMessage DATE64 =18 ;
         TimeUnit DURATION = 19;
         Timestamp TIMESTAMP =20 ;
         TimeUnit TIME32 =21 ;

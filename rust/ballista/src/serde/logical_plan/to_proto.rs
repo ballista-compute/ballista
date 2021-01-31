@@ -21,9 +21,11 @@ use std::{
     convert::{TryFrom, TryInto},
 };
 
-use crate::error::BallistaError;
-use crate::{context::DFTableAdapter, serde::protobuf};
+use crate::context::DFTableAdapter;
+use crate::serde::{protobuf, BallistaError};
+
 use arrow::datatypes::{DataType, Schema};
+use datafusion::datasource::parquet::ParquetTable;
 use datafusion::datasource::CsvFile;
 use datafusion::logical_plan::{Expr, JoinType, LogicalPlan};
 use datafusion::physical_plan::aggregates::AggregateFunction;

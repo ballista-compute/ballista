@@ -14,17 +14,14 @@
 
 //! Core executor logic for executing queries and storing results in memory.
 
-use std::sync::Arc;
-
-use crate::error::Result;
-use crate::scheduler::SchedulerClient;
+use crate::{error::Result, serde::protobuf::scheduler_grpc_client::SchedulerGrpcClient};
 
 use arrow::record_batch::RecordBatch;
 use datafusion::execution::context::ExecutionContext;
 use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::collect;
 use log::{debug, info};
-use uuid::Uuid;
+use tonic::transport::Channel;
 
 #[cfg(feature = "snmalloc")]
 #[global_allocator]
@@ -34,12 +31,12 @@ static ALLOC: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
 
 pub struct ExecutorConfig {
     pub(crate) host: String,
-    pub(crate) port: usize,
+    pub(crate) port: u16,
     pub(crate) concurrent_tasks: usize,
 }
 
 impl ExecutorConfig {
-    pub fn new(host: &str, port: usize, concurrent_tasks: usize) -> Self {
+    pub fn new(host: &str, port: u16, concurrent_tasks: usize) -> Self {
         Self {
             host: host.to_owned(),
             port,
@@ -50,11 +47,11 @@ impl ExecutorConfig {
 
 #[allow(dead_code)]
 pub struct BallistaExecutor {
-    scheduler: Arc<dyn SchedulerClient>,
+    scheduler: SchedulerGrpcClient<Channel>,
 }
 
 impl BallistaExecutor {
-    pub fn new(_uuid: &Uuid, _config: ExecutorConfig, scheduler: Arc<dyn SchedulerClient>) -> Self {
+    pub fn new(_config: ExecutorConfig, scheduler: SchedulerGrpcClient<Channel>) -> Self {
         Self { scheduler }
     }
 

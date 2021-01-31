@@ -28,7 +28,7 @@ use arrow::datatypes::SchemaRef;
 use datafusion::dataframe::DataFrame;
 use datafusion::datasource::datasource::Statistics;
 use datafusion::datasource::TableProvider;
-use datafusion::error::{DataFusionError, Result as DFResult};
+use datafusion::error::Result as DFResult;
 use datafusion::execution::context::ExecutionContext;
 use datafusion::logical_plan::{DFSchema, Expr, LogicalPlan, Partitioning};
 use datafusion::physical_plan::csv::CsvReadOptions;
@@ -49,9 +49,7 @@ pub struct BallistaContextState {
     /// Tables that have been registered with this context
     tables: HashMap<String, LogicalPlan>,
     /// General purpose settings
-    settings: HashMap<String, String>, /* map from shuffle id to executor uuid
-                                        * shuffle_locations: HashMap<ShuffleId, ExecutorMeta>,
-                                        * config: ExecutorConfig */
+    settings: HashMap<String, String>,
 }
 
 impl BallistaContextState {
@@ -132,7 +130,8 @@ impl BallistaContext {
         let state = self.state.lock().unwrap();
         for (name, plan) in &state.tables {
             let plan = ctx.optimize(plan)?;
-            ctx.register_table(name, Box::new(DFTableAdapter::new(plan)))
+            let execution_plan = ctx.create_physical_plan(&plan)?;
+            ctx.register_table(name, Box::new(DFTableAdapter::new(plan, execution_plan)))
         }
         let df = ctx.sql(sql)?;
         Ok(BallistaDataFrame::from(self.state.clone(), df))
@@ -147,11 +146,13 @@ impl BallistaContext {
 pub(crate) struct DFTableAdapter {
     /// DataFusion logical plan
     pub logical_plan: LogicalPlan,
+    /// DataFusion execution plan
+    plan: Arc<dyn ExecutionPlan>,
 }
 
 impl DFTableAdapter {
-    fn new(logical_plan: LogicalPlan) -> Self {
-        Self { logical_plan }
+    fn new(logical_plan: LogicalPlan, plan: Arc<dyn ExecutionPlan>) -> Self {
+        Self { logical_plan, plan }
     }
 }
 
@@ -161,13 +162,16 @@ impl TableProvider for DFTableAdapter {
     }
 
     fn schema(&self) -> SchemaRef {
-        self.logical_plan.schema().as_ref().to_owned().into()
+        self.plan.schema()
     }
 
-    fn scan(&self, _projection: &Option<Vec<usize>>, _batch_size: usize, _filters: &[Expr]) -> DFResult<Arc<dyn ExecutionPlan>> {
-        Err(DataFusionError::NotImplemented(
-            "DFTableAdapter is only used for building the logical plan and cannot be executed".to_owned(),
-        ))
+    fn scan(
+        &self,
+        _projection: &Option<Vec<usize>>,
+        _batch_size: usize,
+        _filters: &[Expr],
+    ) -> DFResult<Arc<dyn ExecutionPlan>> {
+        Ok(self.plan.clone())
     }
 
     fn statistics(&self) -> Statistics {
@@ -218,19 +222,27 @@ impl BallistaDataFrame {
             .await
     }
 
-    pub fn select_columns(&self, columns: Vec<&str>) -> Result<BallistaDataFrame> {
-        Ok(Self::from(self.state.clone(), self.df.select_columns(columns).map_err(BallistaError::from)?))
+    pub fn select_columns(&self, columns: &[&str]) -> Result<BallistaDataFrame> {
+        Ok(Self::from(
+            self.state.clone(),
+            self.df
+                .select_columns(columns)
+                .map_err(BallistaError::from)?,
+        ))
     }
 
-    pub fn select(&self, expr: Vec<Expr>) -> Result<BallistaDataFrame> {
-        Ok(Self::from(self.state.clone(), self.df.select(expr).map_err(BallistaError::from)?))
+    pub fn select(&self, expr: &[Expr]) -> Result<BallistaDataFrame> {
+        Ok(Self::from(
+            self.state.clone(),
+            self.df.select(expr).map_err(BallistaError::from)?,
+        ))
     }
 
     pub fn filter(&self, expr: Expr) -> Result<BallistaDataFrame> {
         Ok(Self::from(self.state.clone(), self.df.filter(expr).map_err(BallistaError::from)?))
     }
 
-    pub fn aggregate(&self, group_expr: Vec<Expr>, aggr_expr: Vec<Expr>) -> Result<BallistaDataFrame> {
+    pub fn aggregate(&self, group_expr: &[Expr], aggr_expr: &[Expr]) -> Result<BallistaDataFrame> {
         Ok(Self::from(
             self.state.clone(),
             self.df.aggregate(group_expr, aggr_expr).map_err(BallistaError::from)?,
@@ -241,8 +253,11 @@ impl BallistaDataFrame {
         Ok(Self::from(self.state.clone(), self.df.limit(n).map_err(BallistaError::from)?))
     }
 
-    pub fn sort(&self, expr: Vec<Expr>) -> Result<BallistaDataFrame> {
-        Ok(Self::from(self.state.clone(), self.df.sort(expr).map_err(BallistaError::from)?))
+    pub fn sort(&self, expr: &[Expr]) -> Result<BallistaDataFrame> {
+        Ok(Self::from(
+            self.state.clone(),
+            self.df.sort(expr).map_err(BallistaError::from)?,
+        ))
     }
 
     // TODO lifetime issue

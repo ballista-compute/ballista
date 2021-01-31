@@ -12,22 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Ballista Distributed Compute
-#![allow(unused_imports)]
-pub const BALLISTA_VERSION: &str = env!("CARGO_PKG_VERSION");
+//! Distributed query planning and execution
+//!
+//! This code is EXPERIMENTAL and still under development
 
-pub mod client;
-pub mod columnar_batch;
-pub mod context;
-pub mod error;
-pub mod execution;
-pub mod executor;
-pub mod flight_service;
-pub mod memory_stream;
-pub mod prelude;
-pub mod scheduler;
-pub mod utils;
-
-#[macro_use]
-
-pub mod serde;
+pub mod planner;
+pub mod query_stage;

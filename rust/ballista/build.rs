@@ -14,5 +14,7 @@
 
 fn main() -> Result<(), String> {
     println!("cargo:rerun-if-changed=proto/ballista.proto");
-    prost_build::compile_protos(&["proto/ballista.proto"], &["proto"]).map_err(|e| format!("protobuf compilation failed: {}", e))
+    tonic_build::configure()
+        .compile(&["proto/ballista.proto"], &["proto"])
+        .map_err(|e| format!("protobuf compilation failed: {}", e))
 }

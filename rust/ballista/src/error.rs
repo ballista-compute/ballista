@@ -41,7 +41,7 @@ pub enum BallistaError {
     KubeAPIError(kube::error::Error),
     KubeAPIRequestError(k8s_openapi::RequestError),
     KubeAPIResponseError(k8s_openapi::ResponseError),
-    // TonicError(tonic::status::Status)
+    TonicError(tonic::transport::Error),
 }
 
 impl<T> Into<Result<T>> for BallistaError {
@@ -84,6 +84,15 @@ impl From<io::Error> for BallistaError {
     }
 }
 
+impl From<sled::Error> for BallistaError {
+    fn from(e: sled::Error) -> Self {
+        match e {
+            sled::Error::Io(io) => BallistaError::IoError(io),
+            _ => BallistaError::General(format!("{}", e)),
+        }
+    }
+}
+
 // impl From<reqwest::Error> for BallistaError {
 //     fn from(e: reqwest::Error) -> Self {
 //         BallistaError::ReqwestError(e)
@@ -114,6 +123,12 @@ impl From<k8s_openapi::ResponseError> for BallistaError {
     }
 }
 
+impl From<tonic::transport::Error> for BallistaError {
+    fn from(e: tonic::transport::Error) -> Self {
+        BallistaError::TonicError(e)
+    }
+}
+
 // impl From<tonic::status::Status> for BallistaError {
 //     fn from(e: tonic::status::Status) -> Self {
 //         BallistaError::TonicError(e)
@@ -132,8 +147,13 @@ impl Display for BallistaError {
             // BallistaError::ReqwestError(ref desc) => write!(f, "Reqwest error: {}", desc),
             // BallistaError::HttpError(ref desc) => write!(f, "HTTP error: {}", desc),
             BallistaError::KubeAPIError(ref desc) => write!(f, "Kube API error: {}", desc),
-            BallistaError::KubeAPIRequestError(ref desc) => write!(f, "KubeAPI request error: {}", desc),
-            BallistaError::KubeAPIResponseError(ref desc) => write!(f, "KubeAPI response error: {}", desc),
+            BallistaError::KubeAPIRequestError(ref desc) => {
+                write!(f, "KubeAPI request error: {}", desc)
+            }
+            BallistaError::KubeAPIResponseError(ref desc) => {
+                write!(f, "KubeAPI response error: {}", desc)
+            }
+            BallistaError::TonicError(desc) => write!(f, "Tonic error: {}", desc),
         }
     }
 }

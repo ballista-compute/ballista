@@ -14,21 +14,26 @@
 
 //! Serde code to convert from protocol buffers to Rust data structures.
 
+use datafusion::physical_plan::hash_utils::JoinType;
 use std::sync::Arc;
 use std::{convert::TryInto, unimplemented};
-
-use datafusion::physical_plan::{
-    empty::EmptyExec,
-    expressions::PhysicalSortExpr,
-    limit::{GlobalLimitExec, LocalLimitExec},
-    projection::ProjectionExec,
-    sort::{SortExec, SortOptions},
-};
-use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
 use crate::error::BallistaError;
 use crate::serde::{proto_error, protobuf};
 use crate::{convert_box_required, convert_required};
+use datafusion::physical_plan::{
+    coalesce_batches::CoalesceBatchesExec,
+    csv::CsvExec,
+    empty::EmptyExec,
+    expressions::PhysicalSortExpr,
+    hash_join::HashJoinExec,
+    limit::{GlobalLimitExec, LocalLimitExec},
+    parquet::ParquetExec,
+    projection::ProjectionExec,
+    sort::{SortExec, SortOptions},
+};
+use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
+use datafusion::prelude::CsvReadOptions;
 
 use protobuf::physical_plan_node::PhysicalPlanType;
 
@@ -50,8 +55,47 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Arc::new(ProjectionExec::try_new(exprs, input)?))
             }
-            PhysicalPlanType::Scan(_) => unimplemented!(),
+            PhysicalPlanType::CsvScan(scan) => {
+                let schema = Arc::new(convert_required!(scan.schema)?);
+                let options = CsvReadOptions::new()
+                    .has_header(scan.has_header)
+                    .file_extension(&scan.file_extension)
+                    .delimiter(scan.delimiter.as_bytes()[0])
+                    .schema(&schema);
+                // TODO we don't care what the DataFusion batch size was because Ballista will
+                // have its own configs. Hard-code for now.
+                let batch_size = 32768;
+                let projection = scan.projection.iter().map(|i| *i as usize).collect();
+                Ok(Arc::new(CsvExec::try_new(
+                    &scan.path,
+                    options,
+                    Some(projection),
+                    batch_size,
+                )?))
+            }
+            PhysicalPlanType::ParquetScan(scan) => {
+                let projection = scan.projection.iter().map(|i| *i as usize).collect();
+                // TODO we don't care what the DataFusion batch size was because Ballista will
+                // have its own configs. Hard-code for now.
+                let batch_size = 32768;
+                let max_concurrency = 8;
+                let filenames: Vec<&str> = scan.filename.iter().map(|s| s.as_str()).collect();
+                Ok(Arc::new(ParquetExec::try_from_files(
+                    &filenames,
+                    Some(projection),
+                    None,
+                    batch_size,
+                    max_concurrency,
+                )?))
+            }
             PhysicalPlanType::Selection(_) => unimplemented!(),
+            PhysicalPlanType::CoalesceBatches(coalesce_batches) => {
+                let input: Arc<dyn ExecutionPlan> = convert_box_required!(coalesce_batches.input)?;
+                Ok(Arc::new(CoalesceBatchesExec::new(
+                    input,
+                    coalesce_batches.target_batch_size as usize,
+                )))
+            }
             PhysicalPlanType::GlobalLimit(limit) => {
                 let input: Arc<dyn ExecutionPlan> = convert_box_required!(limit.input)?;
                 Ok(Arc::new(GlobalLimitExec::new(
@@ -65,6 +109,30 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                 Ok(Arc::new(LocalLimitExec::new(input, limit.limit as usize)))
             }
             PhysicalPlanType::HashAggregate(_) => unimplemented!(),
+            PhysicalPlanType::HashJoin(hashjoin) => {
+                let left: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.left)?;
+                let right: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.right)?;
+                let on: Vec<(String, String)> = hashjoin
+                    .on
+                    .iter()
+                    .map(|col| (col.left.clone(), col.right.clone()))
+                    .collect();
+                let join_type =
+                    protobuf::JoinType::from_i32(hashjoin.join_type).ok_or_else(|| {
+                        proto_error(format!(
+                            "Received a HashJoinNode message with unknown JoinType {}",
+                            hashjoin.join_type
+                        ))
+                    })?;
+                let join_type = match join_type {
+                    protobuf::JoinType::Inner => JoinType::Inner,
+                    protobuf::JoinType::Left => JoinType::Left,
+                    protobuf::JoinType::Right => JoinType::Right,
+                };
+                Ok(Arc::new(HashJoinExec::try_new(
+                    left, right, &on, &join_type,
+                )?))
+            }
             PhysicalPlanType::ShuffleReader(_) => unimplemented!(),
             PhysicalPlanType::Empty(empty) => {
                 let schema = Arc::new(convert_required!(empty.schema)?);

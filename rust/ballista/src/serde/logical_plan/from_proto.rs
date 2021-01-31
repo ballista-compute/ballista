@@ -217,7 +217,7 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
                     join.right_join_column.iter().map(|i| i.as_str()).collect();
                 let join_type = protobuf::JoinType::from_i32(join.join_type).ok_or_else(|| {
                     proto_error(format!(
-                        "Received a JoinNode message with unknwown JoinType {}",
+                        "Received a JoinNode message with unknown JoinType {}",
                         join.join_type
                     ))
                 })?;

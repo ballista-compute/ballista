@@ -27,6 +27,7 @@ use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::functions::ScalarFunctionExpr;
 use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
 use datafusion::physical_plan::hash_join::HashJoinExec;
+use datafusion::physical_plan::hash_utils::JoinType;
 use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
 use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::projection::ProjectionExec;
@@ -93,12 +94,6 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
             Ok(protobuf::PhysicalPlanNode {
                 physical_plan_type: None,
             })
-        } else if let Some(exec) = plan.downcast_ref::<HashJoinExec>() {
-            let _left: protobuf::PhysicalPlanNode = exec.left().to_owned().try_into()?;
-            let _right: protobuf::PhysicalPlanNode = exec.right().to_owned().try_into()?;
-            Ok(protobuf::PhysicalPlanNode {
-                physical_plan_type: None,
-            })
         } else if let Some(limit) = plan.downcast_ref::<GlobalLimitExec>() {
             let input: protobuf::PhysicalPlanNode = limit.input().to_owned().try_into()?;
             Ok(protobuf::PhysicalPlanNode {
@@ -116,6 +111,32 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                     protobuf::LocalLimitExecNode {
                         input: Some(Box::new(input)),
                         limit: limit.limit() as u32,
+                    },
+                ))),
+            })
+        } else if let Some(exec) = plan.downcast_ref::<HashJoinExec>() {
+            let left: protobuf::PhysicalPlanNode = exec.left().to_owned().try_into()?;
+            let right: protobuf::PhysicalPlanNode = exec.right().to_owned().try_into()?;
+            let on: Vec<protobuf::JoinOn> = exec
+                .on()
+                .iter()
+                .map(|tuple| protobuf::JoinOn {
+                    left: tuple.0.to_owned(),
+                    right: tuple.1.to_owned(),
+                })
+                .collect();
+            let join_type = match exec.join_type() {
+                JoinType::Inner => protobuf::JoinType::Inner,
+                JoinType::Left => protobuf::JoinType::Left,
+                JoinType::Right => protobuf::JoinType::Right,
+            };
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: Some(PhysicalPlanType::HashJoin(Box::new(
+                    protobuf::HashJoinExecNode {
+                        left: Some(Box::new(left)),
+                        right: Some(Box::new(right)),
+                        on,
+                        join_type: join_type.into(),
                     },
                 ))),
             })

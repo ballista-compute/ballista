@@ -269,6 +269,7 @@ message PhysicalPlanNode {
     GlobalLimitExecNode global_limit = 22;
     LocalLimitExecNode local_limit = 23;
     HashAggregateExecNode hash_aggregate = 30;
+    HashJoinExecNode hash_join = 31;
     ShuffleReaderExecNode shuffle_reader = 40;
     SortExecNode sort = 50;
     CoalesceBatchesExecNode coalesce_batches = 51;
@@ -292,6 +293,20 @@ message CsvScanExecNode {
   // partition filenames
   repeated string filename = 8;
 }
+
+message HashJoinExecNode {
+  PhysicalPlanNode left = 1;
+  PhysicalPlanNode right = 2;
+  repeated JoinOn on = 3;
+  JoinType join_type = 4;
+
+}
+
+message JoinOn {
+   string left = 1;
+   string right = 2;
+}
+
 
 message EmptyExecNode {
   bool produce_one_row = 1;

@@ -14,25 +14,26 @@
 
 //! Serde code to convert from protocol buffers to Rust data structures.
 
+use datafusion::physical_plan::hash_utils::JoinType;
 use std::sync::Arc;
 use std::{convert::TryInto, unimplemented};
 
-use datafusion::physical_plan::csv::CsvExec;
-use datafusion::physical_plan::parquet::ParquetExec;
+use crate::error::BallistaError;
+use crate::serde::{proto_error, protobuf};
+use crate::{convert_box_required, convert_required};
 use datafusion::physical_plan::{
     coalesce_batches::CoalesceBatchesExec,
+    csv::CsvExec,
     empty::EmptyExec,
     expressions::PhysicalSortExpr,
+    hash_join::HashJoinExec,
     limit::{GlobalLimitExec, LocalLimitExec},
+    parquet::ParquetExec,
     projection::ProjectionExec,
     sort::{SortExec, SortOptions},
 };
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 use datafusion::prelude::CsvReadOptions;
-
-use crate::error::BallistaError;
-use crate::serde::{proto_error, protobuf};
-use crate::{convert_box_required, convert_required};
 
 use protobuf::physical_plan_node::PhysicalPlanType;
 
@@ -110,6 +111,30 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                 Ok(Arc::new(LocalLimitExec::new(input, limit.limit as usize)))
             }
             PhysicalPlanType::HashAggregate(_) => unimplemented!(),
+            PhysicalPlanType::HashJoin(hashjoin) => {
+                let left: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.left)?;
+                let right: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.right)?;
+                let on: Vec<(String, String)> = hashjoin
+                    .on
+                    .iter()
+                    .map(|col| (col.left.clone(), col.right.clone()))
+                    .collect();
+                let join_type =
+                    protobuf::JoinType::from_i32(hashjoin.join_type).ok_or_else(|| {
+                        proto_error(format!(
+                            "Received a HashJoinNode message with unknown JoinType {}",
+                            hashjoin.join_type
+                        ))
+                    })?;
+                let join_type = match join_type {
+                    protobuf::JoinType::Inner => JoinType::Inner,
+                    protobuf::JoinType::Left => JoinType::Left,
+                    protobuf::JoinType::Right => JoinType::Right,
+                };
+                Ok(Arc::new(HashJoinExec::try_new(
+                    left, right, &on, &join_type,
+                )?))
+            }
             PhysicalPlanType::ShuffleReader(_) => unimplemented!(),
             PhysicalPlanType::Empty(empty) => {
                 let schema = Arc::new(convert_required!(empty.schema)?);

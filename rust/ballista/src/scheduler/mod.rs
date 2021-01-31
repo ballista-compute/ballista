@@ -22,8 +22,8 @@ use tonic::{Request, Response};
 
 use crate::error::Result;
 use crate::serde::protobuf::{
-    scheduler_grpc_server::SchedulerGrpc, ExecutorMetadata, GetExecutorMetadataParams,
-    GetExecutorMetadataResult, RegisterExecutorParams, RegisterExecutorResult,
+    scheduler_grpc_server::SchedulerGrpc, ExecutorMetadata, GetExecutorMetadataParams, GetExecutorMetadataResult, RegisterExecutorParams,
+    RegisterExecutorResult,
 };
 use crate::serde::scheduler::ExecutorMeta;
 
@@ -80,38 +80,24 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
             .into_iter()
             .map(|meta| meta.into())
             .collect();
-        Ok(Response::new(GetExecutorMetadataResult {
-            metadata: result,
-        }))
+        Ok(Response::new(GetExecutorMetadataResult { metadata: result }))
     }
 
-    async fn register_executor(
-        &self,
-        request: Request<RegisterExecutorParams>,
-    ) -> std::result::Result<Response<RegisterExecutorResult>, tonic::Status> {
-        if let RegisterExecutorParams {
-            metadata: Some(metadata),
-        } = request.into_inner()
-        {
+    async fn register_executor(&self, request: Request<RegisterExecutorParams>) -> std::result::Result<Response<RegisterExecutorResult>, tonic::Status> {
+        if let RegisterExecutorParams { metadata: Some(metadata) } = request.into_inner() {
             info!("Received register_executor request for {:?}", metadata);
             let ExecutorMetadata { id, host, port } = metadata;
             let key = format!("/ballista/{}/{}", self.namespace, id);
             let value = format!("{}:{}", host, port);
-            self.client
-                .clone()
-                .put(key, value.into_bytes())
-                .await
-                .map_err(|e| {
-                    let msg = format!("Could not put etcd value: {}", e);
-                    error!("{}", msg);
-                    tonic::Status::internal(msg)
-                })?;
+            self.client.clone().put(key, value.into_bytes()).await.map_err(|e| {
+                let msg = format!("Could not put etcd value: {}", e);
+                error!("{}", msg);
+                tonic::Status::internal(msg)
+            })?;
             Ok(Response::new(RegisterExecutorResult {}))
         } else {
             warn!("Received invalid executor registration request");
-            Err(tonic::Status::invalid_argument(
-                "Missing metadata in request",
-            ))
+            Err(tonic::Status::invalid_argument("Missing metadata in request"))
         }
     }
 }

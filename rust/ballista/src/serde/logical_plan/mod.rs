@@ -67,14 +67,10 @@ mod roundtrip_tests {
         ]);
 
         let plan = std::sync::Arc::new(
-            LogicalPlanBuilder::scan_csv(
-                "employee.csv",
-                CsvReadOptions::new().schema(&schema).has_header(true),
-                Some(vec![3, 4]),
-            )
-            .and_then(|plan| plan.sort(&[col("salary")]))
-            .and_then(|plan| plan.build())
-            .unwrap(),
+            LogicalPlanBuilder::scan_csv("employee.csv", CsvReadOptions::new().schema(&schema).has_header(true), Some(vec![3, 4]))
+                .and_then(|plan| plan.sort(&[col("salary")]))
+                .and_then(|plan| plan.build())
+                .unwrap(),
         );
 
         for batch_size in test_batch_sizes.iter() {
@@ -285,11 +281,7 @@ mod roundtrip_tests {
             DataType::LargeUtf8,
             //Recursive list tests
             DataType::List(new_box_field("Level1", DataType::Boolean, true)),
-            DataType::List(new_box_field(
-                "Level1",
-                DataType::List(new_box_field("Level2", DataType::Date32, true)),
-                true,
-            )),
+            DataType::List(new_box_field("Level1", DataType::List(new_box_field("Level2", DataType::Date32, true)), true)),
         ];
 
         let should_fail: Vec<DataType> = vec![
@@ -407,7 +399,7 @@ mod roundtrip_tests {
     #[test]
     fn round_trip_datatype() -> Result<()> {
         use arrow::datatypes::DataType;
-        use arrow::datatypes::{ IntervalUnit, TimeUnit};
+        use arrow::datatypes::{IntervalUnit, TimeUnit};
         let test_cases: Vec<DataType> = vec![
             DataType::Null,
             DataType::Boolean,
@@ -601,25 +593,17 @@ mod roundtrip_tests {
             Field::new("salary", DataType::Int32, false),
         ]);
 
-        let verbose_plan = LogicalPlanBuilder::scan_csv(
-            "employee.csv",
-            CsvReadOptions::new().schema(&schema).has_header(true),
-            Some(vec![3, 4]),
-        )
-        .and_then(|plan| plan.sort(&[col("salary")]))
-        .and_then(|plan| plan.explain(true))
-        .and_then(|plan| plan.build())
-        .unwrap();
+        let verbose_plan = LogicalPlanBuilder::scan_csv("employee.csv", CsvReadOptions::new().schema(&schema).has_header(true), Some(vec![3, 4]))
+            .and_then(|plan| plan.sort(&[col("salary")]))
+            .and_then(|plan| plan.explain(true))
+            .and_then(|plan| plan.build())
+            .unwrap();
 
-        let plan = LogicalPlanBuilder::scan_csv(
-            "employee.csv",
-            CsvReadOptions::new().schema(&schema).has_header(true),
-            Some(vec![3, 4]),
-        )
-        .and_then(|plan| plan.sort(&[col("salary")]))
-        .and_then(|plan| plan.explain(false))
-        .and_then(|plan| plan.build())
-        .unwrap();
+        let plan = LogicalPlanBuilder::scan_csv("employee.csv", CsvReadOptions::new().schema(&schema).has_header(true), Some(vec![3, 4]))
+            .and_then(|plan| plan.sort(&[col("salary")]))
+            .and_then(|plan| plan.explain(false))
+            .and_then(|plan| plan.build())
+            .unwrap();
 
         roundtrip_test!(plan);
 
@@ -658,14 +642,10 @@ mod roundtrip_tests {
             Field::new("salary", DataType::Int32, false),
         ]);
 
-        let plan = LogicalPlanBuilder::scan_csv(
-            "employee.csv",
-            CsvReadOptions::new().schema(&schema).has_header(true),
-            Some(vec![3, 4]),
-        )
-        .and_then(|plan| plan.sort(&[col("salary")]))
-        .and_then(|plan| plan.build())
-        .unwrap();
+        let plan = LogicalPlanBuilder::scan_csv("employee.csv", CsvReadOptions::new().schema(&schema).has_header(true), Some(vec![3, 4]))
+            .and_then(|plan| plan.sort(&[col("salary")]))
+            .and_then(|plan| plan.build())
+            .unwrap();
         roundtrip_test!(plan);
 
         Ok(())
@@ -696,14 +676,10 @@ mod roundtrip_tests {
             Field::new("salary", DataType::Int32, false),
         ]);
 
-        let plan = LogicalPlanBuilder::scan_csv(
-            "employee.csv",
-            CsvReadOptions::new().schema(&schema).has_header(true),
-            Some(vec![3, 4]),
-        )
-        .and_then(|plan| plan.aggregate(&[col("state")], &[max(col("salary"))]))
-        .and_then(|plan| plan.build())
-        .unwrap();
+        let plan = LogicalPlanBuilder::scan_csv("employee.csv", CsvReadOptions::new().schema(&schema).has_header(true), Some(vec![3, 4]))
+            .and_then(|plan| plan.aggregate(&[col("state")], &[max(col("salary"))]))
+            .and_then(|plan| plan.build())
+            .unwrap();
 
         roundtrip_test!(plan);
 

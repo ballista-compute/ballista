@@ -70,11 +70,7 @@ impl FlightService for BallistaFlightService {
 
         match &action {
             BallistaAction::InteractiveQuery { plan, .. } => {
-                let results = self
-                    .executor
-                    .execute_logical_plan(&plan)
-                    .await
-                    .map_err(|e| from_ballista_err(&e))?;
+                let results = self.executor.execute_logical_plan(&plan).await.map_err(|e| from_ballista_err(&e))?;
 
                 if results.is_empty() {
                     return Err(Status::internal("There were no results from ticket"));
@@ -97,11 +93,7 @@ impl FlightService for BallistaFlightService {
                 let path = path.to_str().unwrap();
 
                 // execute the query partition
-                let mut stream = partition
-                    .plan
-                    .execute(partition.partition_id)
-                    .await
-                    .map_err(|e| from_datafusion_err(&e))?;
+                let mut stream = partition.plan.execute(partition.partition_id).await.map_err(|e| from_datafusion_err(&e))?;
 
                 // stream results to disk
                 write_stream_to_disk(&mut stream, &path).await.map_err(|e| from_arrow_err(&e))?;
@@ -169,26 +161,18 @@ impl FlightService for BallistaFlightService {
 }
 
 /// Convert a result set into flight data
-fn create_flight_data(
-    schema: SchemaRef,
-    results: Vec<RecordBatch>,
-) -> Vec<Result<FlightData, Status>> {
+fn create_flight_data(schema: SchemaRef, results: Vec<RecordBatch>) -> Vec<Result<FlightData, Status>> {
     // add an initial FlightData message that sends schema
     let options = arrow::ipc::writer::IpcWriteOptions::default();
-    let schema_flight_data =
-        arrow_flight::utils::flight_data_from_arrow_schema(schema.as_ref(), &options);
+    let schema_flight_data = arrow_flight::utils::flight_data_from_arrow_schema(schema.as_ref(), &options);
 
     let mut flights: Vec<Result<FlightData, Status>> = vec![Ok(schema_flight_data)];
 
     let mut batches: Vec<Result<FlightData, Status>> = results
         .iter()
         .flat_map(|batch| {
-            let (flight_dictionaries, flight_batch) =
-                arrow_flight::utils::flight_data_from_arrow_batch(batch, &options);
-            flight_dictionaries
-                .into_iter()
-                .chain(std::iter::once(flight_batch))
-                .map(Ok)
+            let (flight_dictionaries, flight_batch) = arrow_flight::utils::flight_data_from_arrow_batch(batch, &options);
+            flight_dictionaries.into_iter().chain(std::iter::once(flight_batch)).map(Ok)
         })
         .collect();
 

@@ -84,16 +84,12 @@ impl BallistaClient {
         let batches = collect(stream).await?;
 
         if batches.len() != 1 {
-            return Err(BallistaError::General(
-                "execute_partition received wrong number of result batches".to_owned(),
-            ));
+            return Err(BallistaError::General("execute_partition received wrong number of result batches".to_owned()));
         }
 
         let batch = &batches[0];
         if batch.num_rows() != 1 {
-            return Err(BallistaError::General(
-                "execute_partition received wrong number of rows".to_owned(),
-            ));
+            return Err(BallistaError::General("execute_partition received wrong number of rows".to_owned()));
         }
 
         let path = batch
@@ -106,21 +102,10 @@ impl BallistaClient {
     }
 
     /// Fetch a partition from an executor
-    pub async fn fetch_partition(
-        &mut self,
-        job_uuid: &Uuid,
-        stage_id: usize,
-        partition_id: usize,
-    ) -> Result<Vec<RecordBatch>> {
-        let action = Action::FetchPartition(PartitionId::new(
-            job_uuid.to_owned(),
-            stage_id,
-            partition_id,
-        ));
+    pub async fn fetch_partition(&mut self, job_uuid: &Uuid, stage_id: usize, partition_id: usize) -> Result<Vec<RecordBatch>> {
+        let action = Action::FetchPartition(PartitionId::new(job_uuid.to_owned(), stage_id, partition_id));
         let stream = self.execute_action(&action).await?;
-        Ok(collect(stream)
-            .await
-            .map_err(|e| BallistaError::General(format!("{:?}", e)))?)
+        Ok(collect(stream).await.map_err(|e| BallistaError::General(format!("{:?}", e)))?)
     }
 
     /// Execute an action and retrieve the results

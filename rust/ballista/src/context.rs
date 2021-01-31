@@ -165,12 +165,7 @@ impl TableProvider for DFTableAdapter {
         self.plan.schema()
     }
 
-    fn scan(
-        &self,
-        _projection: &Option<Vec<usize>>,
-        _batch_size: usize,
-        _filters: &[Expr],
-    ) -> DFResult<Arc<dyn ExecutionPlan>> {
+    fn scan(&self, _projection: &Option<Vec<usize>>, _batch_size: usize, _filters: &[Expr]) -> DFResult<Arc<dyn ExecutionPlan>> {
         Ok(self.plan.clone())
     }
 
@@ -223,19 +218,11 @@ impl BallistaDataFrame {
     }
 
     pub fn select_columns(&self, columns: &[&str]) -> Result<BallistaDataFrame> {
-        Ok(Self::from(
-            self.state.clone(),
-            self.df
-                .select_columns(columns)
-                .map_err(BallistaError::from)?,
-        ))
+        Ok(Self::from(self.state.clone(), self.df.select_columns(columns).map_err(BallistaError::from)?))
     }
 
     pub fn select(&self, expr: &[Expr]) -> Result<BallistaDataFrame> {
-        Ok(Self::from(
-            self.state.clone(),
-            self.df.select(expr).map_err(BallistaError::from)?,
-        ))
+        Ok(Self::from(self.state.clone(), self.df.select(expr).map_err(BallistaError::from)?))
     }
 
     pub fn filter(&self, expr: Expr) -> Result<BallistaDataFrame> {
@@ -254,10 +241,7 @@ impl BallistaDataFrame {
     }
 
     pub fn sort(&self, expr: &[Expr]) -> Result<BallistaDataFrame> {
-        Ok(Self::from(
-            self.state.clone(),
-            self.df.sort(expr).map_err(BallistaError::from)?,
-        ))
+        Ok(Self::from(self.state.clone(), self.df.sort(expr).map_err(BallistaError::from)?))
     }
 
     // TODO lifetime issue

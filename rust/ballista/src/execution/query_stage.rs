@@ -48,11 +48,7 @@ impl QueryStageExec {
     /// Create a new query stage
     pub fn try_new(job_uuid: Uuid, stage_id: usize, child: Arc<dyn ExecutionPlan>) -> Result<Self> {
         //TODO add some validation to make sure the plan is supported for distributed execution
-        Ok(Self {
-            job_uuid,
-            stage_id,
-            child,
-        })
+        Ok(Self { job_uuid, stage_id, child })
     }
 }
 
@@ -77,13 +73,8 @@ impl ExecutionPlan for QueryStageExec {
         vec![]
     }
 
-    fn with_new_children(
-        &self,
-        _children: Vec<Arc<dyn ExecutionPlan>>,
-    ) -> Result<Arc<dyn ExecutionPlan>> {
-        Err(DataFusionError::Plan(
-            "Ballista QueryStageExec does not support with_new_children()".to_owned(),
-        ))
+    fn with_new_children(&self, _children: Vec<Arc<dyn ExecutionPlan>>) -> Result<Arc<dyn ExecutionPlan>> {
+        Err(DataFusionError::Plan("Ballista QueryStageExec does not support with_new_children()".to_owned()))
     }
 
     async fn execute(&self, partition: usize) -> Result<SendableRecordBatchStream> {
@@ -105,19 +96,11 @@ impl ExecutionPlan for QueryStageExec {
 
             let stage_id = &self.stage_id;
             let partition_metadata = client
-                .execute_partition(
-                    self.job_uuid,
-                    *stage_id,
-                    child_partition,
-                    self.child.clone(),
-                )
+                .execute_partition(self.job_uuid, *stage_id, child_partition, self.child.clone())
                 .await
                 .map_err(|e| DataFusionError::Execution(format!("Ballista Error: {:?}", e)))?;
 
-            debug!(
-                "Partition {} metadata: {:?}",
-                child_partition, partition_metadata
-            );
+            debug!("Partition {} metadata: {:?}", child_partition, partition_metadata);
 
             partition_id.append_value(child_partition as u16)?;
             partition_path.append_value(partition_metadata.path())?;
@@ -130,13 +113,7 @@ impl ExecutionPlan for QueryStageExec {
             Field::new("path", DataType::Utf8, false),
         ]));
 
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(partition_id.finish()),
-                Arc::new(partition_path.finish()),
-            ],
-        )?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(partition_id.finish()), Arc::new(partition_path.finish())])?;
 
         Ok(Box::pin(MemoryStream::try_new(vec![batch], schema, None)?))
     }

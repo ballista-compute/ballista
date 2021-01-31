@@ -40,10 +40,7 @@ pub async fn execute_distributed_query(execution_plan: Arc<dyn ExecutionPlan>) -
     Ok(())
 }
 
-pub fn optimize(
-    job_uuid: &Uuid,
-    execution_plan: Arc<dyn ExecutionPlan>,
-) -> Result<Arc<dyn ExecutionPlan>> {
+pub fn optimize(job_uuid: &Uuid, execution_plan: Arc<dyn ExecutionPlan>) -> Result<Arc<dyn ExecutionPlan>> {
     println!("optimize: {:?}", execution_plan);
 
     // recurse down and replace children
@@ -82,9 +79,7 @@ fn pretty_print(plan: Arc<dyn ExecutionPlan>, indent: usize) {
         print!("  ");
     }
     println!("{:?}", plan);
-    plan.children()
-        .iter()
-        .for_each(|c| pretty_print(c.clone(), indent + 1));
+    plan.children().iter().for_each(|c| pretty_print(c.clone(), indent + 1));
 }
 
 // #[cfg(test)]

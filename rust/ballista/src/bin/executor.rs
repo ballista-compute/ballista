@@ -18,9 +18,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use arrow_flight::flight_service_server::FlightServiceServer;
-use ballista::serde::protobuf::{
-    scheduler_grpc_client::SchedulerGrpcClient, RegisterExecutorParams,
-};
+use ballista::serde::protobuf::{scheduler_grpc_client::SchedulerGrpcClient, RegisterExecutorParams};
 use ballista::BALLISTA_VERSION;
 use ballista::{
     executor::{BallistaExecutor, ExecutorConfig},
@@ -87,15 +85,9 @@ async fn main() -> Result<()> {
     let port = opt.port;
 
     let addr = format!("{}:{}", bind_host, port);
-    let addr = addr
-        .parse()
-        .with_context(|| format!("Could not parse address: {}", addr))?;
+    let addr = addr.parse().with_context(|| format!("Could not parse address: {}", addr))?;
 
-    let scheduler_host = if opt.local {
-        external_host.to_owned()
-    } else {
-        opt.scheduler_host
-    };
+    let scheduler_host = if opt.local { external_host.to_owned() } else { opt.scheduler_host };
     let scheduler_port = opt.scheduler_port;
 
     let config = ExecutorConfig::new(&external_host, port, opt.concurrent_tasks);
@@ -109,24 +101,17 @@ async fn main() -> Result<()> {
 
     if opt.local {
         info!("Running in local mode. Scheduler will be run in-proc");
-        let client = StandaloneClient::try_new_temporary()
-            .context("Could not create standalone config backend")?;
+        let client = StandaloneClient::try_new_temporary().context("Could not create standalone config backend")?;
         let server = SchedulerGrpcServer::new(SchedulerServer::new(client, namespace));
         let addr = format!("{}:{}", bind_host, scheduler_port);
-        let addr = addr
-            .parse()
-            .with_context(|| format!("Could not parse {}", addr))?;
-        info!(
-            "Ballista v{} Rust Scheduler listening on {:?}",
-            BALLISTA_VERSION, addr
-        );
+        let addr = addr.parse().with_context(|| format!("Could not parse {}", addr))?;
+        info!("Ballista v{} Rust Scheduler listening on {:?}", BALLISTA_VERSION, addr);
         tokio::spawn(Server::builder().add_service(server).serve(addr));
     }
 
-    let mut scheduler =
-        SchedulerGrpcClient::connect(format!("http://{}:{}", scheduler_host, scheduler_port))
-            .await
-            .context("Could not connect to scheduler")?;
+    let mut scheduler = SchedulerGrpcClient::connect(format!("http://{}:{}", scheduler_host, scheduler_port))
+        .await
+        .context("Could not connect to scheduler")?;
     scheduler
         .register_executor(RegisterExecutorParams {
             metadata: Some(executor_meta.into()),
@@ -137,10 +122,7 @@ async fn main() -> Result<()> {
     let service = BallistaFlightService::new(executor);
 
     let server = FlightServiceServer::new(service);
-    info!(
-        "Ballista v{} Rust Executor listening on {:?}",
-        BALLISTA_VERSION, addr
-    );
+    info!("Ballista v{} Rust Executor listening on {:?}", BALLISTA_VERSION, addr);
     Server::builder()
         .add_service(server)
         .serve(addr)

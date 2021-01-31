@@ -66,12 +66,7 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                 // have its own configs. Hard-code for now.
                 let batch_size = 32768;
                 let projection = scan.projection.iter().map(|i| *i as usize).collect();
-                Ok(Arc::new(CsvExec::try_new(
-                    &scan.path,
-                    options,
-                    Some(projection),
-                    batch_size,
-                )?))
+                Ok(Arc::new(CsvExec::try_new(&scan.path, options, Some(projection), batch_size)?))
             }
             PhysicalPlanType::ParquetScan(scan) => {
                 let projection = scan.projection.iter().map(|i| *i as usize).collect();
@@ -91,18 +86,12 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
             PhysicalPlanType::Selection(_) => unimplemented!(),
             PhysicalPlanType::CoalesceBatches(coalesce_batches) => {
                 let input: Arc<dyn ExecutionPlan> = convert_box_required!(coalesce_batches.input)?;
-                Ok(Arc::new(CoalesceBatchesExec::new(
-                    input,
-                    coalesce_batches.target_batch_size as usize,
-                )))
+                Ok(Arc::new(CoalesceBatchesExec::new(input, coalesce_batches.target_batch_size as usize)))
             }
             PhysicalPlanType::GlobalLimit(limit) => {
                 let input: Arc<dyn ExecutionPlan> = convert_box_required!(limit.input)?;
-                Ok(Arc::new(GlobalLimitExec::new(
-                    input,
-                    limit.limit as usize,
-                    0,
-                ))) // TODO: concurrency param doesn't seem to be used in datafusion. not sure how to fill this in
+                Ok(Arc::new(GlobalLimitExec::new(input, limit.limit as usize, 0)))
+                // TODO: concurrency param doesn't seem to be used in datafusion. not sure how to fill this in
             }
             PhysicalPlanType::LocalLimit(limit) => {
                 let input: Arc<dyn ExecutionPlan> = convert_box_required!(limit.input)?;
@@ -112,26 +101,15 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
             PhysicalPlanType::HashJoin(hashjoin) => {
                 let left: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.left)?;
                 let right: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.right)?;
-                let on: Vec<(String, String)> = hashjoin
-                    .on
-                    .iter()
-                    .map(|col| (col.left.clone(), col.right.clone()))
-                    .collect();
-                let join_type =
-                    protobuf::JoinType::from_i32(hashjoin.join_type).ok_or_else(|| {
-                        proto_error(format!(
-                            "Received a HashJoinNode message with unknown JoinType {}",
-                            hashjoin.join_type
-                        ))
-                    })?;
+                let on: Vec<(String, String)> = hashjoin.on.iter().map(|col| (col.left.clone(), col.right.clone())).collect();
+                let join_type = protobuf::JoinType::from_i32(hashjoin.join_type)
+                    .ok_or_else(|| proto_error(format!("Received a HashJoinNode message with unknown JoinType {}", hashjoin.join_type)))?;
                 let join_type = match join_type {
                     protobuf::JoinType::Inner => JoinType::Inner,
                     protobuf::JoinType::Left => JoinType::Left,
                     protobuf::JoinType::Right => JoinType::Right,
                 };
-                Ok(Arc::new(HashJoinExec::try_new(
-                    left, right, &on, &join_type,
-                )?))
+                Ok(Arc::new(HashJoinExec::try_new(left, right, &on, &join_type)?))
             }
             PhysicalPlanType::ShuffleReader(_) => unimplemented!(),
             PhysicalPlanType::Empty(empty) => {
@@ -144,22 +122,15 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     .expr
                     .iter()
                     .map(|expr| {
-                        let expr = expr.expr_type.as_ref().ok_or_else(|| {
-                            proto_error(format!(
-                                "physical_plan::from_proto() Unexpected expr {:?}",
-                                self
-                            ))
-                        })?;
+                        let expr = expr
+                            .expr_type
+                            .as_ref()
+                            .ok_or_else(|| proto_error(format!("physical_plan::from_proto() Unexpected expr {:?}", self)))?;
                         if let protobuf::logical_expr_node::ExprType::Sort(sort_expr) = expr {
                             let expr = sort_expr
                                 .expr
                                 .as_ref()
-                                .ok_or_else(|| {
-                                    proto_error(format!(
-                                        "physical_plan::from_proto() Unexpected sort expr {:?}",
-                                        self
-                                    ))
-                                })?
+                                .ok_or_else(|| proto_error(format!("physical_plan::from_proto() Unexpected sort expr {:?}", self)))?
                                 .as_ref();
                             Ok(PhysicalSortExpr {
                                 expr: expr.try_into()?,
@@ -169,10 +140,7 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                                 },
                             })
                         } else {
-                            Err(BallistaError::General(format!(
-                                "physical_plan::from_proto() {:?}",
-                                self
-                            )))
+                            Err(BallistaError::General(format!("physical_plan::from_proto() {:?}", self)))
                         }
                     })
                     .collect::<Result<Vec<_>, _>>()?;

@@ -26,9 +26,7 @@ pub struct StandaloneClient {
 impl StandaloneClient {
     /// Creates a StandaloneClient that saves data to the specified file.
     pub fn try_new<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
-        Ok(Self {
-            db: sled::open(path)?,
-        })
+        Ok(Self { db: sled::open(path)? })
     }
 
     /// Creates a StandaloneClient that saves data to a temp file.

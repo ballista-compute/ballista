@@ -24,12 +24,7 @@ impl TryInto<protobuf::Action> for Action {
 
     fn try_into(self) -> Result<protobuf::Action, Self::Error> {
         match self {
-
-            
-            Action::InteractiveQuery {
-                ref plan,
-                ref settings,
-            } => {
+            Action::InteractiveQuery { ref plan, ref settings } => {
                 let settings = settings
                     .iter()
                     .map(|e| protobuf::KeyValuePair {

@@ -135,9 +135,7 @@ pub struct ExecutePartitionResult {
 
 impl ExecutePartitionResult {
     pub fn new(path: &str) -> Self {
-        Self {
-            path: path.to_owned(),
-        }
+        Self { path: path.to_owned() }
     }
 
     pub fn path(&self) -> &str {

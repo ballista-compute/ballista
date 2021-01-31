@@ -25,7 +25,7 @@ use prost::Message;
 #[allow(clippy::all)]
 pub mod protobuf {
     include!(concat!(env!("OUT_DIR"), "/ballista.protobuf.rs"));
-} 
+}
 
 pub mod logical_plan;
 pub mod physical_plan;

@@ -53,7 +53,7 @@ impl protobuf::IntervalUnit {
         }
     }
 }
-    /* Arrow changed dates to no longer have date unit
+/* Arrow changed dates to no longer have date unit
 
 impl protobuf::DateUnit {
     pub fn from_arrow_date_unit(val: &arrow::datatypes::DateUnit) -> Self {
@@ -73,7 +73,7 @@ impl protobuf::DateUnit {
             None => Err(proto_error("Error converting i32 to DateUnit: Passed invalid variant")),
         }
     }
-    
+
 }*/
 
 impl protobuf::TimeUnit {
@@ -252,8 +252,8 @@ impl From<&arrow::datatypes::DataType> for protobuf::arrow_type::ArrowTypeEnum {
                 time_unit: protobuf::TimeUnit::from_arrow_time_unit(time_unit) as i32,
                 timezone: timezone.to_owned().unwrap_or_else(String::new),
             }),
-            DataType::Date32 => ArrowTypeEnum::Date32(EmptyMessage{}),
-            DataType::Date64 => ArrowTypeEnum::Date64(EmptyMessage{}),
+            DataType::Date32 => ArrowTypeEnum::Date32(EmptyMessage {}),
+            DataType::Date64 => ArrowTypeEnum::Date64(EmptyMessage {}),
             DataType::Time32(time_unit) => ArrowTypeEnum::Time32(protobuf::TimeUnit::from_arrow_time_unit(time_unit) as i32),
             DataType::Time64(time_unit) => ArrowTypeEnum::Time64(protobuf::TimeUnit::from_arrow_time_unit(time_unit) as i32),
             DataType::Duration(time_unit) => ArrowTypeEnum::Duration(protobuf::TimeUnit::from_arrow_time_unit(time_unit) as i32),

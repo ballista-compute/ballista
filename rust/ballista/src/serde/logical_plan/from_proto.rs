@@ -45,13 +45,7 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
             LogicalPlanType::Projection(projection) => {
                 let input: LogicalPlan = convert_box_required!(projection.input)?;
                 LogicalPlanBuilder::from(&input)
-                    .project(
-                        &projection
-                            .expr
-                            .iter()
-                            .map(|expr| expr.try_into())
-                            .collect::<Result<Vec<_>, _>>()?,
-                    )?
+                    .project(&projection.expr.iter().map(|expr| expr.try_into()).collect::<Result<Vec<_>, _>>()?)?
                     .build()
                     .map_err(|e| e.into())
             }
@@ -64,16 +58,8 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
             }
             LogicalPlanType::Aggregate(aggregate) => {
                 let input: LogicalPlan = convert_box_required!(aggregate.input)?;
-                let group_expr = aggregate
-                    .group_expr
-                    .iter()
-                    .map(|expr| expr.try_into())
-                    .collect::<Result<Vec<_>, _>>()?;
-                let aggr_expr = aggregate
-                    .aggr_expr
-                    .iter()
-                    .map(|expr| expr.try_into())
-                    .collect::<Result<Vec<_>, _>>()?;
+                let group_expr = aggregate.group_expr.iter().map(|expr| expr.try_into()).collect::<Result<Vec<_>, _>>()?;
+                let aggr_expr = aggregate.aggr_expr.iter().map(|expr| expr.try_into()).collect::<Result<Vec<_>, _>>()?;
                 LogicalPlanBuilder::from(&input)
                     .aggregate(&group_expr, &aggr_expr)?
                     .build()
@@ -126,15 +112,8 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
             }
             LogicalPlanType::Sort(sort) => {
                 let input: LogicalPlan = convert_box_required!(sort.input)?;
-                let sort_expr: Vec<Expr> = sort
-                    .expr
-                    .iter()
-                    .map(|expr| expr.try_into())
-                    .collect::<Result<Vec<Expr>, _>>()?;
-                LogicalPlanBuilder::from(&input)
-                    .sort(&sort_expr)?
-                    .build()
-                    .map_err(|e| e.into())
+                let sort_expr: Vec<Expr> = sort.expr.iter().map(|expr| expr.try_into()).collect::<Result<Vec<Expr>, _>>()?;
+                LogicalPlanBuilder::from(&input).sort(&sort_expr)?.build().map_err(|e| e.into())
             }
             LogicalPlanType::Repartition(repartition) => {
                 use datafusion::logical_plan::Partitioning;
@@ -186,16 +165,10 @@ impl TryInto<LogicalPlan> for &protobuf::LogicalPlanNode {
                 LogicalPlanBuilder::from(&input).limit(limit.limit as usize)?.build().map_err(|e| e.into())
             }
             LogicalPlanType::Join(join) => {
-                let left_keys: Vec<&str> =
-                    join.left_join_column.iter().map(|i| i.as_str()).collect();
-                let right_keys: Vec<&str> =
-                    join.right_join_column.iter().map(|i| i.as_str()).collect();
-                let join_type = protobuf::JoinType::from_i32(join.join_type).ok_or_else(|| {
-                    proto_error(format!(
-                        "Received a JoinNode message with unknown JoinType {}",
-                        join.join_type
-                    ))
-                })?;
+                let left_keys: Vec<&str> = join.left_join_column.iter().map(|i| i.as_str()).collect();
+                let right_keys: Vec<&str> = join.right_join_column.iter().map(|i| i.as_str()).collect();
+                let join_type = protobuf::JoinType::from_i32(join.join_type)
+                    .ok_or_else(|| proto_error(format!("Received a JoinNode message with unknown JoinType {}", join.join_type)))?;
                 let join_type = match join_type {
                     protobuf::JoinType::Inner => JoinType::Inner,
                     protobuf::JoinType::Left => JoinType::Left,
@@ -347,7 +320,6 @@ impl TryInto<arrow::datatypes::DataType> for &protobuf::arrow_type::ArrowTypeEnu
                 let value_datatype: DataType = pb_value_datatype.as_ref().try_into()?;
                 DataType::Dictionary(Box::new(key_datatype), Box::new(value_datatype))
             }
-            
         })
     }
 }

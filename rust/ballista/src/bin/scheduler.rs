@@ -5,9 +5,7 @@ use std::net::SocketAddr;
 use anyhow::{Context, Result};
 use ballista::BALLISTA_VERSION;
 use ballista::{
-    scheduler::{
-        etcd::EtcdClient, standalone::StandaloneClient, ConfigBackendClient, SchedulerServer,
-    },
+    scheduler::{etcd::EtcdClient, standalone::StandaloneClient, ConfigBackendClient, SchedulerServer},
     serde::protobuf::scheduler_grpc_server::SchedulerGrpcServer,
 };
 use clap::arg_enum;
@@ -47,21 +45,10 @@ struct Opt {
     port: u16,
 }
 
-async fn start_server<T: ConfigBackendClient + Send + Sync + 'static>(
-    config_backend: T,
-    namespace: String,
-    addr: SocketAddr,
-) -> Result<()> {
-    info!(
-        "Ballista v{} Scheduler listening on {:?}",
-        BALLISTA_VERSION, addr
-    );
+async fn start_server<T: ConfigBackendClient + Send + Sync + 'static>(config_backend: T, namespace: String, addr: SocketAddr) -> Result<()> {
+    info!("Ballista v{} Scheduler listening on {:?}", BALLISTA_VERSION, addr);
     let server = SchedulerGrpcServer::new(SchedulerServer::new(config_backend, namespace));
-    Ok(Server::builder()
-        .add_service(server)
-        .serve(addr)
-        .await
-        .context("Could not start grpc server")?)
+    Ok(Server::builder().add_service(server).serve(addr).await.context("Could not start grpc server")?)
 }
 
 #[tokio::main]
@@ -87,8 +74,7 @@ async fn main() -> Result<()> {
         }
         ConfigBackend::Standalone => {
             // TODO: Use a real file and make path is configurable
-            let client = StandaloneClient::try_new_temporary()
-                .context("Could not create standalone config backend")?;
+            let client = StandaloneClient::try_new_temporary().context("Could not create standalone config backend")?;
             start_server(client, namespace, addr).await?;
         }
     };

@@ -217,7 +217,7 @@ impl BallistaDataFrame {
             .await
     }
 
-    pub fn select_columns(&self, columns: Vec<&str>) -> Result<BallistaDataFrame> {
+    pub fn select_columns(&self, columns: &[&str]) -> Result<BallistaDataFrame> {
         Ok(Self::from(
             self.state.clone(),
             self.df
@@ -226,7 +226,7 @@ impl BallistaDataFrame {
         ))
     }
 
-    pub fn select(&self, expr: Vec<Expr>) -> Result<BallistaDataFrame> {
+    pub fn select(&self, expr: &[Expr]) -> Result<BallistaDataFrame> {
         Ok(Self::from(
             self.state.clone(),
             self.df.select(expr).map_err(BallistaError::from)?,
@@ -240,11 +240,7 @@ impl BallistaDataFrame {
         ))
     }
 
-    pub fn aggregate(
-        &self,
-        group_expr: Vec<Expr>,
-        aggr_expr: Vec<Expr>,
-    ) -> Result<BallistaDataFrame> {
+    pub fn aggregate(&self, group_expr: &[Expr], aggr_expr: &[Expr]) -> Result<BallistaDataFrame> {
         Ok(Self::from(
             self.state.clone(),
             self.df
@@ -260,7 +256,7 @@ impl BallistaDataFrame {
         ))
     }
 
-    pub fn sort(&self, expr: Vec<Expr>) -> Result<BallistaDataFrame> {
+    pub fn sort(&self, expr: &[Expr]) -> Result<BallistaDataFrame> {
         Ok(Self::from(
             self.state.clone(),
             self.df.sort(expr).map_err(BallistaError::from)?,

@@ -175,9 +175,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                         .map(|n| *n as u32)
                         .collect(),
                     file_extension: exec.file_extension().to_owned(),
-                    // TODO we are losing the underlying schema
-                    // fix when https://issues.apache.org/jira/browse/ARROW-11440 is resolved
-                    schema: None, // should be Some(exec.file_schema().as_ref().try_into()?),
+                    schema: Some(exec.file_schema().as_ref().try_into()?),
                     has_header: exec.has_header(),
                     delimiter: delimiter.to_string(),
                     batch_size: 32768,

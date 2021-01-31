@@ -26,6 +26,9 @@ use datafusion::physical_plan::{
     sort::{SortExec, SortOptions},
 };
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
+use datafusion::physical_plan::csv::CsvExec;
+use datafusion::physical_plan::parquet::ParquetExec;
+use datafusion::prelude::CsvReadOptions;
 
 use crate::error::BallistaError;
 use crate::serde::{proto_error, protobuf};
@@ -53,8 +56,30 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Arc::new(ProjectionExec::try_new(exprs, input)?))
             }
-            PhysicalPlanType::CsvScan(_) => unimplemented!(),
-            PhysicalPlanType::ParquetScan(_) => unimplemented!(),
+            PhysicalPlanType::CsvScan(scan) => {
+
+                let schema = Arc::new(convert_required!(scan.schema)?);
+                let options = CsvReadOptions::new()
+                    .has_header(scan.has_header)
+                    .file_extension(&scan.file_extension)
+                    .delimiter(scan.delimiter.as_bytes()[0])
+                    .schema(&schema);
+                // TODO we don't care what the DataFusion batch size was because Ballista will
+                // have its own configs. Hard-code for now.
+                let batch_size = 32768;
+                let projection = scan.projection.iter().map(|i| *i as usize).collect();
+                Ok(Arc::new(CsvExec::try_new(&scan.path, options, Some(projection), batch_size)?))
+            },
+            PhysicalPlanType::ParquetScan(scan) => {
+                let projection = scan.projection.iter().map(|i| *i as usize).collect();
+                let max_concurrency = 8;
+                let filenames: Vec<&str> = scan.filename.iter().map(|s| s.as_str()).collect();
+                Ok(Arc::new(ParquetExec::try_from_files(
+                    &filenames,
+                    Some(projection),
+                    None,
+                    max_concurrency)?))
+            },
             PhysicalPlanType::Selection(_) => unimplemented!(),
             PhysicalPlanType::CoalesceBatches(coalesce_batches) => {
                 let input: Arc<dyn ExecutionPlan> = convert_box_required!(coalesce_batches.input)?;

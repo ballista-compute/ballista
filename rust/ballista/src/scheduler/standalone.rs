@@ -17,15 +17,25 @@ use crate::scheduler::ConfigBackendClient;
 
 use log::warn;
 
+/// A [`ConfigBackendClient`] implementation that uses file-based storage to save cluster configuration.
 #[derive(Clone)]
 pub struct StandaloneClient {
     db: sled::Db,
 }
 
 impl StandaloneClient {
-    // TODO: accept file path
-    pub fn new(db: sled::Db) -> Self {
-        Self { db }
+    /// Creates a StandaloneClient that saves data to the specified file.
+    pub fn try_new<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
+        Ok(Self {
+            db: sled::open(path)?,
+        })
+    }
+
+    /// Creates a StandaloneClient that saves data to a temp file.
+    pub fn try_new_temporary() -> Result<Self> {
+        Ok(Self {
+            db: sled::Config::new().temporary(true).open()?,
+        })
     }
 }
 
@@ -68,9 +78,7 @@ mod tests {
     use std::result::Result;
 
     fn create_instance() -> Result<StandaloneClient, Box<dyn std::error::Error>> {
-        Ok(StandaloneClient::new(
-            sled::Config::new().temporary(true).open()?,
-        ))
+        Ok(StandaloneClient::try_new_temporary()?)
     }
 
     #[tokio::test]

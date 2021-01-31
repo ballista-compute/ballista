@@ -15,10 +15,9 @@
 //! Support for distributed schedulers, such as Kubernetes
 
 pub mod etcd;
-pub mod k8s;
 pub mod standalone;
 
-use log::error;
+use log::{error, info, warn};
 use tonic::{Request, Response};
 
 use crate::error::Result;
@@ -28,10 +27,18 @@ use crate::serde::protobuf::{
 };
 use crate::serde::scheduler::ExecutorMeta;
 
+/// A trait that contains the necessary methods to save and retrieve the state and configuration of a cluster.
 #[tonic::async_trait]
 pub trait ConfigBackendClient: Clone {
+    /// Retrieve the data associated with a specific key.
+    ///
+    /// An empty vec is returned if the key does not exist.
     async fn get(&mut self, key: &str) -> Result<Vec<u8>>;
+
+    /// Retrieve all data associated with a specific key.
     async fn get_from_prefix(&mut self, prefix: &str) -> Result<Vec<Vec<u8>>>;
+
+    /// Saves the value into the provided key, overriding any previous data that might have been associated to that key.
     async fn put(&mut self, key: String, value: Vec<u8>) -> Result<()>;
 }
 
@@ -52,6 +59,7 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
         &self,
         _request: Request<GetExecutorMetadataParams>,
     ) -> std::result::Result<Response<GetExecutorMetadataResult>, tonic::Status> {
+        info!("Received get_executors_metadata request");
         let mut client = self.client.clone();
         let result = client
             .get_from_prefix(&self.namespace)
@@ -82,9 +90,11 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
         request: Request<RegisterExecutorParams>,
     ) -> std::result::Result<Response<RegisterExecutorResult>, tonic::Status> {
         if let RegisterExecutorParams {
-            metadata: Some(ExecutorMetadata { id, host, port }),
+            metadata: Some(metadata),
         } = request.into_inner()
         {
+            info!("Received register_executor request for {:?}", metadata);
+            let ExecutorMetadata { id, host, port } = metadata;
             let key = format!("/ballista/{}/{}", self.namespace, id);
             let value = format!("{}:{}", host, port);
             self.client
@@ -98,6 +108,7 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
                 })?;
             Ok(Response::new(RegisterExecutorResult {}))
         } else {
+            warn!("Received invalid executor registration request");
             Err(tonic::Status::invalid_argument(
                 "Missing metadata in request",
             ))

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Support for etcd discovery mechanism.
+//! Etcd config backend.
 
 use crate::error::{ballista_error, Result};
 use crate::scheduler::ConfigBackendClient;
@@ -20,6 +20,7 @@ use crate::scheduler::ConfigBackendClient;
 use etcd_client::{GetOptions, PutOptions};
 use log::warn;
 
+/// A [`ConfigBackendClient`] implementation that uses etcd to save cluster configuration.
 #[derive(Clone)]
 pub struct EtcdClient {
     etcd: etcd_client::Client,

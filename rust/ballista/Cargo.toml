@@ -15,6 +15,7 @@ simd = ["datafusion/simd"]
 snmalloc = ["snmalloc-rs"]
 
 [dependencies]
+anyhow = "1"
 async-trait = "0.1.36"
 clap = "2"
 crossbeam = "0.7"

@@ -139,30 +139,29 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                 ))),
             })
         } else if let Some(exec) = plan.downcast_ref::<CsvExec>() {
-
             let delimiter = [*exec.delimiter().unwrap()];
             let delimiter = std::str::from_utf8(&delimiter)
                 .map_err(|_| BallistaError::General("Invalid CSV delimiter".to_owned()))?;
 
-          Ok(protobuf::PhysicalPlanNode {
-              physical_plan_type: Some(PhysicalPlanType::CsvScan(protobuf::CsvScanExecNode {
-                  path: exec.path().to_owned(),
-                  filename: exec.filenames().to_vec(),
-                  projection: exec
-                      .projection()
-                      .unwrap()
-                      .iter()
-                      .map(|n| *n as u32)
-                      .collect(),
-                  file_extension: exec.file_extension().to_owned(),
-                  // TODO we are losing the underlying schema
-                  // fix when https://issues.apache.org/jira/browse/ARROW-11440 is resolved
-                  schema: None, // should be Some(exec.file_schema().as_ref().try_into()?),
-                  has_header: exec.has_header(),
-                  delimiter: delimiter.to_string(),
-                  batch_size: 32768,
-              }))
-          })
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: Some(PhysicalPlanType::CsvScan(protobuf::CsvScanExecNode {
+                    path: exec.path().to_owned(),
+                    filename: exec.filenames().to_vec(),
+                    projection: exec
+                        .projection()
+                        .unwrap()
+                        .iter()
+                        .map(|n| *n as u32)
+                        .collect(),
+                    file_extension: exec.file_extension().to_owned(),
+                    // TODO we are losing the underlying schema
+                    // fix when https://issues.apache.org/jira/browse/ARROW-11440 is resolved
+                    schema: None, // should be Some(exec.file_schema().as_ref().try_into()?),
+                    has_header: exec.has_header(),
+                    delimiter: delimiter.to_string(),
+                    batch_size: 32768,
+                })),
+            })
         } else if let Some(exec) = plan.downcast_ref::<ParquetExec>() {
             let filenames = exec
                 .partitions()

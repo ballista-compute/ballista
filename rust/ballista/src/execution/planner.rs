@@ -77,7 +77,7 @@ pub fn optimize(
     }
 }
 
-fn pretty_print(plan: Arc<dyn ExecutionPlan>, indent: usize) {
+pub fn pretty_print(plan: Arc<dyn ExecutionPlan>, indent: usize) {
     for _ in 0..indent {
         print!("  ");
     }
@@ -91,7 +91,7 @@ fn pretty_print(plan: Arc<dyn ExecutionPlan>, indent: usize) {
 // mod tests {
 //     use super::*;
 //     use crate::context::BallistaContext;
-//     use arrow::datatypes::{DataType, DateUnit, Field, Schema};
+//     use arrow::datatypes::{DataType, Field, Schema};
 //     use datafusion::execution::context::ExecutionContext;
 //     use datafusion::physical_plan::csv::CsvReadOptions;
 //     use std::collections::HashMap;
@@ -135,18 +135,21 @@ fn pretty_print(plan: Arc<dyn ExecutionPlan>, indent: usize) {
 //     orders
 //     on
 //             l_orderkey = o_orderkey
-// where
-//         l_shipmode in ('MAIL', 'SHIP')
-//   and l_commitdate < l_receiptdate
-//   and l_shipdate < l_commitdate
-//   and l_receiptdate >= date '1994-01-01'
-//   and l_receiptdate < date '1995-01-01'
 // group by
 //     l_shipmode
 // order by
 //     l_shipmode",
 //         )?;
 //
+//         /*
+//               where
+//               l_shipmode in ('MAIL', 'SHIP')
+//         and l_commitdate < l_receiptdate
+//         and l_shipdate < l_commitdate
+//         and l_receiptdate >= date '1994-01-01'
+//         and l_receiptdate < date '1995-01-01'
+//
+//                */
 //         let df = ExecutionContext::new();
 //         let plan = df.optimize(&plan.to_logical_plan())?;
 //         let plan = df.create_physical_plan(&plan)?;
@@ -207,7 +210,7 @@ fn pretty_print(plan: Arc<dyn ExecutionPlan>, indent: usize) {
 //                 Field::new("o_custkey", DataType::Int32, false),
 //                 Field::new("o_orderstatus", DataType::Utf8, false),
 //                 Field::new("o_totalprice", DataType::Float64, false),
-//                 Field::new("o_orderdate", DataType::Date32(DateUnit::Day), false),
+//                 Field::new("o_orderdate", DataType::Date32, false),
 //                 Field::new("o_orderpriority", DataType::Utf8, false),
 //                 Field::new("o_clerk", DataType::Utf8, false),
 //                 Field::new("o_shippriority", DataType::Int32, false),
@@ -225,9 +228,9 @@ fn pretty_print(plan: Arc<dyn ExecutionPlan>, indent: usize) {
 //                 Field::new("l_tax", DataType::Float64, false),
 //                 Field::new("l_returnflag", DataType::Utf8, false),
 //                 Field::new("l_linestatus", DataType::Utf8, false),
-//                 Field::new("l_shipdate", DataType::Date32(DateUnit::Day), false),
-//                 Field::new("l_commitdate", DataType::Date32(DateUnit::Day), false),
-//                 Field::new("l_receiptdate", DataType::Date32(DateUnit::Day), false),
+//                 Field::new("l_shipdate", DataType::Date32, false),
+//                 Field::new("l_commitdate", DataType::Date32, false),
+//                 Field::new("l_receiptdate", DataType::Date32, false),
 //                 Field::new("l_shipinstruct", DataType::Utf8, false),
 //                 Field::new("l_shipmode", DataType::Utf8, false),
 //                 Field::new("l_comment", DataType::Utf8, false),

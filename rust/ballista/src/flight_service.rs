@@ -17,6 +17,7 @@
 use std::pin::Pin;
 use std::sync::Arc;
 
+use crate::execution::planner::pretty_print;
 use crate::executor::BallistaExecutor;
 use crate::serde::decode_protobuf;
 use crate::serde::scheduler::Action as BallistaAction;
@@ -91,6 +92,8 @@ impl FlightService for BallistaFlightService {
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
             BallistaAction::ExecutePartition(partition) => {
+                pretty_print(partition.plan.clone(), 0);
+
                 let work_dir = TempDir::new()?;
                 let mut path = work_dir.into_path();
                 path.push(&format!("{}", partition.job_uuid));

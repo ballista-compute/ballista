@@ -45,6 +45,7 @@ impl BallistaClient {
     /// host and port
     pub async fn try_new(host: &str, port: usize) -> Result<Self> {
         let addr = format!("http://{}:{}", host, port);
+        println!("BallistaClient Connecting to {}", addr);
         let flight_client = FlightServiceClient::connect(addr)
             .await
             .map_err(|e| BallistaError::General(format!("{:?}", e)))?;

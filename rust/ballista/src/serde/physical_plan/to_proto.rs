@@ -13,7 +13,7 @@
 // limitations under the License.
 
 //! Serde code to convert Arrow schemas and DataFusion logical plans to Ballista protocol
-//! buffer format, allowing DataFusion logical plans to be serialized and transmitted between
+//! buffer format, allowing DataFusion physical plans to be serialized and transmitted between
 //! processes.
 
 use std::convert::{TryFrom, TryInto};
@@ -24,8 +24,6 @@ use crate::serde::{protobuf, BallistaError};
 use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
 use datafusion::physical_plan::csv::CsvExec;
 use datafusion::physical_plan::filter::FilterExec;
-use datafusion::physical_plan::functions::ScalarFunctionExpr;
-use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
 use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::hash_utils::JoinType;
 use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
@@ -34,10 +32,7 @@ use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::sort::SortExec;
 use datafusion::physical_plan::{
     empty::EmptyExec,
-    expressions::{
-        BinaryExpr, CaseExpr, CastExpr, Column, InListExpr, IsNotNullExpr, IsNullExpr, Literal,
-        NegativeExpr, NotExpr,
-    },
+    expressions::{BinaryExpr, Column},
 };
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
@@ -64,36 +59,38 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                 ))),
             })
         } else if let Some(exec) = plan.downcast_ref::<FilterExec>() {
-            let _input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
-            //         node.selection = Some(protobuf::SelectionExecNode {
-            //             expr: Some(exec.as_ref().filter_expr.as_ref().try_into()?),
-            //         });
+            let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
             Ok(protobuf::PhysicalPlanNode {
-                physical_plan_type: None,
+                physical_plan_type: Some(PhysicalPlanType::Filter(Box::new(
+                    protobuf::FilterExecNode {
+                        input: Some(Box::new(input)),
+                        expr: Some(exec.predicate().clone().try_into()?),
+                    },
+                ))),
             })
-        } else if let Some(exec) = plan.downcast_ref::<HashAggregateExec>() {
-            let _input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
-            //         node.hash_aggregate = Some(protobuf::HashAggregateExecNode {
-            //             mode: match exec.mode {
-            //                 AggregateMode::Partial => protobuf::AggregateMode::Partial,
-            //                 AggregateMode::Final => protobuf::AggregateMode::Final,
-            //                 AggregateMode::Complete => protobuf::AggregateMode::Complete,
-            //             }
-            //                 .into(),
-            //             group_expr: exec
-            //                 .group_expr
-            //                 .iter()
-            //                 .map(|expr| expr.try_into())
-            //                 .collect::<Result<Vec<_>, BallistaError>>()?,
-            //             aggr_expr: exec
-            //                 .aggr_expr
-            //                 .iter()
-            //                 .map(|expr| expr.try_into())
-            //                 .collect::<Result<Vec<_>, BallistaError>>()?,
-            //         });
-            Ok(protobuf::PhysicalPlanNode {
-                physical_plan_type: None,
-            })
+        // } else if let Some(exec) = plan.downcast_ref::<HashAggregateExec>() {
+        //     let _input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
+        //     //         node.hash_aggregate = Some(protobuf::HashAggregateExecNode {
+        //     //             mode: match exec.mode {
+        //     //                 AggregateMode::Partial => protobuf::AggregateMode::Partial,
+        //     //                 AggregateMode::Final => protobuf::AggregateMode::Final,
+        //     //                 AggregateMode::Complete => protobuf::AggregateMode::Complete,
+        //     //             }
+        //     //                 .into(),
+        //     //             group_expr: exec
+        //     //                 .group_expr
+        //     //                 .iter()
+        //     //                 .map(|expr| expr.try_into())
+        //     //                 .collect::<Result<Vec<_>, BallistaError>>()?,
+        //     //             aggr_expr: exec
+        //     //                 .aggr_expr
+        //     //                 .iter()
+        //     //                 .map(|expr| expr.try_into())
+        //     //                 .collect::<Result<Vec<_>, BallistaError>>()?,
+        //     //         });
+        //     Ok(protobuf::PhysicalPlanNode {
+        //         physical_plan_type: None,
+        //     })
         } else if let Some(limit) = plan.downcast_ref::<GlobalLimitExec>() {
             let input: protobuf::PhysicalPlanNode = limit.input().to_owned().try_into()?;
             Ok(protobuf::PhysicalPlanNode {
@@ -270,29 +267,9 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
                     binary_expr,
                 )),
             })
-        } else if let Some(_expr) = expr.downcast_ref::<Literal>() {
-            unimplemented!()
-        } else if let Some(_expr) = expr.downcast_ref::<CaseExpr>() {
-            unimplemented!()
-        } else if let Some(_expr) = expr.downcast_ref::<CastExpr>() {
-            unimplemented!()
-        } else if let Some(_expr) = expr.downcast_ref::<NotExpr>() {
-            unimplemented!()
-        } else if let Some(_expr) = expr.downcast_ref::<IsNullExpr>() {
-            unimplemented!()
-        } else if let Some(_expr) = expr.downcast_ref::<IsNotNullExpr>() {
-            unimplemented!()
-        } else if let Some(_expr) = expr.downcast_ref::<InListExpr>() {
-            unimplemented!()
-        } else if let Some(_expr) = expr.downcast_ref::<InListExpr>() {
-            unimplemented!()
-        } else if let Some(_expr) = expr.downcast_ref::<NegativeExpr>() {
-            unimplemented!()
-        } else if let Some(_expr) = expr.downcast_ref::<ScalarFunctionExpr>() {
-            unimplemented!()
         } else {
             Err(BallistaError::General(format!(
-                "unsupported physical expression {:?}",
+                "physical_plan::from_proto() unsupported expression {:?}",
                 value
             )))
         }

@@ -14,19 +14,26 @@
 
 //! Serde code to convert from protocol buffers to Rust data structures.
 
-use datafusion::physical_plan::hash_utils::JoinType;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::{convert::TryInto, unimplemented};
 
 use crate::error::BallistaError;
 use crate::serde::{proto_error, protobuf};
 use crate::{convert_box_required, convert_required};
+
+use arrow::datatypes::Schema;
+use datafusion::execution::context::{ExecutionConfig, ExecutionContextState};
+use datafusion::logical_plan::Expr;
+use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
 use datafusion::physical_plan::{
     coalesce_batches::CoalesceBatchesExec,
     csv::CsvExec,
     empty::EmptyExec,
     expressions::PhysicalSortExpr,
+    filter::FilterExec,
     hash_join::HashJoinExec,
+    hash_utils::JoinType,
     limit::{GlobalLimitExec, LocalLimitExec},
     parquet::ParquetExec,
     projection::ProjectionExec,
@@ -53,9 +60,17 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                 let exprs = projection
                     .expr
                     .iter()
-                    .map(|expr| expr.try_into().map(|e| (e, "unused".to_string())))
+                    .map(|expr| {
+                        compile_expr(expr, &input.schema()).map(|e| (e, "unused".to_string()))
+                    })
+                    // .map(|expr| expr.try_into().map(|e| (e, "unused".to_string())))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Arc::new(ProjectionExec::try_new(exprs, input)?))
+            }
+            PhysicalPlanType::Filter(filter) => {
+                let input: Arc<dyn ExecutionPlan> = convert_box_required!(filter.input)?;
+                let predicate = compile_expr(filter.expr.as_ref().unwrap(), &input.schema())?;
+                Ok(Arc::new(FilterExec::try_new(predicate, input)?))
             }
             PhysicalPlanType::CsvScan(scan) => {
                 let schema = Arc::new(convert_required!(scan.schema)?);
@@ -164,7 +179,7 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                                 })?
                                 .as_ref();
                             Ok(PhysicalSortExpr {
-                                expr: expr.try_into()?,
+                                expr: compile_expr(expr, &input.schema())?,
                                 options: SortOptions {
                                     descending: !sort_expr.asc,
                                     nulls_first: sort_expr.nulls_first,
@@ -185,10 +200,20 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
     }
 }
 
-impl TryInto<Arc<dyn PhysicalExpr>> for &protobuf::LogicalExprNode {
-    type Error = BallistaError;
-
-    fn try_into(self) -> Result<Arc<dyn PhysicalExpr>, Self::Error> {
-        unimplemented!()
-    }
+fn compile_expr(
+    expr: &protobuf::LogicalExprNode,
+    schema: &Schema,
+) -> Result<Arc<dyn PhysicalExpr>, BallistaError> {
+    let df_planner = DefaultPhysicalPlanner::default();
+    let state = ExecutionContextState {
+        datasources: HashMap::new(),
+        scalar_functions: HashMap::new(),
+        var_provider: HashMap::new(),
+        aggregate_functions: HashMap::new(),
+        config: ExecutionConfig::new(),
+    };
+    let expr: Expr = expr.try_into()?;
+    df_planner
+        .create_physical_expr(&expr, schema, &state)
+        .map_err(|e| BallistaError::General(format!("{:?}", e)))
 }

@@ -267,6 +267,14 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
                     binary_expr,
                 )),
             })
+        } else if let Some(expr) = expr.downcast_ref::<IsNullExpr>() {
+            Ok(protobuf::LogicalExprNode {
+                expr_type: Some(protobuf::logical_expr_node::ExprType::IsNullExpr(
+                    Box::new(protobuf::IsNull {
+                        expr: Some(Box::new(expr.arg().to_owned().try_into()?))
+                    })
+                )),
+            })
         } else {
             Err(BallistaError::General(format!(
                 "physical_plan::from_proto() unsupported expression {:?}",

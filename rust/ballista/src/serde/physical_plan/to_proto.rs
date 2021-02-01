@@ -26,6 +26,7 @@ use datafusion::physical_plan::csv::CsvExec;
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::hash_utils::JoinType;
+use datafusion::physical_plan::hash_aggregate::AggregateMode;
 use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
 use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::projection::ProjectionExec;
@@ -37,6 +38,7 @@ use datafusion::physical_plan::{
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
 use protobuf::physical_plan_node::PhysicalPlanType;
+use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
 
 impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
     type Error = BallistaError;
@@ -137,6 +139,26 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                     },
                 ))),
             })
+        } else if let Some(exec) = plan.downcast_ref::<HashAggregateExec>() {
+            let groups = exec.group_expr().iter().map(|expr| try_from(expr.0));
+            let agg = exec.aggr_expr().to_owned().try_from()?;
+            let agg_mode = match exec.mode()  {
+                AggregateMode::Partial => protobuf::AggregateMode::Partial,
+                AggregateMode::Final => protobuf::AggregateMode::Final,
+            };
+            let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: Some(PhysicalPlanType::HashAggregate(Box::new(
+                    protobuf::HashAggregateExecNode {
+                        group_expr: groups,
+                        aggr_expr: agg,
+                        mode: agg_mode,
+                        input,
+                    },
+                ))),
+            })
+
+
         } else if let Some(empty) = plan.downcast_ref::<EmptyExec>() {
             let schema = empty.schema().as_ref().try_into()?;
             Ok(protobuf::PhysicalPlanNode {

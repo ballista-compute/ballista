@@ -36,6 +36,7 @@ use datafusion::physical_plan::{
 };
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
+use datafusion::physical_plan::expressions::IsNullExpr;
 use protobuf::physical_plan_node::PhysicalPlanType;
 
 impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
@@ -266,6 +267,14 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
                 expr_type: Some(protobuf::logical_expr_node::ExprType::BinaryExpr(
                     binary_expr,
                 )),
+            })
+        } else if let Some(expr) = expr.downcast_ref::<IsNullExpr>() {
+            Ok(protobuf::LogicalExprNode {
+                expr_type: Some(protobuf::logical_expr_node::ExprType::IsNullExpr(Box::new(
+                    protobuf::IsNull {
+                        expr: Some(Box::new(expr.arg().to_owned().try_into()?)),
+                    },
+                ))),
             })
         } else {
             Err(BallistaError::General(format!(

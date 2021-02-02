@@ -16,6 +16,7 @@
 
 use std::pin::Pin;
 use std::sync::Arc;
+use std::time::Instant;
 
 use crate::execution::planner::pretty_print;
 use crate::executor::BallistaExecutor;
@@ -103,7 +104,9 @@ impl FlightService for BallistaFlightService {
 
                 path.push("data.arrow");
                 let path = path.to_str().unwrap();
-                debug!("Writing results to {}", path);
+                info!("Writing results to {}", path);
+
+                let now = Instant::now();
 
                 // execute the query partition
                 let mut stream = partition
@@ -127,6 +130,9 @@ impl FlightService for BallistaFlightService {
                 let results = vec![RecordBatch::try_new(schema.clone(), vec![path]).unwrap()];
                 let flights = create_flight_data(schema, results);
                 let output = futures::stream::iter(flights);
+
+                info!("Executed partition in {} seconds", now.elapsed().as_secs());
+
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
             BallistaAction::FetchPartition(partition_id) => {

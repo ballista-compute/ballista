@@ -100,8 +100,7 @@ impl DistributedPlanner {
             // and not specifically for this operator
             match agg.mode() {
                 AggregateMode::Final => {
-                    let children = agg
-                        .children()
+                    let children = children
                         .iter()
                         .map(|plan| {
                             create_query_stage(job_uuid, self.next_stage_id(), plan.clone())

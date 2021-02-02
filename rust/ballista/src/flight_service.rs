@@ -99,7 +99,11 @@ impl FlightService for BallistaFlightService {
                 path.push(&format!("{}", partition.job_uuid));
                 path.push(&format!("{}", partition.stage_id));
                 path.push(&format!("{}", partition.partition_id));
+                std::fs::create_dir_all(&path)?;
+
+                path.push("data.arrow");
                 let path = path.to_str().unwrap();
+                debug!("Writing results to {}", path);
 
                 // execute the query partition
                 let mut stream = partition
@@ -125,8 +129,9 @@ impl FlightService for BallistaFlightService {
                 let output = futures::stream::iter(flights);
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
-            BallistaAction::FetchPartition(_) => {
+            BallistaAction::FetchPartition(partition_id) => {
                 // fetch a partition that was previously executed by this executor
+                debug!("FetchPartition {:?}", partition_id);
                 Err(Status::unimplemented("FetchPartition"))
             }
         }

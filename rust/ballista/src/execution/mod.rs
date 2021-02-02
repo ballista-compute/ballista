@@ -18,3 +18,4 @@
 
 pub mod planner;
 pub mod query_stage;
+pub mod shuffle_reader;

@@ -42,13 +42,28 @@ pub struct PartitionLocation {
     pub(crate) executor_meta: ExecutorMeta,
 }
 
+/// Trait that the distributed planner uses to get a list of available executors
+pub trait SchedulerClient {
+    fn get_executors(&self) -> Result<Vec<ExecutorMeta>>;
+}
+
+impl SchedulerClient for Vec<ExecutorMeta> {
+    fn get_executors(&self) -> Result<Vec<ExecutorMeta>> {
+        Ok(self.clone())
+    }
+}
+
 pub struct DistributedPlanner {
+    scheduler_client: Box<dyn SchedulerClient>,
     next_stage_id: usize,
 }
 
-impl Default for DistributedPlanner {
-    fn default() -> Self {
-        Self { next_stage_id: 0 }
+impl DistributedPlanner {
+    pub fn new(scheduler_client: Box<dyn SchedulerClient>) -> Self {
+        Self {
+            scheduler_client,
+            next_stage_id: 0,
+        }
     }
 }
 
@@ -63,7 +78,11 @@ impl DistributedPlanner {
         let execution_plan = self.prepare_query_stages(&job_uuid, execution_plan)?;
         pretty_print(execution_plan.clone(), 0);
 
-        execute(execution_plan.clone()).await.await?;
+        let executors = self.scheduler_client.get_executors()?;
+
+        execute(execution_plan.clone(), executors.clone())
+            .await
+            .await?;
 
         Ok(())
     }
@@ -142,19 +161,26 @@ impl DistributedPlanner {
 /// up the tree
 async fn execute(
     plan: Arc<dyn ExecutionPlan>,
+    executors: Vec<ExecutorMeta>,
 ) -> Pin<Box<dyn Future<Output = Result<Vec<PartitionLocation>>>>> {
+    let executors = executors.to_vec();
     Box::pin(async move {
         let mut partition_locations = vec![];
         for child in plan.children() {
-            let xx: Result<Vec<PartitionLocation>> = execute(child.clone()).await.await;
+            let xx: Result<Vec<PartitionLocation>> =
+                execute(child.clone(), executors.clone()).await.await;
             let mut part_loc = xx.unwrap();
             partition_locations.append(&mut part_loc);
         }
         if let Some(stage) = plan.as_any().downcast_ref::<QueryStageExec>() {
-            let mut part_loc =
-                execute_query_stage(&stage.job_uuid, stage.stage_id, stage.children()[0].clone())
-                    .await
-                    .unwrap();
+            let mut part_loc = execute_query_stage(
+                &stage.job_uuid,
+                stage.stage_id,
+                stage.children()[0].clone(),
+                executors.clone(),
+            )
+            .await
+            .unwrap();
             partition_locations.append(&mut part_loc);
         }
 
@@ -181,6 +207,7 @@ async fn execute_query_stage(
     job_uuid: &Uuid,
     stage_id: usize,
     plan: Arc<dyn ExecutionPlan>,
+    executors: Vec<ExecutorMeta>,
 ) -> Result<Vec<PartitionLocation>> {
     let partition_count = plan.output_partitioning().partition_count();
     let mut meta = Vec::with_capacity(partition_count);
@@ -188,9 +215,8 @@ async fn execute_query_stage(
     // TODO make this concurrent by executing all partitions at once instead of one at a time
 
     for child_partition in 0..partition_count {
-        //TODO remove hard-coded executor connection details and use scheduler to discover
-        // executors, but for now assume a single executor is running on the default port
-        let mut client = BallistaClient::try_new("localhost", 50051)
+        let executor_meta = &executors[executors.len() % child_partition];
+        let mut client = BallistaClient::try_new(&executor_meta.host, executor_meta.port as usize)
             .await
             .map_err(|e| DataFusionError::Execution(format!("Ballista Error: {:?}", e)))?;
 
@@ -206,11 +232,7 @@ async fn execute_query_stage(
 
         meta.push(PartitionLocation {
             partition_id: PartitionId::new(*job_uuid, stage_id, child_partition),
-            executor_meta: ExecutorMeta {
-                id: "TBD".to_owned(),
-                host: "localhost".to_owned(),
-                port: 50051,
-            },
+            executor_meta: executor_meta.clone(),
         });
     }
 
@@ -294,7 +316,13 @@ pub fn pretty_print(plan: Arc<dyn ExecutionPlan>, indent: usize) {
 //         let plan = df.optimize(&plan.to_logical_plan())?;
 //         let plan = df.create_physical_plan(&plan)?;
 //
-//         let mut planner = DistributedPlanner::default();
+//         let executors = vec![ExecutorMeta {
+//             id: "TBD".to_string(),
+//             host: "localhost".to_string(),
+//             port: 50051,
+//         }];
+//
+//         let mut planner = DistributedPlanner::new(Box::new(executors));
 //         planner.execute_distributed_query(plan).await?;
 //
 //         Ok(())

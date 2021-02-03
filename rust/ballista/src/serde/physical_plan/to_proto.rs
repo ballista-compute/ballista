@@ -36,7 +36,7 @@ use datafusion::physical_plan::{
 };
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
-use datafusion::physical_plan::expressions::IsNullExpr;
+use datafusion::physical_plan::expressions::{IsNotNullExpr, IsNullExpr, NegativeExpr};
 use protobuf::physical_plan_node::PhysicalPlanType;
 
 impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
@@ -272,6 +272,22 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
             Ok(protobuf::LogicalExprNode {
                 expr_type: Some(protobuf::logical_expr_node::ExprType::IsNullExpr(Box::new(
                     protobuf::IsNull {
+                        expr: Some(Box::new(expr.arg().to_owned().try_into()?)),
+                    },
+                ))),
+            })
+        } else if let Some(expr) = expr.downcast_ref::<IsNotNullExpr>() {
+            Ok(protobuf::LogicalExprNode {
+                expr_type: Some(protobuf::logical_expr_node::ExprType::IsNotNullExpr(
+                    Box::new(protobuf::IsNotNull {
+                        expr: Some(Box::new(expr.arg().to_owned().try_into()?)),
+                    }),
+                )),
+            })
+        } else if let Some(expr) = expr.downcast_ref::<NegativeExpr>() {
+            Ok(protobuf::LogicalExprNode {
+                expr_type: Some(protobuf::logical_expr_node::ExprType::Negative(Box::new(
+                    protobuf::NegativeNode {
                         expr: Some(Box::new(expr.arg().to_owned().try_into()?)),
                     },
                 ))),

@@ -22,7 +22,6 @@ pub mod context;
 pub mod error;
 pub mod execution;
 pub mod executor;
-pub mod flight_service;
 pub mod memory_stream;
 pub mod prelude;
 pub mod scheduler;

@@ -23,6 +23,8 @@ use datafusion::physical_plan::collect;
 use log::{debug, info};
 use tonic::transport::Channel;
 
+pub mod flight_service;
+
 #[cfg(feature = "snmalloc")]
 #[global_allocator]
 static ALLOC: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;

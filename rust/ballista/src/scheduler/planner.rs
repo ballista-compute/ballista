@@ -16,65 +16,227 @@
 //!
 //! This code is EXPERIMENTAL and still under development
 
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 
+use crate::client::BallistaClient;
 use crate::context::DFTableAdapter;
 use crate::error::Result;
-use crate::execution::query_stage::QueryStageExec;
+use crate::executor::query_stage::QueryStageExec;
+use crate::serde::scheduler::ExecutorMeta;
+use crate::serde::scheduler::PartitionId;
 
+use datafusion::error::DataFusionError;
 use datafusion::execution::context::ExecutionContext;
+use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
 use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::ExecutionPlan;
+use log::debug;
 use uuid::Uuid;
 
-pub async fn execute_distributed_query(execution_plan: Arc<dyn ExecutionPlan>) -> Result<()> {
-    let job_uuid = Uuid::new_v4();
-    pretty_print(execution_plan.clone(), 0);
-    let execution_plan = optimize(&job_uuid, execution_plan)?;
-    pretty_print(execution_plan.clone(), 0);
-
-    // execute a partition just to test this out
-    let _stream = execution_plan.execute(0).await?;
-
-    Ok(())
+#[derive(Debug, Clone)]
+pub struct PartitionLocation {
+    pub(crate) partition_id: PartitionId,
+    pub(crate) executor_meta: ExecutorMeta,
 }
 
-pub fn optimize(
+/// Trait that the distributed planner uses to get a list of available executors
+pub trait SchedulerClient {
+    fn get_executors(&self) -> Result<Vec<ExecutorMeta>>;
+}
+
+impl SchedulerClient for Vec<ExecutorMeta> {
+    fn get_executors(&self) -> Result<Vec<ExecutorMeta>> {
+        Ok(self.clone())
+    }
+}
+
+pub struct DistributedPlanner {
+    scheduler_client: Box<dyn SchedulerClient>,
+    next_stage_id: usize,
+}
+
+impl DistributedPlanner {
+    pub fn new(scheduler_client: Box<dyn SchedulerClient>) -> Self {
+        Self {
+            scheduler_client,
+            next_stage_id: 0,
+        }
+    }
+}
+
+impl DistributedPlanner {
+    pub async fn execute_distributed_query(
+        &mut self,
+        execution_plan: Arc<dyn ExecutionPlan>,
+    ) -> Result<()> {
+        let job_uuid = Uuid::new_v4();
+        pretty_print(execution_plan.clone(), 0);
+
+        let execution_plan = self.prepare_query_stages(&job_uuid, execution_plan)?;
+        pretty_print(execution_plan.clone(), 0);
+
+        let executors = self.scheduler_client.get_executors()?;
+
+        execute(execution_plan.clone(), executors.clone())
+            .await
+            .await?;
+
+        Ok(())
+    }
+
+    /// Insert QueryStageExec nodes into the plan wherever partitioning changes
+    pub fn prepare_query_stages(
+        &mut self,
+        job_uuid: &Uuid,
+        execution_plan: Arc<dyn ExecutionPlan>,
+    ) -> Result<Arc<dyn ExecutionPlan>> {
+        // recurse down and replace children
+        if execution_plan.children().is_empty() {
+            return Ok(execution_plan.clone());
+        }
+
+        let children: Vec<Arc<dyn ExecutionPlan>> = execution_plan
+            .children()
+            .iter()
+            .map(|c| self.prepare_query_stages(&job_uuid, c.clone()))
+            .collect::<Result<Vec<_>>>()?;
+
+        if let Some(adapter) = execution_plan.as_any().downcast_ref::<DFTableAdapter>() {
+            let ctx = ExecutionContext::new();
+            Ok(ctx.create_physical_plan(&adapter.logical_plan)?)
+        } else if let Some(merge) = execution_plan.as_any().downcast_ref::<MergeExec>() {
+            let child = merge.children()[0].clone();
+            Ok(Arc::new(QueryStageExec::try_new(
+                *job_uuid,
+                self.next_stage_id(),
+                child,
+            )?))
+        } else if let Some(agg) = execution_plan.as_any().downcast_ref::<HashAggregateExec>() {
+            //TODO should insert query stages in more generic way based on partitioning metadata
+            // and not specifically for this operator
+            match agg.mode() {
+                AggregateMode::Final => {
+                    let children = children
+                        .iter()
+                        .map(|plan| {
+                            create_query_stage(job_uuid, self.next_stage_id(), plan.clone())
+                        })
+                        .collect::<Result<Vec<_>>>()?;
+                    Ok(agg.with_new_children(children)?)
+                }
+                AggregateMode::Partial => Ok(agg.with_new_children(children)?),
+            }
+        } else if let Some(join) = execution_plan.as_any().downcast_ref::<HashJoinExec>() {
+            Ok(join.with_new_children(vec![
+                create_query_stage(&*job_uuid, self.next_stage_id(), join.left().clone())?,
+                create_query_stage(&*job_uuid, self.next_stage_id(), join.right().clone())?,
+            ])?)
+        } else {
+            // TODO check for compatible partitioning schema, not just count
+            if execution_plan.output_partitioning().partition_count()
+                != children[0].output_partitioning().partition_count()
+            {
+                let children = children
+                    .iter()
+                    .map(|plan| create_query_stage(job_uuid, self.next_stage_id(), plan.clone()))
+                    .collect::<Result<Vec<_>>>()?;
+                Ok(execution_plan.with_new_children(children)?)
+            } else {
+                Ok(execution_plan.with_new_children(children)?)
+            }
+        }
+    }
+
+    /// Generate a new stage ID
+    fn next_stage_id(&mut self) -> usize {
+        self.next_stage_id += 1;
+        self.next_stage_id
+    }
+}
+
+/// Visitor pattern to walk the plan, depth-first, and then execute query stages when walking
+/// up the tree
+async fn execute(
+    plan: Arc<dyn ExecutionPlan>,
+    executors: Vec<ExecutorMeta>,
+) -> Pin<Box<dyn Future<Output = Result<Vec<PartitionLocation>>>>> {
+    let executors = executors.to_vec();
+    Box::pin(async move {
+        let mut partition_locations = vec![];
+        for child in plan.children() {
+            let xx: Result<Vec<PartitionLocation>> =
+                execute(child.clone(), executors.clone()).await.await;
+            let mut part_loc = xx.unwrap();
+            partition_locations.append(&mut part_loc);
+        }
+        if let Some(stage) = plan.as_any().downcast_ref::<QueryStageExec>() {
+            let mut part_loc = execute_query_stage(
+                &stage.job_uuid,
+                stage.stage_id,
+                stage.children()[0].clone(),
+                executors.clone(),
+            )
+            .await
+            .unwrap();
+            partition_locations.append(&mut part_loc);
+        }
+
+        println!("execute {:?}\n\treturning {:?}", plan, partition_locations);
+
+        Ok(partition_locations)
+    })
+}
+
+fn create_query_stage(
     job_uuid: &Uuid,
-    execution_plan: Arc<dyn ExecutionPlan>,
+    stage_id: usize,
+    plan: Arc<dyn ExecutionPlan>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
-    println!("optimize: {:?}", execution_plan);
+    Ok(Arc::new(QueryStageExec::try_new(
+        *job_uuid,
+        stage_id,
+        plan.clone(),
+    )?))
+}
 
-    // recurse down and replace children
-    if execution_plan.children().is_empty() {
-        return Ok(execution_plan.clone());
+/// Execute a query stage by sending each partition to an executor
+async fn execute_query_stage(
+    job_uuid: &Uuid,
+    stage_id: usize,
+    plan: Arc<dyn ExecutionPlan>,
+    executors: Vec<ExecutorMeta>,
+) -> Result<Vec<PartitionLocation>> {
+    let partition_count = plan.output_partitioning().partition_count();
+    let mut meta = Vec::with_capacity(partition_count);
+
+    // TODO make this concurrent by executing all partitions at once instead of one at a time
+
+    for child_partition in 0..partition_count {
+        let executor_meta = &executors[executors.len() % child_partition];
+        let mut client = BallistaClient::try_new(&executor_meta.host, executor_meta.port as usize)
+            .await
+            .map_err(|e| DataFusionError::Execution(format!("Ballista Error: {:?}", e)))?;
+
+        let partition_metadata = client
+            .execute_partition(*job_uuid, stage_id, child_partition, plan.clone())
+            .await
+            .map_err(|e| DataFusionError::Execution(format!("Ballista Error: {:?}", e)))?;
+
+        debug!(
+            "Partition {} metadata: {:?}",
+            child_partition, partition_metadata
+        );
+
+        meta.push(PartitionLocation {
+            partition_id: PartitionId::new(*job_uuid, stage_id, child_partition),
+            executor_meta: executor_meta.clone(),
+        });
     }
-    let children: Vec<Arc<dyn ExecutionPlan>> = execution_plan
-        .children()
-        .iter()
-        .map(|c| optimize(&job_uuid, c.clone()))
-        .collect::<Result<Vec<_>>>()?;
 
-    if let Some(adapter) = execution_plan.as_any().downcast_ref::<DFTableAdapter>() {
-        let ctx = ExecutionContext::new();
-        Ok(ctx.create_physical_plan(&adapter.logical_plan)?)
-    } else if let Some(merge) = execution_plan.as_any().downcast_ref::<MergeExec>() {
-        let child = merge.children()[0].clone();
-        Ok(Arc::new(QueryStageExec::try_new(*job_uuid, 0, child)?))
-
-    // } else if let Some(_) = execution_plan.as_any().downcast_ref::<HashAggregateExec>() {
-    //     Err(BallistaError::NotImplemented(
-    //         "distributed HashAggregateExec not yet supported".to_owned(),
-    //     ))
-    } else if let Some(join) = execution_plan.as_any().downcast_ref::<HashJoinExec>() {
-        Ok(join.with_new_children(vec![
-            Arc::new(QueryStageExec::try_new(*job_uuid, 0, join.left().clone())?),
-            Arc::new(QueryStageExec::try_new(*job_uuid, 0, join.right().clone())?),
-        ])?)
-    } else {
-        Ok(execution_plan.with_new_children(children)?)
-    }
+    Ok(meta)
 }
 
 pub fn pretty_print(plan: Arc<dyn ExecutionPlan>, indent: usize) {
@@ -153,7 +315,15 @@ pub fn pretty_print(plan: Arc<dyn ExecutionPlan>, indent: usize) {
 //         let df = ExecutionContext::new();
 //         let plan = df.optimize(&plan.to_logical_plan())?;
 //         let plan = df.create_physical_plan(&plan)?;
-//         execute_distributed_query(plan).await?;
+//
+//         let executors = vec![ExecutorMeta {
+//             id: "TBD".to_string(),
+//             host: "localhost".to_string(),
+//             port: 50051,
+//         }];
+//
+//         let mut planner = DistributedPlanner::new(Box::new(executors));
+//         planner.execute_distributed_query(plan).await?;
 //
 //         Ok(())
 //     }

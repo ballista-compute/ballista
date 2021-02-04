@@ -16,9 +16,10 @@
 
 use std::pin::Pin;
 use std::sync::Arc;
+use std::time::Instant;
 
-use crate::execution::planner::pretty_print;
 use crate::executor::BallistaExecutor;
+use crate::scheduler::planner::pretty_print;
 use crate::serde::decode_protobuf;
 use crate::serde::scheduler::Action as BallistaAction;
 use crate::utils::write_stream_to_disk;
@@ -99,7 +100,13 @@ impl FlightService for BallistaFlightService {
                 path.push(&format!("{}", partition.job_uuid));
                 path.push(&format!("{}", partition.stage_id));
                 path.push(&format!("{}", partition.partition_id));
+                std::fs::create_dir_all(&path)?;
+
+                path.push("data.arrow");
                 let path = path.to_str().unwrap();
+                info!("Writing results to {}", path);
+
+                let now = Instant::now();
 
                 // execute the query partition
                 let mut stream = partition
@@ -123,10 +130,14 @@ impl FlightService for BallistaFlightService {
                 let results = vec![RecordBatch::try_new(schema.clone(), vec![path]).unwrap()];
                 let flights = create_flight_data(schema, results);
                 let output = futures::stream::iter(flights);
+
+                info!("Executed partition in {} seconds", now.elapsed().as_secs());
+
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
-            BallistaAction::FetchPartition(_) => {
+            BallistaAction::FetchPartition(partition_id) => {
                 // fetch a partition that was previously executed by this executor
+                debug!("FetchPartition {:?}", partition_id);
                 Err(Status::unimplemented("FetchPartition"))
             }
         }

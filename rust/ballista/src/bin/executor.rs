@@ -18,17 +18,15 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use arrow_flight::flight_service_server::FlightServiceServer;
+use ballista::serde::protobuf::{
+    scheduler_grpc_client::SchedulerGrpcClient, RegisterExecutorParams,
+};
 use ballista::{
+    executor::flight_service::BallistaFlightService,
     executor::{BallistaExecutor, ExecutorConfig},
-    flight_service::BallistaFlightService,
     scheduler::{standalone::StandaloneClient, SchedulerServer},
-    serde::{
-        protobuf::{
-            scheduler_grpc_client::SchedulerGrpcClient, scheduler_grpc_server::SchedulerGrpcServer,
-            RegisterExecutorParams,
-        },
-        scheduler::ExecutorMeta,
-    },
+    serde::protobuf::scheduler_grpc_server::SchedulerGrpcServer,
+    serde::scheduler::ExecutorMeta,
     BALLISTA_VERSION,
 };
 use futures::future::MaybeDone;

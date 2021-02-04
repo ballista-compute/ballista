@@ -15,6 +15,7 @@
 //! Support for distributed schedulers, such as Kubernetes
 
 pub mod etcd;
+pub mod planner;
 pub mod standalone;
 
 use log::{error, info, warn};

@@ -71,6 +71,10 @@ impl TryInto<protobuf::PartitionId> for PartitionId {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<protobuf::PartitionId, Self::Error> {
-        unimplemented!()
+        Ok(protobuf::PartitionId {
+            job_uuid: self.job_uuid.to_string(),
+            stage_id: self.stage_id as u32,
+            partition_id: self.partition_id as u32,
+        })
     }
 }

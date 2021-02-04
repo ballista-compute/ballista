@@ -20,7 +20,6 @@ pub mod client;
 pub mod columnar_batch;
 pub mod context;
 pub mod error;
-pub mod execution;
 pub mod executor;
 pub mod memory_stream;
 pub mod prelude;

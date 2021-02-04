@@ -20,8 +20,8 @@ use std::any::Any;
 use std::sync::Arc;
 
 use crate::client::BallistaClient;
-use crate::execution::planner::PartitionLocation;
 use crate::memory_stream::MemoryStream;
+use crate::scheduler::planner::PartitionLocation;
 
 use arrow::datatypes::SchemaRef;
 use async_trait::async_trait;

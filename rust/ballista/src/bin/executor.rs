@@ -22,12 +22,12 @@ use ballista::serde::protobuf::{
     scheduler_grpc_client::SchedulerGrpcClient, RegisterExecutorParams,
 };
 use ballista::{
-    BALLISTA_VERSION,
-    executor::{BallistaExecutor, ExecutorConfig},
     executor::flight_service::BallistaFlightService,
+    executor::{BallistaExecutor, ExecutorConfig},
     scheduler::{standalone::StandaloneClient, SchedulerServer},
     serde::protobuf::scheduler_grpc_server::SchedulerGrpcServer,
     serde::scheduler::ExecutorMeta,
+    BALLISTA_VERSION,
 };
 use log::info;
 use structopt::StructOpt;

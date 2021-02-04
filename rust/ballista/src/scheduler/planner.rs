@@ -23,7 +23,7 @@ use std::sync::Arc;
 use crate::client::BallistaClient;
 use crate::context::DFTableAdapter;
 use crate::error::Result;
-use crate::execution::query_stage::QueryStageExec;
+use crate::executor::query_stage::QueryStageExec;
 use crate::serde::scheduler::ExecutorMeta;
 use crate::serde::scheduler::PartitionId;
 

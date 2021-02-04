@@ -18,8 +18,8 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::execution::planner::pretty_print;
 use crate::executor::BallistaExecutor;
+use crate::scheduler::planner::pretty_print;
 use crate::serde::decode_protobuf;
 use crate::serde::scheduler::Action as BallistaAction;
 use crate::utils::write_stream_to_disk;

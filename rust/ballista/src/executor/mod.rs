@@ -24,6 +24,8 @@ use log::{debug, info};
 use tonic::transport::Channel;
 
 pub mod flight_service;
+pub mod query_stage;
+pub mod shuffle_reader;
 
 #[cfg(feature = "snmalloc")]
 #[global_allocator]

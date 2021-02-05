@@ -35,14 +35,17 @@ static ALLOC: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
 pub struct ExecutorConfig {
     pub(crate) host: String,
     pub(crate) port: u16,
+    /// Directory for temporary files, such as IPC files
+    pub(crate) work_dir: String,
     pub(crate) concurrent_tasks: usize,
 }
 
 impl ExecutorConfig {
-    pub fn new(host: &str, port: u16, concurrent_tasks: usize) -> Self {
+    pub fn new(host: &str, port: u16, work_dir: &str, concurrent_tasks: usize) -> Self {
         Self {
             host: host.to_owned(),
             port,
+            work_dir: work_dir.to_owned(),
             concurrent_tasks,
         }
     }
@@ -50,12 +53,13 @@ impl ExecutorConfig {
 
 #[allow(dead_code)]
 pub struct BallistaExecutor {
+    pub(crate) config: ExecutorConfig,
     scheduler: SchedulerGrpcClient<Channel>,
 }
 
 impl BallistaExecutor {
-    pub fn new(_config: ExecutorConfig, scheduler: SchedulerGrpcClient<Channel>) -> Self {
-        Self { scheduler }
+    pub fn new(config: ExecutorConfig, scheduler: SchedulerGrpcClient<Channel>) -> Self {
+        Self { config, scheduler }
     }
 
     pub async fn execute_logical_plan(&self, plan: &LogicalPlan) -> Result<Vec<RecordBatch>> {

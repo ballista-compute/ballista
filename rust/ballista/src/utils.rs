@@ -14,7 +14,10 @@
 
 use std::fs::File;
 
+use crate::memory_stream::MemoryStream;
+
 use arrow::error::Result;
+use arrow::ipc::reader::FileReader;
 use arrow::ipc::writer::FileWriter;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use futures::StreamExt;
@@ -31,4 +34,16 @@ pub async fn write_stream_to_disk(
         writer.write(&batch)?;
     }
     writer.finish()
+}
+
+pub async fn read_stream_from_disk(path: &str) -> Result<SendableRecordBatchStream> {
+    let file = File::create(&path)?;
+    let reader = FileReader::try_new(file)?;
+    let schema = reader.schema();
+    // TODO we should be able return a stream / iterator rather than load into memory first
+    let mut batches = vec![];
+    for batch in reader {
+        batches.push(batch?);
+    }
+    Ok(Box::pin(MemoryStream::try_new(batches, schema, None)?))
 }

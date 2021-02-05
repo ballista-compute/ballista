@@ -96,7 +96,6 @@ impl FlightService for BallistaFlightService {
             }
             BallistaAction::ExecutePartition(partition) => {
                 debug!("ExecutePartition {:?}", partition);
-
                 pretty_print(partition.plan.clone(), 0);
 
                 let mut path = PathBuf::from(&self.executor.config.work_dir);

@@ -89,7 +89,7 @@ mod roundtrip_tests {
         Arc::new(Column::new(name))
     }
 
- /*   #[test]
+    #[test]
     fn rountrip_hash_aggregate() -> Result<()> {
 
         ///let expr = Expr::Column("c1".to_string()) + Expr::Column("c2".to_string());
@@ -109,5 +109,5 @@ mod roundtrip_tests {
             aggregates.clone(),
             Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
         )?))
-    }*/
+    }
 }

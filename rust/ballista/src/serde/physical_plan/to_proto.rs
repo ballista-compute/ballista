@@ -33,9 +33,9 @@ use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::sort::SortExec;
 use datafusion::physical_plan::{
     empty::EmptyExec,
-    expressions::{BinaryExpr, Column},
+    expressions::{BinaryExpr, Column, Avg},
 };
-use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
+use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr, AggregateExpr};
 
 use protobuf::physical_plan_node::PhysicalPlanType;
 use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
@@ -70,30 +70,31 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                     },
                 ))),
             })
-        // } else if let Some(exec) = plan.downcast_ref::<HashAggregateExec>() {
-        //     let _input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
-        //     //         node.hash_aggregate = Some(protobuf::HashAggregateExecNode {
-        //     //             mode: match exec.mode {
-        //     //                 AggregateMode::Partial => protobuf::AggregateMode::Partial,
-        //     //                 AggregateMode::Final => protobuf::AggregateMode::Final,
-        //     //                 AggregateMode::Complete => protobuf::AggregateMode::Complete,
-        //     //             }
-        //     //                 .into(),
-        //     //             group_expr: exec
-        //     //                 .group_expr
-        //     //                 .iter()
-        //     //                 .map(|expr| expr.try_into())
-        //     //                 .collect::<Result<Vec<_>, BallistaError>>()?,
-        //     //             aggr_expr: exec
-        //     //                 .aggr_expr
-        //     //                 .iter()
-        //     //                 .map(|expr| expr.try_into())
-        //     //                 .collect::<Result<Vec<_>, BallistaError>>()?,
-        //     //         });
-        //     Ok(protobuf::PhysicalPlanNode {
-        //         physical_plan_type: None,
-        //     })
-        } else if let Some(limit) = plan.downcast_ref::<GlobalLimitExec>() {
+         } /*else if let Some(exec) = plan.downcast_ref::<HashAggregateExec>() {
+             let _input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
+                      let hash = Some(protobuf::HashAggregateExecNode {
+                          mode: match exec.mode {
+                              AggregateMode::Partial => protobuf::AggregateMode::Partial,
+                              AggregateMode::Final => protobuf::AggregateMode::Final,
+                          }
+                              .into(),
+                          group_expr: exec
+                              .group_expr
+                              .iter()
+                              .map(|expr| expr.try_into())
+                              .collect::<Result<Vec<_>, BallistaError>>()?,
+                          aggr_expr: exec
+                              .aggr_expr
+                              .iter()
+                              .map(|expr| expr.try_into())
+                              .collect::<Result<Vec<_>, BallistaError>>()?,
+                      });
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: Some(PhysicalPlanType::HashAggregate(Box::new(
+                    hash
+                ))),
+            })
+        } */else if let Some(limit) = plan.downcast_ref::<GlobalLimitExec>() {
             let input: protobuf::PhysicalPlanNode = limit.input().to_owned().try_into()?;
             Ok(protobuf::PhysicalPlanNode {
                 physical_plan_type: Some(PhysicalPlanType::GlobalLimit(Box::new(
@@ -140,8 +141,11 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                 ))),
             })
         } else if let Some(exec) = plan.downcast_ref::<HashAggregateExec>() {
-            let groups = exec.group_expr().iter().map(|expr| try_from(expr.0));
-            let agg = exec.aggr_expr().to_owned().try_from()?;
+
+            let groups = exec.group_expr().iter().map(|expr| expr.0.to_owned().try_into())
+                .collect::<Result<Vec<_>, BallistaError>>()?;
+            let agg = exec.aggr_expr().iter().map(|expr| expr.to_owned().try_into())
+                .collect::<Result<Vec<_>, BallistaError>>()?;
             let agg_mode = match exec.mode()  {
                 AggregateMode::Partial => protobuf::AggregateMode::Partial,
                 AggregateMode::Final => protobuf::AggregateMode::Final,
@@ -157,8 +161,6 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                     },
                 ))),
             })
-
-
         } else if let Some(empty) = plan.downcast_ref::<EmptyExec>() {
             let schema = empty.schema().as_ref().try_into()?;
             Ok(protobuf::PhysicalPlanNode {
@@ -267,6 +269,30 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
     }
 }
 
+impl TryFrom<Arc<dyn AggregateExpr>> for protobuf::LogicalExprNode {
+    type Error = BallistaError;
+
+    fn try_from(value: Arc<dyn AggregateExpr>) -> Result<Self, Self::Error> {
+        let expr = value.as_any();
+
+        if let Some(expr) = expr.downcast_ref::<AggregateExpr>() {
+
+
+            let expr_type = Box::new(protobuf::AggregateExprNode {
+                //name, expr, datatype
+                    aggr_function: protobuf::AggregateFunction::Avg.into(), // wrong!
+                    expr: expr.expr().to_owned(),
+        });
+
+            Ok(protobuf::LogicalExprNode {
+                expr_type: Some(protobuf::logical_expr_node::ExprType::AggregateExpr(
+                    expr_type
+                ))
+            })
+        }
+    }
+}
+
 impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
     type Error = BallistaError;
 
@@ -297,3 +323,5 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
         }
     }
 }
+
+

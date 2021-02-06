@@ -17,7 +17,7 @@
 use crate::error::{ballista_error, Result};
 use crate::scheduler::ConfigBackendClient;
 
-use etcd_client::GetOptions;
+use etcd_client::{GetOptions, PutOptions};
 use log::warn;
 
 /// A [`ConfigBackendClient`] implementation that uses etcd to save cluster configuration.
@@ -59,13 +59,23 @@ impl ConfigBackendClient for EtcdClient {
     }
 
     async fn put(&mut self, key: String, value: Vec<u8>) -> Result<()> {
-        self.etcd
-            .put(key.clone(), value.clone(), None)
-            .await
-            .map_err(|e| {
-                warn!("etcd put failed: {}", e);
-                ballista_error("etcd put failed")
-            })
-            .map(|_| ())
+        let lease_time_seconds = 60;
+        match self.etcd.lease_grant(lease_time_seconds, None).await {
+            Ok(lease) => {
+                let options = PutOptions::new().with_lease(lease.id());
+                self.etcd
+                    .put(key.clone(), value.clone(), Some(options))
+                    .await
+                    .map_err(|e| {
+                        warn!("etcd put failed: {}", e);
+                        ballista_error("etcd put failed")
+                    })
+                    .map(|_| ())
+            }
+            Err(e) => {
+                warn!("etcd lease grant failed: {:?}", e.to_string());
+                Err(ballista_error("etcd lease grant failed"))
+            }
+        }
     }
 }

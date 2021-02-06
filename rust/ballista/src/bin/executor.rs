@@ -14,12 +14,12 @@
 
 //! Ballista Rust executor binary.
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
 use arrow_flight::flight_service_server::FlightServiceServer;
 use ballista::serde::protobuf::{
-    scheduler_grpc_client::SchedulerGrpcClient, RegisterExecutorParams,
+    self, scheduler_grpc_client::SchedulerGrpcClient, RegisterExecutorParams,
 };
 use ballista::{
     executor::flight_service::BallistaFlightService,
@@ -30,10 +30,10 @@ use ballista::{
     BALLISTA_VERSION,
 };
 use futures::future::MaybeDone;
-use log::info;
+use log::{info, warn};
 use structopt::StructOpt;
 use tempfile::TempDir;
-use tonic::transport::Server;
+use tonic::transport::{Channel, Server};
 use uuid::Uuid;
 
 /// Ballista Rust Executor
@@ -77,6 +77,25 @@ struct Opt {
     /// Max concurrent tasks.
     #[structopt(short, long, default_value = "4")]
     concurrent_tasks: usize,
+}
+
+async fn registration_loop(
+    mut scheduler: SchedulerGrpcClient<Channel>,
+    executor_meta: ExecutorMeta,
+) {
+    let executor_meta: protobuf::ExecutorMetadata = executor_meta.into();
+    loop {
+        info!("Starting registration with scheduler");
+        let registration_result = scheduler
+            .register_executor(RegisterExecutorParams {
+                metadata: Some(executor_meta.clone()),
+            })
+            .await;
+        if let Err(error) = registration_result {
+            warn!("Executor registration failed. If this continues to happen the executor might be marked as dead by the scheduler. Error: {}", error);
+        }
+        tokio::time::sleep(Duration::from_secs(15)).await;
+    }
 }
 
 #[tokio::main]
@@ -158,7 +177,7 @@ async fn main() -> Result<()> {
         }
     }
 
-    let mut scheduler = SchedulerGrpcClient::connect(scheduler_url)
+    let scheduler = SchedulerGrpcClient::connect(scheduler_url)
         .await
         .context("Could not connect to scheduler")?;
     let executor = Arc::new(BallistaExecutor::new(config, scheduler.clone()));
@@ -169,12 +188,7 @@ async fn main() -> Result<()> {
         BALLISTA_VERSION, addr
     );
     let server_future = tokio::spawn(Server::builder().add_service(server).serve(addr));
-    scheduler
-        .register_executor(RegisterExecutorParams {
-            metadata: Some(executor_meta.into()),
-        })
-        .await
-        .context("Could not register executor")?;
+    tokio::spawn(registration_loop(scheduler, executor_meta));
 
     server_future
         .await

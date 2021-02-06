@@ -175,10 +175,12 @@ mod roundtrip_tests {
         for test_case in should_fail_on_seralize.into_iter() {
             let res: Result<protobuf::ScalarValue> = (&test_case).try_into();
             match res {
-                Ok(val) => return Err(BallistaError::General(format!(
+                Ok(val) => {
+                    return Err(BallistaError::General(format!(
                     "The value {:?} should not have been able to serialize. Serialized to :{:?}",
                     test_case, val
-                ))),
+                )))
+                }
                 Err(_) => (),
             }
         }

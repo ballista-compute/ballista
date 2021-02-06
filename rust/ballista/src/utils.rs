@@ -14,7 +14,6 @@
 
 use std::fs::File;
 
-
 use crate::memory_stream::MemoryStream;
 
 use arrow::error::Result;

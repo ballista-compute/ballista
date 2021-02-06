@@ -3183,6 +3183,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "tpch"
+version = "0.4.0-SNAPSHOT"
+dependencies = [
+ "arrow",
+ "arrow-flight",
+ "ballista",
+ "datafusion",
+ "env_logger",
+ "parquet",
+ "structopt",
+ "tokio 1.1.1",
+]
+
+[[package]]
 name = "tracing"
 version = "0.1.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"

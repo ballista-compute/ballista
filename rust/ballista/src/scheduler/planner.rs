@@ -44,7 +44,7 @@ pub struct PartitionLocation {
 }
 
 /// Trait that the distributed planner uses to get a list of available executors
-pub trait SchedulerClient {
+pub trait SchedulerClient: Send + Sync {
     fn get_executors(&self) -> Result<Vec<ExecutorMeta>>;
 }
 
@@ -84,9 +84,7 @@ impl DistributedPlanner {
 
         let executors = self.scheduler_client.get_executors()?;
 
-        execute(execution_plan.clone(), executors.clone())
-            .await?
-            .await
+        execute(execution_plan.clone(), executors.clone()).await
     }
 
     /// Insert QueryStageExec nodes into the plan wherever partitioning changes
@@ -161,26 +159,28 @@ impl DistributedPlanner {
 
 /// Visitor pattern to walk the plan, depth-first, and then execute query stages when walking
 /// up the tree
-async fn execute(
+fn execute(
     plan: Arc<dyn ExecutionPlan>,
     executors: Vec<ExecutorMeta>,
-) -> Result<Pin<Box<dyn Future<Output = Result<Arc<dyn ExecutionPlan>>>>>> {
-    debug!("execute() {}", &format!("{:?}", plan)[0..60]);
-    let executors = executors.to_vec();
-    Ok(Box::pin(async move {
+) -> Pin<Box<dyn Future<Output = Result<Arc<dyn ExecutionPlan>>> + Send + Sync>> {
+    Box::pin(async move {
+        debug!("execute() {}", &format!("{:?}", plan)[0..60]);
+        let executors = executors.to_vec();
         // execute children first
         let mut children: Vec<Arc<dyn ExecutionPlan>> = vec![];
         for child in plan.children() {
-            let executed_child = execute(child.clone(), executors.clone()).await?.await?;
+            let executed_child = execute(child.clone(), executors.clone()).await?;
             children.push(executed_child);
         }
         let plan = plan.with_new_children(children)?;
 
-        let new_plan: Arc<dyn ExecutionPlan> = if let Some(stage) =
-            plan.as_any().downcast_ref::<QueryStageExec>()
-        {
+        let new_plan: Arc<dyn ExecutionPlan> = if plan.as_any().is::<QueryStageExec>() {
+            let stage = plan
+                .as_any()
+                .downcast_ref::<QueryStageExec>()
+                .unwrap();
             let partition_locations = execute_query_stage(
-                &stage.job_uuid,
+                &stage.job_uuid.clone(),
                 stage.stage_id,
                 stage.children()[0].clone(),
                 executors.clone(),
@@ -199,7 +199,7 @@ async fn execute(
         pretty_print(new_plan.clone(), 0);
 
         Ok(new_plan)
-    }))
+    })
 }
 
 // struct Foo {
@@ -226,6 +226,7 @@ async fn execute_query_stage(
     plan: Arc<dyn ExecutionPlan>,
     executors: Vec<ExecutorMeta>,
 ) -> Result<Vec<PartitionLocation>> {
+    
     debug!("execute_query_stage() stage_id={}", stage_id);
     pretty_print(plan.clone(), 0);
 
@@ -236,6 +237,9 @@ async fn execute_query_stage(
 
     for child_partition in 0..partition_count {
         let executor_meta = &executors[child_partition % executors.len()];
+       
+        // TODO: this won't compile because it causes the resulting future to be !Sync
+        /*
         let mut client = BallistaClient::try_new(&executor_meta.host, executor_meta.port as usize)
             .await
             .map_err(|e| DataFusionError::Execution(format!("Ballista Error: {:?}", e)))?;
@@ -244,7 +248,7 @@ async fn execute_query_stage(
             .execute_partition(*job_uuid, stage_id, child_partition, plan.clone())
             .await
             .map_err(|e| DataFusionError::Execution(format!("Ballista Error: {:?}", e)))?;
-
+            */
         meta.push(PartitionLocation {
             partition_id: PartitionId::new(*job_uuid, stage_id, child_partition),
             executor_meta: executor_meta.clone(),

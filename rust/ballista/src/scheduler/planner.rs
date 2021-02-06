@@ -44,7 +44,7 @@ pub struct PartitionLocation {
 }
 
 /// Trait that the distributed planner uses to get a list of available executors
-pub trait SchedulerClient {
+pub trait SchedulerClient: Send + Sync {
     fn get_executors(&self) -> Result<Vec<ExecutorMeta>>;
 }
 
@@ -84,9 +84,7 @@ impl DistributedPlanner {
 
         let executors = self.scheduler_client.get_executors()?;
 
-        execute(execution_plan.clone(), executors.clone())
-            .await?
-            .await
+        execute(execution_plan.clone(), executors.clone()).await
     }
 
     /// Insert QueryStageExec nodes into the plan wherever partitioning changes
@@ -161,26 +159,29 @@ impl DistributedPlanner {
 
 /// Visitor pattern to walk the plan, depth-first, and then execute query stages when walking
 /// up the tree
-async fn execute(
+fn execute(
     plan: Arc<dyn ExecutionPlan>,
     executors: Vec<ExecutorMeta>,
-) -> Result<Pin<Box<dyn Future<Output = Result<Arc<dyn ExecutionPlan>>>>>> {
-    debug!("execute() {}", &format!("{:?}", plan)[0..60]);
-    let executors = executors.to_vec();
-    Ok(Box::pin(async move {
+) -> Pin<Box<dyn Future<Output = Result<Arc<dyn ExecutionPlan>>> + Send + Sync>> {
+    Box::pin(async move {
+        debug!("execute() {}", &format!("{:?}", plan)[0..60]);
+        let executors = executors.to_vec();
         // execute children first
         let mut children: Vec<Arc<dyn ExecutionPlan>> = vec![];
         for child in plan.children() {
-            let executed_child = execute(child.clone(), executors.clone()).await?.await?;
+            let executed_child = execute(child.clone(), executors.clone()).await?;
             children.push(executed_child);
         }
         let plan = plan.with_new_children(children)?;
 
-        let new_plan: Arc<dyn ExecutionPlan> = if let Some(stage) =
-            plan.as_any().downcast_ref::<QueryStageExec>()
-        {
+        let new_plan: Arc<dyn ExecutionPlan> = if plan.as_any().is::<QueryStageExec>() {
+            let stage = plan
+                .clone()
+                .as_any()
+                .downcast_ref::<QueryStageExec>()
+                .unwrap();
             let partition_locations = execute_query_stage(
-                &stage.job_uuid,
+                &stage.job_uuid.clone(),
                 stage.stage_id,
                 stage.children()[0].clone(),
                 executors.clone(),
@@ -199,7 +200,7 @@ async fn execute(
         pretty_print(new_plan.clone(), 0);
 
         Ok(new_plan)
-    }))
+    })
 }
 
 // struct Foo {

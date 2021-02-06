@@ -49,6 +49,7 @@ impl BallistaClient {
         let flight_client = FlightServiceClient::connect(addr)
             .await
             .map_err(|e| BallistaError::General(format!("{:?}", e)))?;
+        println!("BallistaClient connected OK");
 
         Ok(Self { flight_client })
     }

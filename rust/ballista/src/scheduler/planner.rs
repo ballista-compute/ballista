@@ -189,8 +189,7 @@ async fn execute(
                 stage.children()[0].clone(),
                 executors.clone(),
             )
-            .await
-            .unwrap();
+            .await?;
 
             // replace the query stage with a ShuffleReaderExec that can read the partitions
             // produced by the executed query stage

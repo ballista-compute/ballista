@@ -341,7 +341,7 @@ message HashAggregateExecNode {
 }
 
 message ShuffleReaderExecNode {
-  repeated PartitionId shuffle_id = 1;
+  repeated PartitionLocation partition_location = 1;
   Schema schema = 2;
 }
 

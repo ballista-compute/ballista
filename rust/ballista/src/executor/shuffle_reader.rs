@@ -35,15 +35,15 @@ use log::info;
 pub struct ShuffleReaderExec {
     // The query stage that is responsible for producing the shuffle partitions that
     // this operator will read
-    partition_meta: Vec<PartitionLocation>,
-    schema: SchemaRef,
+    pub(crate) partition_location: Vec<PartitionLocation>,
+    pub(crate) schema: SchemaRef,
 }
 
 impl ShuffleReaderExec {
     /// Create a new query stage
     pub fn try_new(partition_meta: Vec<PartitionLocation>, schema: SchemaRef) -> Result<Self> {
         Ok(Self {
-            partition_meta,
+            partition_location: partition_meta,
             schema,
         })
     }
@@ -61,7 +61,7 @@ impl ExecutionPlan for ShuffleReaderExec {
 
     fn output_partitioning(&self) -> Partitioning {
         // The output of this operator is a single partition containing metadata
-        Partitioning::UnknownPartitioning(self.partition_meta.len())
+        Partitioning::UnknownPartitioning(self.partition_location.len())
     }
 
     fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
@@ -86,7 +86,7 @@ impl ExecutionPlan for ShuffleReaderExec {
             .await
             .map_err(|e| DataFusionError::Execution(format!("Ballista Error: {:?}", e)))?;
 
-        let partition_location = &self.partition_meta[partition];
+        let partition_location = &self.partition_location[partition];
 
         let batches = client
             .fetch_partition(

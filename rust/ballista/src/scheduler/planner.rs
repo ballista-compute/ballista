@@ -28,6 +28,7 @@ use crate::executor::shuffle_reader::ShuffleReaderExec;
 use crate::serde::scheduler::ExecutorMeta;
 use crate::serde::scheduler::PartitionId;
 
+use crate::executor::collect::CollectExec;
 use datafusion::error::DataFusionError;
 use datafusion::execution::context::ExecutionContext;
 use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
@@ -72,7 +73,7 @@ impl DistributedPlanner {
     pub async fn execute_distributed_query(
         &mut self,
         execution_plan: Arc<dyn ExecutionPlan>,
-    ) -> Result<()> {
+    ) -> Result<Arc<dyn ExecutionPlan>> {
         let job_uuid = Uuid::new_v4();
 
         let execution_plan = self.prepare_query_stages(&job_uuid, execution_plan)?;
@@ -84,13 +85,11 @@ impl DistributedPlanner {
 
         let executors = self.scheduler_client.get_executors()?;
 
-        execute(execution_plan.clone(), executors.clone())
+        let final_stage = execute(execution_plan.clone(), executors.clone())
             .await?
             .await?;
 
-        debug!("execute_distributed_query completed");
-
-        Ok(())
+        Ok(Arc::new(CollectExec::new(final_stage)))
     }
 
     /// Insert QueryStageExec nodes into the plan wherever partitioning changes

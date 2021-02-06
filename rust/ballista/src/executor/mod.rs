@@ -23,6 +23,7 @@ use datafusion::physical_plan::collect;
 use log::{debug, info};
 use tonic::transport::Channel;
 
+pub mod collect;
 pub mod flight_service;
 pub mod query_stage;
 pub mod shuffle_reader;

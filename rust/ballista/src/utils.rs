@@ -19,6 +19,7 @@ use crate::memory_stream::MemoryStream;
 use arrow::error::Result;
 use arrow::ipc::reader::FileReader;
 use arrow::ipc::writer::FileWriter;
+use arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use futures::StreamExt;
 
@@ -75,4 +76,12 @@ pub async fn read_stream_from_disk(path: &str) -> Result<SendableRecordBatchStre
         batches.push(batch?);
     }
     Ok(Box::pin(MemoryStream::try_new(batches, schema, None)?))
+}
+
+pub async fn collect_stream(stream: &mut SendableRecordBatchStream) -> Result<Vec<RecordBatch>> {
+    let mut batches = vec![];
+    while let Some(batch) = stream.next().await {
+        batches.push(batch?);
+    }
+    Ok(batches)
 }

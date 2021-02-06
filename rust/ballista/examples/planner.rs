@@ -24,7 +24,7 @@ use datafusion::physical_plan::csv::CsvReadOptions;
 #[tokio::main]
 async fn main() -> Result<()> {
     // assumes benchmark data is available
-    let tpch_data = "/home/andy/git/ballista/benchmarks/tpch/data";
+    let tpch_data = "/home/andy/git/ballista/rust/benchmarks/tpch/data";
 
     let ctx = BallistaContext::remote("localhost", 50051, HashMap::new());
 
@@ -50,6 +50,7 @@ from
     orders
     on
             l_orderkey = o_orderkey
+limit 10
 ",
     )?;
 

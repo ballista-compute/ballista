@@ -95,7 +95,7 @@ impl FlightService for BallistaFlightService {
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
             BallistaAction::ExecutePartition(partition) => {
-                debug!("ExecutePartition {:?}", partition);
+                info!("ExecutePartition {:?}", partition);
                 pretty_print(partition.plan.clone(), 0);
 
                 let mut path = PathBuf::from(&self.executor.config.work_dir);
@@ -118,9 +118,15 @@ impl FlightService for BallistaFlightService {
                     .map_err(|e| from_datafusion_err(&e))?;
 
                 // stream results to disk
-                utils::write_stream_to_disk(&mut stream, &path)
+                let info = utils::write_stream_to_disk(&mut stream, &path)
                     .await
                     .map_err(|e| from_arrow_err(&e))?;
+
+                info!(
+                    "Executed partition in {} seconds. Statistics: {:?}",
+                    now.elapsed().as_secs(),
+                    info
+                );
 
                 // build result set with summary of the partition execution status
                 let mut c0 = StringBuilder::new(1);
@@ -133,13 +139,11 @@ impl FlightService for BallistaFlightService {
                 let flights = create_flight_data(schema, results);
                 let output = futures::stream::iter(flights);
 
-                info!("Executed partition in {} seconds", now.elapsed().as_secs());
-
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
             BallistaAction::FetchPartition(partition_id) => {
                 // fetch a partition that was previously executed by this executor
-                debug!("FetchPartition {:?}", partition_id);
+                info!("FetchPartition {:?}", partition_id);
 
                 let mut path = PathBuf::from(&self.executor.config.work_dir);
                 path.push(&format!("{}", partition_id.job_uuid));
@@ -148,6 +152,7 @@ impl FlightService for BallistaFlightService {
                 path.push("data.arrow");
                 let path = path.to_str().unwrap();
 
+                info!("FetchPartition {:?} reading {}", partition_id, path);
                 let mut stream = utils::read_stream_from_disk(path)
                     .await
                     .map_err(|e| from_arrow_err(&e))?;

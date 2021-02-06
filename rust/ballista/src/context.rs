@@ -71,7 +71,10 @@ pub struct BallistaContext {
 impl BallistaContext {
     /// Create a context for executing queries against a remote Ballista executor instance
     pub fn remote(host: &str, port: usize, settings: HashMap<String, String>) -> Self {
-        let meta = ClusterMeta::Direct { host: host.to_owned(), port };
+        let meta = ClusterMeta::Direct {
+            host: host.to_owned(),
+            port,
+        };
         let state = BallistaContextState::new(meta, settings);
 
         Self {
@@ -108,7 +111,9 @@ impl BallistaContext {
     /// Register a DataFrame as a table that can be referenced from a SQL query
     pub fn register_table(&self, name: &str, table: &BallistaDataFrame) -> Result<()> {
         let mut state = self.state.lock().unwrap();
-        state.tables.insert(name.to_owned(), table.to_logical_plan());
+        state
+            .tables
+            .insert(name.to_owned(), table.to_logical_plan());
         Ok(())
     }
 
@@ -165,7 +170,12 @@ impl TableProvider for DFTableAdapter {
         self.plan.schema()
     }
 
-    fn scan(&self, _projection: &Option<Vec<usize>>, _batch_size: usize, _filters: &[Expr]) -> DFResult<Arc<dyn ExecutionPlan>> {
+    fn scan(
+        &self,
+        _projection: &Option<Vec<usize>>,
+        _batch_size: usize,
+        _filters: &[Expr],
+    ) -> DFResult<Arc<dyn ExecutionPlan>> {
         Ok(self.plan.clone())
     }
 
@@ -218,30 +228,49 @@ impl BallistaDataFrame {
     }
 
     pub fn select_columns(&self, columns: &[&str]) -> Result<BallistaDataFrame> {
-        Ok(Self::from(self.state.clone(), self.df.select_columns(columns).map_err(BallistaError::from)?))
+        Ok(Self::from(
+            self.state.clone(),
+            self.df
+                .select_columns(columns)
+                .map_err(BallistaError::from)?,
+        ))
     }
 
     pub fn select(&self, expr: &[Expr]) -> Result<BallistaDataFrame> {
-        Ok(Self::from(self.state.clone(), self.df.select(expr).map_err(BallistaError::from)?))
+        Ok(Self::from(
+            self.state.clone(),
+            self.df.select(expr).map_err(BallistaError::from)?,
+        ))
     }
 
     pub fn filter(&self, expr: Expr) -> Result<BallistaDataFrame> {
-        Ok(Self::from(self.state.clone(), self.df.filter(expr).map_err(BallistaError::from)?))
+        Ok(Self::from(
+            self.state.clone(),
+            self.df.filter(expr).map_err(BallistaError::from)?,
+        ))
     }
 
     pub fn aggregate(&self, group_expr: &[Expr], aggr_expr: &[Expr]) -> Result<BallistaDataFrame> {
         Ok(Self::from(
             self.state.clone(),
-            self.df.aggregate(group_expr, aggr_expr).map_err(BallistaError::from)?,
+            self.df
+                .aggregate(group_expr, aggr_expr)
+                .map_err(BallistaError::from)?,
         ))
     }
 
     pub fn limit(&self, n: usize) -> Result<BallistaDataFrame> {
-        Ok(Self::from(self.state.clone(), self.df.limit(n).map_err(BallistaError::from)?))
+        Ok(Self::from(
+            self.state.clone(),
+            self.df.limit(n).map_err(BallistaError::from)?,
+        ))
     }
 
     pub fn sort(&self, expr: &[Expr]) -> Result<BallistaDataFrame> {
-        Ok(Self::from(self.state.clone(), self.df.sort(expr).map_err(BallistaError::from)?))
+        Ok(Self::from(
+            self.state.clone(),
+            self.df.sort(expr).map_err(BallistaError::from)?,
+        ))
     }
 
     // TODO lifetime issue
@@ -252,7 +281,9 @@ impl BallistaDataFrame {
     pub fn repartition(&self, partitioning_scheme: Partitioning) -> Result<BallistaDataFrame> {
         Ok(Self::from(
             self.state.clone(),
-            self.df.repartition(partitioning_scheme).map_err(BallistaError::from)?,
+            self.df
+                .repartition(partitioning_scheme)
+                .map_err(BallistaError::from)?,
         ))
     }
 
@@ -265,7 +296,10 @@ impl BallistaDataFrame {
     }
 
     pub fn explain(&self, verbose: bool) -> Result<BallistaDataFrame> {
-        Ok(Self::from(self.state.clone(), self.df.explain(verbose).map_err(BallistaError::from)?))
+        Ok(Self::from(
+            self.state.clone(),
+            self.df.explain(verbose).map_err(BallistaError::from)?,
+        ))
     }
 }
 

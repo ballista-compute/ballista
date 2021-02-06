@@ -39,7 +39,10 @@ mod roundtrip_tests {
 
             let round_trip: $struct_type = (&proto).try_into()?;
 
-            assert_eq!(format!("{:?}", $initial_struct), format!("{:?}", round_trip));
+            assert_eq!(
+                format!("{:?}", $initial_struct),
+                format!("{:?}", round_trip)
+            );
         };
         ($initial_struct:ident, $struct_type:ty) => {
             roundtrip_test!($initial_struct, protobuf::LogicalPlanNode, $struct_type);
@@ -56,7 +59,10 @@ mod roundtrip_tests {
 
         let test_batch_sizes = [usize::MIN, usize::MAX, 43256];
 
-        let test_expr: Vec<Expr> = vec![Expr::Column("c1".to_string()) + Expr::Column("c2".to_string()), Expr::Literal((4.0).into())];
+        let test_expr: Vec<Expr> = vec![
+            Expr::Column("c1".to_string()) + Expr::Column("c2".to_string()),
+            Expr::Literal((4.0).into()),
+        ];
 
         let schema = Schema::new(vec![
             Field::new("id", DataType::Int32, false),
@@ -67,10 +73,14 @@ mod roundtrip_tests {
         ]);
 
         let plan = std::sync::Arc::new(
-            LogicalPlanBuilder::scan_csv("employee.csv", CsvReadOptions::new().schema(&schema).has_header(true), Some(vec![3, 4]))
-                .and_then(|plan| plan.sort(&[col("salary")]))
-                .and_then(|plan| plan.build())
-                .unwrap(),
+            LogicalPlanBuilder::scan_csv(
+                "employee.csv",
+                CsvReadOptions::new().schema(&schema).has_header(true),
+                Some(vec![3, 4]),
+            )
+            .and_then(|plan| plan.sort(&[col("salary")]))
+            .and_then(|plan| plan.build())
+            .unwrap(),
         );
 
         for batch_size in test_batch_sizes.iter() {
@@ -116,16 +126,25 @@ mod roundtrip_tests {
         let should_fail_on_seralize: Vec<ScalarValue> = vec![
             //Should fail due to inconsistent types
             ScalarValue::List(
-                Some(vec![ScalarValue::Int16(None), ScalarValue::Float32(Some(32.0))]),
-                DataType::List(new_box_field("item", DataType::Int16, true)),
-            ),
-            ScalarValue::List(
-                Some(vec![ScalarValue::Float32(None), ScalarValue::Float32(Some(32.0))]),
+                Some(vec![
+                    ScalarValue::Int16(None),
+                    ScalarValue::Float32(Some(32.0)),
+                ]),
                 DataType::List(new_box_field("item", DataType::Int16, true)),
             ),
             ScalarValue::List(
                 Some(vec![
-                    ScalarValue::List(None, DataType::List(new_box_field("level2", DataType::Float32, true))),
+                    ScalarValue::Float32(None),
+                    ScalarValue::Float32(Some(32.0)),
+                ]),
+                DataType::List(new_box_field("item", DataType::Int16, true)),
+            ),
+            ScalarValue::List(
+                Some(vec![
+                    ScalarValue::List(
+                        None,
+                        DataType::List(new_box_field("level2", DataType::Float32, true)),
+                    ),
                     ScalarValue::List(
                         Some(vec![
                             ScalarValue::Float32(Some(-213.1)),
@@ -136,21 +155,30 @@ mod roundtrip_tests {
                         ]),
                         DataType::List(new_box_field("level2", DataType::Float32, true)),
                     ),
-                    ScalarValue::List(None, DataType::List(new_box_field("lists are typed inconsistently", DataType::Int16, true))),
+                    ScalarValue::List(
+                        None,
+                        DataType::List(new_box_field(
+                            "lists are typed inconsistently",
+                            DataType::Int16,
+                            true,
+                        )),
+                    ),
                 ]),
-                DataType::List(new_box_field("level1", DataType::List(new_box_field("level2", DataType::Float32, true)), true)),
+                DataType::List(new_box_field(
+                    "level1",
+                    DataType::List(new_box_field("level2", DataType::Float32, true)),
+                    true,
+                )),
             ),
         ];
 
         for test_case in should_fail_on_seralize.into_iter() {
             let res: Result<protobuf::ScalarValue> = (&test_case).try_into();
             match res {
-                Ok(val) => {
-                    return Err(BallistaError::General(format!(
-                        "The value {:?} should not have been able to serialize. Serialized to :{:?}",
-                        test_case, val
-                    )))
-                }
+                Ok(val) => return Err(BallistaError::General(format!(
+                    "The value {:?} should not have been able to serialize. Serialized to :{:?}",
+                    test_case, val
+                ))),
                 Err(_) => (),
             }
         }
@@ -234,7 +262,10 @@ mod roundtrip_tests {
             ),
             ScalarValue::List(
                 Some(vec![
-                    ScalarValue::List(None, DataType::List(new_box_field("level2", DataType::Float32, true))),
+                    ScalarValue::List(
+                        None,
+                        DataType::List(new_box_field("level2", DataType::Float32, true)),
+                    ),
                     ScalarValue::List(
                         Some(vec![
                             ScalarValue::Float32(Some(-213.1)),
@@ -246,7 +277,11 @@ mod roundtrip_tests {
                         DataType::List(new_box_field("level2", DataType::Float32, true)),
                     ),
                 ]),
-                DataType::List(new_box_field("level1", DataType::List(new_box_field("level2", DataType::Float32, true)), true)),
+                DataType::List(new_box_field(
+                    "level1",
+                    DataType::List(new_box_field("level2", DataType::Float32, true)),
+                    true,
+                )),
             ),
         ];
 
@@ -281,7 +316,11 @@ mod roundtrip_tests {
             DataType::LargeUtf8,
             //Recursive list tests
             DataType::List(new_box_field("Level1", DataType::Boolean, true)),
-            DataType::List(new_box_field("Level1", DataType::List(new_box_field("Level2", DataType::Date32, true)), true)),
+            DataType::List(new_box_field(
+                "Level1",
+                DataType::List(new_box_field("Level2", DataType::Date32, true)),
+                true,
+            )),
         ];
 
         let should_fail: Vec<DataType> = vec![
@@ -312,13 +351,25 @@ mod roundtrip_tests {
             DataType::List(new_box_field("Level1", DataType::Binary, true)),
             DataType::List(new_box_field(
                 "Level1",
-                DataType::List(new_box_field("Level2", DataType::FixedSizeBinary(53), false)),
+                DataType::List(new_box_field(
+                    "Level2",
+                    DataType::FixedSizeBinary(53),
+                    false,
+                )),
                 true,
             )),
             //Fixed size lists
             DataType::FixedSizeList(new_box_field("Level1", DataType::Binary, true), 4),
             DataType::FixedSizeList(
-                new_box_field("Level1", DataType::List(new_box_field("Level2", DataType::FixedSizeBinary(53), false)), true),
+                new_box_field(
+                    "Level1",
+                    DataType::List(new_box_field(
+                        "Level2",
+                        DataType::FixedSizeBinary(53),
+                        false,
+                    )),
+                    true,
+                ),
                 41,
             ),
             //Struct Testing
@@ -370,7 +421,10 @@ mod roundtrip_tests {
             ),
             DataType::Dictionary(
                 Box::new(DataType::Decimal(10, 50)),
-                Box::new(DataType::FixedSizeList(new_box_field("Level1", DataType::Binary, true), 4)),
+                Box::new(DataType::FixedSizeList(
+                    new_box_field("Level1", DataType::Binary, true),
+                    4,
+                )),
             ),
         ];
 
@@ -444,13 +498,25 @@ mod roundtrip_tests {
             DataType::List(new_box_field("Level1", DataType::Binary, true)),
             DataType::List(new_box_field(
                 "Level1",
-                DataType::List(new_box_field("Level2", DataType::FixedSizeBinary(53), false)),
+                DataType::List(new_box_field(
+                    "Level2",
+                    DataType::FixedSizeBinary(53),
+                    false,
+                )),
                 true,
             )),
             //Fixed size lists
             DataType::FixedSizeList(new_box_field("Level1", DataType::Binary, true), 4),
             DataType::FixedSizeList(
-                new_box_field("Level1", DataType::List(new_box_field("Level2", DataType::FixedSizeBinary(53), false)), true),
+                new_box_field(
+                    "Level1",
+                    DataType::List(new_box_field(
+                        "Level2",
+                        DataType::FixedSizeBinary(53),
+                        false,
+                    )),
+                    true,
+                ),
                 41,
             ),
             //Struct Testing
@@ -502,7 +568,10 @@ mod roundtrip_tests {
             ),
             DataType::Dictionary(
                 Box::new(DataType::Decimal(10, 50)),
-                Box::new(DataType::FixedSizeList(new_box_field("Level1", DataType::Binary, true), 4)),
+                Box::new(DataType::FixedSizeList(
+                    new_box_field("Level1", DataType::Binary, true),
+                    4,
+                )),
             ),
         ];
 
@@ -542,7 +611,10 @@ mod roundtrip_tests {
         for test_case in test_types.into_iter() {
             let proto_scalar: protobuf::ScalarValue = (&test_case).try_into()?;
             let returned_scalar: datafusion::scalar::ScalarValue = (&proto_scalar).try_into()?;
-            assert_eq!(format!("{:?}", &test_case), format!("{:?}", returned_scalar));
+            assert_eq!(
+                format!("{:?}", &test_case),
+                format!("{:?}", returned_scalar)
+            );
         }
 
         Ok(())
@@ -593,17 +665,25 @@ mod roundtrip_tests {
             Field::new("salary", DataType::Int32, false),
         ]);
 
-        let verbose_plan = LogicalPlanBuilder::scan_csv("employee.csv", CsvReadOptions::new().schema(&schema).has_header(true), Some(vec![3, 4]))
-            .and_then(|plan| plan.sort(&[col("salary")]))
-            .and_then(|plan| plan.explain(true))
-            .and_then(|plan| plan.build())
-            .unwrap();
+        let verbose_plan = LogicalPlanBuilder::scan_csv(
+            "employee.csv",
+            CsvReadOptions::new().schema(&schema).has_header(true),
+            Some(vec![3, 4]),
+        )
+        .and_then(|plan| plan.sort(&[col("salary")]))
+        .and_then(|plan| plan.explain(true))
+        .and_then(|plan| plan.build())
+        .unwrap();
 
-        let plan = LogicalPlanBuilder::scan_csv("employee.csv", CsvReadOptions::new().schema(&schema).has_header(true), Some(vec![3, 4]))
-            .and_then(|plan| plan.sort(&[col("salary")]))
-            .and_then(|plan| plan.explain(false))
-            .and_then(|plan| plan.build())
-            .unwrap();
+        let plan = LogicalPlanBuilder::scan_csv(
+            "employee.csv",
+            CsvReadOptions::new().schema(&schema).has_header(true),
+            Some(vec![3, 4]),
+        )
+        .and_then(|plan| plan.sort(&[col("salary")]))
+        .and_then(|plan| plan.explain(false))
+        .and_then(|plan| plan.build())
+        .unwrap();
 
         roundtrip_test!(plan);
 
@@ -623,10 +703,14 @@ mod roundtrip_tests {
         ]);
 
         let scan_plan = LogicalPlanBuilder::empty(false).build().unwrap();
-        let plan = LogicalPlanBuilder::scan_csv("employee.csv", CsvReadOptions::new().schema(&schema).has_header(true), Some(vec![3, 4]))
-            .and_then(|plan| plan.join(&scan_plan, JoinType::Inner, &["id"], &["id"]))
-            .and_then(|plan| plan.build())
-            .unwrap();
+        let plan = LogicalPlanBuilder::scan_csv(
+            "employee.csv",
+            CsvReadOptions::new().schema(&schema).has_header(true),
+            Some(vec![3, 4]),
+        )
+        .and_then(|plan| plan.join(&scan_plan, JoinType::Inner, &["id"], &["id"]))
+        .and_then(|plan| plan.build())
+        .unwrap();
 
         roundtrip_test!(plan);
         Ok(())
@@ -642,10 +726,14 @@ mod roundtrip_tests {
             Field::new("salary", DataType::Int32, false),
         ]);
 
-        let plan = LogicalPlanBuilder::scan_csv("employee.csv", CsvReadOptions::new().schema(&schema).has_header(true), Some(vec![3, 4]))
-            .and_then(|plan| plan.sort(&[col("salary")]))
-            .and_then(|plan| plan.build())
-            .unwrap();
+        let plan = LogicalPlanBuilder::scan_csv(
+            "employee.csv",
+            CsvReadOptions::new().schema(&schema).has_header(true),
+            Some(vec![3, 4]),
+        )
+        .and_then(|plan| plan.sort(&[col("salary")]))
+        .and_then(|plan| plan.build())
+        .unwrap();
         roundtrip_test!(plan);
 
         Ok(())
@@ -676,10 +764,14 @@ mod roundtrip_tests {
             Field::new("salary", DataType::Int32, false),
         ]);
 
-        let plan = LogicalPlanBuilder::scan_csv("employee.csv", CsvReadOptions::new().schema(&schema).has_header(true), Some(vec![3, 4]))
-            .and_then(|plan| plan.aggregate(&[col("state")], &[max(col("salary"))]))
-            .and_then(|plan| plan.build())
-            .unwrap();
+        let plan = LogicalPlanBuilder::scan_csv(
+            "employee.csv",
+            CsvReadOptions::new().schema(&schema).has_header(true),
+            Some(vec![3, 4]),
+        )
+        .and_then(|plan| plan.aggregate(&[col("state")], &[max(col("salary"))]))
+        .and_then(|plan| plan.build())
+        .unwrap();
 
         roundtrip_test!(plan);
 
@@ -736,7 +828,10 @@ mod roundtrip_tests {
     fn roundtrip_case() -> Result<()> {
         let test_expr = Expr::Case {
             expr: Some(Box::new(Expr::Literal((1.0).into()))),
-            when_then_expr: vec![(Box::new(Expr::Literal((2.0).into())), Box::new(Expr::Literal((3.0).into())))],
+            when_then_expr: vec![(
+                Box::new(Expr::Literal((2.0).into())),
+                Box::new(Expr::Literal((3.0).into())),
+            )],
             else_expr: Some(Box::new(Expr::Literal((4.0).into()))),
         };
 

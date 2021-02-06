@@ -14,21 +14,24 @@
 
 //! Implementation of the Apache Arrow Flight protocol that wraps an executor.
 
-use std::{pin::Pin, sync::Arc};
+use std::pin::Pin;
+use std::sync::Arc;
+use std::time::Instant;
 
-use crate::{
-    executor::BallistaExecutor,
-    serde::{decode_protobuf, scheduler::Action as BallistaAction},
-    utils::write_stream_to_disk,
-};
+use crate::executor::BallistaExecutor;
+use crate::scheduler::planner::pretty_print;
+use crate::serde::decode_protobuf;
+use crate::serde::scheduler::Action as BallistaAction;
+use crate::utils::write_stream_to_disk;
 
 use arrow::array::{ArrayRef, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 use arrow_flight::{
-    flight_service_server::FlightService, Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo, HandshakeRequest, HandshakeResponse,
-    PutResult, SchemaResult, Ticket,
+    flight_service_server::FlightService, Action, ActionType, Criteria, Empty, FlightData,
+    FlightDescriptor, FlightInfo, HandshakeRequest, HandshakeResponse, PutResult, SchemaResult,
+    Ticket,
 };
 use datafusion::error::DataFusionError;
 use futures::{Stream, StreamExt};
@@ -62,7 +65,10 @@ impl FlightService for BallistaFlightService {
     type ListActionsStream = BoxedFlightStream<ActionType>;
     type ListFlightsStream = BoxedFlightStream<FlightInfo>;
 
-    async fn do_get(&self, request: Request<Ticket>) -> Result<Response<Self::DoGetStream>, Status> {
+    async fn do_get(
+        &self,
+        request: Request<Ticket>,
+    ) -> Result<Response<Self::DoGetStream>, Status> {
         let ticket = request.into_inner();
         info!("Received do_get request");
 
@@ -70,7 +76,11 @@ impl FlightService for BallistaFlightService {
 
         match &action {
             BallistaAction::InteractiveQuery { plan, .. } => {
-                let results = self.executor.execute_logical_plan(&plan).await.map_err(|e| from_ballista_err(&e))?;
+                let results = self
+                    .executor
+                    .execute_logical_plan(&plan)
+                    .await
+                    .map_err(|e| from_ballista_err(&e))?;
 
                 if results.is_empty() {
                     return Err(Status::internal("There were no results from ticket"));
@@ -85,18 +95,32 @@ impl FlightService for BallistaFlightService {
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
             BallistaAction::ExecutePartition(partition) => {
+                pretty_print(partition.plan.clone(), 0);
+
                 let work_dir = TempDir::new()?;
                 let mut path = work_dir.into_path();
                 path.push(&format!("{}", partition.job_uuid));
                 path.push(&format!("{}", partition.stage_id));
                 path.push(&format!("{}", partition.partition_id));
+                std::fs::create_dir_all(&path)?;
+
+                path.push("data.arrow");
                 let path = path.to_str().unwrap();
+                info!("Writing results to {}", path);
+
+                let now = Instant::now();
 
                 // execute the query partition
-                let mut stream = partition.plan.execute(partition.partition_id).await.map_err(|e| from_datafusion_err(&e))?;
+                let mut stream = partition
+                    .plan
+                    .execute(partition.partition_id)
+                    .await
+                    .map_err(|e| from_datafusion_err(&e))?;
 
                 // stream results to disk
-                write_stream_to_disk(&mut stream, &path).await.map_err(|e| from_arrow_err(&e))?;
+                write_stream_to_disk(&mut stream, &path)
+                    .await
+                    .map_err(|e| from_arrow_err(&e))?;
 
                 // build result set with summary of the partition execution status
                 let mut c0 = StringBuilder::new(1);
@@ -108,32 +132,51 @@ impl FlightService for BallistaFlightService {
                 let results = vec![RecordBatch::try_new(schema.clone(), vec![path]).unwrap()];
                 let flights = create_flight_data(schema, results);
                 let output = futures::stream::iter(flights);
+
+                info!("Executed partition in {} seconds", now.elapsed().as_secs());
+
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
-            BallistaAction::FetchPartition(_) => {
+            BallistaAction::FetchPartition(partition_id) => {
                 // fetch a partition that was previously executed by this executor
+                debug!("FetchPartition {:?}", partition_id);
                 Err(Status::unimplemented("FetchPartition"))
             }
         }
     }
 
-    async fn get_schema(&self, _request: Request<FlightDescriptor>) -> Result<Response<SchemaResult>, Status> {
+    async fn get_schema(
+        &self,
+        _request: Request<FlightDescriptor>,
+    ) -> Result<Response<SchemaResult>, Status> {
         Err(Status::unimplemented("get_schema"))
     }
 
-    async fn get_flight_info(&self, _request: Request<FlightDescriptor>) -> Result<Response<FlightInfo>, Status> {
+    async fn get_flight_info(
+        &self,
+        _request: Request<FlightDescriptor>,
+    ) -> Result<Response<FlightInfo>, Status> {
         Err(Status::unimplemented("get_flight_info"))
     }
 
-    async fn handshake(&self, _request: Request<Streaming<HandshakeRequest>>) -> Result<Response<Self::HandshakeStream>, Status> {
+    async fn handshake(
+        &self,
+        _request: Request<Streaming<HandshakeRequest>>,
+    ) -> Result<Response<Self::HandshakeStream>, Status> {
         Err(Status::unimplemented("handshake"))
     }
 
-    async fn list_flights(&self, _request: Request<Criteria>) -> Result<Response<Self::ListFlightsStream>, Status> {
+    async fn list_flights(
+        &self,
+        _request: Request<Criteria>,
+    ) -> Result<Response<Self::ListFlightsStream>, Status> {
         Err(Status::unimplemented("list_flights"))
     }
 
-    async fn do_put(&self, request: Request<Streaming<FlightData>>) -> Result<Response<Self::DoPutStream>, Status> {
+    async fn do_put(
+        &self,
+        request: Request<Streaming<FlightData>>,
+    ) -> Result<Response<Self::DoPutStream>, Status> {
         let mut request = request.into_inner();
 
         while let Some(data) = request.next().await {
@@ -143,7 +186,10 @@ impl FlightService for BallistaFlightService {
         Err(Status::unimplemented("do_put"))
     }
 
-    async fn do_action(&self, request: Request<Action>) -> Result<Response<Self::DoActionStream>, Status> {
+    async fn do_action(
+        &self,
+        request: Request<Action>,
+    ) -> Result<Response<Self::DoActionStream>, Status> {
         let action = request.into_inner();
 
         let _action = decode_protobuf(&action.body.to_vec()).map_err(|e| from_ballista_err(&e))?;
@@ -151,28 +197,42 @@ impl FlightService for BallistaFlightService {
         Err(Status::unimplemented("do_action"))
     }
 
-    async fn list_actions(&self, _request: Request<Empty>) -> Result<Response<Self::ListActionsStream>, Status> {
+    async fn list_actions(
+        &self,
+        _request: Request<Empty>,
+    ) -> Result<Response<Self::ListActionsStream>, Status> {
         Err(Status::unimplemented("list_actions"))
     }
 
-    async fn do_exchange(&self, _request: Request<Streaming<FlightData>>) -> Result<Response<Self::DoExchangeStream>, Status> {
+    async fn do_exchange(
+        &self,
+        _request: Request<Streaming<FlightData>>,
+    ) -> Result<Response<Self::DoExchangeStream>, Status> {
         Err(Status::unimplemented("do_exchange"))
     }
 }
 
 /// Convert a result set into flight data
-fn create_flight_data(schema: SchemaRef, results: Vec<RecordBatch>) -> Vec<Result<FlightData, Status>> {
+fn create_flight_data(
+    schema: SchemaRef,
+    results: Vec<RecordBatch>,
+) -> Vec<Result<FlightData, Status>> {
     // add an initial FlightData message that sends schema
     let options = arrow::ipc::writer::IpcWriteOptions::default();
-    let schema_flight_data = arrow_flight::utils::flight_data_from_arrow_schema(schema.as_ref(), &options);
+    let schema_flight_data =
+        arrow_flight::utils::flight_data_from_arrow_schema(schema.as_ref(), &options);
 
     let mut flights: Vec<Result<FlightData, Status>> = vec![Ok(schema_flight_data)];
 
     let mut batches: Vec<Result<FlightData, Status>> = results
         .iter()
         .flat_map(|batch| {
-            let (flight_dictionaries, flight_batch) = arrow_flight::utils::flight_data_from_arrow_batch(batch, &options);
-            flight_dictionaries.into_iter().chain(std::iter::once(flight_batch)).map(Ok)
+            let (flight_dictionaries, flight_batch) =
+                arrow_flight::utils::flight_data_from_arrow_batch(batch, &options);
+            flight_dictionaries
+                .into_iter()
+                .chain(std::iter::once(flight_batch))
+                .map(Ok)
         })
         .collect();
 

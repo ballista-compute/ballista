@@ -48,12 +48,16 @@ impl TryInto<Action> for protobuf::Action {
                     HashMap::new(),
                 )))
             }
-            Some(ActionType::FetchPartition(partition)) => Ok(Action::FetchPartition(PartitionId::new(
-                Uuid::parse_str(&partition.job_uuid).unwrap(),
-                partition.stage_id as usize,
-                partition.partition_id as usize,
-            ))),
-            _ => Err(BallistaError::General("scheduler::from_proto(Action) invalid or missing action".to_owned())),
+            Some(ActionType::FetchPartition(partition)) => {
+                Ok(Action::FetchPartition(PartitionId::new(
+                    Uuid::parse_str(&partition.job_uuid).unwrap(),
+                    partition.stage_id as usize,
+                    partition.partition_id as usize,
+                )))
+            }
+            _ => Err(BallistaError::General(
+                "scheduler::from_proto(Action) invalid or missing action".to_owned(),
+            )),
         }
     }
 }

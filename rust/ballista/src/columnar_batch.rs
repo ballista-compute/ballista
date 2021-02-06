@@ -41,7 +41,12 @@ impl ColumnarBatch {
             .columns()
             .iter()
             .enumerate()
-            .map(|(i, array)| (batch.schema().field(i).name().clone(), ColumnarValue::Columnar(array.clone())))
+            .map(|(i, array)| {
+                (
+                    batch.schema().field(i).name().clone(),
+                    ColumnarValue::Columnar(array.clone()),
+                )
+            })
             .collect();
 
         Self {
@@ -51,7 +56,12 @@ impl ColumnarBatch {
     }
 
     pub fn from_values(values: &[ColumnarValue], schema: &Schema) -> Self {
-        let columns = schema.fields().iter().enumerate().map(|(i, f)| (f.name().clone(), values[i].clone())).collect();
+        let columns = schema
+            .fields()
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (f.name().clone(), values[i].clone()))
+            .collect();
 
         Self {
             schema: Arc::new(schema.clone()),

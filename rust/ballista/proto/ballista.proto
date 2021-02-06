@@ -266,7 +266,13 @@ message PhysicalPlanNode {
     ShuffleReaderExecNode shuffle_reader = 40;
     SortExecNode sort = 50;
     CoalesceBatchesExecNode coalesce_batches = 51;
+    FilterExecNode filter = 52;
   }
+}
+
+message FilterExecNode {
+  PhysicalPlanNode input = 1;
+  LogicalExprNode expr = 2;
 }
 
 message ParquetScanExecNode {

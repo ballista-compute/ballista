@@ -34,7 +34,10 @@ mod roundtrip_tests {
     fn roundtrip_test(exec_plan: Arc<dyn ExecutionPlan>) -> Result<()> {
         let proto: protobuf::PhysicalPlanNode = exec_plan.clone().try_into()?;
         let result_exec_plan: Arc<dyn ExecutionPlan> = (&proto).try_into()?;
-        assert_eq!(format!("{:?}", exec_plan), format!("{:?}", result_exec_plan));
+        assert_eq!(
+            format!("{:?}", exec_plan),
+            format!("{:?}", result_exec_plan)
+        );
         Ok(())
     }
 
@@ -45,7 +48,10 @@ mod roundtrip_tests {
 
     #[test]
     fn roundtrip_local_limit() -> Result<()> {
-        roundtrip_test(Arc::new(LocalLimitExec::new(Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))), 25)))
+        roundtrip_test(Arc::new(LocalLimitExec::new(
+            Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
+            25,
+        )))
     }
 
     #[test]

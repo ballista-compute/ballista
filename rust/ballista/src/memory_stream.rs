@@ -40,7 +40,11 @@ pub struct MemoryStream {
 impl MemoryStream {
     /// Create an iterator for a vector of record batches
 
-    pub fn try_new(data: Vec<RecordBatch>, schema: SchemaRef, projection: Option<Vec<usize>>) -> Result<Self> {
+    pub fn try_new(
+        data: Vec<RecordBatch>,
+        schema: SchemaRef,
+        projection: Option<Vec<usize>>,
+    ) -> Result<Self> {
         Ok(Self {
             data,
             schema,
@@ -53,7 +57,10 @@ impl MemoryStream {
 impl Stream for MemoryStream {
     type Item = Result<RecordBatch>;
 
-    fn poll_next(mut self: std::pin::Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        _: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
         Poll::Ready(if self.index < self.data.len() {
             self.index += 1;
 

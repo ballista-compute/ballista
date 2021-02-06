@@ -6,7 +6,12 @@ BALLISTA_VERSION=0.4.0-SNAPSHOT
 
 docker build -t ballistacompute/ballista-tpchgen:$BALLISTA_VERSION -f tpchgen.dockerfile .
 
-# Generate data into the ./data directory
-mkdir data 2>/dev/null
-docker run -v `pwd`/data:/data -it ballistacompute/ballista-tpchgen:$BALLISTA_VERSION
-ls -l data
+# Generate data into the ./data directory if it does not already exist
+FILE=./data/supplier.tbl
+if test -f "$FILE"; then
+    echo "$FILE exists."
+else
+  mkdir data 2>/dev/null
+  docker run -v `pwd`/data:/data -it ballistacompute/ballista-tpchgen:$BALLISTA_VERSION
+  ls -l data
+fi

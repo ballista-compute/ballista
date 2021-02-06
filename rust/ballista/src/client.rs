@@ -14,7 +14,7 @@
 
 //! Client API for sending requests to executors.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, pin::Pin};
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
@@ -29,9 +29,9 @@ use arrow::record_batch::RecordBatch;
 use arrow_flight::flight_service_client::FlightServiceClient;
 use arrow_flight::utils::flight_data_to_arrow_batch;
 use arrow_flight::Ticket;
-use datafusion::logical_plan::LogicalPlan;
+use datafusion::{logical_plan::LogicalPlan, physical_plan::RecordBatchStream};
 use datafusion::physical_plan::common::collect;
-use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
+use datafusion::physical_plan::ExecutionPlan;
 use log::debug;
 use prost::Message;
 use uuid::Uuid;
@@ -61,7 +61,7 @@ impl BallistaClient {
     }
 
     /// Execute a logical query plan and retrieve the results
-    pub async fn execute_query(&mut self, plan: &LogicalPlan) -> Result<SendableRecordBatchStream> {
+    pub async fn execute_query(&mut self, plan: &LogicalPlan) -> Result<Pin<Box<dyn RecordBatchStream + Send + Sync>>> {
         let action = Action::InteractiveQuery {
             plan: plan.to_owned(),
             settings: HashMap::new(),
@@ -130,7 +130,7 @@ impl BallistaClient {
     }
 
     /// Execute an action and retrieve the results
-    pub async fn execute_action(&mut self, action: &Action) -> Result<SendableRecordBatchStream> {
+    pub async fn execute_action(&mut self, action: &Action) -> Result<Pin<Box<dyn RecordBatchStream + Send + Sync>>> {
         let serialized_action: protobuf::Action = action.to_owned().try_into()?;
         let mut buf: Vec<u8> = Vec::with_capacity(serialized_action.encoded_len());
         serialized_action

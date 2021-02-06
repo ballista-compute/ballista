@@ -17,13 +17,13 @@
 //!
 //! This operator is EXPERIMENTAL and still under development
 
-use std::any::Any;
+use std::{any::Any, pin::Pin};
 use std::sync::Arc;
 
 use arrow::datatypes::SchemaRef;
 use async_trait::async_trait;
-use datafusion::error::Result;
-use datafusion::physical_plan::{ExecutionPlan, Partitioning, SendableRecordBatchStream};
+use datafusion::{error::Result, physical_plan::RecordBatchStream};
+use datafusion::physical_plan::{ExecutionPlan, Partitioning};
 use uuid::Uuid;
 
 /// QueryStageExec executes a subset of a query plan and returns a data set containing statistics
@@ -79,7 +79,7 @@ impl ExecutionPlan for QueryStageExec {
         )?))
     }
 
-    async fn execute(&self, partition: usize) -> Result<SendableRecordBatchStream> {
+    async fn execute(&self, partition: usize) -> Result<Pin<Box<dyn RecordBatchStream + Send + Sync>>> {
         self.child.execute(partition).await
     }
 }

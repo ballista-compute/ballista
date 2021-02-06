@@ -28,7 +28,6 @@ use crate::executor::shuffle_reader::ShuffleReaderExec;
 use crate::serde::scheduler::ExecutorMeta;
 use crate::serde::scheduler::PartitionId;
 
-use crate::executor::collect::CollectExec;
 use datafusion::error::DataFusionError;
 use datafusion::execution::context::ExecutionContext;
 use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
@@ -85,11 +84,9 @@ impl DistributedPlanner {
 
         let executors = self.scheduler_client.get_executors()?;
 
-        let final_stage = execute(execution_plan.clone(), executors.clone())
+        execute(execution_plan.clone(), executors.clone())
             .await?
-            .await?;
-
-        Ok(Arc::new(CollectExec::new(final_stage)))
+            .await
     }
 
     /// Insert QueryStageExec nodes into the plan wherever partitioning changes

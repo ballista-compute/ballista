@@ -431,11 +431,20 @@ message RegisterExecutorParams {
 
 message RegisterExecutorResult {}
 
+message ExecuteQueryParams {
+  LogicalPlanNode logical_plan = 1;
+}
+
+message ExecuteQueryResult {
+  repeated PartitionLocation partition_location = 1;
+}
 
 service SchedulerGrpc {
   rpc GetExecutorsMetadata (GetExecutorMetadataParams) returns (GetExecutorMetadataResult) {}
 
   rpc RegisterExecutor (RegisterExecutorParams) returns (RegisterExecutorResult) {}
+
+  rpc ExecuteLogicalPlan (ExecuteQueryParams) returns (ExecuteQueryResult) {}
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

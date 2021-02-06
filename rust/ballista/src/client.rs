@@ -67,6 +67,8 @@ impl BallistaClient {
             settings: HashMap::new(),
         };
         self.execute_action(&action).await
+
+        //Ok(Arc::new(CollectExec::new(final_stage)))
     }
 
     /// Execute one partition of a physical query plan against the executor

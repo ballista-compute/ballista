@@ -452,57 +452,6 @@ fn from_proto_arrow_type(dt: i32) -> Result<DataType, BallistaError> {
     }
 }
 
-// impl TryInto<ExecutionTask> for &protobuf::Task {
-//     type Error = BallistaError;
-//
-//     fn try_into(self) -> Result<ExecutionTask, Self::Error> {
-//         let mut shuffle_locations: HashMap<ShuffleId, ExecutorMeta> = HashMap::new();
-//         for loc in &self.shuffle_loc {
-//             let shuffle_id = ShuffleId::new(
-//                 Uuid::parse_str(&loc.job_uuid).expect("error parsing uuid in from_proto"),
-//                 loc.stage_id as usize,
-//                 loc.partition_id as usize,
-//             );
-//
-//             let exec = ExecutorMeta {
-//                 id: loc.executor_id.to_owned(),
-//                 host: loc.executor_host.to_owned(),
-//                 port: loc.executor_port as usize,
-//             };
-//
-//             shuffle_locations.insert(shuffle_id, exec);
-//         }
-//
-//         Ok(ExecutionTask::new(
-//             Uuid::parse_str(&self.job_uuid).expect("error parsing uuid in from_proto"),
-//             self.stage_id as usize,
-//             self.partition_id as usize,
-//             convert_required!(self.plan)?,
-//             shuffle_locations,
-//         ))
-//     }
-// }
-//
-// impl TryInto<ShuffleLocation> for &protobuf::ShuffleLocation {
-//     type Error = BallistaError;
-//
-//     fn try_into(self) -> Result<ShuffleLocation, Self::Error> {
-//         Ok(ShuffleLocation {}) //TODO why empty?
-//     }
-// }
-//
-// impl TryInto<ShuffleId> for &protobuf::ShuffleId {
-//     type Error = BallistaError;
-//
-//     fn try_into(self) -> Result<ShuffleId, Self::Error> {
-//         Ok(ShuffleId::new(
-//             Uuid::parse_str(&self.job_uuid).expect("error parsing uuid in from_proto"),
-//             self.stage_id as usize,
-//             self.partition_id as usize,
-//         ))
-//     }
-// }
-
 impl TryInto<Schema> for &protobuf::Schema {
     type Error = BallistaError;
 

@@ -19,6 +19,7 @@
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
+use crate::executor::shuffle_reader::ShuffleReaderExec;
 use crate::serde::{protobuf, BallistaError};
 
 use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
@@ -36,7 +37,7 @@ use datafusion::physical_plan::{
 };
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
-use datafusion::physical_plan::expressions::IsNullExpr;
+use datafusion::physical_plan::expressions::{IsNotNullExpr, IsNullExpr, NegativeExpr};
 use protobuf::physical_plan_node::PhysicalPlanType;
 
 impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
@@ -198,21 +199,21 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                     },
                 )),
             })
-        //     PhysicalPlan::ShuffleReader(exec) => {
-        //         let mut node = empty_physical_plan_node();
-        //
-        //         let shuffle_id: Vec<protobuf::ShuffleId> = exec
-        //             .shuffle_id
-        //             .iter()
-        //             .map(|s| s.try_into())
-        //             .collect::<Result<_, _>>()?;
-        //
-        //         node.shuffle_reader = Some(protobuf::ShuffleReaderExecNode {
-        //             schema: Some(exec.schema().as_ref().try_into()?),
-        //             shuffle_id,
-        //         });
-        //         Ok(node)
-        //     }
+        } else if let Some(exec) = plan.downcast_ref::<ShuffleReaderExec>() {
+            let partition_location = exec
+                .partition_location
+                .iter()
+                .map(|l| l.clone().try_into())
+                .collect::<Result<_, _>>()?;
+
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: Some(PhysicalPlanType::ShuffleReader(
+                    protobuf::ShuffleReaderExecNode {
+                        partition_location,
+                        schema: Some(exec.schema().as_ref().try_into()?),
+                    },
+                )),
+            })
         } else if let Some(exec) = plan.downcast_ref::<SortExec>() {
             let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
             let expr = exec
@@ -272,6 +273,22 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
             Ok(protobuf::LogicalExprNode {
                 expr_type: Some(protobuf::logical_expr_node::ExprType::IsNullExpr(Box::new(
                     protobuf::IsNull {
+                        expr: Some(Box::new(expr.arg().to_owned().try_into()?)),
+                    },
+                ))),
+            })
+        } else if let Some(expr) = expr.downcast_ref::<IsNotNullExpr>() {
+            Ok(protobuf::LogicalExprNode {
+                expr_type: Some(protobuf::logical_expr_node::ExprType::IsNotNullExpr(
+                    Box::new(protobuf::IsNotNull {
+                        expr: Some(Box::new(expr.arg().to_owned().try_into()?)),
+                    }),
+                )),
+            })
+        } else if let Some(expr) = expr.downcast_ref::<NegativeExpr>() {
+            Ok(protobuf::LogicalExprNode {
+                expr_type: Some(protobuf::logical_expr_node::ExprType::Negative(Box::new(
+                    protobuf::NegativeNode {
                         expr: Some(Box::new(expr.arg().to_owned().try_into()?)),
                     },
                 ))),

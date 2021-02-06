@@ -2,4 +2,5 @@
 
 members = [
     "ballista",
+    "benchmarks/tpch",
 ]

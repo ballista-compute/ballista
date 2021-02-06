@@ -31,6 +31,7 @@ use ballista::{
 };
 use log::info;
 use structopt::StructOpt;
+use tempfile::TempDir;
 use tonic::transport::Server;
 use uuid::Uuid;
 
@@ -68,6 +69,10 @@ struct Opt {
     #[structopt(short, long, default_value = "50051")]
     port: u16,
 
+    /// Directory for temporary IPC files
+    #[structopt(long)]
+    work_dir: Option<String>,
+
     /// Max concurrent tasks.
     #[structopt(short, long, default_value = "4")]
     concurrent_tasks: usize,
@@ -96,7 +101,14 @@ async fn main() -> Result<()> {
     };
     let scheduler_port = opt.scheduler_port;
 
-    let config = ExecutorConfig::new(&external_host, port, opt.concurrent_tasks);
+    let work_dir = opt.work_dir.unwrap_or(
+        TempDir::new()?
+            .into_path()
+            .into_os_string()
+            .into_string()
+            .unwrap(),
+    );
+    let config = ExecutorConfig::new(&external_host, port, &work_dir, opt.concurrent_tasks);
     info!("Running with config: {:?}", config);
 
     let executor_meta = ExecutorMeta {

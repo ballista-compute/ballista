@@ -14,6 +14,7 @@
 
 //! Implementation of the Apache Arrow Flight protocol that wraps an executor.
 
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Instant;
@@ -22,7 +23,7 @@ use crate::executor::BallistaExecutor;
 use crate::scheduler::planner::pretty_print;
 use crate::serde::decode_protobuf;
 use crate::serde::scheduler::Action as BallistaAction;
-use crate::utils::write_stream_to_disk;
+use crate::utils;
 
 use arrow::array::{ArrayRef, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
@@ -36,7 +37,6 @@ use arrow_flight::{
 use datafusion::error::DataFusionError;
 use futures::{Stream, StreamExt};
 use log::{debug, info};
-use tempfile::TempDir;
 use tonic::{Request, Response, Status, Streaming};
 
 /// Service implementing the Apache Arrow Flight Protocol
@@ -76,6 +76,8 @@ impl FlightService for BallistaFlightService {
 
         match &action {
             BallistaAction::InteractiveQuery { plan, .. } => {
+                debug!("InteractiveQuery {:?}", plan);
+
                 let results = self
                     .executor
                     .execute_logical_plan(&plan)
@@ -95,10 +97,10 @@ impl FlightService for BallistaFlightService {
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
             BallistaAction::ExecutePartition(partition) => {
+                info!("ExecutePartition {:?}", partition);
                 pretty_print(partition.plan.clone(), 0);
 
-                let work_dir = TempDir::new()?;
-                let mut path = work_dir.into_path();
+                let mut path = PathBuf::from(&self.executor.config.work_dir);
                 path.push(&format!("{}", partition.job_uuid));
                 path.push(&format!("{}", partition.stage_id));
                 path.push(&format!("{}", partition.partition_id));
@@ -118,9 +120,15 @@ impl FlightService for BallistaFlightService {
                     .map_err(|e| from_datafusion_err(&e))?;
 
                 // stream results to disk
-                write_stream_to_disk(&mut stream, &path)
+                let info = utils::write_stream_to_disk(&mut stream, &path)
                     .await
                     .map_err(|e| from_arrow_err(&e))?;
+
+                info!(
+                    "Executed partition in {} seconds. Statistics: {:?}",
+                    now.elapsed().as_secs(),
+                    info
+                );
 
                 // build result set with summary of the partition execution status
                 let mut c0 = StringBuilder::new(1);
@@ -133,14 +141,34 @@ impl FlightService for BallistaFlightService {
                 let flights = create_flight_data(schema, results);
                 let output = futures::stream::iter(flights);
 
-                info!("Executed partition in {} seconds", now.elapsed().as_secs());
-
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
             BallistaAction::FetchPartition(partition_id) => {
                 // fetch a partition that was previously executed by this executor
-                debug!("FetchPartition {:?}", partition_id);
-                Err(Status::unimplemented("FetchPartition"))
+                info!("FetchPartition {:?}", partition_id);
+
+                let mut path = PathBuf::from(&self.executor.config.work_dir);
+                path.push(&format!("{}", partition_id.job_uuid));
+                path.push(&format!("{}", partition_id.stage_id));
+                path.push(&format!("{}", partition_id.partition_id));
+                path.push("data.arrow");
+                let path = path.to_str().unwrap();
+
+                info!("FetchPartition {:?} reading {}", partition_id, path);
+                let mut stream = utils::read_stream_from_disk(path)
+                    .await
+                    .map_err(|e| from_arrow_err(&e))?;
+
+                // TODO should be able to stream end to end rather than load into memory here
+                let mut batches = vec![];
+                while let Some(batch) = stream.next().await {
+                    batches.push(batch.map_err(|e| from_arrow_err(&e))?);
+                }
+
+                let flights = create_flight_data(stream.schema(), batches);
+                let output = futures::stream::iter(flights);
+
+                Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
         }
     }

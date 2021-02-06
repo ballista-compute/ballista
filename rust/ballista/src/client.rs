@@ -32,6 +32,7 @@ use arrow_flight::Ticket;
 use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
+use log::debug;
 use prost::Message;
 use uuid::Uuid;
 
@@ -46,10 +47,16 @@ impl BallistaClient {
 
     pub async fn try_new(host: &str, port: usize) -> Result<Self> {
         let addr = format!("http://{}:{}", host, port);
-        println!("BallistaClient Connecting to {}", addr);
-        let flight_client = FlightServiceClient::connect(addr)
+        debug!("BallistaClient connecting to {}", addr);
+        let flight_client = FlightServiceClient::connect(addr.clone())
             .await
-            .map_err(|e| BallistaError::General(format!("{:?}", e)))?;
+            .map_err(|e| {
+                BallistaError::General(format!(
+                    "Error connecting to Ballista scheduler or executor at {}: {:?}",
+                    addr, e
+                ))
+            })?;
+        debug!("BallistaClient connected OK");
 
         Ok(Self { flight_client })
     }

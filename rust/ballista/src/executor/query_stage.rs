@@ -22,7 +22,7 @@ use std::sync::Arc;
 
 use arrow::datatypes::SchemaRef;
 use async_trait::async_trait;
-use datafusion::error::{DataFusionError, Result};
+use datafusion::error::Result;
 use datafusion::physical_plan::{ExecutionPlan, Partitioning, SendableRecordBatchStream};
 use uuid::Uuid;
 
@@ -69,11 +69,14 @@ impl ExecutionPlan for QueryStageExec {
 
     fn with_new_children(
         &self,
-        _children: Vec<Arc<dyn ExecutionPlan>>,
+        children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        Err(DataFusionError::Plan(
-            "Ballista QueryStageExec does not support with_new_children()".to_owned(),
-        ))
+        assert!(children.len() == 1);
+        Ok(Arc::new(QueryStageExec::try_new(
+            self.job_uuid,
+            self.stage_id,
+            children[0].clone(),
+        )?))
     }
 
     async fn execute(&self, partition: usize) -> Result<SendableRecordBatchStream> {

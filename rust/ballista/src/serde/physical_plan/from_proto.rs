@@ -19,6 +19,8 @@ use std::sync::Arc;
 use std::{convert::TryInto, unimplemented};
 
 use crate::error::BallistaError;
+use crate::executor::shuffle_reader::ShuffleReaderExec;
+use crate::scheduler::planner::PartitionLocation;
 use crate::serde::{proto_error, protobuf};
 use crate::{convert_box_required, convert_required};
 
@@ -151,7 +153,16 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     left, right, &on, &join_type,
                 )?))
             }
-            PhysicalPlanType::ShuffleReader(_) => unimplemented!(),
+            PhysicalPlanType::ShuffleReader(shuffle_reader) => {
+                let schema = Arc::new(convert_required!(shuffle_reader.schema)?);
+                let partition_location: Vec<PartitionLocation> = shuffle_reader
+                    .partition_location
+                    .iter()
+                    .map(|p| p.clone().try_into())
+                    .collect::<Result<Vec<_>, BallistaError>>()?;
+                let shuffle_reader = ShuffleReaderExec::try_new(partition_location, schema)?;
+                Ok(Arc::new(shuffle_reader))
+            }
             PhysicalPlanType::Empty(empty) => {
                 let schema = Arc::new(convert_required!(empty.schema)?);
                 Ok(Arc::new(EmptyExec::new(empty.produce_one_row, schema)))

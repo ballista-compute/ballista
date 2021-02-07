@@ -1,5 +1,8 @@
 # Integration Testing
 
+*NOTE:* Ballista 0.4.0 is still under development and this page is out of date. Please see the [benchmarks](https://github.com/ballista-compute/ballista/tree/main/rust/benchmarks/tpch) for
+current usage.
+
 ## Start the executors
 
 The integration-tests directory contains a `docker-compose.yml` defining the three executors.

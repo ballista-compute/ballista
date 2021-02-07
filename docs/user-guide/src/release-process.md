@@ -1,5 +1,7 @@
 # Release Process
 
+*NOTE:* Ballista 0.4.0 is still under development and this page is out of date.
+
 These instructions are for project maintainers wishing to create public releases of Ballista.
 
 ## Build All Artifacts

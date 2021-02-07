@@ -1,5 +1,8 @@
 # Installing Ballista with Docker Compose
 
+*NOTE:* Ballista 0.4.0 is still under development and this page is out of date. Please see the [benchmarks](https://github.com/ballista-compute/ballista/tree/main/rust/benchmarks/tpch) for 
+current usage.
+
 Docker Compose is a convenient way to launch executors when testing locally. This example `docker-compose.yaml` 
 demonstrates how to start a Ballista Rust executor and how to mount a data volume into the container.
 
@@ -12,7 +15,7 @@ services:
     ports:
       - "2379:2379"
   ballista-rust:
-    image: ballistacompute/ballista-rust:0.3.0
+    image: ballistacompute/ballista-rust:0.4.0-SNAPSHOT
     command: "/executor --mode etcd --etcd-urls etcd:2379 --external-host 0.0.0.0 --port 50051 --concurrent-tasks=2"
     ports:
       - "50051:50051"

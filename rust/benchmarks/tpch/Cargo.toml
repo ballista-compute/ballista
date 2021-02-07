@@ -7,10 +7,10 @@ edition = "2018"
 [dependencies]
 ballista = { path="../../ballista" }
 
-arrow = { git = "https://github.com/apache/arrow", rev="b18c567" }
-arrow-flight = { git = "https://github.com/apache/arrow", rev="b18c567" }
-datafusion = { git = "https://github.com/apache/arrow", rev="b18c567" }
-parquet = { git = "https://github.com/apache/arrow", rev="b18c567" }
+arrow = { git = "https://github.com/apache/arrow", rev="eb7f053" }
+arrow-flight = { git = "https://github.com/apache/arrow", rev="eb7f053" }
+datafusion = { git = "https://github.com/apache/arrow", rev="eb7f053" }
+parquet = { git = "https://github.com/apache/arrow", rev="eb7f053" }
 
 env_logger = "0.8"
 tokio = { version = "1.0", features = ["macros", "rt", "rt-multi-thread", "sync"] }

@@ -32,6 +32,7 @@ pub type Result<T> = result::Result<T, BallistaError>;
 pub enum BallistaError {
     NotImplemented(String),
     General(String),
+    Internal(String),
     ArrowError(ArrowError),
     DataFusionError(DataFusionError),
     SqlError(parser::ParserError),
@@ -42,6 +43,7 @@ pub enum BallistaError {
     KubeAPIRequestError(k8s_openapi::RequestError),
     KubeAPIResponseError(k8s_openapi::ResponseError),
     TonicError(tonic::transport::Error),
+    GrpcError(tonic::Status),
 }
 
 impl<T> Into<Result<T>> for BallistaError {
@@ -129,11 +131,11 @@ impl From<tonic::transport::Error> for BallistaError {
     }
 }
 
-// impl From<tonic::status::Status> for BallistaError {
-//     fn from(e: tonic::status::Status) -> Self {
-//         BallistaError::TonicError(e)
-//     }
-// }
+impl From<tonic::Status> for BallistaError {
+    fn from(e: tonic::Status) -> Self {
+        BallistaError::GrpcError(e)
+    }
+}
 
 impl Display for BallistaError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -154,6 +156,8 @@ impl Display for BallistaError {
                 write!(f, "KubeAPI response error: {}", desc)
             }
             BallistaError::TonicError(desc) => write!(f, "Tonic error: {}", desc),
+            BallistaError::GrpcError(desc) => write!(f, "Grpc error: {}", desc),
+            BallistaError::Internal(desc) => write!(f, "Internal Ballista error: {}", desc),
         }
     }
 }

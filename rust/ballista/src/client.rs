@@ -36,7 +36,7 @@ use log::debug;
 use prost::Message;
 use uuid::Uuid;
 
-/// Client for interacting with Ballista schedulers and executors.
+/// Client for interacting with Ballista executors.
 pub struct BallistaClient {
     flight_client: FlightServiceClient<tonic::transport::channel::Channel>,
 }
@@ -45,7 +45,7 @@ impl BallistaClient {
     /// Create a new BallistaClient to connect to the executor listening on the specified
     /// host and port
 
-    pub async fn try_new(host: &str, port: usize) -> Result<Self> {
+    pub async fn try_new(host: &str, port: u16) -> Result<Self> {
         let addr = format!("http://{}:{}", host, port);
         debug!("BallistaClient connecting to {}", addr);
         let flight_client = FlightServiceClient::connect(addr.clone())

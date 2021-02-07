@@ -85,7 +85,7 @@ impl ExecutionPlan for ShuffleReaderExec {
 
         let mut client = BallistaClient::try_new(
             &partition_location.executor_meta.host,
-            partition_location.executor_meta.port as usize,
+            partition_location.executor_meta.port,
         )
         .await
         .map_err(|e| DataFusionError::Execution(format!("Ballista Error: {:?}", e)))?;

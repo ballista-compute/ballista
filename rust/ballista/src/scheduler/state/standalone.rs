@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::time::Duration;
+
 use crate::error::{ballista_error, Result};
-use crate::scheduler::ConfigBackendClient;
+use crate::scheduler::state::ConfigBackendClient;
 
 use log::warn;
 
@@ -59,7 +61,13 @@ impl ConfigBackendClient for StandaloneClient {
             .map_err(|e| ballista_error(&format!("sled error {:?}", e)))?)
     }
 
-    async fn put(&mut self, key: String, value: Vec<u8>) -> Result<()> {
+    // TODO: support lease_time. See https://github.com/spacejam/sled/issues/1119 for how to approach this
+    async fn put(
+        &mut self,
+        key: String,
+        value: Vec<u8>,
+        _lease_time: Option<Duration>,
+    ) -> Result<()> {
         self.db
             .insert(key, value)
             .map_err(|e| {
@@ -72,7 +80,7 @@ impl ConfigBackendClient for StandaloneClient {
 
 #[cfg(test)]
 mod tests {
-    use crate::scheduler::ConfigBackendClient;
+    use crate::scheduler::state::ConfigBackendClient;
 
     use super::StandaloneClient;
     use std::result::Result;
@@ -86,7 +94,7 @@ mod tests {
         let mut client = create_instance()?;
         let key = "key";
         let value = "value".as_bytes();
-        client.put(key.to_owned(), value.to_vec()).await?;
+        client.put(key.to_owned(), value.to_vec(), None).await?;
         assert_eq!(client.get(key).await?, value);
         Ok(())
     }
@@ -105,8 +113,12 @@ mod tests {
         let mut client = create_instance()?;
         let key = "key";
         let value = "value".as_bytes();
-        client.put(format!("{}/1", key), value.to_vec()).await?;
-        client.put(format!("{}/2", key), value.to_vec()).await?;
+        client
+            .put(format!("{}/1", key), value.to_vec(), None)
+            .await?;
+        client
+            .put(format!("{}/2", key), value.to_vec(), None)
+            .await?;
         assert_eq!(client.get_from_prefix(key).await?, vec![value, value]);
         Ok(())
     }

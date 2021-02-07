@@ -68,7 +68,7 @@ mod roundtrip_tests {
         use arrow::datatypes::{DataType, Field, Schema};
         let field_a = Field::new("col", DataType::Int64, false);
         let schema_left = Schema::new(vec![field_a.clone()]);
-        let schema_right = Schema::new(vec![field_a.clone()]);
+        let schema_right = Schema::new(vec![field_a]);
 
         roundtrip_test(Arc::new(HashJoinExec::try_new(
             Arc::new(EmptyExec::new(false, Arc::new(schema_left))),

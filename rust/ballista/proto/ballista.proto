@@ -429,7 +429,19 @@ message ExecuteQueryParams {
 }
 
 message ExecuteQueryResult {
-  repeated PartitionLocation partition_location = 1;
+  string job_id = 1;
+}
+
+message GetJobStatusParams {
+  string job_id = 1;
+}
+
+message GetJobStatusResult {
+  // TODO: right now we only return the partition_locations once all of them are available
+  // We should probably add a bunch more info here, like a job status (queued, running, error, done...)
+  // along with progress report for each stage
+  Schema schema = 1;
+  repeated PartitionLocation partition_location = 2;
 }
 
 service SchedulerGrpc {
@@ -438,6 +450,8 @@ service SchedulerGrpc {
   rpc RegisterExecutor (RegisterExecutorParams) returns (RegisterExecutorResult) {}
 
   rpc ExecuteLogicalPlan (ExecuteQueryParams) returns (ExecuteQueryResult) {}
+
+  rpc GetJobStatus (GetJobStatusParams) returns (GetJobStatusResult) {}
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

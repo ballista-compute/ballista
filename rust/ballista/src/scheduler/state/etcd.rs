@@ -14,8 +14,10 @@
 
 //! Etcd config backend.
 
+use std::time::Duration;
+
 use crate::error::{ballista_error, Result};
-use crate::scheduler::ConfigBackendClient;
+use crate::scheduler::state::ConfigBackendClient;
 
 use etcd_client::{GetOptions, PutOptions};
 use log::warn;
@@ -58,24 +60,31 @@ impl ConfigBackendClient for EtcdClient {
             .collect())
     }
 
-    async fn put(&mut self, key: String, value: Vec<u8>) -> Result<()> {
-        let lease_time_seconds = 60;
-        match self.etcd.lease_grant(lease_time_seconds, None).await {
-            Ok(lease) => {
-                let options = PutOptions::new().with_lease(lease.id());
-                self.etcd
-                    .put(key.clone(), value.clone(), Some(options))
-                    .await
-                    .map_err(|e| {
-                        warn!("etcd put failed: {}", e);
-                        ballista_error("etcd put failed")
-                    })
-                    .map(|_| ())
-            }
-            Err(e) => {
-                warn!("etcd lease grant failed: {:?}", e.to_string());
-                Err(ballista_error("etcd lease grant failed"))
-            }
-        }
+    async fn put(
+        &mut self,
+        key: String,
+        value: Vec<u8>,
+        lease_time: Option<Duration>,
+    ) -> Result<()> {
+        let put_options = if let Some(lease_time) = lease_time {
+            self.etcd
+                .lease_grant(lease_time.as_secs() as i64, None)
+                .await
+                .map(|lease| Some(PutOptions::new().with_lease(lease.id())))
+                .map_err(|e| {
+                    warn!("etcd lease grant failed: {:?}", e.to_string());
+                    ballista_error("etcd lease grant failed")
+                })?
+        } else {
+            None
+        };
+        self.etcd
+            .put(key.clone(), value.clone(), put_options)
+            .await
+            .map_err(|e| {
+                warn!("etcd put failed: {}", e);
+                ballista_error("etcd put failed")
+            })
+            .map(|_| ())
     }
 }

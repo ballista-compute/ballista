@@ -174,14 +174,11 @@ mod roundtrip_tests {
 
         for test_case in should_fail_on_seralize.into_iter() {
             let res: Result<protobuf::ScalarValue> = (&test_case).try_into();
-            match res {
-                Ok(val) => {
-                    return Err(BallistaError::General(format!(
+            if let Ok(val) = res {
+                return Err(BallistaError::General(format!(
                     "The value {:?} should not have been able to serialize. Serialized to :{:?}",
                     test_case, val
-                )))
-                }
-                Err(_) => (),
+                )));
             }
         }
         Ok(())
@@ -439,11 +436,11 @@ mod roundtrip_tests {
         let mut success: Vec<DataType> = Vec::new();
         for test_case in should_fail.into_iter() {
             let proto: Result<protobuf::ScalarType> = (&test_case).try_into();
-            if !proto.is_err() {
+            if proto.is_ok() {
                 success.push(test_case)
             }
         }
-        if success.len() > 0 {
+        if !success.is_empty() {
             return Err(BallistaError::General(format!(
                 "The following items which should have ressulted in an error completed successfully: {:?}",
                 success

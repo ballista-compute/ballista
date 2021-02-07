@@ -42,7 +42,7 @@ struct BenchmarkOpt {
 
     /// Ballista executor port
     #[structopt(long = "port")]
-    port: usize,
+    port: u16,
 
     /// Query number
     #[structopt(long)]

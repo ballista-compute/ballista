@@ -92,8 +92,6 @@ mod roundtrip_tests {
     #[test]
     fn rountrip_hash_aggregate() -> Result<()> {
 
-        ///let expr = Expr::Column("c1".to_string()) + Expr::Column("c2".to_string());
-
         let groups: Vec<(Arc<dyn PhysicalExpr>, String)> =
             vec![(col("a"), "a".to_string())];
 

@@ -19,6 +19,7 @@
 //!
 //! This is a modified version of the DataFusion version of these benchmarks.
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -29,10 +30,8 @@ use arrow::datatypes::{DataType, Field, Schema};
 use arrow::util::pretty;
 use ballista::prelude::*;
 use datafusion::prelude::*;
-
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
-use std::collections::HashMap;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]

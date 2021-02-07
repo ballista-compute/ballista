@@ -22,8 +22,9 @@ use std::sync::{Arc, Mutex};
 
 use crate::client::BallistaClient;
 use crate::error::{BallistaError, Result};
-use crate::serde::scheduler::Action;
+use crate::serde::scheduler::{Action, ExecutorMeta};
 
+use crate::scheduler::planner::DistributedPlanner;
 use arrow::datatypes::SchemaRef;
 use datafusion::dataframe::DataFrame;
 use datafusion::datasource::datasource::Statistics;
@@ -214,17 +215,29 @@ impl BallistaDataFrame {
 
         info!("Connecting to Ballista executor at {}:{}", host, port);
 
-        let mut client = BallistaClient::try_new(&host, port).await?;
         let plan = self.df.to_logical_plan();
 
-        debug!("Sending logical plan to executor: {:?}", plan);
+        let distributed = false;
 
-        client
-            .execute_action(&Action::InteractiveQuery {
-                plan,
-                settings: Default::default(),
-            })
-            .await
+        if distributed {
+            debug!("Executing plan using distributed planner: {:?}", plan);
+            let executors = vec![ExecutorMeta {
+                id: "TBD".to_string(),
+                host: host.to_string(),
+                port: port as u16,
+            }];
+            let mut planner = DistributedPlanner::new(executors);
+            planner.collect(&plan).await
+        } else {
+            debug!("Sending logical plan to executor: {:?}", plan);
+            let mut client = BallistaClient::try_new(&host, port).await?;
+            client
+                .execute_action(&Action::InteractiveQuery {
+                    plan,
+                    settings: Default::default(),
+                })
+                .await
+        }
     }
 
     pub fn select_columns(&self, columns: &[&str]) -> Result<BallistaDataFrame> {

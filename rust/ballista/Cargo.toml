@@ -38,9 +38,9 @@ tokio = { version = "1.0", features = ["macros", "rt", "rt-multi-thread", "sync"
 tonic = "0.4"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 
-arrow = { git = "https://github.com/apache/arrow", rev="eb7f053" }
-arrow-flight = { git = "https://github.com/apache/arrow", rev="eb7f053" }
-datafusion = { git = "https://github.com/apache/arrow", rev="eb7f053" }
+arrow = { git = "https://github.com/apache/arrow", rev="c3b972c" }
+arrow-flight = { git = "https://github.com/apache/arrow", rev="c3b972c" }
+datafusion = { git = "https://github.com/apache/arrow", rev="c3b972c" }
 
 [dev-dependencies]
 

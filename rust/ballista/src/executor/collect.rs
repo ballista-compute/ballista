@@ -15,17 +15,19 @@
 //! The CollectExec operator retrieves results from the cluster and returns them as a single
 //! vector of [RecordBatch].
 
-use std::any::Any;
 use std::sync::Arc;
+use std::{any::Any, pin::Pin};
 
 use crate::memory_stream::MemoryStream;
 use crate::utils;
 
 use arrow::datatypes::SchemaRef;
 use async_trait::async_trait;
-use datafusion::error::Result;
-use datafusion::physical_plan::{ExecutionPlan, Partitioning, SendableRecordBatchStream};
+use datafusion::physical_plan::{ExecutionPlan, Partitioning};
+use datafusion::{error::Result, physical_plan::RecordBatchStream};
 
+/// The CollectExec operator retrieves results from the cluster and returns them as a single
+/// vector of [RecordBatch].
 #[derive(Debug, Clone)]
 pub struct CollectExec {
     plan: Arc<dyn ExecutionPlan>,
@@ -62,7 +64,10 @@ impl ExecutionPlan for CollectExec {
         unimplemented!()
     }
 
-    async fn execute(&self, partition: usize) -> Result<SendableRecordBatchStream> {
+    async fn execute(
+        &self,
+        partition: usize,
+    ) -> Result<Pin<Box<dyn RecordBatchStream + Send + Sync>>> {
         // TODO reimplement this to use true streaming end to end rather than fetch
         // into memory and then re-stream
         assert_eq!(0, partition);

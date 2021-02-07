@@ -1,5 +1,8 @@
 # Installing Ballista with Kubernetes
 
+*NOTE:* Ballista 0.4.0 is still under development and this page is out of date. Please see the [benchmarks](https://github.com/ballista-compute/ballista/tree/main/rust/benchmarks/tpch) for
+current usage.
+
 You will need a Kubernetes cluster to deploy to. I recommend using 
 [Minikube](https://kubernetes.io/docs/tutorials/hello-minikube) for local testing, or Amazon's Elastic Kubernetes 
 Service (EKS). 
@@ -168,7 +171,7 @@ spec:
     spec:
       containers:
       - name: ballista
-        image: ballistacompute/ballista-rust:0.3.0
+        image: ballistacompute/ballista-rust:0.4.0-SNAPSHOT
         command: ["/executor"]
         args: ["--mode=k8s", "--external-host=0.0.0.0", "--port=50051", "--concurrent-tasks=2"]
         resources:

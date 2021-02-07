@@ -8,7 +8,7 @@ Create a new Rust binary application using `cargo init --bin nyctaxi` then add t
 
 ```toml
 [dependencies]
-ballista = "0.3.0"
+ballista = "0.4.0-SNAPSHOT"
 tokio = { version = "0.2", features = ["full"] }
 ```
 

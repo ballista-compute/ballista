@@ -632,6 +632,7 @@ impl TryFrom<&datafusion::scalar::ScalarValue> for protobuf::ScalarValue {
                     Value::TimeNanosecondValue(*s)
                 })
             }
+            _ => unimplemented!(), //TODO there are new interval types
         })
     }
 }

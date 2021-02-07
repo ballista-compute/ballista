@@ -16,6 +16,7 @@ use std::{
     fs::File,
     io::{prelude::*, BufReader},
     path::Path,
+    pin::Pin
 };
 
 use crate::memory_stream::MemoryStream;
@@ -24,7 +25,7 @@ use arrow::error::Result;
 use arrow::ipc::reader::FileReader;
 use arrow::ipc::writer::FileWriter;
 use arrow::record_batch::RecordBatch;
-use datafusion::physical_plan::SendableRecordBatchStream;
+use datafusion::physical_plan::RecordBatchStream;
 use futures::StreamExt;
 
 /// Summary of executed partition
@@ -39,7 +40,7 @@ pub struct PartitionStats {
 /// Stream data to disk in Arrow IPC format
 
 pub async fn write_stream_to_disk(
-    stream: &mut SendableRecordBatchStream,
+    stream: &mut Pin<Box<dyn RecordBatchStream + Send + Sync>>,
     path: &str,
 ) -> Result<PartitionStats> {
     let file = File::create(&path)?;
@@ -74,7 +75,9 @@ pub async fn write_stream_to_disk(
     })
 }
 
-pub async fn read_stream_from_disk(path: &str) -> Result<SendableRecordBatchStream> {
+pub async fn read_stream_from_disk(
+    path: &str,
+) -> Result<Pin<Box<dyn RecordBatchStream + Send + Sync>>> {
     let file = File::open(&path)?;
     let reader = FileReader::try_new(file)?;
     let schema = reader.schema();
@@ -86,7 +89,9 @@ pub async fn read_stream_from_disk(path: &str) -> Result<SendableRecordBatchStre
     Ok(Box::pin(MemoryStream::try_new(batches, schema, None)?))
 }
 
-pub async fn collect_stream(stream: &mut SendableRecordBatchStream) -> Result<Vec<RecordBatch>> {
+pub async fn collect_stream(
+    stream: &mut Pin<Box<dyn RecordBatchStream + Send + Sync>>,
+) -> Result<Vec<RecordBatch>> {
     let mut batches = vec![];
     while let Some(batch) = stream.next().await {
         batches.push(batch?);

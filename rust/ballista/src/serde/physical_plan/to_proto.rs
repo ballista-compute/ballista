@@ -23,7 +23,9 @@ use std::{
 
 use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
 use datafusion::physical_plan::csv::CsvExec;
-use datafusion::physical_plan::expressions::{CaseExpr, IsNotNullExpr, IsNullExpr, NegativeExpr};
+use datafusion::physical_plan::expressions::{
+    CaseExpr, InListExpr, IsNotNullExpr, IsNullExpr, NegativeExpr,
+};
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::hash_utils::JoinType;
@@ -313,6 +315,20 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
                         expr: Some(Box::new(expr.arg().to_owned().try_into()?)),
                     }),
                 )),
+            })
+        } else if let Some(expr) = expr.downcast_ref::<InListExpr>() {
+            Ok(protobuf::LogicalExprNode {
+                expr_type: Some(protobuf::logical_expr_node::ExprType::InList(Box::new(
+                    protobuf::InListNode {
+                        expr: Some(Box::new(expr.expr().to_owned().try_into()?)),
+                        list: expr
+                            .list()
+                            .iter()
+                            .map(|a| a.clone().try_into())
+                            .collect::<Result<Vec<protobuf::LogicalExprNode>, Self::Error>>()?,
+                        negated: expr.negated(),
+                    },
+                ))),
             })
         } else if let Some(expr) = expr.downcast_ref::<NegativeExpr>() {
             Ok(protobuf::LogicalExprNode {

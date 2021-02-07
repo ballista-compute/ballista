@@ -36,11 +36,13 @@ use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
 use log::{debug, info};
 
 #[derive(Debug)]
+
 pub enum ClusterMeta {
     Direct { host: String, port: usize }, //TODO add etcd and k8s options here
 }
 
 #[allow(dead_code)]
+
 pub struct BallistaContextState {
     /// Meta-data required for connecting to a scheduler instances in the cluster
     cluster_meta: ClusterMeta,
@@ -61,6 +63,7 @@ impl BallistaContextState {
 }
 
 #[allow(dead_code)]
+
 pub struct BallistaContext {
     state: Arc<Mutex<BallistaContextState>>,
 }
@@ -73,12 +76,14 @@ impl BallistaContext {
             port,
         };
         let state = BallistaContextState::new(meta, settings);
+
         Self {
             state: Arc::new(Mutex::new(state)),
         }
     }
 
     /// Create a DataFrame representing a Parquet table scan
+
     pub fn read_parquet(&self, path: &str) -> Result<BallistaDataFrame> {
         // convert to absolute path because the executor likely has a different working directory
         let path = PathBuf::from(path);
@@ -91,6 +96,7 @@ impl BallistaContext {
     }
 
     /// Create a DataFrame representing a CSV table scan
+
     pub fn read_csv(&self, path: &str, options: CsvReadOptions) -> Result<BallistaDataFrame> {
         // convert to absolute path because the executor likely has a different working directory
         let path = PathBuf::from(path);
@@ -184,6 +190,7 @@ impl TableProvider for DFTableAdapter {
 
 /// The Ballista DataFrame is a wrapper around the DataFusion DataFrame and overrides the
 /// `collect` method so that the query is executed against Ballista and not DataFusion.
+
 pub struct BallistaDataFrame {
     /// Ballista context state
     state: Arc<Mutex<BallistaContextState>>,
@@ -199,11 +206,14 @@ impl BallistaDataFrame {
     pub async fn collect(&self) -> Result<SendableRecordBatchStream> {
         let (host, port) = {
             let state = self.state.lock().unwrap();
+
             match &state.cluster_meta {
                 ClusterMeta::Direct { host, port, .. } => (host.to_owned(), *port),
             }
         };
+
         info!("Connecting to Ballista executor at {}:{}", host, port);
+
         let mut client = BallistaClient::try_new(&host, port).await?;
         let plan = self.df.to_logical_plan();
 
@@ -264,9 +274,9 @@ impl BallistaDataFrame {
     }
 
     // TODO lifetime issue
-    // pub fn join(&self, right: Arc<dyn DataFrame>, join_type: JoinType, left_cols: &[&str], right_cols: &[&str]) -> Result<BallistaDataFrame> {
-    //     Ok(Self::from(self.state.clone(), self.df.join(right, join_type, &left_cols, &right_cols).map_err(BallistaError::from)?))
-    // }
+    // pub fn join(&self, right: Arc<dyn DataFrame>, join_type: JoinType, left_cols: &[&str], right_cols: &[&str]) ->
+    // Result<BallistaDataFrame> {     Ok(Self::from(self.state.clone(), self.df.join(right, join_type, &left_cols,
+    // &right_cols).map_err(BallistaError::from)?)) }
 
     pub fn repartition(&self, partitioning_scheme: Partitioning) -> Result<BallistaDataFrame> {
         Ok(Self::from(

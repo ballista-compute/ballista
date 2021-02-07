@@ -14,26 +14,26 @@
 
 //! Ballista Rust executor binary.
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
 use arrow_flight::flight_service_server::FlightServiceServer;
 use ballista::serde::protobuf::{
-    scheduler_grpc_client::SchedulerGrpcClient, RegisterExecutorParams,
+    self, scheduler_grpc_client::SchedulerGrpcClient, RegisterExecutorParams,
 };
-use ballista::BALLISTA_VERSION;
 use ballista::{
+    executor::flight_service::BallistaFlightService,
     executor::{BallistaExecutor, ExecutorConfig},
-    serde::scheduler::ExecutorMeta,
-};
-use ballista::{
-    flight_service::BallistaFlightService,
     scheduler::{standalone::StandaloneClient, SchedulerServer},
     serde::protobuf::scheduler_grpc_server::SchedulerGrpcServer,
+    serde::scheduler::ExecutorMeta,
+    BALLISTA_VERSION,
 };
-use log::info;
+use futures::future::MaybeDone;
+use log::{info, warn};
 use structopt::StructOpt;
-use tonic::transport::Server;
+use tempfile::TempDir;
+use tonic::transport::{Channel, Server};
 use uuid::Uuid;
 
 /// Ballista Rust Executor
@@ -70,9 +70,32 @@ struct Opt {
     #[structopt(short, long, default_value = "50051")]
     port: u16,
 
+    /// Directory for temporary IPC files
+    #[structopt(long)]
+    work_dir: Option<String>,
+
     /// Max concurrent tasks.
     #[structopt(short, long, default_value = "4")]
     concurrent_tasks: usize,
+}
+
+async fn registration_loop(
+    mut scheduler: SchedulerGrpcClient<Channel>,
+    executor_meta: ExecutorMeta,
+) {
+    let executor_meta: protobuf::ExecutorMetadata = executor_meta.into();
+    loop {
+        info!("Starting registration with scheduler");
+        let registration_result = scheduler
+            .register_executor(RegisterExecutorParams {
+                metadata: Some(executor_meta.clone()),
+            })
+            .await;
+        if let Err(error) = registration_result {
+            warn!("Executor registration failed. If this continues to happen the executor might be marked as dead by the scheduler. Error: {}", error);
+        }
+        tokio::time::sleep(Duration::from_secs(15)).await;
+    }
 }
 
 #[tokio::main]
@@ -97,8 +120,16 @@ async fn main() -> Result<()> {
         opt.scheduler_host
     };
     let scheduler_port = opt.scheduler_port;
+    let scheduler_url = format!("http://{}:{}", scheduler_host, scheduler_port);
 
-    let config = ExecutorConfig::new(&external_host, port, opt.concurrent_tasks);
+    let work_dir = opt.work_dir.unwrap_or(
+        TempDir::new()?
+            .into_path()
+            .into_os_string()
+            .into_string()
+            .unwrap(),
+    );
+    let config = ExecutorConfig::new(&external_host, port, &work_dir, opt.concurrent_tasks);
     info!("Running with config: {:?}", config);
 
     let executor_meta = ExecutorMeta {
@@ -120,30 +151,49 @@ async fn main() -> Result<()> {
             "Ballista v{} Rust Scheduler listening on {:?}",
             BALLISTA_VERSION, addr
         );
-        tokio::spawn(Server::builder().add_service(server).serve(addr));
+        let scheduler_future = tokio::spawn(Server::builder().add_service(server).serve(addr));
+        let mut scheduler_result = futures::future::maybe_done(scheduler_future);
+
+        // Ensure scheduler is ready to receive connections
+        while SchedulerGrpcClient::connect(scheduler_url.clone())
+            .await
+            .is_err()
+        {
+            let scheduler_future = match scheduler_result {
+                MaybeDone::Future(f) => f,
+                MaybeDone::Done(Err(e)) => return Err(e).context("Tokio error"),
+                MaybeDone::Done(Ok(Err(e))) => {
+                    return Err(e).context("Scheduler failed to initialize correctly")
+                }
+                MaybeDone::Done(Ok(Ok(()))) => {
+                    return Err(anyhow::format_err!(
+                        "Scheduler unexpectedly finished successfully"
+                    ))
+                }
+                MaybeDone::Gone => panic!("Received Gone from recently created MaybeDone"),
+            };
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            scheduler_result = futures::future::maybe_done(scheduler_future);
+        }
     }
 
-    let mut scheduler =
-        SchedulerGrpcClient::connect(format!("http://{}:{}", scheduler_host, scheduler_port))
-            .await
-            .context("Could not connect to scheduler")?;
-    scheduler
-        .register_executor(RegisterExecutorParams {
-            metadata: Some(executor_meta.into()),
-        })
+    let scheduler = SchedulerGrpcClient::connect(scheduler_url)
         .await
-        .context("Could not register executor")?;
-    let executor = Arc::new(BallistaExecutor::new(config, scheduler));
+        .context("Could not connect to scheduler")?;
+    let executor = Arc::new(BallistaExecutor::new(config, scheduler.clone()));
     let service = BallistaFlightService::new(executor);
+
     let server = FlightServiceServer::new(service);
     info!(
         "Ballista v{} Rust Executor listening on {:?}",
         BALLISTA_VERSION, addr
     );
-    Server::builder()
-        .add_service(server)
-        .serve(addr)
+    let server_future = tokio::spawn(Server::builder().add_service(server).serve(addr));
+    tokio::spawn(registration_loop(scheduler, executor_meta));
+
+    server_future
         .await
+        .context("Tokio error")?
         .context("Could not start executor server")?;
     Ok(())
 }

@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
-use std::convert::TryInto;
+use std::{collections::HashMap, convert::TryInto};
 
 use crate::error::BallistaError;
+use crate::scheduler::planner::PartitionLocation;
 use crate::serde::protobuf;
 use crate::serde::protobuf::action::ActionType;
 use crate::serde::scheduler::{Action, ExecutePartition, PartitionId};
@@ -50,15 +50,34 @@ impl TryInto<Action> for protobuf::Action {
                 )))
             }
             Some(ActionType::FetchPartition(partition)) => {
-                Ok(Action::FetchPartition(PartitionId::new(
-                    Uuid::parse_str(&partition.job_uuid).unwrap(),
-                    partition.stage_id as usize,
-                    partition.partition_id as usize,
-                )))
+                Ok(Action::FetchPartition(partition.try_into()?))
             }
             _ => Err(BallistaError::General(
                 "scheduler::from_proto(Action) invalid or missing action".to_owned(),
             )),
         }
+    }
+}
+
+impl TryInto<PartitionId> for protobuf::PartitionId {
+    type Error = BallistaError;
+
+    fn try_into(self) -> Result<PartitionId, Self::Error> {
+        Ok(PartitionId::new(
+            Uuid::parse_str(&self.job_uuid).unwrap(),
+            self.stage_id as usize,
+            self.partition_id as usize,
+        ))
+    }
+}
+
+impl TryInto<PartitionLocation> for protobuf::PartitionLocation {
+    type Error = BallistaError;
+
+    fn try_into(self) -> Result<PartitionLocation, Self::Error> {
+        Ok(PartitionLocation {
+            partition_id: self.partition_id.unwrap().try_into()?,
+            executor_meta: self.executor_meta.unwrap().into(),
+        })
     }
 }

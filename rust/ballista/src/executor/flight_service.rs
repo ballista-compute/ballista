@@ -14,14 +14,16 @@
 
 //! Implementation of the Apache Arrow Flight protocol that wraps an executor.
 
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::time::Instant;
 
-use crate::execution::planner::pretty_print;
 use crate::executor::BallistaExecutor;
+use crate::scheduler::planner::pretty_print;
 use crate::serde::decode_protobuf;
 use crate::serde::scheduler::Action as BallistaAction;
-use crate::utils::write_stream_to_disk;
+use crate::utils;
 
 use arrow::array::{ArrayRef, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
@@ -35,11 +37,11 @@ use arrow_flight::{
 use datafusion::error::DataFusionError;
 use futures::{Stream, StreamExt};
 use log::{debug, info};
-use tempfile::TempDir;
 use tonic::{Request, Response, Status, Streaming};
 
 /// Service implementing the Apache Arrow Flight Protocol
 #[derive(Clone)]
+
 pub struct BallistaFlightService {
     executor: Arc<BallistaExecutor>,
 }
@@ -53,14 +55,15 @@ impl BallistaFlightService {
 type BoxedFlightStream<T> = Pin<Box<dyn Stream<Item = Result<T, Status>> + Send + Sync + 'static>>;
 
 #[tonic::async_trait]
+
 impl FlightService for BallistaFlightService {
-    type HandshakeStream = BoxedFlightStream<HandshakeResponse>;
-    type ListFlightsStream = BoxedFlightStream<FlightInfo>;
+    type DoActionStream = BoxedFlightStream<arrow_flight::Result>;
+    type DoExchangeStream = BoxedFlightStream<FlightData>;
     type DoGetStream = BoxedFlightStream<FlightData>;
     type DoPutStream = BoxedFlightStream<PutResult>;
-    type DoActionStream = BoxedFlightStream<arrow_flight::Result>;
+    type HandshakeStream = BoxedFlightStream<HandshakeResponse>;
     type ListActionsStream = BoxedFlightStream<ActionType>;
-    type DoExchangeStream = BoxedFlightStream<FlightData>;
+    type ListFlightsStream = BoxedFlightStream<FlightInfo>;
 
     async fn do_get(
         &self,
@@ -73,6 +76,8 @@ impl FlightService for BallistaFlightService {
 
         match &action {
             BallistaAction::InteractiveQuery { plan, .. } => {
+                debug!("InteractiveQuery {:?}", plan);
+
                 let results = self
                     .executor
                     .execute_logical_plan(&plan)
@@ -92,14 +97,20 @@ impl FlightService for BallistaFlightService {
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
             BallistaAction::ExecutePartition(partition) => {
+                info!("ExecutePartition {:?}", partition);
                 pretty_print(partition.plan.clone(), 0);
 
-                let work_dir = TempDir::new()?;
-                let mut path = work_dir.into_path();
+                let mut path = PathBuf::from(&self.executor.config.work_dir);
                 path.push(&format!("{}", partition.job_uuid));
                 path.push(&format!("{}", partition.stage_id));
                 path.push(&format!("{}", partition.partition_id));
+                std::fs::create_dir_all(&path)?;
+
+                path.push("data.arrow");
                 let path = path.to_str().unwrap();
+                info!("Writing results to {}", path);
+
+                let now = Instant::now();
 
                 // execute the query partition
                 let mut stream = partition
@@ -109,9 +120,15 @@ impl FlightService for BallistaFlightService {
                     .map_err(|e| from_datafusion_err(&e))?;
 
                 // stream results to disk
-                write_stream_to_disk(&mut stream, &path)
+                let info = utils::write_stream_to_disk(&mut stream, &path)
                     .await
                     .map_err(|e| from_arrow_err(&e))?;
+
+                info!(
+                    "Executed partition in {} seconds. Statistics: {:?}",
+                    now.elapsed().as_secs(),
+                    info
+                );
 
                 // build result set with summary of the partition execution status
                 let mut c0 = StringBuilder::new(1);
@@ -123,11 +140,35 @@ impl FlightService for BallistaFlightService {
                 let results = vec![RecordBatch::try_new(schema.clone(), vec![path]).unwrap()];
                 let flights = create_flight_data(schema, results);
                 let output = futures::stream::iter(flights);
+
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
-            BallistaAction::FetchPartition(_) => {
+            BallistaAction::FetchPartition(partition_id) => {
                 // fetch a partition that was previously executed by this executor
-                Err(Status::unimplemented("FetchPartition"))
+                info!("FetchPartition {:?}", partition_id);
+
+                let mut path = PathBuf::from(&self.executor.config.work_dir);
+                path.push(&format!("{}", partition_id.job_uuid));
+                path.push(&format!("{}", partition_id.stage_id));
+                path.push(&format!("{}", partition_id.partition_id));
+                path.push("data.arrow");
+                let path = path.to_str().unwrap();
+
+                info!("FetchPartition {:?} reading {}", partition_id, path);
+                let mut stream = utils::read_stream_from_disk(path)
+                    .await
+                    .map_err(|e| from_arrow_err(&e))?;
+
+                // TODO should be able to stream end to end rather than load into memory here
+                let mut batches = vec![];
+                while let Some(batch) = stream.next().await {
+                    batches.push(batch.map_err(|e| from_arrow_err(&e))?);
+                }
+
+                let flights = create_flight_data(stream.schema(), batches);
+                let output = futures::stream::iter(flights);
+
+                Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
         }
     }
@@ -165,9 +206,11 @@ impl FlightService for BallistaFlightService {
         request: Request<Streaming<FlightData>>,
     ) -> Result<Response<Self::DoPutStream>, Status> {
         let mut request = request.into_inner();
+
         while let Some(data) = request.next().await {
             let _data = data?;
         }
+
         Err(Status::unimplemented("do_put"))
     }
 
@@ -176,7 +219,9 @@ impl FlightService for BallistaFlightService {
         request: Request<Action>,
     ) -> Result<Response<Self::DoActionStream>, Status> {
         let action = request.into_inner();
+
         let _action = decode_protobuf(&action.body.to_vec()).map_err(|e| from_ballista_err(&e))?;
+
         Err(Status::unimplemented("do_action"))
     }
 

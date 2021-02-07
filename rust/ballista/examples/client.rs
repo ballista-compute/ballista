@@ -20,6 +20,7 @@ use ballista::prelude::*;
 use std::collections::HashMap;
 
 #[tokio::main]
+
 async fn main() -> Result<()> {
     let path = "/mnt/tpch/parquet-sf100-partitioned/customer/";
 
@@ -29,6 +30,7 @@ async fn main() -> Result<()> {
 
     while let Some(result) = stream.next().await {
         let batch = result?;
+
         println!("{:?}", batch)
     }
 

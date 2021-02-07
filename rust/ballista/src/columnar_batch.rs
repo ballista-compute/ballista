@@ -13,14 +13,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::error::{ballista_error, Result};
 
-use arrow::array::ArrayRef;
-use arrow::datatypes::{DataType, Schema};
-use arrow::record_batch::RecordBatch;
+use arrow::{
+    array::ArrayRef,
+    datatypes::{DataType, Schema},
+    record_batch::RecordBatch,
+};
 use datafusion::scalar::ScalarValue;
 
 pub type MaybeColumnarBatch = Result<Option<ColumnarBatch>>;
@@ -28,6 +29,7 @@ pub type MaybeColumnarBatch = Result<Option<ColumnarBatch>>;
 /// Batch of columnar data.
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
+
 pub struct ColumnarBatch {
     schema: Arc<Schema>,
     columns: HashMap<String, ColumnarValue>,
@@ -46,6 +48,7 @@ impl ColumnarBatch {
                 )
             })
             .collect();
+
         Self {
             schema: batch.schema(),
             columns,
@@ -59,6 +62,7 @@ impl ColumnarBatch {
             .enumerate()
             .map(|(i, f)| (f.name().clone(), values[i].clone()))
             .collect();
+
         Self {
             schema: Arc::new(schema.clone()),
             columns,
@@ -80,6 +84,7 @@ impl ColumnarBatch {
                 }
             })
             .collect::<Result<Vec<_>>>()?;
+
         Ok(RecordBatch::try_new(self.schema.clone(), arrays)?)
     }
 
@@ -107,6 +112,7 @@ impl ColumnarBatch {
 /// A columnar value can either be a scalar value or an Arrow array.
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
+
 pub enum ColumnarValue {
     Scalar(ScalarValue, usize),
     Columnar(ArrayRef),
@@ -119,6 +125,7 @@ impl ColumnarValue {
             ColumnarValue::Columnar(array) => array.len(),
         }
     }
+
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }

@@ -16,35 +16,41 @@
 //! buffer format, allowing DataFusion physical plans to be serialized and transmitted between
 //! processes.
 
-use std::convert::{TryFrom, TryInto};
-use std::sync::Arc;
-
-use crate::serde::{protobuf, BallistaError};
+use std::{
+    convert::{TryFrom, TryInto},
+    sync::Arc,
+};
 
 use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
 use datafusion::physical_plan::csv::CsvExec;
+use datafusion::physical_plan::expressions::{CaseExpr, IsNotNullExpr, IsNullExpr, NegativeExpr};
 use datafusion::physical_plan::filter::FilterExec;
+use datafusion::physical_plan::hash_aggregate::AggregateMode;
 use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::hash_utils::JoinType;
-use datafusion::physical_plan::hash_aggregate::AggregateMode;
 use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
 use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::sort::SortExec;
+
 use datafusion::physical_plan::{
     empty::EmptyExec,
-    expressions::{BinaryExpr, Column, Avg},
+    expressions::{Avg, BinaryExpr, Column},
 };
-use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr, AggregateExpr};
+use datafusion::physical_plan::{AggregateExpr, ExecutionPlan, PhysicalExpr};
 
-use protobuf::physical_plan_node::PhysicalPlanType;
 use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
+use protobuf::physical_plan_node::PhysicalPlanType;
+
+use crate::executor::shuffle_reader::ShuffleReaderExec;
+use crate::serde::{protobuf, BallistaError};
 
 impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<protobuf::PhysicalPlanNode, Self::Error> {
         let plan = self.as_any();
+
         if let Some(exec) = plan.downcast_ref::<ProjectionExec>() {
             let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
             let expr = exec
@@ -70,7 +76,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                     },
                 ))),
             })
-         } else if let Some(limit) = plan.downcast_ref::<GlobalLimitExec>() {
+        } else if let Some(limit) = plan.downcast_ref::<GlobalLimitExec>() {
             let input: protobuf::PhysicalPlanNode = limit.input().to_owned().try_into()?;
             Ok(protobuf::PhysicalPlanNode {
                 physical_plan_type: Some(PhysicalPlanType::GlobalLimit(Box::new(
@@ -117,12 +123,17 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                 ))),
             })
         } else if let Some(exec) = plan.downcast_ref::<HashAggregateExec>() {
-
-            let groups = exec.group_expr().iter().map(|expr| expr.0.to_owned().try_into())
+            let groups = exec
+                .group_expr()
+                .iter()
+                .map(|expr| expr.0.to_owned().try_into())
                 .collect::<Result<Vec<_>, BallistaError>>()?;
-            let agg = exec.aggr_expr().iter().map(|expr| expr.to_owned().try_into())
+            let agg = exec
+                .aggr_expr()
+                .iter()
+                .map(|expr| expr.to_owned().try_into())
                 .collect::<Result<Vec<_>, BallistaError>>()?;
-            let agg_mode = match exec.mode()  {
+            let agg_mode = match exec.mode() {
                 AggregateMode::Partial => protobuf::AggregateMode::Partial,
                 AggregateMode::Final => protobuf::AggregateMode::Final,
             };
@@ -197,21 +208,21 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                     },
                 )),
             })
-        //     PhysicalPlan::ShuffleReader(exec) => {
-        //         let mut node = empty_physical_plan_node();
-        //
-        //         let shuffle_id: Vec<protobuf::ShuffleId> = exec
-        //             .shuffle_id
-        //             .iter()
-        //             .map(|s| s.try_into())
-        //             .collect::<Result<_, _>>()?;
-        //
-        //         node.shuffle_reader = Some(protobuf::ShuffleReaderExecNode {
-        //             schema: Some(exec.schema().as_ref().try_into()?),
-        //             shuffle_id,
-        //         });
-        //         Ok(node)
-        //     }
+        } else if let Some(exec) = plan.downcast_ref::<ShuffleReaderExec>() {
+            let partition_location = exec
+                .partition_location
+                .iter()
+                .map(|l| l.clone().try_into())
+                .collect::<Result<_, _>>()?;
+
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: Some(PhysicalPlanType::ShuffleReader(
+                    protobuf::ShuffleReaderExecNode {
+                        partition_location,
+                        schema: Some(exec.schema().as_ref().try_into()?),
+                    },
+                )),
+            })
         } else if let Some(exec) = plan.downcast_ref::<SortExec>() {
             let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
             let expr = exec
@@ -245,34 +256,36 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
     }
 }
 
-impl TryInto<protobuf::LogicalExprNode> for Arc<dyn AggregateExpr> { //need to fix!
+impl TryInto<protobuf::LogicalExprNode> for Arc<dyn AggregateExpr> {
+    //need to fix!
     type Error = BallistaError;
 
     fn try_into(self) -> Result<protobuf::LogicalExprNode, Self::Error> {
-
         /*if let Some(value) = value::<Avg>() {
-            let expr_type = Box::new(protobuf::AggregateExprNode {
-                //name, expr, datatype
-                aggr_function: protobuf::AggregateFunction::Avg.into(), // wrong!
-                expr: expr.expr().to_owned(),
-            });*/
+        let expr_type = Box::new(protobuf::AggregateExprNode {
+            //name, expr, datatype
+            aggr_function: protobuf::AggregateFunction::Avg.into(), // wrong!
+            expr: expr.expr().to_owned(),
+        });*/
 
-            Ok(protobuf::LogicalExprNode {
-                expr_type: Some(protobuf::logical_expr_node::ExprType::AggregateExpr(
-                     Box::new(protobuf::AggregateExprNode {
-                         //name, expr, datatype
-                         aggr_function: protobuf::AggregateFunction::Avg.into(), // wrong!
-                         expr: Some(Box::new(self.expressions())),
-                     }))),
-            })
-        }
+        Ok(protobuf::LogicalExprNode {
+            expr_type: Some(protobuf::logical_expr_node::ExprType::AggregateExpr(
+                Box::new(protobuf::AggregateExprNode {
+                    //name, expr, datatype
+                    aggr_function: protobuf::AggregateFunction::Avg.into(), // wrong!
+                    expr: Some(Box::new(self.expressions())),
+                }),
+            )),
+        })
     }
+}
 
 impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
     type Error = BallistaError;
 
     fn try_from(value: Arc<dyn PhysicalExpr>) -> Result<Self, Self::Error> {
         let expr = value.as_any();
+
         if let Some(expr) = expr.downcast_ref::<Column>() {
             Ok(protobuf::LogicalExprNode {
                 expr_type: Some(protobuf::logical_expr_node::ExprType::ColumnName(
@@ -285,10 +298,58 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
                 r: Some(Box::new(expr.right().to_owned().try_into()?)),
                 op: format!("{:?}", expr.op()),
             });
+
             Ok(protobuf::LogicalExprNode {
                 expr_type: Some(protobuf::logical_expr_node::ExprType::BinaryExpr(
                     binary_expr,
                 )),
+            })
+        } else if let Some(expr) = expr.downcast_ref::<CaseExpr>() {
+            Ok(protobuf::LogicalExprNode {
+                expr_type: Some(protobuf::logical_expr_node::ExprType::Case(Box::new(
+                    protobuf::CaseNode {
+                        expr: expr
+                            .expr()
+                            .as_ref()
+                            .map(|exp| exp.clone().try_into().map(Box::new))
+                            .transpose()?,
+                        when_then_expr: expr
+                            .when_then_expr()
+                            .iter()
+                            .map(|(when_expr, then_expr)| {
+                                try_parse_when_then_expr(when_expr, then_expr)
+                            })
+                            .collect::<Result<Vec<protobuf::WhenThen>, Self::Error>>()?,
+                        else_expr: expr
+                            .else_expr()
+                            .map(|a| a.clone().try_into().map(Box::new))
+                            .transpose()?,
+                    },
+                ))),
+            })
+        } else if let Some(expr) = expr.downcast_ref::<IsNullExpr>() {
+            Ok(protobuf::LogicalExprNode {
+                expr_type: Some(protobuf::logical_expr_node::ExprType::IsNullExpr(Box::new(
+                    protobuf::IsNull {
+                        expr: Some(Box::new(expr.arg().to_owned().try_into()?)),
+                    },
+                ))),
+            })
+        } else if let Some(expr) = expr.downcast_ref::<IsNotNullExpr>() {
+            Ok(protobuf::LogicalExprNode {
+                expr_type: Some(protobuf::logical_expr_node::ExprType::IsNotNullExpr(
+                    Box::new(protobuf::IsNotNull {
+                        expr: Some(Box::new(expr.arg().to_owned().try_into()?)),
+                    }),
+                )),
+            })
+        } else if let Some(expr) = expr.downcast_ref::<NegativeExpr>() {
+            Ok(protobuf::LogicalExprNode {
+                expr_type: Some(protobuf::logical_expr_node::ExprType::Negative(Box::new(
+                    protobuf::NegativeNode {
+                        expr: Some(Box::new(expr.arg().to_owned().try_into()?)),
+                    },
+                ))),
             })
         } else {
             Err(BallistaError::General(format!(
@@ -299,4 +360,12 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
     }
 }
 
-
+fn try_parse_when_then_expr(
+    when_expr: &Arc<dyn PhysicalExpr>,
+    then_expr: &Arc<dyn PhysicalExpr>,
+) -> Result<protobuf::WhenThen, BallistaError> {
+    Ok(protobuf::WhenThen {
+        when_expr: Some(when_expr.clone().try_into()?),
+        then_expr: Some(then_expr.clone().try_into()?),
+    })
+}

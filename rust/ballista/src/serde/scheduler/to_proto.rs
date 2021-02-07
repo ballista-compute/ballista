@@ -15,6 +15,7 @@
 use std::convert::TryInto;
 
 use crate::error::BallistaError;
+use crate::scheduler::planner::PartitionLocation;
 use crate::serde::protobuf;
 use crate::serde::protobuf::action::ActionType;
 use crate::serde::scheduler::{Action, ExecutePartition, PartitionId};
@@ -71,6 +72,21 @@ impl TryInto<protobuf::PartitionId> for PartitionId {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<protobuf::PartitionId, Self::Error> {
-        unimplemented!()
+        Ok(protobuf::PartitionId {
+            job_uuid: self.job_uuid.to_string(),
+            stage_id: self.stage_id as u32,
+            partition_id: self.partition_id as u32,
+        })
+    }
+}
+
+impl TryInto<protobuf::PartitionLocation> for PartitionLocation {
+    type Error = BallistaError;
+
+    fn try_into(self) -> Result<protobuf::PartitionLocation, Self::Error> {
+        Ok(protobuf::PartitionLocation {
+            partition_id: Some(self.partition_id.try_into()?),
+            executor_meta: Some(self.executor_meta.into()),
+        })
     }
 }

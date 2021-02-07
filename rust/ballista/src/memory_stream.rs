@@ -20,13 +20,12 @@
 
 use std::task::{Context, Poll};
 
-use arrow::datatypes::SchemaRef;
-use arrow::error::Result;
-use arrow::record_batch::RecordBatch;
+use arrow::{datatypes::SchemaRef, error::Result, record_batch::RecordBatch};
 use datafusion::physical_plan::RecordBatchStream;
 use futures::Stream;
 
 /// Iterator over batches
+
 pub struct MemoryStream {
     /// Vector of record batches
     data: Vec<RecordBatch>,
@@ -40,6 +39,7 @@ pub struct MemoryStream {
 
 impl MemoryStream {
     /// Create an iterator for a vector of record batches
+
     pub fn try_new(
         data: Vec<RecordBatch>,
         schema: SchemaRef,
@@ -63,7 +63,9 @@ impl Stream for MemoryStream {
     ) -> Poll<Option<Self::Item>> {
         Poll::Ready(if self.index < self.data.len() {
             self.index += 1;
+
             let batch = &self.data[self.index - 1];
+
             // apply projection
             match &self.projection {
                 Some(columns) => Some(RecordBatch::try_new(
@@ -84,6 +86,7 @@ impl Stream for MemoryStream {
 
 impl RecordBatchStream for MemoryStream {
     /// Get the schema
+
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }

@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::fs::File;
+use std::{
+    fs::File,
+    io::{prelude::*, BufReader},
+    path::Path,
+};
 
 use crate::memory_stream::MemoryStream;
 
@@ -88,4 +92,31 @@ pub async fn collect_stream(stream: &mut SendableRecordBatchStream) -> Result<Ve
         batches.push(batch?);
     }
     Ok(batches)
+}
+
+pub fn parse_opts_from_file(filename: impl AsRef<Path>) -> Vec<String> {
+    // Parses a file where each line is a key value pair into a vector of strings
+    // e.g port=1234 becomes ["--port", "1234"]
+    // lines starting with '#' are treated as comments and ignored
+    let file = File::open(filename).expect("no such file");
+    let buf = BufReader::new(file);
+    let lines: Vec<String> = buf
+        .lines()
+        .map(|l| l.expect("Could not parse line"))
+        .collect();
+    let mut args: Vec<String> = vec![];
+    for line in lines {
+        if line.starts_with('#') {
+            continue;
+        }
+        let mut split_line = line.split('=');
+        let mut key = "--".to_owned();
+        key.push_str(split_line.next().unwrap());
+        args.push(key);
+        // add the value if it exists
+        for arg in split_line {
+            args.push(arg.parse().unwrap());
+        }
+    }
+    return args;
 }

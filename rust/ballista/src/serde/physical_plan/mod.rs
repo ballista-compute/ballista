@@ -40,7 +40,7 @@ mod roundtrip_tests {
         //let result_exec_plan: Arc<dyn ExecutionPlan> = (&proto).try_into()?;
         //assert_eq!(
         //   format!("{:?}", exec_plan),
-        //  format!("{:?}", result_exec_plan)
+        //   format!("{:?}", result_exec_plan)
         //);
         Ok(())
     }

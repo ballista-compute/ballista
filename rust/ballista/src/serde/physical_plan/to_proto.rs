@@ -35,7 +35,7 @@ use datafusion::physical_plan::sort::SortExec;
 
 use datafusion::physical_plan::{
     empty::EmptyExec,
-    expressions::{Avg, BinaryExpr, Column},
+    expressions::{Avg, Sum, BinaryExpr, Column},
 };
 use datafusion::physical_plan::{AggregateExpr, ExecutionPlan, PhysicalExpr};
 
@@ -143,8 +143,8 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                     protobuf::HashAggregateExecNode {
                         group_expr: groups,
                         aggr_expr: agg,
-                        mode: agg_mode,
-                        input,
+                        mode: agg_mode as i32,
+                        input: Some(Box::new(input)),
                     },
                 ))),
             })
@@ -257,23 +257,25 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
 }
 
 impl TryInto<protobuf::LogicalExprNode> for Arc<dyn AggregateExpr> {
-    //need to fix!
     type Error = BallistaError;
 
     fn try_into(self) -> Result<protobuf::LogicalExprNode, Self::Error> {
-        /*if let Some(value) = value::<Avg>() {
-        let expr_type = Box::new(protobuf::AggregateExprNode {
-            //name, expr, datatype
-            aggr_function: protobuf::AggregateFunction::Avg.into(), // wrong!
-            expr: expr.expr().to_owned(),
-        });*/
-
+        let aggr_function = if self.as_any().downcast_ref::<Avg>().is_some() {
+            Ok(protobuf::AggregateFunction::Avg.into())
+        } else if self.as_any().downcast_ref::<Sum>().is_some() {
+            Ok(protobuf::AggregateFunction::Sum.into())
+        } else {
+            Err(BallistaError::NotImplemented(format!("Aggregate function not supported: {:?}", self)))
+        }?;
+        let expressions: Vec<protobuf::LogicalExprNode> = self.expressions()
+            .iter()
+            .map(|e| e.clone().try_into())
+            .collect::<Result<Vec<_>, BallistaError>>()?;
         Ok(protobuf::LogicalExprNode {
             expr_type: Some(protobuf::logical_expr_node::ExprType::AggregateExpr(
                 Box::new(protobuf::AggregateExprNode {
-                    //name, expr, datatype
-                    aggr_function: protobuf::AggregateFunction::Avg.into(), // wrong!
-                    expr: Some(Box::new(self.expressions())),
+                    aggr_function,
+                    expr: Some(Box::new(expressions[0].clone())),
                 }),
             )),
         })

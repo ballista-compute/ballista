@@ -23,6 +23,7 @@ use crate::executor::shuffle_reader::ShuffleReaderExec;
 use crate::scheduler::planner::PartitionLocation;
 use crate::serde::{proto_error, protobuf};
 use crate::{convert_box_required, convert_required};
+use crate::serde::protobuf::LogicalExprNode;
 
 use arrow::datatypes::Schema;
 use datafusion::execution::context::{ExecutionConfig, ExecutionContextState};
@@ -32,7 +33,7 @@ use datafusion::physical_plan::{
     coalesce_batches::CoalesceBatchesExec,
     csv::CsvExec,
     empty::EmptyExec,
-    expressions::PhysicalSortExpr,
+    expressions::{Avg, Column, PhysicalSortExpr},
     filter::FilterExec,
     hash_join::HashJoinExec,
     hash_utils::JoinType,
@@ -41,10 +42,13 @@ use datafusion::physical_plan::{
     projection::ProjectionExec,
     sort::{SortExec, SortOptions},
 };
+
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 use datafusion::prelude::CsvReadOptions;
 
 use protobuf::physical_plan_node::PhysicalPlanType;
+//use protobuf::physical_::PhysicalExprType;
+use datafusion::physical_plan::hash_aggregate::{HashAggregateExec, AggregateMode};
 
 impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
     type Error = BallistaError;
@@ -128,7 +132,28 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                 let input: Arc<dyn ExecutionPlan> = convert_box_required!(limit.input)?;
                 Ok(Arc::new(LocalLimitExec::new(input, limit.limit as usize)))
             }
-            PhysicalPlanType::HashAggregate(_) => unimplemented!(),
+            PhysicalPlanType::HashAggregate(hashAgg) => {
+                let mode = protobuf::AggregateMode::from_i32(hashAgg.mode).ok_or_else(|| {
+                    proto_error(format!(
+                        "Received a HashAggregateNode message with unknown AggregateMode {}",
+                        hashAgg.mode
+                    ))
+                })?;
+                let agg_mode= match mode {
+                    protobuf::AggregateMode::Partial => AggregateMode::Partial,
+                    protobuf::AggregateMode::Final => AggregateMode::Final,
+                };
+                let group = hashAgg.group_expr.iter().map(|expr| convert_box_required!(expr.0)).collect()?;
+                let agg_expr = hashAgg.aggr_expr.iter().map(|expr| convert_box_required!(expr)).collect()?;
+                let input = convert_box_required!(hashAgg.input)?;
+
+                Ok(Arc::new(HashAggregateExec::try_new(
+                    mode: agg_mode,
+                    group_expr: group,
+                    agg_expr,
+                    input
+                )?))
+            },
             PhysicalPlanType::HashJoin(hashjoin) => {
                 let left: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.left)?;
                 let right: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.right)?;
@@ -209,6 +234,43 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                 Ok(Arc::new(SortExec::try_new(exprs, input, 1)?))
             }
         }
+    }
+}
+
+impl TryInto<Arc<dyn PhysicalExpr>> for &LogicalExprNode {
+    type Error = BallistaError;
+    fn try_into(self) -> Result<Arc<dyn PhysicalExpr>, Self::Error> {
+        let plan = self.expr_type.as_ref().ok_or_else(|| {
+                proto_error(format!(
+                "physical_plan::from_proto() Unsupported physical plan '{:?}'",
+                self
+            ))
+        })?;
+        match plan {
+            PhysicalExprType::Column(c) => {
+                Ok(Arc::new(Column::new(c.name)))
+            }
+        }
+
+    }
+}
+
+impl TryInto<Arc<dyn AggregateExpr>> for &LogicalExprNode {
+    type Error = BallistaError;
+    fn try_into(self) -> Result<Arc<dyn PhysicalExpr>, Self::Error> {
+        let plan = self.expr_type.as_ref().ok_or_else(|| {
+            proto_error(format!(
+                "physical_plan::from_proto() Unsupported physical plan '{:?}'",
+                self
+            ))
+        })?;
+        match plan {
+            AggregateExprType::Avg(a) => {
+                let agg_fn = a.aggr_function.try_into();
+                //Ok(Arc::new(Avg::new(agg_fn))) // TODO
+            }
+        }
+
     }
 }
 

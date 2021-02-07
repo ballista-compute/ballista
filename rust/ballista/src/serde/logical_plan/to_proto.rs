@@ -494,7 +494,7 @@ impl TryFrom<&datafusion::scalar::ScalarValue> for protobuf::ScalarValue {
         use datafusion::scalar;
         use protobuf::scalar_value::Value;
         use protobuf::PrimitiveScalarType;
-        Ok(match val {
+        let scalar_val = match val {
             scalar::ScalarValue::Boolean(val) => {
                 create_proto_scalar(val, PrimitiveScalarType::Bool, |s| Value::BoolValue(*s))
             }
@@ -632,7 +632,14 @@ impl TryFrom<&datafusion::scalar::ScalarValue> for protobuf::ScalarValue {
                     Value::TimeNanosecondValue(*s)
                 })
             }
-        })
+            _ => {
+                return Err(proto_error(format!(
+                    "Error converting to Datatype to scalar type, {:?} is invalid as a datafusion scalar.",
+                    val
+                )))
+            }
+        };
+        Ok(scalar_val)
     }
 }
 

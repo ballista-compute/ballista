@@ -324,7 +324,6 @@ message SelectionExecNode {
 enum AggregateMode {
   PARTIAL = 0;
   FINAL = 1;
-  COMPLETE = 2;
 }
 
 message HashAggregateExecNode {

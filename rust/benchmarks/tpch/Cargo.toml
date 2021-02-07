@@ -7,11 +7,10 @@ edition = "2018"
 [dependencies]
 ballista = { path="../../ballista" }
 
-# use fork until https://github.com/apache/arrow/pull/9439 is merged
-arrow = { git = "https://github.com/andygrove/arrow", rev="6e163c2" }
-arrow-flight = { git = "https://github.com/andygrove/arrow", rev="6e163c2" }
-datafusion = { git = "https://github.com/andygrove/arrow", rev="6e163c2" }
-parquet = { git = "https://github.com/andygrove/arrow", rev="6e163c2" }
+arrow = { git = "https://github.com/apache/arrow", rev="c3b972c" }
+arrow-flight = { git = "https://github.com/apache/arrow", rev="c3b972c" }
+datafusion = { git = "https://github.com/apache/arrow", rev="c3b972c" }
+parquet = { git = "https://github.com/apache/arrow", rev="c3b972c" }
 
 env_logger = "0.8"
 tokio = { version = "1.0", features = ["macros", "rt", "rt-multi-thread", "sync"] }

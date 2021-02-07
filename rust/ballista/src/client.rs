@@ -14,9 +14,9 @@
 
 //! Client API for sending requests to executors.
 
-use std::{collections::HashMap, pin::Pin};
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
+use std::{collections::HashMap, pin::Pin};
 
 use crate::error::{ballista_error, BallistaError, Result};
 use crate::memory_stream::MemoryStream;
@@ -29,9 +29,9 @@ use arrow::record_batch::RecordBatch;
 use arrow_flight::flight_service_client::FlightServiceClient;
 use arrow_flight::utils::flight_data_to_arrow_batch;
 use arrow_flight::Ticket;
-use datafusion::{logical_plan::LogicalPlan, physical_plan::RecordBatchStream};
 use datafusion::physical_plan::common::collect;
-use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
+use datafusion::{logical_plan::LogicalPlan, physical_plan::RecordBatchStream};
 use log::debug;
 use prost::Message;
 use uuid::Uuid;
@@ -44,6 +44,7 @@ pub struct BallistaClient {
 impl BallistaClient {
     /// Create a new BallistaClient to connect to the executor listening on the specified
     /// host and port
+
     pub async fn try_new(host: &str, port: usize) -> Result<Self> {
         let addr = format!("http://{}:{}", host, port);
         debug!("BallistaClient connecting to {}", addr);
@@ -61,11 +62,12 @@ impl BallistaClient {
     }
 
     /// Execute a logical query plan and retrieve the results
-    pub async fn execute_query(&mut self, plan: &LogicalPlan) -> Result<Pin<Box<dyn RecordBatchStream + Send + Sync>>> {
+    pub async fn execute_query(&mut self, plan: &LogicalPlan) -> Result<SendableRecordBatchStream> {
         let action = Action::InteractiveQuery {
             plan: plan.to_owned(),
             settings: HashMap::new(),
         };
+
         self.execute_action(&action).await
 
         //Ok(Arc::new(CollectExec::new(final_stage)))
@@ -130,9 +132,11 @@ impl BallistaClient {
     }
 
     /// Execute an action and retrieve the results
-    pub async fn execute_action(&mut self, action: &Action) -> Result<Pin<Box<dyn RecordBatchStream + Send + Sync>>> {
+    pub async fn execute_action(&mut self, action: &Action) -> Result<SendableRecordBatchStream> {
         let serialized_action: protobuf::Action = action.to_owned().try_into()?;
+
         let mut buf: Vec<u8> = Vec::with_capacity(serialized_action.encoded_len());
+
         serialized_action
             .encode(&mut buf)
             .map_err(|e| BallistaError::General(format!("{:?}", e)))?;
@@ -160,12 +164,14 @@ impl BallistaClient {
 
                 //TODO we should stream the data rather than load into memory first
                 let mut batches = vec![];
+
                 while let Some(flight_data) = stream
                     .message()
                     .await
                     .map_err(|e| BallistaError::General(format!("{:?}", e)))?
                 {
                     let batch = flight_data_to_arrow_batch(&flight_data, schema.clone(), &[])?;
+
                     batches.push(batch);
                 }
 

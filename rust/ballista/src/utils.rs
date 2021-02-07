@@ -33,18 +33,22 @@ pub struct PartitionStats {
 }
 
 /// Stream data to disk in Arrow IPC format
+
 pub async fn write_stream_to_disk(
     stream: &mut Pin<Box<dyn RecordBatchStream + Send + Sync>>,
     path: &str,
 ) -> Result<PartitionStats> {
     let file = File::create(&path)?;
+
     let mut num_rows = 0;
     let mut num_batches = 0;
     let mut num_bytes = 0;
     let mut null_count = 0;
     let mut writer = FileWriter::try_new(file, stream.schema().as_ref())?;
+
     while let Some(result) = stream.next().await {
         let batch = result?;
+
         let batch_size_bytes: usize = batch
             .columns()
             .iter()
@@ -66,7 +70,9 @@ pub async fn write_stream_to_disk(
     })
 }
 
-pub async fn read_stream_from_disk(path: &str) -> Result<Pin<Box<dyn RecordBatchStream + Send + Sync>>> {
+pub async fn read_stream_from_disk(
+    path: &str,
+) -> Result<Pin<Box<dyn RecordBatchStream + Send + Sync>>> {
     let file = File::open(&path)?;
     let reader = FileReader::try_new(file)?;
     let schema = reader.schema();
@@ -78,7 +84,9 @@ pub async fn read_stream_from_disk(path: &str) -> Result<Pin<Box<dyn RecordBatch
     Ok(Box::pin(MemoryStream::try_new(batches, schema, None)?))
 }
 
-pub async fn collect_stream(stream: &mut Pin<Box<dyn RecordBatchStream + Send + Sync>>) -> Result<Vec<RecordBatch>> {
+pub async fn collect_stream(
+    stream: &mut Pin<Box<dyn RecordBatchStream + Send + Sync>>,
+) -> Result<Vec<RecordBatch>> {
     let mut batches = vec![];
     while let Some(batch) = stream.next().await {
         batches.push(batch?);

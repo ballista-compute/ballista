@@ -7,18 +7,20 @@ services:
       - "2379:2379"
   ballista-scheduler:
     image: ballistacompute/ballista-rust:0.4.0-SNAPSHOT
-    command: "/scheduler --mode etcd --etcd-urls etcd:2379 --external-host 0.0.0.0 --port 50050"
+    command: "/scheduler --config-backend etcd --etcd-urls etcd:2379 --bind-host 0.0.0.0 --port 50050"
     ports:
       - "50050:50050"
-    volumes:
-      - ./data:/mnt/tpch
+    depends_on:
+      - etcd
   ballista-executor:
     image: ballistacompute/ballista-rust:0.4.0-SNAPSHOT
-    command: "/executor --mode etcd --etcd-urls etcd:2379 --external-host 0.0.0.0 --port 50051"
+    command: "/executor --bind-host 0.0.0.0 --port 50051 --scheduler-host ballista-scheduler"
     ports:
       - "50051:50051"
     volumes:
-      - ./data:/mnt/tpch
+      - ./data:/data
+    depends_on:
+      - ballista-scheduler
 #  ballista-jvm:
 #    image: ballistacompute/ballista-jvm:0.4.0-SNAPSHOT
 #    ports:

@@ -22,18 +22,22 @@ use std::sync::Arc;
 
 use crate::client::BallistaClient;
 use crate::context::DFTableAdapter;
-use crate::error::Result;
+use crate::error::{BallistaError, Result};
+use crate::executor::collect::CollectExec;
 use crate::executor::query_stage::QueryStageExec;
 use crate::executor::shuffle_reader::ShuffleReaderExec;
 use crate::serde::scheduler::ExecutorMeta;
 use crate::serde::scheduler::PartitionId;
+use crate::utils;
 
+use arrow::record_batch::RecordBatch;
 use datafusion::error::DataFusionError;
 use datafusion::execution::context::ExecutionContext;
+use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
 use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::merge::MergeExec;
-use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
 use log::debug;
 use uuid::Uuid;
 
@@ -43,32 +47,39 @@ pub struct PartitionLocation {
     pub(crate) executor_meta: ExecutorMeta,
 }
 
-/// Trait that the distributed planner uses to get a list of available executors
-pub trait SchedulerClient: Send + Sync {
-    fn get_executors(&self) -> Result<Vec<ExecutorMeta>>;
-}
-
-impl SchedulerClient for Vec<ExecutorMeta> {
-    fn get_executors(&self) -> Result<Vec<ExecutorMeta>> {
-        Ok(self.clone())
-    }
-}
-
 pub struct DistributedPlanner {
-    scheduler_client: Box<dyn SchedulerClient>,
+    executors: Vec<ExecutorMeta>,
     next_stage_id: usize,
 }
 
 impl DistributedPlanner {
-    pub fn new(scheduler_client: Box<dyn SchedulerClient>) -> Self {
+    pub fn new(executors: Vec<ExecutorMeta>) -> Self {
         Self {
-            scheduler_client,
+            executors,
             next_stage_id: 0,
         }
     }
 }
 
 impl DistributedPlanner {
+    /// Execute a logical plan using distributed query execution and collect the results into a
+    /// vector of [RecordBatch].
+    pub async fn collect(
+        &mut self,
+        logical_plan: &LogicalPlan,
+    ) -> Result<SendableRecordBatchStream> {
+        let datafusion_ctx = ExecutionContext::new();
+        let plan = datafusion_ctx.optimize(logical_plan)?;
+        let plan = datafusion_ctx.create_physical_plan(&plan)?;
+        let plan = self.execute_distributed_query(plan).await?;
+        let plan = Arc::new(CollectExec::new(plan));
+        plan.execute(0).await.map_err(|e| e.into())
+    }
+
+    /// Execute a distributed query against a cluster, leaving the final results on the
+    /// executors. The [ExecutionPlan] returned by this method is guaranteed to be a
+    /// [ShuffleReaderExec] that can be used to fetch the final results from the executors
+    /// in parallel.
     pub async fn execute_distributed_query(
         &mut self,
         execution_plan: Arc<dyn ExecutionPlan>,
@@ -82,12 +93,10 @@ impl DistributedPlanner {
             create_query_stage(&job_uuid, self.next_stage_id(), execution_plan.clone())?;
         pretty_print(execution_plan.clone(), 0);
 
-        let executors = self.scheduler_client.get_executors()?;
-
-        execute(execution_plan.clone(), executors.clone()).await
+        execute(execution_plan.clone(), self.executors.clone()).await
     }
 
-    /// Insert QueryStageExec nodes into the plan wherever partitioning changes
+    /// Insert [QueryStageExec] nodes into the plan wherever partitioning changes
     pub fn prepare_query_stages(
         &mut self,
         job_uuid: &Uuid,
@@ -175,10 +184,7 @@ fn execute(
         let plan = plan.with_new_children(children)?;
 
         let new_plan: Arc<dyn ExecutionPlan> = if plan.as_any().is::<QueryStageExec>() {
-            let stage = plan
-                .as_any()
-                .downcast_ref::<QueryStageExec>()
-                .unwrap();
+            let stage = plan.as_any().downcast_ref::<QueryStageExec>().unwrap();
             let partition_locations = execute_query_stage(
                 &stage.job_uuid.clone(),
                 stage.stage_id,
@@ -202,11 +208,6 @@ fn execute(
     })
 }
 
-// struct Foo {
-//     plan: Arc<dyn ExecutionPlan>,
-//     partition_locations: Vec<PartitionLocation>
-// }
-
 fn create_query_stage(
     job_uuid: &Uuid,
     stage_id: usize,
@@ -226,7 +227,6 @@ async fn execute_query_stage(
     plan: Arc<dyn ExecutionPlan>,
     executors: Vec<ExecutorMeta>,
 ) -> Result<Vec<PartitionLocation>> {
-    
     debug!("execute_query_stage() stage_id={}", stage_id);
     pretty_print(plan.clone(), 0);
 
@@ -237,7 +237,7 @@ async fn execute_query_stage(
 
     for child_partition in 0..partition_count {
         let executor_meta = &executors[child_partition % executors.len()];
-       
+
         // TODO: this won't compile because it causes the resulting future to be !Sync
         /*
         let mut client = BallistaClient::try_new(&executor_meta.host, executor_meta.port as usize)

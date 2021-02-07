@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::ExecutionPlan;
@@ -27,6 +26,7 @@ pub mod to_proto;
 
 /// Action that can be sent to an executor
 #[derive(Debug, Clone)]
+
 pub enum Action {
     /// Execute the query and return the results
     InteractiveQuery {

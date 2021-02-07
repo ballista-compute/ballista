@@ -41,6 +41,7 @@ use tonic::{Request, Response, Status, Streaming};
 
 /// Service implementing the Apache Arrow Flight Protocol
 #[derive(Clone)]
+
 pub struct BallistaFlightService {
     executor: Arc<BallistaExecutor>,
 }
@@ -54,14 +55,15 @@ impl BallistaFlightService {
 type BoxedFlightStream<T> = Pin<Box<dyn Stream<Item = Result<T, Status>> + Send + Sync + 'static>>;
 
 #[tonic::async_trait]
+
 impl FlightService for BallistaFlightService {
-    type HandshakeStream = BoxedFlightStream<HandshakeResponse>;
-    type ListFlightsStream = BoxedFlightStream<FlightInfo>;
+    type DoActionStream = BoxedFlightStream<arrow_flight::Result>;
+    type DoExchangeStream = BoxedFlightStream<FlightData>;
     type DoGetStream = BoxedFlightStream<FlightData>;
     type DoPutStream = BoxedFlightStream<PutResult>;
-    type DoActionStream = BoxedFlightStream<arrow_flight::Result>;
+    type HandshakeStream = BoxedFlightStream<HandshakeResponse>;
     type ListActionsStream = BoxedFlightStream<ActionType>;
-    type DoExchangeStream = BoxedFlightStream<FlightData>;
+    type ListFlightsStream = BoxedFlightStream<FlightInfo>;
 
     async fn do_get(
         &self,
@@ -204,9 +206,11 @@ impl FlightService for BallistaFlightService {
         request: Request<Streaming<FlightData>>,
     ) -> Result<Response<Self::DoPutStream>, Status> {
         let mut request = request.into_inner();
+
         while let Some(data) = request.next().await {
             let _data = data?;
         }
+
         Err(Status::unimplemented("do_put"))
     }
 
@@ -215,7 +219,9 @@ impl FlightService for BallistaFlightService {
         request: Request<Action>,
     ) -> Result<Response<Self::DoActionStream>, Status> {
         let action = request.into_inner();
+
         let _action = decode_protobuf(&action.body.to_vec()).map_err(|e| from_ballista_err(&e))?;
+
         Err(Status::unimplemented("do_action"))
     }
 

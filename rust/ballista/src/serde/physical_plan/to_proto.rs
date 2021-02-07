@@ -16,14 +16,14 @@
 //! buffer format, allowing DataFusion physical plans to be serialized and transmitted between
 //! processes.
 
-use std::convert::{TryFrom, TryInto};
-use std::sync::Arc;
-
-use crate::executor::shuffle_reader::ShuffleReaderExec;
-use crate::serde::{protobuf, BallistaError};
+use std::{
+    convert::{TryFrom, TryInto},
+    sync::Arc,
+};
 
 use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
 use datafusion::physical_plan::csv::CsvExec;
+use datafusion::physical_plan::expressions::{CaseExpr, IsNotNullExpr, IsNullExpr, NegativeExpr};
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::hash_utils::JoinType;
@@ -31,20 +31,24 @@ use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
 use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::sort::SortExec;
+
 use datafusion::physical_plan::{
     empty::EmptyExec,
     expressions::{BinaryExpr, Column},
 };
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
-use datafusion::physical_plan::expressions::{IsNotNullExpr, IsNullExpr, NegativeExpr};
 use protobuf::physical_plan_node::PhysicalPlanType;
+
+use crate::executor::shuffle_reader::ShuffleReaderExec;
+use crate::serde::{protobuf, BallistaError};
 
 impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
     type Error = BallistaError;
 
     fn try_into(self) -> Result<protobuf::PhysicalPlanNode, Self::Error> {
         let plan = self.as_any();
+
         if let Some(exec) = plan.downcast_ref::<ProjectionExec>() {
             let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
             let expr = exec
@@ -252,6 +256,7 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
 
     fn try_from(value: Arc<dyn PhysicalExpr>) -> Result<Self, Self::Error> {
         let expr = value.as_any();
+
         if let Some(expr) = expr.downcast_ref::<Column>() {
             Ok(protobuf::LogicalExprNode {
                 expr_type: Some(protobuf::logical_expr_node::ExprType::ColumnName(
@@ -264,10 +269,34 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
                 r: Some(Box::new(expr.right().to_owned().try_into()?)),
                 op: format!("{:?}", expr.op()),
             });
+
             Ok(protobuf::LogicalExprNode {
                 expr_type: Some(protobuf::logical_expr_node::ExprType::BinaryExpr(
                     binary_expr,
                 )),
+            })
+        } else if let Some(expr) = expr.downcast_ref::<CaseExpr>() {
+            Ok(protobuf::LogicalExprNode {
+                expr_type: Some(protobuf::logical_expr_node::ExprType::Case(Box::new(
+                    protobuf::CaseNode {
+                        expr: expr
+                            .expr()
+                            .as_ref()
+                            .map(|exp| exp.clone().try_into().map(Box::new))
+                            .transpose()?,
+                        when_then_expr: expr
+                            .when_then_expr()
+                            .iter()
+                            .map(|(when_expr, then_expr)| {
+                                try_parse_when_then_expr(when_expr, then_expr)
+                            })
+                            .collect::<Result<Vec<protobuf::WhenThen>, Self::Error>>()?,
+                        else_expr: expr
+                            .else_expr()
+                            .map(|a| a.clone().try_into().map(Box::new))
+                            .transpose()?,
+                    },
+                ))),
             })
         } else if let Some(expr) = expr.downcast_ref::<IsNullExpr>() {
             Ok(protobuf::LogicalExprNode {
@@ -300,4 +329,14 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
             )))
         }
     }
+}
+
+fn try_parse_when_then_expr(
+    when_expr: &Arc<dyn PhysicalExpr>,
+    then_expr: &Arc<dyn PhysicalExpr>,
+) -> Result<protobuf::WhenThen, BallistaError> {
+    Ok(protobuf::WhenThen {
+        when_expr: Some(when_expr.clone().try_into()?),
+        then_expr: Some(then_expr.clone().try_into()?),
+    })
 }

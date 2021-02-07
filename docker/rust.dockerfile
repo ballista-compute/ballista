@@ -104,12 +104,18 @@ RUN cargo build $RELEASE_FLAG
 ENV RELEASE_FLAG=${RELEASE_FLAG}
 RUN if [ -z "$RELEASE_FLAG" ]; then mv /tmp/ballista/target/debug/executor /executor; else mv /tmp/ballista/target/release/executor /executor; fi
 
+# put the executor on /executor (need to be copied from different places depending on FLAG)
+ENV RELEASE_FLAG=${RELEASE_FLAG}
+RUN if [ -z "$RELEASE_FLAG" ]; then mv /tmp/ballista/target/debug/scheduler /scheduler; else mv /tmp/ballista/target/release/scheduler /scheduler; fi
+
 # Copy the binary into a new container for a smaller docker image
 FROM debian:buster-slim
 
 COPY --from=builder /executor /
 
+COPY --from=builder /scheduler /
+
 ENV RUST_LOG=info
 ENV RUST_BACKTRACE=full
 
-CMD ["/executor"]
+CMD ["/executor", "--local"]

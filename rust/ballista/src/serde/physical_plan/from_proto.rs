@@ -121,7 +121,8 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     input,
                     limit.limit as usize,
                     0,
-                ))) // TODO: concurrency param doesn't seem to be used in datafusion. not sure how to fill this in
+                )))
+                // TODO: concurrency param doesn't seem to be used in datafusion. not sure how to fill this in
             }
             PhysicalPlanType::LocalLimit(limit) => {
                 let input: Arc<dyn ExecutionPlan> = convert_box_required!(limit.input)?;

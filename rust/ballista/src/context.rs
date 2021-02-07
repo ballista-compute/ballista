@@ -14,18 +14,18 @@
 
 //! Distributed execution context.
 
-use std::{any::Any, pin::Pin};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::{any::Any, pin::Pin};
 
 use crate::client::BallistaClient;
 use crate::error::{BallistaError, Result};
-use crate::serde::scheduler::Action;
+use crate::serde::scheduler::{Action, ExecutorMeta};
 
+use crate::scheduler::planner::DistributedPlanner;
 use arrow::datatypes::SchemaRef;
-use datafusion::{dataframe::DataFrame, physical_plan::RecordBatchStream};
 use datafusion::datasource::datasource::Statistics;
 use datafusion::datasource::TableProvider;
 use datafusion::error::Result as DFResult;
@@ -33,14 +33,17 @@ use datafusion::execution::context::ExecutionContext;
 use datafusion::logical_plan::{DFSchema, Expr, LogicalPlan, Partitioning};
 use datafusion::physical_plan::csv::CsvReadOptions;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::{dataframe::DataFrame, physical_plan::RecordBatchStream};
 use log::{debug, info};
 
 #[derive(Debug)]
+
 pub enum ClusterMeta {
     Direct { host: String, port: usize }, //TODO add etcd and k8s options here
 }
 
 #[allow(dead_code)]
+
 pub struct BallistaContextState {
     /// Meta-data required for connecting to a scheduler instances in the cluster
     cluster_meta: ClusterMeta,
@@ -61,6 +64,7 @@ impl BallistaContextState {
 }
 
 #[allow(dead_code)]
+
 pub struct BallistaContext {
     state: Arc<Mutex<BallistaContextState>>,
 }
@@ -73,12 +77,14 @@ impl BallistaContext {
             port,
         };
         let state = BallistaContextState::new(meta, settings);
+
         Self {
             state: Arc::new(Mutex::new(state)),
         }
     }
 
     /// Create a DataFrame representing a Parquet table scan
+
     pub fn read_parquet(&self, path: &str) -> Result<BallistaDataFrame> {
         // convert to absolute path because the executor likely has a different working directory
         let path = PathBuf::from(path);
@@ -91,6 +97,7 @@ impl BallistaContext {
     }
 
     /// Create a DataFrame representing a CSV table scan
+
     pub fn read_csv(&self, path: &str, options: CsvReadOptions) -> Result<BallistaDataFrame> {
         // convert to absolute path because the executor likely has a different working directory
         let path = PathBuf::from(path);
@@ -184,6 +191,7 @@ impl TableProvider for DFTableAdapter {
 
 /// The Ballista DataFrame is a wrapper around the DataFusion DataFrame and overrides the
 /// `collect` method so that the query is executed against Ballista and not DataFusion.
+
 pub struct BallistaDataFrame {
     /// Ballista context state
     state: Arc<Mutex<BallistaContextState>>,
@@ -199,22 +207,41 @@ impl BallistaDataFrame {
     pub async fn collect(&self) -> Result<Pin<Box<dyn RecordBatchStream + Send + Sync>>> {
         let (host, port) = {
             let state = self.state.lock().unwrap();
+
             match &state.cluster_meta {
                 ClusterMeta::Direct { host, port, .. } => (host.to_owned(), *port),
             }
         };
+
         info!("Connecting to Ballista executor at {}:{}", host, port);
-        let mut client = BallistaClient::try_new(&host, port).await?;
+
         let plan = self.df.to_logical_plan();
 
-        debug!("Sending logical plan to executor: {:?}", plan);
+        //TODO change this to test distributed execution
+        let distributed = false;
 
-        client
-            .execute_action(&Action::InteractiveQuery {
-                plan,
-                settings: Default::default(),
-            })
-            .await
+        if distributed {
+            // TODO this logic needs to move into the scheduler so that the scheduler
+            // orchestrates the distributed execution
+            debug!("Executing plan using distributed planner: {:?}", plan);
+            // TODO get list of executors from the scheduler
+            let executors = vec![ExecutorMeta {
+                id: "TBD".to_string(),
+                host: host.to_string(),
+                port: port as u16,
+            }];
+            let mut planner = DistributedPlanner::new(executors);
+            planner.collect(&plan).await
+        } else {
+            debug!("Sending logical plan to executor: {:?}", plan);
+            let mut client = BallistaClient::try_new(&host, port).await?;
+            client
+                .execute_action(&Action::InteractiveQuery {
+                    plan,
+                    settings: Default::default(),
+                })
+                .await
+        }
     }
 
     pub fn select_columns(&self, columns: &[&str]) -> Result<BallistaDataFrame> {
@@ -264,9 +291,9 @@ impl BallistaDataFrame {
     }
 
     // TODO lifetime issue
-    // pub fn join(&self, right: Arc<dyn DataFrame>, join_type: JoinType, left_cols: &[&str], right_cols: &[&str]) -> Result<BallistaDataFrame> {
-    //     Ok(Self::from(self.state.clone(), self.df.join(right, join_type, &left_cols, &right_cols).map_err(BallistaError::from)?))
-    // }
+    // pub fn join(&self, right: Arc<dyn DataFrame>, join_type: JoinType, left_cols: &[&str], right_cols: &[&str]) ->
+    // Result<BallistaDataFrame> {     Ok(Self::from(self.state.clone(), self.df.join(right, join_type, &left_cols,
+    // &right_cols).map_err(BallistaError::from)?)) }
 
     pub fn repartition(&self, partitioning_scheme: Partitioning) -> Result<BallistaDataFrame> {
         Ok(Self::from(

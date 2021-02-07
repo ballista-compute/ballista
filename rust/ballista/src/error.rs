@@ -14,10 +14,11 @@
 
 //! Ballista error types
 
-use std::error::Error;
-use std::fmt::{Display, Formatter};
-use std::io;
-use std::result;
+use std::{
+    error::Error,
+    fmt::{Display, Formatter},
+    io, result,
+};
 
 use arrow::error::ArrowError;
 use datafusion::error::DataFusionError;
@@ -27,6 +28,7 @@ pub type Result<T> = result::Result<T, BallistaError>;
 
 /// Ballista error
 #[derive(Debug)]
+
 pub enum BallistaError {
     NotImplemented(String),
     General(String),
@@ -40,6 +42,12 @@ pub enum BallistaError {
     KubeAPIRequestError(k8s_openapi::RequestError),
     KubeAPIResponseError(k8s_openapi::ResponseError),
     TonicError(tonic::transport::Error),
+}
+
+impl<T> Into<Result<T>> for BallistaError {
+    fn into(self) -> Result<T> {
+        Err(self)
+    }
 }
 
 pub fn ballista_error(message: &str) -> BallistaError {

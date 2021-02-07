@@ -91,6 +91,16 @@ enum AggregateFunction {
   COUNT = 4;
 }
 
+// TODO(Yesh): Will need to redefine this in a better way for aggregate expression as part of physical plan.
+/*
+message AggregateExprNode {
+  AggregateFunction aggr_function = 1;
+  string name = 2;
+  ArrowType data_type = 3;
+  bool nullable = 4;
+  LogicalExprNode expr = 5;
+}
+ */
 message AggregateExprNode {
   AggregateFunction aggr_function = 1;
   LogicalExprNode expr = 2;

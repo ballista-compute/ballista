@@ -26,6 +26,8 @@ use async_trait::async_trait;
 use datafusion::error::Result;
 use datafusion::physical_plan::{ExecutionPlan, Partitioning, SendableRecordBatchStream};
 
+/// The CollectExec operator retrieves results from the cluster and returns them as a single
+/// vector of [RecordBatch].
 #[derive(Debug, Clone)]
 pub struct CollectExec {
     plan: Arc<dyn ExecutionPlan>,

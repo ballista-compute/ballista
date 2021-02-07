@@ -13,8 +13,6 @@
 // limitations under the License.
 
 //! ShuffleReaderExec reads partitions that have already been materialized by an executor.
-//!
-//! This operator is EXPERIMENTAL and still under development
 
 use std::any::Any;
 use std::sync::Arc;
@@ -29,8 +27,7 @@ use datafusion::error::{DataFusionError, Result};
 use datafusion::physical_plan::{ExecutionPlan, Partitioning, SendableRecordBatchStream};
 use log::info;
 
-/// QueryStageExec executes a subset of a query plan and returns a data set containing statistics
-/// about the data.
+/// ShuffleReaderExec reads partitions that have already been materialized by an executor.
 #[derive(Debug, Clone)]
 pub struct ShuffleReaderExec {
     // The query stage that is responsible for producing the shuffle partitions that
@@ -40,7 +37,7 @@ pub struct ShuffleReaderExec {
 }
 
 impl ShuffleReaderExec {
-    /// Create a new query stage
+    /// Create a new ShuffleReaderExec
     pub fn try_new(partition_meta: Vec<PartitionLocation>, schema: SchemaRef) -> Result<Self> {
         Ok(Self {
             partition_location: partition_meta,
@@ -60,7 +57,6 @@ impl ExecutionPlan for ShuffleReaderExec {
     }
 
     fn output_partitioning(&self) -> Partitioning {
-        // The output of this operator is a single partition containing metadata
         Partitioning::UnknownPartitioning(self.partition_location.len())
     }
 
@@ -79,14 +75,14 @@ impl ExecutionPlan for ShuffleReaderExec {
 
     async fn execute(&self, partition: usize) -> Result<SendableRecordBatchStream> {
         info!("ShuffleReaderExec::execute({})", partition);
-
-        //TODO remove hard-coded executor connection details and use scheduler to discover
-        // executors, but for now assume a single executor is running on the default port
-        let mut client = BallistaClient::try_new("localhost", 50051)
-            .await
-            .map_err(|e| DataFusionError::Execution(format!("Ballista Error: {:?}", e)))?;
-
         let partition_location = &self.partition_location[partition];
+
+        let mut client = BallistaClient::try_new(
+            &partition_location.executor_meta.host,
+            partition_location.executor_meta.port as usize,
+        )
+        .await
+        .map_err(|e| DataFusionError::Execution(format!("Ballista Error: {:?}", e)))?;
 
         let batches = client
             .fetch_partition(

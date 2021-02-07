@@ -24,7 +24,7 @@ use std::{
 use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
 use datafusion::physical_plan::csv::CsvExec;
 use datafusion::physical_plan::expressions::{
-    CaseExpr, InListExpr, IsNotNullExpr, IsNullExpr, NegativeExpr,
+    CaseExpr, InListExpr, IsNotNullExpr, IsNullExpr, NegativeExpr, NotExpr,
 };
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::hash_join::HashJoinExec;
@@ -297,6 +297,14 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
                             .else_expr()
                             .map(|a| a.clone().try_into().map(Box::new))
                             .transpose()?,
+                    },
+                ))),
+            })
+        } else if let Some(expr) = expr.downcast_ref::<NotExpr>() {
+            Ok(protobuf::LogicalExprNode {
+                expr_type: Some(protobuf::logical_expr_node::ExprType::NotExpr(Box::new(
+                    protobuf::Not {
+                        expr: Some(Box::new(expr.arg().to_owned().try_into()?)),
                     },
                 ))),
             })

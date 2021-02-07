@@ -217,10 +217,14 @@ impl BallistaDataFrame {
 
         let plan = self.df.to_logical_plan();
 
+        //TODO change this to test distributed execution
         let distributed = false;
 
         if distributed {
+            // TODO this logic needs to move into the scheduler so that the scheduler
+            // orchestrates the distributed execution
             debug!("Executing plan using distributed planner: {:?}", plan);
+            // TODO get list of executors from the scheduler
             let executors = vec![ExecutorMeta {
                 id: "TBD".to_string(),
                 host: host.to_string(),

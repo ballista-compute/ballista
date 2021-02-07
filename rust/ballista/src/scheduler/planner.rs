@@ -74,10 +74,6 @@ impl DistributedPlanner {
         let plan = self.execute_distributed_query(plan).await?;
         let plan = Arc::new(CollectExec::new(plan));
         plan.execute(0).await.map_err(|e| e.into())
-        // let mut stream = plan.execute(0).await?;
-        // utils::collect_stream(&mut stream)
-        //     .await
-        //     .map_err(|e| e.into())
     }
 
     /// Execute a distributed query against a cluster, leaving the final results on the

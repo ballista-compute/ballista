@@ -41,6 +41,9 @@ use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
 use log::debug;
 use uuid::Uuid;
 
+type SendableExecutionPlan =
+    Pin<Box<dyn Future<Output = Result<Arc<dyn ExecutionPlan>>> + Send + Sync>>;
+
 #[derive(Debug, Clone)]
 pub struct PartitionLocation {
     pub(crate) partition_id: PartitionId,
@@ -168,10 +171,7 @@ impl DistributedPlanner {
 
 /// Visitor pattern to walk the plan, depth-first, and then execute query stages when walking
 /// up the tree
-fn execute(
-    plan: Arc<dyn ExecutionPlan>,
-    executors: Vec<ExecutorMeta>,
-) -> Pin<Box<dyn Future<Output = Result<Arc<dyn ExecutionPlan>>> + Send + Sync>> {
+fn execute(plan: Arc<dyn ExecutionPlan>, executors: Vec<ExecutorMeta>) -> SendableExecutionPlan {
     Box::pin(async move {
         debug!("execute() {}", &format!("{:?}", plan)[0..60]);
         let executors = executors.to_vec();

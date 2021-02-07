@@ -36,7 +36,7 @@ use log::debug;
 use prost::Message;
 use uuid::Uuid;
 
-/// Client for interacting with Ballista executors.
+/// Client for interacting with Ballista schedulers and executors.
 pub struct BallistaClient {
     flight_client: FlightServiceClient<tonic::transport::channel::Channel>,
 }

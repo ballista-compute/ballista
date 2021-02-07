@@ -7,10 +7,11 @@ edition = "2018"
 [dependencies]
 ballista = { path="../../ballista" }
 
-arrow = { path = "../../../../arrow/rust/arrow" }
-arrow-flight = { path = "../../../../arrow/rust/arrow-flight" }
-datafusion = { path = "../../../../arrow/rust/datafusion" }
-parquet = { path = "../../../../arrow/rust/parquet" }
+# use fork until https://github.com/apache/arrow/pull/9439 is merged
+arrow = { git = "https://github.com/andygrove/arrow", rev="6e163c2" }
+arrow-flight = { git = "https://github.com/andygrove/arrow", rev="6e163c2" }
+datafusion = { git = "https://github.com/andygrove/arrow", rev="6e163c2" }
+parquet = { git = "https://github.com/andygrove/arrow", rev="6e163c2" }
 
 env_logger = "0.8"
 tokio = { version = "1.0", features = ["macros", "rt", "rt-multi-thread", "sync"] }

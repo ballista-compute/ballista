@@ -14,7 +14,7 @@ use clap::arg_enum;
 use log::info;
 use std::env;
 use std::path::PathBuf;
-use structopt::StructOpt;
+use structopt::{clap, StructOpt};
 use tonic::transport::Server;
 
 arg_enum! {
@@ -26,7 +26,7 @@ arg_enum! {
 }
 
 #[derive(StructOpt, Debug)]
-#[structopt(name = "scheduler")]
+#[structopt(name = "scheduler", setting(clap::AppSettings::AllArgsOverrideSelf))]
 struct Opt {
     /// The configuration backend for the scheduler.
     #[structopt(short, long, possible_values = &ConfigBackend::variants(), case_insensitive = true, default_value = "Standalone")]

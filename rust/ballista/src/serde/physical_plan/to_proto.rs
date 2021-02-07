@@ -42,6 +42,7 @@ use protobuf::physical_plan_node::PhysicalPlanType;
 
 use crate::executor::shuffle_reader::ShuffleReaderExec;
 use crate::serde::{protobuf, BallistaError};
+use datafusion::physical_plan::functions::ScalarFunctionExpr;
 
 impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
     type Error = BallistaError;
@@ -321,6 +322,57 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
                         expr: Some(Box::new(expr.arg().to_owned().try_into()?)),
                     },
                 ))),
+            })
+        } else if let Some(expr) = expr.downcast_ref::<ScalarFunctionExpr>() {
+            let fun = match expr.name() {
+                "sqrt" => Ok(protobuf::ScalarFunction::Sqrt),
+                "sin" => Ok(protobuf::ScalarFunction::Sin),
+                "cos" => Ok(protobuf::ScalarFunction::Cos),
+                "tan" => Ok(protobuf::ScalarFunction::Tan),
+                "asin" => Ok(protobuf::ScalarFunction::Asin),
+                "acos" => Ok(protobuf::ScalarFunction::Acos),
+                "atan" => Ok(protobuf::ScalarFunction::Atan),
+                "exp" => Ok(protobuf::ScalarFunction::Exp),
+                "log" => Ok(protobuf::ScalarFunction::Log),
+                "log10" => Ok(protobuf::ScalarFunction::Log10),
+                "floor" => Ok(protobuf::ScalarFunction::Floor),
+                "ceil" => Ok(protobuf::ScalarFunction::Ceil),
+                "round" => Ok(protobuf::ScalarFunction::Round),
+                "trunc" => Ok(protobuf::ScalarFunction::Trunc),
+                "abs" => Ok(protobuf::ScalarFunction::Abs),
+                "length" => Ok(protobuf::ScalarFunction::Length),
+                "concat" => Ok(protobuf::ScalarFunction::Concat),
+                "lower" => Ok(protobuf::ScalarFunction::Lower),
+                "upper" => Ok(protobuf::ScalarFunction::Upper),
+                "trim" => Ok(protobuf::ScalarFunction::Trim),
+                "ltrim" => Ok(protobuf::ScalarFunction::Ltrim),
+                "rtrim" => Ok(protobuf::ScalarFunction::Rtrim),
+                "totimestamp" => Ok(protobuf::ScalarFunction::Totimestamp),
+                "array" => Ok(protobuf::ScalarFunction::Array),
+                "nullif" => Ok(protobuf::ScalarFunction::Nullif),
+                "datetrunc" => Ok(protobuf::ScalarFunction::Datetrunc),
+                "md5" => Ok(protobuf::ScalarFunction::Md5),
+                "sha224" => Ok(protobuf::ScalarFunction::Sha224),
+                "sha256" => Ok(protobuf::ScalarFunction::Sha256),
+                "sha384" => Ok(protobuf::ScalarFunction::Sha384),
+                "sha512" => Ok(protobuf::ScalarFunction::Sha512),
+                _ => Err(BallistaError::General(format!(
+                    "physical_plan::to_proto() unsupported scalar function {:?}",
+                    expr
+                ))),
+            }?;
+            let expr: Vec<protobuf::LogicalExprNode> = expr
+                .args()
+                .iter()
+                .map(|e| e.to_owned().try_into())
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(protobuf::LogicalExprNode {
+                expr_type: Some(protobuf::logical_expr_node::ExprType::ScalarFunction(
+                    protobuf::ScalarFunctionNode {
+                        fun: fun.into(),
+                        expr,
+                    },
+                )),
             })
         } else {
             Err(BallistaError::General(format!(

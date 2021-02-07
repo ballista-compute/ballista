@@ -14,6 +14,9 @@
 
 //! Core executor logic for executing queries and storing results in memory.
 
+use crate::scheduler::planner::DistributedPlanner;
+use crate::serde::scheduler::ExecutorMeta;
+use crate::utils;
 use crate::{error::Result, serde::protobuf::scheduler_grpc_client::SchedulerGrpcClient};
 
 use arrow::record_batch::RecordBatch;

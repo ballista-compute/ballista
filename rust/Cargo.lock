@@ -110,7 +110,7 @@ dependencies = [
 [[package]]
 name = "arrow"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow?rev=b18c567#b18c5677ecc5058333b69d08f82b267f79d2df8d"
+source = "git+https://github.com/apache/arrow?rev=c3b972c#c3b972c8f7005e037bdb183914ad0853cd7f9cf5"
 dependencies = [
  "cfg_aliases",
  "chrono",
@@ -148,9 +148,9 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow?rev=b18c567#b18c5677ecc5058333b69d08f82b267f79d2df8d"
+source = "git+https://github.com/apache/arrow?rev=c3b972c#c3b972c8f7005e037bdb183914ad0853cd7f9cf5"
 dependencies = [
- "arrow 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=b18c567)",
+ "arrow 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=c3b972c)",
  "bytes 1.0.1",
  "futures",
  "proc-macro2",
@@ -678,10 +678,10 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow?rev=b18c567#b18c5677ecc5058333b69d08f82b267f79d2df8d"
+source = "git+https://github.com/apache/arrow?rev=c3b972c#c3b972c8f7005e037bdb183914ad0853cd7f9cf5"
 dependencies = [
  "ahash 0.7.0",
- "arrow 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=b18c567)",
+ "arrow 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=c3b972c)",
  "async-trait",
  "chrono",
  "clap",
@@ -692,7 +692,7 @@ dependencies = [
  "md-5",
  "num_cpus",
  "ordered-float 2.0.1",
- "parquet 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=b18c567)",
+ "parquet 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=c3b972c)",
  "paste",
  "pin-project-lite 0.2.4",
  "rustyline",
@@ -1857,9 +1857,9 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow?rev=b18c567#b18c5677ecc5058333b69d08f82b267f79d2df8d"
+source = "git+https://github.com/apache/arrow?rev=c3b972c#c3b972c8f7005e037bdb183914ad0853cd7f9cf5"
 dependencies = [
- "arrow 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=b18c567)",
+ "arrow 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=c3b972c)",
  "base64 0.12.3",
  "brotli",
  "byteorder",
@@ -3269,12 +3269,12 @@ dependencies = [
 name = "tpch"
 version = "0.4.0-SNAPSHOT"
 dependencies = [
- "arrow 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=b18c567)",
- "arrow-flight 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=b18c567)",
+ "arrow 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=c3b972c)",
+ "arrow-flight 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=c3b972c)",
  "ballista",
- "datafusion 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=b18c567)",
+ "datafusion 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=c3b972c)",
  "env_logger",
- "parquet 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=b18c567)",
+ "parquet 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=c3b972c)",
  "structopt",
  "tokio 1.1.1",
 ]

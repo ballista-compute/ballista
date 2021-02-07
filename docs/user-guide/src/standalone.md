@@ -1,5 +1,7 @@
 ## Creating a Ballista cluster using etcd
 
+*NOTE:* Ballista 0.4.0 is still under development and this page is out of date.
+
 Ballista can use etcd for discovery, making it easy to create a cluster on a local development environment, or on 
 any networked computers.
 

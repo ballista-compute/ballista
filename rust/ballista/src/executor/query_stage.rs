@@ -12,22 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! QueryStageExec executes a subset of a query plan and returns a data set containing statistics
-//! about the data.
-//!
-//! This operator is EXPERIMENTAL and still under development
+//! QueryStageExec represents a section of a query plan that has consistent partitioning and
+//! can be executed as one unit with each partition being executed in parallel. The output of
+//! a query stage either forms the input of another query stage or can be the final result of
+//! a query.
 
-use std::any::Any;
 use std::sync::Arc;
+use std::{any::Any, pin::Pin};
 
 use arrow::datatypes::SchemaRef;
 use async_trait::async_trait;
-use datafusion::error::Result;
-use datafusion::physical_plan::{ExecutionPlan, Partitioning, SendableRecordBatchStream};
+use datafusion::physical_plan::{ExecutionPlan, Partitioning};
+use datafusion::{error::Result, physical_plan::RecordBatchStream};
 use uuid::Uuid;
 
-/// QueryStageExec executes a subset of a query plan and returns a data set containing statistics
-/// about the data.
+/// QueryStageExec represents a section of a query plan that has consistent partitioning and
+/// can be executed as one unit with each partition being executed in parallel. The output of
+/// a query stage either forms the input of another query stage or can be the final result of
+/// a query.
 #[derive(Debug, Clone)]
 pub struct QueryStageExec {
     /// Unique ID for the job (query) that this stage is a part of
@@ -79,7 +81,10 @@ impl ExecutionPlan for QueryStageExec {
         )?))
     }
 
-    async fn execute(&self, partition: usize) -> Result<SendableRecordBatchStream> {
+    async fn execute(
+        &self,
+        partition: usize,
+    ) -> Result<Pin<Box<dyn RecordBatchStream + Send + Sync>>> {
         self.child.execute(partition).await
     }
 }

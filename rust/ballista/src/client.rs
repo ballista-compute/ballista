@@ -14,9 +14,9 @@
 
 //! Client API for sending requests to executors.
 
-use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
+use std::{collections::HashMap, pin::Pin};
 
 use crate::error::{ballista_error, BallistaError, Result};
 use crate::memory_stream::MemoryStream;
@@ -29,14 +29,14 @@ use arrow::record_batch::RecordBatch;
 use arrow_flight::flight_service_client::FlightServiceClient;
 use arrow_flight::utils::flight_data_to_arrow_batch;
 use arrow_flight::Ticket;
-use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
+use datafusion::{logical_plan::LogicalPlan, physical_plan::RecordBatchStream};
 use log::debug;
 use prost::Message;
 use uuid::Uuid;
 
-/// Client for interacting with Ballista executors.
+/// Client for interacting with Ballista schedulers and executors.
 pub struct BallistaClient {
     flight_client: FlightServiceClient<tonic::transport::channel::Channel>,
 }
@@ -62,7 +62,6 @@ impl BallistaClient {
     }
 
     /// Execute a logical query plan and retrieve the results
-
     pub async fn execute_query(&mut self, plan: &LogicalPlan) -> Result<SendableRecordBatchStream> {
         let action = Action::InteractiveQuery {
             plan: plan.to_owned(),
@@ -70,6 +69,8 @@ impl BallistaClient {
         };
 
         self.execute_action(&action).await
+
+        //Ok(Arc::new(CollectExec::new(final_stage)))
     }
 
     /// Execute one partition of a physical query plan against the executor
@@ -131,7 +132,6 @@ impl BallistaClient {
     }
 
     /// Execute an action and retrieve the results
-
     pub async fn execute_action(&mut self, action: &Action) -> Result<SendableRecordBatchStream> {
         let serialized_action: protobuf::Action = action.to_owned().try_into()?;
 

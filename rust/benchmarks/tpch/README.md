@@ -48,7 +48,7 @@ To start a Rust scheduler and executor using Docker Compose:
 ```bash
 cd $BALLISTA_HOME
 ./dev/build-rust.sh
-cd $BALLISTA_HOME/benchmarks/tpch
+cd $BALLISTA_HOME/rust/benchmarks/tpch
 docker-compose up
 ```
 

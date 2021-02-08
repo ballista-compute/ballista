@@ -144,7 +144,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                 ))),
             })
         } else if let Some(empty) = plan.downcast_ref::<EmptyExec>() {
-            let schema = empty.schema().as_ref().try_into()?;
+            let schema = empty.schema().as_ref().into();
             Ok(protobuf::PhysicalPlanNode {
                 physical_plan_type: Some(PhysicalPlanType::Empty(protobuf::EmptyExecNode {
                     produce_one_row: empty.produce_one_row(),
@@ -178,7 +178,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                         .map(|n| *n as u32)
                         .collect(),
                     file_extension: exec.file_extension().to_owned(),
-                    schema: Some(exec.file_schema().as_ref().try_into()?),
+                    schema: Some(exec.file_schema().as_ref().into()),
                     has_header: exec.has_header(),
                     delimiter: delimiter.to_string(),
                     batch_size: 32768,
@@ -214,7 +214,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                 physical_plan_type: Some(PhysicalPlanType::ShuffleReader(
                     protobuf::ShuffleReaderExecNode {
                         partition_location,
-                        schema: Some(exec.schema().as_ref().try_into()?),
+                        schema: Some(exec.schema().as_ref().into()),
                     },
                 )),
             })

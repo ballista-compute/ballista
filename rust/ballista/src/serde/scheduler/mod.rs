@@ -14,6 +14,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+use arrow::datatypes::{Schema, SchemaRef};
 use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::ExecutionPlan;
 use serde::{Deserialize, Serialize};
@@ -43,7 +44,7 @@ pub enum Action {
 }
 
 /// Unique identifier for the output partition of an operator.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct PartitionId {
     pub(crate) job_uuid: Uuid,
     pub(crate) stage_id: usize,
@@ -58,6 +59,14 @@ impl PartitionId {
             partition_id,
         }
     }
+}
+
+/// Meta-data for a job
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JobMeta {
+    pub id: String,
+    pub schema: Schema,
+    pub partitions: Vec<(ExecutorMeta, PartitionId)>,
 }
 
 /// Meta-data for an executor, used when fetching shuffle partitions from other executors

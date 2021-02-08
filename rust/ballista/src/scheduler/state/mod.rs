@@ -1,7 +1,9 @@
 use std::time::Duration;
 
-use crate::error::Result;
+use log::debug;
+
 use crate::{error::ballista_error, prelude::BallistaError, serde::scheduler::ExecutorMeta};
+use crate::{error::Result, serde::scheduler::JobMeta};
 
 use super::SchedulerServer;
 
@@ -30,6 +32,7 @@ pub trait ConfigBackendClient: Clone {
     ) -> Result<()>;
 }
 
+#[derive(Clone)]
 pub(super) struct SchedulerState<Config: ConfigBackendClient> {
     config_client: Config,
 }
@@ -48,7 +51,7 @@ impl<Config: ConfigBackendClient> SchedulerState<Config> {
             .map(|bytes| serde_json::from_slice::<ExecutorMeta>(&bytes))
             .collect::<std::result::Result<Vec<_>, _>>()
             .map_err(|e| {
-                BallistaError::Internal(format!("Could not deserialize etcd value: {}", e))
+                BallistaError::Internal(format!("Could not deserialize state value: {}", e))
             })
     }
 
@@ -63,10 +66,24 @@ impl<Config: ConfigBackendClient> SchedulerState<Config> {
             .await
     }
 
-    pub async fn save_job_metadata(&self, namespace: &str, job_id: &str) -> Result<()> {
-        let key = get_job_key(namespace, job_id);
-        let value = vec![];
+    pub async fn save_job_metadata(&self, namespace: &str, meta: &JobMeta) -> Result<()> {
+        debug!("Saving job metadata: {:?}", meta);
+        let key = get_job_key(namespace, &meta.id);
+        let value = serde_json::to_vec(meta).map_err(|e| {
+            BallistaError::Internal(format!("Could not serialize ExecutorMeta: {}", e))
+        })?;
         self.config_client.clone().put(key, value, None).await
+    }
+
+    pub async fn get_job_metadata(&self, namespace: &str, job_id: &str) -> Result<JobMeta> {
+        let key = get_job_key(namespace, job_id);
+        let value = &self.config_client.clone().get(&key).await?;
+        let msg = String::from_utf8(value.clone()).unwrap();
+        debug!("Going to deserialize {}", msg);
+        let value: JobMeta = serde_json::from_slice(value).map_err(|e| {
+            BallistaError::Internal(format!("Could not deserialize state value: {}", e))
+        })?;
+        Ok(value)
     }
 }
 

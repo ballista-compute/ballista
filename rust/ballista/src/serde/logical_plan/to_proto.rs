@@ -677,7 +677,7 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
                         })
                     }
                 };
-                let schema: protobuf::Schema = schema.as_ref().try_into()?;
+                let schema: protobuf::Schema = schema.as_ref().into();
 
                 let filters: Vec<protobuf::LogicalExprNode> = filters
                     .iter()
@@ -1119,17 +1119,15 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
     }
 }
 
-impl TryInto<protobuf::Schema> for &Schema {
-    type Error = BallistaError;
-
-    fn try_into(self) -> Result<protobuf::Schema, Self::Error> {
-        Ok(protobuf::Schema {
+impl Into<protobuf::Schema> for &Schema {
+    fn into(self) -> protobuf::Schema {
+        protobuf::Schema {
             columns: self
                 .fields()
                 .iter()
                 .map(protobuf::Field::from)
                 .collect::<Vec<_>>(),
-        })
+        }
     }
 }
 

@@ -244,13 +244,13 @@ impl BallistaDataFrame {
                 info!("Job {} still executing...", job_id);
                 tokio::time::sleep(Duration::from_secs(5)).await;
             } else {
-                // TODO: use streaming. Probably need to change the signature of fetch_partition to avchieve that
+                // TODO: use streaming. Probably need to change the signature of fetch_partition to achieve that
                 let mut result = vec![];
                 for location in partition_location {
-                    let metadata = location.executor_meta.ok_or(BallistaError::Internal(
+                    let metadata = location.executor_meta.ok_or_else(|| BallistaError::Internal(
                         "Received empty executor metadata".to_owned(),
                     ))?;
-                    let partition_id = location.partition_id.ok_or(BallistaError::Internal(
+                    let partition_id = location.partition_id.ok_or_else(|| BallistaError::Internal(
                         "Received empty partition id".to_owned(),
                     ))?;
                     let mut ballista_client =

@@ -639,7 +639,7 @@ impl TryFrom<&datafusion::scalar::ScalarValue> for protobuf::ScalarValue {
                 )))
             }
         };
-        Ok(scalar_val);
+        Ok(scalar_val)
     }
 }
 

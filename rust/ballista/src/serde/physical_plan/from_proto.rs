@@ -25,7 +25,7 @@ use crate::serde::{proto_error, protobuf};
 use crate::{convert_box_required, convert_required};
 use crate::serde::protobuf::LogicalExprNode;
 
-use arrow::datatypes::Schema;
+use arrow::datatypes::{DataType, Schema};
 use datafusion::execution::context::{ExecutionConfig, ExecutionContextState};
 use datafusion::logical_plan::Expr;
 use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
@@ -42,12 +42,14 @@ use datafusion::physical_plan::{
     projection::ProjectionExec,
     sort::{SortExec, SortOptions},
 };
+use datafusion::physical_plan::expressions::col;
 
-use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
+use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr, AggregateExpr};
 use datafusion::prelude::CsvReadOptions;
 
 use protobuf::physical_plan_node::PhysicalPlanType;
-//use protobuf::physical_::PhysicalExprType;
+use protobuf::logical_expr_node::ExprType;
+
 use datafusion::physical_plan::hash_aggregate::{HashAggregateExec, AggregateMode};
 
 impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
@@ -139,12 +141,13 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                         hashAgg.mode
                     ))
                 })?;
-                let agg_mode= match mode {
+                let agg_mode: AggregateMode = match mode {
                     protobuf::AggregateMode::Partial => AggregateMode::Partial,
                     protobuf::AggregateMode::Final => AggregateMode::Final,
                 };
-                let group = hashAgg.group_expr.iter().map(|expr| convert_box_required!(expr.0)).collect()?;
+                let group = hashAgg.group_expr.iter().map(|expr| convert_box_required!(expr)).collect()?;
                 let agg_expr = hashAgg.aggr_expr.iter().map(|expr| convert_box_required!(expr)).collect()?;
+
                 let input = convert_box_required!(hashAgg.input)?;
 
                 Ok(Arc::new(HashAggregateExec::try_new(
@@ -237,7 +240,7 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
     }
 }
 
-impl TryInto<Arc<dyn PhysicalExpr>> for &LogicalExprNode {
+impl TryInto<Arc<dyn PhysicalExpr>> for &protobuf::LogicalExprNode {
     type Error = BallistaError;
     fn try_into(self) -> Result<Arc<dyn PhysicalExpr>, Self::Error> {
         let plan = self.expr_type.as_ref().ok_or_else(|| {
@@ -247,17 +250,17 @@ impl TryInto<Arc<dyn PhysicalExpr>> for &LogicalExprNode {
             ))
         })?;
         match plan {
-            PhysicalExprType::Column(c) => {
-                Ok(Arc::new(Column::new(c.name)))
+            ExprType::ColumnName(c) => {
+                Ok(Arc::new(Column::new(c)))
             }
         }
-
     }
 }
 
-impl TryInto<Arc<dyn AggregateExpr>> for &LogicalExprNode {
+/*
+impl TryInto<Arc<dyn AggregateExpr>> for protobuf::LogicalExprNode {
     type Error = BallistaError;
-    fn try_into(self) -> Result<Arc<dyn PhysicalExpr>, Self::Error> {
+    fn try_into(self) -> Result<Arc<dyn AggregateExpr>, Self::Error> {
         let plan = self.expr_type.as_ref().ok_or_else(|| {
             proto_error(format!(
                 "physical_plan::from_proto() Unsupported physical plan '{:?}'",
@@ -265,14 +268,15 @@ impl TryInto<Arc<dyn AggregateExpr>> for &LogicalExprNode {
             ))
         })?;
         match plan {
-            AggregateExprType::Avg(a) => {
+            ExprType::AggregateExpr::Avg(a) => {
                 let agg_fn = a.aggr_function.try_into();
-                //Ok(Arc::new(Avg::new(agg_fn))) // TODO
+                let expr = a.expr.try_into();
+                Ok(Arc::new(Avg::new(expr, "".to_string(), DataType::Float64))) // TODO
             }
         }
-
     }
 }
+*/
 
 fn compile_expr(
     expr: &protobuf::LogicalExprNode,

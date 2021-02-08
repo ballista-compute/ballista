@@ -43,13 +43,6 @@ message LogicalExprNode {
   }
 }
 
-
-
-
-
-
-
-
 message IsNull {
   LogicalExprNode expr = 1;
 }

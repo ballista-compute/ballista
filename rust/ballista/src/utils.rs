@@ -16,7 +16,7 @@ use std::{
     fs::File,
     io::{prelude::*, BufReader},
     path::Path,
-    pin::Pin
+    pin::Pin,
 };
 
 use crate::memory_stream::MemoryStream;
@@ -123,5 +123,5 @@ pub fn parse_opts_from_file(filename: impl AsRef<Path>) -> Vec<String> {
             args.push(arg.parse().unwrap());
         }
     }
-    return args;
+    args
 }

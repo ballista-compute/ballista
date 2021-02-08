@@ -12,13 +12,16 @@ The foundational technologies in Ballista are:
 - [Google Protocol Buffers](https://developers.google.com/protocol-buffers) for serializing query plans.
 - [Docker](https://www.docker.com/) for packaging up executors along with user-defined code.
 
+Ballista 0.4.0 is under active development, with a release due in March 2021. Ballista 0.3.0 no longer compiles due
+to changes in packed_simd.
+
 Ballista 0.4.0 will support the following cluster deployment modes:
 
-- Local Mode: Single process containing scheduler and executor, intended for local development testing
-- Standalone: Single scheduler process, supporting multiple executor processes that register with the scheduler
-- Etcd: Scheduler uses [etcd](https://etcd.io/) as a backing support, so that multiple scheduler instances can run 
+- **Local Mode**: Single process containing scheduler and executor, intended for local development testing
+- **Standalone**: Single scheduler process, supporting multiple executor processes that register with the scheduler
+- **Etcd**: Scheduler uses [etcd](https://etcd.io/) as a backing store, so that multiple scheduler instances can run 
   concurrently
-- Kubernetes: Schedulers and executors will be deployed as stateful sets in [Kubernetes](https://kubernetes.io/)
+- **Kubernetes**: Schedulers and executors will be deployed as stateful sets in [Kubernetes](https://kubernetes.io/)
 
 ## Architecture
 

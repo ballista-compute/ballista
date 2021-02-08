@@ -1,7 +1,8 @@
-# Installing Ballista with Kubernetes
+# Deploying Ballista with Kubernetes
 
-*NOTE:* Ballista 0.4.0 is still under development and this page is out of date. Please see the [benchmarks](https://github.com/ballista-compute/ballista/tree/main/rust/benchmarks/tpch) for
-current usage.
+*NOTE: Ballista 0.4.0 is still under development and there are no published Docker images yet. Please refer to the
+[developer documentation](https://github.com/ballista-compute/ballista/tree/main/docs) for instructions on building
+Docker images locally.*
 
 You will need a Kubernetes cluster to deploy to. I recommend using 
 [Minikube](https://kubernetes.io/docs/tutorials/hello-minikube) for local testing, or Amazon's Elastic Kubernetes 

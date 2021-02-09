@@ -245,12 +245,12 @@ impl BallistaDataFrame {
                 // TODO: use streaming. Probably need to change the signature of fetch_partition to achieve that
                 let mut result = vec![];
                 for location in partition_location {
-                    let metadata = location.executor_meta.ok_or_else(|| BallistaError::Internal(
-                        "Received empty executor metadata".to_owned(),
-                    ))?;
-                    let partition_id = location.partition_id.ok_or_else(|| BallistaError::Internal(
-                        "Received empty partition id".to_owned(),
-                    ))?;
+                    let metadata = location.executor_meta.ok_or_else(|| {
+                        BallistaError::Internal("Received empty executor metadata".to_owned())
+                    })?;
+                    let partition_id = location.partition_id.ok_or_else(|| {
+                        BallistaError::Internal("Received empty partition id".to_owned())
+                    })?;
                     let mut ballista_client =
                         BallistaClient::try_new(metadata.host.as_str(), metadata.port as u16)
                             .await?;

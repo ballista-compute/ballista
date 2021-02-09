@@ -7,8 +7,11 @@ use crate::{error::Result, serde::scheduler::JobMeta};
 
 use super::SchedulerServer;
 
-pub mod etcd;
-pub mod standalone;
+mod etcd;
+mod standalone;
+
+pub use etcd::EtcdClient;
+pub use standalone::StandaloneClient;
 
 const LEASE_TIME: Duration = Duration::from_secs(60);
 

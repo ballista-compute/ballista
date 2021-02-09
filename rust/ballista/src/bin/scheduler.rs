@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use ballista::BALLISTA_VERSION;
 use ballista::{
     scheduler::{
-        state::{etcd::EtcdClient, standalone::StandaloneClient, ConfigBackendClient},
+        state::{ConfigBackendClient, EtcdClient, StandaloneClient},
         SchedulerServer,
     },
     serde::protobuf::scheduler_grpc_server::SchedulerGrpcServer,

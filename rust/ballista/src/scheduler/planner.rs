@@ -41,8 +41,7 @@ use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
 use log::debug;
 use uuid::Uuid;
 
-type SendableExecutionPlan =
-    Pin<Box<dyn Future<Output = Result<Arc<dyn ExecutionPlan>>> + Send + Sync>>;
+type SendableExecutionPlan = Pin<Box<dyn Future<Output = Result<Arc<dyn ExecutionPlan>>> + Send>>;
 
 #[derive(Debug, Clone)]
 pub struct PartitionLocation {
@@ -237,9 +236,7 @@ async fn execute_query_stage(
     for child_partition in 0..partition_count {
         let executor_meta = &executors[child_partition % executors.len()];
 
-        // TODO: this won't compile because it causes the resulting future to be !Sync
-        /*
-        let mut client = BallistaClient::try_new(&executor_meta.host, executor_meta.port as usize)
+        let mut client = BallistaClient::try_new(&executor_meta.host, executor_meta.port)
             .await
             .map_err(|e| DataFusionError::Execution(format!("Ballista Error: {:?}", e)))?;
 
@@ -247,7 +244,6 @@ async fn execute_query_stage(
             .execute_partition(*job_uuid, stage_id, child_partition, plan.clone())
             .await
             .map_err(|e| DataFusionError::Execution(format!("Ballista Error: {:?}", e)))?;
-            */
         meta.push(PartitionLocation {
             partition_id: PartitionId::new(*job_uuid, stage_id, child_partition),
             executor_meta: executor_meta.clone(),

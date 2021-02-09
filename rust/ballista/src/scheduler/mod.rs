@@ -185,7 +185,10 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
                     .unwrap();
 
                 // save partition info into job's state
-                let plan = plan.as_any().downcast_ref::<ShuffleReaderExec>().expect("Expected plan final operator to be ShuffleReaderExec");
+                let plan = plan
+                    .as_any()
+                    .downcast_ref::<ShuffleReaderExec>()
+                    .expect("Expected plan final operator to be ShuffleReaderExec");
                 let mut partition_location = vec![];
                 for loc in &plan.partition_location {
                     partition_location.push((loc.executor_meta.clone(), loc.partition_id));
@@ -214,7 +217,8 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
     ) -> std::result::Result<Response<GetJobStatusResult>, tonic::Status> {
         let job_id = request.into_inner().job_id;
         info!("Received get_job_status request for job {}", job_id);
-        let job_meta = self.state
+        let job_meta = self
+            .state
             .get_job_metadata(&self.namespace, &job_id)
             .await
             .map_err(|e| {
@@ -226,11 +230,9 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
         for (executor, partition_id) in job_meta.partitions {
             partition_location.push(PartitionLocation {
                 partition_id: Some(partition_id.into()),
-                executor_meta: Some(executor.into())
+                executor_meta: Some(executor.into()),
             });
         }
-        Ok(Response::new(GetJobStatusResult {
-            partition_location,
-        }))
+        Ok(Response::new(GetJobStatusResult { partition_location }))
     }
 }

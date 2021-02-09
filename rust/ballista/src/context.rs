@@ -32,7 +32,7 @@ use crate::{
 };
 
 use crate::scheduler::planner::DistributedPlanner;
-use arrow::datatypes::SchemaRef;
+use arrow::datatypes::{Schema, SchemaRef};
 use datafusion::datasource::datasource::Statistics;
 use datafusion::datasource::TableProvider;
 use datafusion::error::Result as DFResult;
@@ -221,6 +221,7 @@ impl BallistaDataFrame {
         let mut scheduler = SchedulerGrpcClient::connect(scheduler_url).await?;
 
         let plan = self.df.to_logical_plan();
+        let schema: Schema = plan.schema().as_ref().clone().into();
 
         let job_id = scheduler
             .execute_logical_plan(ExecuteQueryParams {
@@ -231,10 +232,7 @@ impl BallistaDataFrame {
             .job_id;
 
         loop {
-            let GetJobStatusResult {
-                schema,
-                partition_location,
-            } = scheduler
+            let GetJobStatusResult { partition_location } = scheduler
                 .get_job_status(GetJobStatusParams {
                     job_id: job_id.clone(),
                 })
@@ -268,7 +266,7 @@ impl BallistaDataFrame {
                 }
                 break Ok(Box::pin(MemoryStream::try_new(
                     result,
-                    Arc::new((&schema.unwrap()).try_into()?),
+                    Arc::new(schema),
                     None,
                 )?));
             }

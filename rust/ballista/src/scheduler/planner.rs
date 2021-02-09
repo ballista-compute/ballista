@@ -174,7 +174,6 @@ impl DistributedPlanner {
 fn execute(plan: Arc<dyn ExecutionPlan>, executors: Vec<ExecutorMeta>) -> SendableExecutionPlan {
     Box::pin(async move {
         debug!("execute() {}", &format!("{:?}", plan)[0..60]);
-        let executors = executors.to_vec();
         // execute children first
         let mut children: Vec<Arc<dyn ExecutionPlan>> = vec![];
         for child in plan.children() {

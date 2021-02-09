@@ -120,6 +120,7 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
                     error!("{}", msg);
                     tonic::Status::internal(msg)
                 })?;
+            debug!("Found executors: {:?}", executors);
 
             // parse protobuf
             let plan = (&logical_plan).try_into().map_err(|e| {
@@ -145,7 +146,6 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
                     &self.namespace,
                     &JobMeta {
                         id: job_id.clone(),
-                        schema: Schema::empty(),
                         partitions: Default::default(),
                     },
                 )
@@ -195,7 +195,6 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
                         &namespace,
                         &JobMeta {
                             id: job_id_spawn,
-                            schema: (*plan.schema).clone(),
                             partitions: partition_location,
                         },
                     )
@@ -231,7 +230,6 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
             });
         }
         Ok(Response::new(GetJobStatusResult {
-            schema: Some((&job_meta.schema).into()),
             partition_location,
         }))
     }

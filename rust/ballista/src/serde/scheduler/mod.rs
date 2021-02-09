@@ -65,7 +65,6 @@ impl PartitionId {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JobMeta {
     pub id: String,
-    pub schema: Schema,
     pub partitions: Vec<(ExecutorMeta, PartitionId)>,
 }
 

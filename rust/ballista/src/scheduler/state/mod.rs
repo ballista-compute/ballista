@@ -45,7 +45,7 @@ impl<Config: ConfigBackendClient> SchedulerState<Config> {
     pub async fn get_executors_metadata(&self, namespace: &str) -> Result<Vec<ExecutorMeta>> {
         self.config_client
             .clone()
-            .get_from_prefix(namespace)
+            .get_from_prefix(&get_executors_prefix(namespace))
             .await?
             .into_iter()
             .map(|bytes| serde_json::from_slice::<ExecutorMeta>(&bytes))
@@ -87,8 +87,12 @@ impl<Config: ConfigBackendClient> SchedulerState<Config> {
     }
 }
 
+fn get_executors_prefix(namespace: &str) -> String {
+    format!("/ballista/executors/{}", namespace)
+}
+
 fn get_executor_key(namespace: &str, id: &str) -> String {
-    format!("/ballista/executors/{}/{}", namespace, id)
+    format!("{}/{}", get_executors_prefix(namespace), id)
 }
 
 fn get_job_key(namespace: &str, id: &str) -> String {

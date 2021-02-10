@@ -226,8 +226,6 @@ dependencies = [
  "prost 0.7.0",
  "prost-types 0.7.0",
  "rand 0.8.3",
- "serde",
- "serde_json",
  "sled",
  "snmalloc-rs",
  "sqlparser",

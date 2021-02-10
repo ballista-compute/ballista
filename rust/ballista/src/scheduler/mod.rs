@@ -19,21 +19,21 @@ pub mod state;
 
 use std::convert::TryInto;
 
-use crate::scheduler::planner::DistributedPlanner;
+use crate::executor::shuffle_reader::ShuffleReaderExec;
 use crate::serde::protobuf::{
-    scheduler_grpc_server::SchedulerGrpc, ExecuteQueryParams, ExecuteQueryResult, ExecutorMetadata,
-    GetExecutorMetadataParams, GetExecutorMetadataResult, GetJobStatusParams, GetJobStatusResult,
-    PartitionLocation, RegisterExecutorParams, RegisterExecutorResult,
+    job_status, scheduler_grpc_server::SchedulerGrpc, CompletedJob, ExecuteQueryParams,
+    ExecuteQueryResult, ExecutorMetadata, FailedJob, GetExecutorMetadataParams,
+    GetExecutorMetadataResult, GetJobStatusParams, GetJobStatusResult, JobStatus,
+    PartitionLocation, QueuedJob, RegisterExecutorParams, RegisterExecutorResult, RunningJob,
 };
 use crate::serde::scheduler::ExecutorMeta;
 use crate::{client::BallistaClient, error::Result, serde::scheduler::Action};
-use crate::{executor::shuffle_reader::ShuffleReaderExec, serde::scheduler::JobMeta};
+use crate::{prelude::BallistaError, scheduler::planner::DistributedPlanner};
 
 use arrow::datatypes::{Schema, SchemaRef};
 use datafusion::execution::context::ExecutionContext;
 use log::{debug, error, info, warn};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use serde::__private::de;
 use tonic::{Request, Response};
 
 use self::state::{ConfigBackendClient, SchedulerState};
@@ -86,7 +86,7 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
         {
             info!("Received register_executor request for {:?}", metadata);
             self.state
-                .save_executor_metadata(&self.namespace, &metadata.into())
+                .save_executor_metadata(&self.namespace, metadata.into())
                 .await
                 .map_err(|e| {
                     let msg = format!("Could not save executor metadata: {}", e);
@@ -144,9 +144,9 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
             self.state
                 .save_job_metadata(
                     &self.namespace,
-                    &JobMeta {
-                        id: job_id.clone(),
-                        partitions: Default::default(),
+                    &job_id,
+                    &JobStatus {
+                        status: Some(job_status::Status::Queued(QueuedJob {})),
                     },
                 )
                 .await
@@ -161,7 +161,30 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
             tokio::spawn(async move {
                 // create physical plan using DataFusion
                 let datafusion_ctx = ExecutionContext::new();
-                let plan = datafusion_ctx
+                macro_rules! fail_job {
+                    ($code :expr) => {{
+                        match $code {
+                            Err(error) => {
+                                warn!("Job {} failed with {}", job_id_spawn, error);
+                                state
+                                    .save_job_metadata(
+                                        &namespace,
+                                        &job_id_spawn,
+                                        &JobStatus {
+                                            status: Some(job_status::Status::Failed(FailedJob {
+                                                error: format!("{}", error),
+                                            })),
+                                        },
+                                    )
+                                    .await
+                                    .unwrap();
+                                return;
+                            }
+                            Ok(value) => value,
+                        }
+                    }};
+                };
+                let plan = fail_job!(datafusion_ctx
                     .optimize(&plan)
                     .and_then(|plan| datafusion_ctx.create_physical_plan(&plan))
                     .map_err(|e| {
@@ -169,20 +192,30 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
                             format!("Could not retrieve data from configuration store: {}", e);
                         error!("{}", msg);
                         tonic::Status::internal(msg)
-                    })
-                    .unwrap();
+                    }));
 
                 // create distributed physical plan using Ballista
-                let mut planner = DistributedPlanner::new(executors);
-                let plan = planner
-                    .execute_distributed_query(plan)
+                if let Err(e) = state
+                    .save_job_metadata(
+                        &namespace,
+                        &job_id_spawn,
+                        &JobStatus {
+                            status: Some(job_status::Status::Running(RunningJob {})),
+                        },
+                    )
                     .await
-                    .map_err(|e| {
-                        let msg = format!("Could not execute distributed plan: {}", e);
-                        error!("{}", msg);
-                        tonic::Status::internal(msg)
-                    })
-                    .unwrap();
+                {
+                    warn!(
+                        "Could not update job {} status to running: {}",
+                        job_id_spawn, e
+                    );
+                }
+                let mut planner = DistributedPlanner::new(executors);
+                let plan = fail_job!(planner.execute_distributed_query(plan).await.map_err(|e| {
+                    let msg = format!("Could not execute distributed plan: {}", e);
+                    error!("{}", msg);
+                    tonic::Status::internal(msg)
+                }));
 
                 // save partition info into job's state
                 let plan = plan
@@ -191,14 +224,16 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
                     .expect("Expected plan final operator to be ShuffleReaderExec");
                 let mut partition_location = vec![];
                 for loc in &plan.partition_location {
-                    partition_location.push((loc.executor_meta.clone(), loc.partition_id));
+                    partition_location.push(loc.clone().try_into().unwrap());
                 }
                 state
                     .save_job_metadata(
                         &namespace,
-                        &JobMeta {
-                            id: job_id_spawn,
-                            partitions: partition_location,
+                        &job_id_spawn,
+                        &JobStatus {
+                            status: Some(job_status::Status::Completed(CompletedJob {
+                                partition_location,
+                            })),
                         },
                     )
                     .await
@@ -226,13 +261,8 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
                 error!("{}", msg);
                 tonic::Status::internal(msg)
             })?;
-        let mut partition_location = vec![];
-        for (executor, partition_id) in job_meta.partitions {
-            partition_location.push(PartitionLocation {
-                partition_id: Some(partition_id.into()),
-                executor_meta: Some(executor.into()),
-            });
-        }
-        Ok(Response::new(GetJobStatusResult { partition_location }))
+        Ok(Response::new(GetJobStatusResult {
+            status: Some(job_meta),
+        }))
     }
 }

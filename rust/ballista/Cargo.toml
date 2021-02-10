@@ -28,8 +28,6 @@ log = "0.4"
 prost = "0.7"
 prost-types = "0.7"
 rand = "0.8"
-serde = "1"
-serde_json = "1"
 sled = "0.34"
 snmalloc-rs = {version = "0.2", features= ["cache-friendly"], optional = true}
 sqlparser = "0.7"

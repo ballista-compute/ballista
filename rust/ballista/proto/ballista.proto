@@ -436,11 +436,30 @@ message GetJobStatusParams {
   string job_id = 1;
 }
 
-message GetJobStatusResult {
-  // TODO: right now we only return the partition_locations once all of them are available
-  // We should probably add a bunch more info here, like a job status (queued, running, error, done...)
-  // along with progress report for each stage
+message CompletedJob {
   repeated PartitionLocation partition_location = 1;
+}
+
+message QueuedJob {}
+
+// TODO: add progress report
+message RunningJob {}
+
+message FailedJob {
+  string error = 1;
+}
+
+message JobStatus {
+  oneof status {
+    QueuedJob queued = 1;
+    RunningJob running = 2;
+    FailedJob failed = 3;
+    CompletedJob completed = 4;
+  }
+}
+
+message GetJobStatusResult {
+  JobStatus status = 1;
 }
 
 service SchedulerGrpc {

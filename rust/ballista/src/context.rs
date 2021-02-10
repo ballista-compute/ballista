@@ -22,7 +22,7 @@ use std::{fs, time::Duration};
 
 use crate::serde::protobuf::scheduler_grpc_client::SchedulerGrpcClient;
 use crate::serde::protobuf::{
-    ExecuteQueryParams, ExecuteQueryResult, GetJobStatusParams, GetJobStatusResult,
+    job_status, ExecuteQueryParams, ExecuteQueryResult, GetJobStatusParams, GetJobStatusResult,
 };
 use crate::serde::scheduler::{Action, ExecutorMeta};
 use crate::{client::BallistaClient, serde::scheduler};
@@ -41,7 +41,7 @@ use datafusion::logical_plan::{DFSchema, Expr, LogicalPlan, Partitioning};
 use datafusion::physical_plan::csv::CsvReadOptions;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::{dataframe::DataFrame, physical_plan::RecordBatchStream};
-use log::{debug, info};
+use log::{debug, error, info};
 use uuid::Uuid;
 
 #[allow(dead_code)]
@@ -232,44 +232,60 @@ impl BallistaDataFrame {
             .job_id;
 
         loop {
-            let GetJobStatusResult { partition_location } = scheduler
+            let GetJobStatusResult { status } = scheduler
                 .get_job_status(GetJobStatusParams {
                     job_id: job_id.clone(),
                 })
                 .await?
                 .into_inner();
-            if partition_location.is_empty() {
-                info!("Job {} still executing...", job_id);
-                tokio::time::sleep(Duration::from_secs(5)).await;
-            } else {
-                // TODO: use streaming. Probably need to change the signature of fetch_partition to achieve that
-                let mut result = vec![];
-                for location in partition_location {
-                    let metadata = location.executor_meta.ok_or_else(|| {
-                        BallistaError::Internal("Received empty executor metadata".to_owned())
-                    })?;
-                    let partition_id = location.partition_id.ok_or_else(|| {
-                        BallistaError::Internal("Received empty partition id".to_owned())
-                    })?;
-                    let mut ballista_client =
-                        BallistaClient::try_new(metadata.host.as_str(), metadata.port as u16)
-                            .await?;
-                    result.append(
-                        &mut ballista_client
-                            .fetch_partition(
-                                &Uuid::parse_str(&partition_id.job_uuid).unwrap(),
-                                partition_id.stage_id as usize,
-                                partition_id.partition_id as usize,
-                            )
-                            .await?,
-                    );
+            let status = status.and_then(|s| s.status).ok_or_else(|| {
+                BallistaError::Internal("Received empty status message".to_owned())
+            })?;
+            let wait_future = tokio::time::sleep(Duration::from_secs(5));
+            match status {
+                job_status::Status::Queued(_) => {
+                    info!("Job {} still queued...", job_id);
+                    wait_future.await;
                 }
-                break Ok(Box::pin(MemoryStream::try_new(
-                    result,
-                    Arc::new(schema),
-                    None,
-                )?));
-            }
+                job_status::Status::Running(_) => {
+                    info!("Job {} is running...", job_id);
+                    wait_future.await;
+                }
+                job_status::Status::Failed(err) => {
+                    let msg = format!("Job {} failed: {}", job_id, err.error);
+                    error!("{}", msg);
+                    break Err(BallistaError::General(msg));
+                }
+                job_status::Status::Completed(completed) => {
+                    // TODO: use streaming. Probably need to change the signature of fetch_partition to achieve that
+                    let mut result = vec![];
+                    for location in completed.partition_location {
+                        let metadata = location.executor_meta.ok_or_else(|| {
+                            BallistaError::Internal("Received empty executor metadata".to_owned())
+                        })?;
+                        let partition_id = location.partition_id.ok_or_else(|| {
+                            BallistaError::Internal("Received empty partition id".to_owned())
+                        })?;
+                        let mut ballista_client =
+                            BallistaClient::try_new(metadata.host.as_str(), metadata.port as u16)
+                                .await?;
+                        result.append(
+                            &mut ballista_client
+                                .fetch_partition(
+                                    &Uuid::parse_str(&partition_id.job_uuid).unwrap(),
+                                    partition_id.stage_id as usize,
+                                    partition_id.partition_id as usize,
+                                )
+                                .await?,
+                        );
+                    }
+                    break Ok(Box::pin(MemoryStream::try_new(
+                        result,
+                        Arc::new(schema),
+                        None,
+                    )?));
+                }
+            };
         }
     }
 

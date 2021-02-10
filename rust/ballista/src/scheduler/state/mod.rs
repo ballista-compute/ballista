@@ -1,9 +1,15 @@
-use std::time::Duration;
+use std::{
+    any::type_name,
+    io::{Cursor, Read},
+    time::Duration,
+};
 
 use log::debug;
+use prost::Message;
 
+use crate::error::Result;
+use crate::serde::protobuf::{ExecutorMetadata, JobStatus};
 use crate::{error::ballista_error, prelude::BallistaError, serde::scheduler::ExecutorMeta};
-use crate::{error::Result, serde::scheduler::JobMeta};
 
 use super::SchedulerServer;
 
@@ -46,46 +52,46 @@ impl<Config: ConfigBackendClient> SchedulerState<Config> {
     }
 
     pub async fn get_executors_metadata(&self, namespace: &str) -> Result<Vec<ExecutorMeta>> {
-        self.config_client
+        let mut result = vec![];
+
+        let entries = self
+            .config_client
             .clone()
             .get_from_prefix(&get_executors_prefix(namespace))
-            .await?
-            .into_iter()
-            .map(|bytes| serde_json::from_slice::<ExecutorMeta>(&bytes))
-            .collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(|e| {
-                BallistaError::Internal(format!("Could not deserialize state value: {}", e))
-            })
+            .await?;
+        for entry in entries {
+            let meta: ExecutorMetadata = decode_protobuf(&entry)?;
+            result.push(meta.into());
+        }
+        Ok(result)
     }
 
-    pub async fn save_executor_metadata(&self, namespace: &str, meta: &ExecutorMeta) -> Result<()> {
+    pub async fn save_executor_metadata(&self, namespace: &str, meta: ExecutorMeta) -> Result<()> {
         let key = get_executor_key(namespace, &meta.id);
-        let value = serde_json::to_vec(meta).map_err(|e| {
-            BallistaError::Internal(format!("Could not serialize ExecutorMeta: {}", e))
-        })?;
+        let meta: ExecutorMetadata = meta.into();
+        let value: Vec<u8> = encode_protobuf(&meta)?;
         self.config_client
             .clone()
             .put(key, value, Some(LEASE_TIME))
             .await
     }
 
-    pub async fn save_job_metadata(&self, namespace: &str, meta: &JobMeta) -> Result<()> {
-        debug!("Saving job metadata: {:?}", meta);
-        let key = get_job_key(namespace, &meta.id);
-        let value = serde_json::to_vec(meta).map_err(|e| {
-            BallistaError::Internal(format!("Could not serialize ExecutorMeta: {}", e))
-        })?;
+    pub async fn save_job_metadata(
+        &self,
+        namespace: &str,
+        job_id: &str,
+        status: &JobStatus,
+    ) -> Result<()> {
+        debug!("Saving job metadata: {:?}", status);
+        let key = get_job_key(namespace, job_id);
+        let value = encode_protobuf(status)?;
         self.config_client.clone().put(key, value, None).await
     }
 
-    pub async fn get_job_metadata(&self, namespace: &str, job_id: &str) -> Result<JobMeta> {
+    pub async fn get_job_metadata(&self, namespace: &str, job_id: &str) -> Result<JobStatus> {
         let key = get_job_key(namespace, job_id);
         let value = &self.config_client.clone().get(&key).await?;
-        let msg = String::from_utf8(value.clone()).unwrap();
-        debug!("Going to deserialize {}", msg);
-        let value: JobMeta = serde_json::from_slice(value).map_err(|e| {
-            BallistaError::Internal(format!("Could not deserialize state value: {}", e))
-        })?;
+        let value: JobStatus = decode_protobuf(value)?;
         Ok(value)
     }
 }
@@ -100,4 +106,18 @@ fn get_executor_key(namespace: &str, id: &str) -> String {
 
 fn get_job_key(namespace: &str, id: &str) -> String {
     format!("/ballista/jobs/{}/{}", namespace, id)
+}
+
+fn decode_protobuf<T: Message + Default>(bytes: &[u8]) -> Result<T> {
+    T::decode(bytes).map_err(|e| {
+        BallistaError::Internal(format!("Could not deserialize {}: {}", type_name::<T>(), e))
+    })
+}
+
+fn encode_protobuf<T: Message + Default>(msg: &T) -> Result<Vec<u8>> {
+    let mut value: Vec<u8> = Vec::with_capacity(msg.encoded_len());
+    msg.encode(&mut value).map_err(|e| {
+        BallistaError::Internal(format!("Could not serialize {}: {}", type_name::<T>(), e))
+    })?;
+    Ok(value)
 }

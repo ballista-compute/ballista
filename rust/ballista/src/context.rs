@@ -230,7 +230,7 @@ impl BallistaDataFrame {
                 host: host.to_string(),
                 port: port as u16,
             }];
-            let mut planner = DistributedPlanner::new(executors);
+            let mut planner = DistributedPlanner::new(executors)?;
             planner.collect(&plan).await
         } else {
             debug!("Sending logical plan to executor: {:?}", plan);

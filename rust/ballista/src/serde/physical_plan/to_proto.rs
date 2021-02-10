@@ -21,8 +21,7 @@ use std::{
     sync::Arc,
 };
 
-use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
-use datafusion::physical_plan::csv::CsvExec;
+use arrow::datatypes::DataType;
 use datafusion::physical_plan::expressions::{
     CaseExpr, InListExpr, IsNotNullExpr, IsNullExpr, NegativeExpr, NotExpr,
 };
@@ -34,6 +33,14 @@ use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
 use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::sort::SortExec;
+use datafusion::physical_plan::{coalesce_batches::CoalesceBatchesExec, expressions::CastExpr};
+use datafusion::{
+    physical_plan::{
+        csv::CsvExec,
+        expressions::{Count, Literal},
+    },
+    scalar::ScalarValue,
+};
 
 use datafusion::physical_plan::{
     empty::EmptyExec,
@@ -267,6 +274,8 @@ impl TryInto<protobuf::LogicalExprNode> for Arc<dyn AggregateExpr> {
             Ok(protobuf::AggregateFunction::Avg.into())
         } else if self.as_any().downcast_ref::<Sum>().is_some() {
             Ok(protobuf::AggregateFunction::Sum.into())
+        } else if self.as_any().downcast_ref::<Count>().is_some() {
+            Ok(protobuf::AggregateFunction::Count.into())
         } else {
             Err(BallistaError::NotImplemented(format!(
                 "Aggregate function not supported: {:?}",
@@ -382,6 +391,21 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
                     },
                 ))),
             })
+        } else if let Some(lit) = expr.downcast_ref::<Literal>() {
+            Ok(protobuf::LogicalExprNode {
+                expr_type: Some(protobuf::logical_expr_node::ExprType::Literal(
+                    lit.value().try_into()?,
+                )),
+            })
+        } else if let Some(cast) = expr.downcast_ref::<CastExpr>() {
+            Ok(protobuf::LogicalExprNode {
+                expr_type: Some(protobuf::logical_expr_node::ExprType::Cast(Box::new(
+                    protobuf::CastNode {
+                        expr: Some(Box::new(cast.expr().clone().try_into()?)),
+                        arrow_type: Some(cast.cast_type().into()),
+                    },
+                ))),
+            })
         } else if let Some(expr) = expr.downcast_ref::<ScalarFunctionExpr>() {
             let fun = match expr.name() {
                 "sqrt" => Ok(protobuf::ScalarFunction::Sqrt),
@@ -435,7 +459,7 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
             })
         } else {
             Err(BallistaError::General(format!(
-                "physical_plan::from_proto() unsupported expression {:?}",
+                "physical_plan::to_proto() unsupported expression {:?}",
                 value
             )))
         }

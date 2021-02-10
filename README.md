@@ -51,7 +51,7 @@ Ballista can be deployed in [Kubernetes](https://kubernetes.io/), or as a standa
 The following diagram highlights some of the integrations that will be possible with this unique architecture. Note 
 that not all components shown here are available yet.
 
-![Ballista Architecture Diagram](docs/ballista-architecture.png)
+![Ballista Architecture Diagram](docs/user-guide/src/img/ballista-architecture.png)
 
 ## How does this compare to Apache Spark?
 

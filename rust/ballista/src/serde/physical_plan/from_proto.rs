@@ -21,18 +21,20 @@ use std::{convert::TryInto, unimplemented};
 use crate::error::BallistaError;
 use crate::executor::shuffle_reader::ShuffleReaderExec;
 use crate::scheduler::planner::PartitionLocation;
+use crate::serde::protobuf::LogicalExprNode;
 use crate::serde::{proto_error, protobuf};
 use crate::{convert_box_required, convert_required};
 
-use arrow::datatypes::Schema;
+use arrow::datatypes::{DataType, Schema};
 use datafusion::execution::context::{ExecutionConfig, ExecutionContextState};
-use datafusion::logical_plan::Expr;
+use datafusion::logical_plan::{DFSchema, Expr};
+use datafusion::physical_plan::expressions::col;
 use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
 use datafusion::physical_plan::{
     coalesce_batches::CoalesceBatchesExec,
     csv::CsvExec,
     empty::EmptyExec,
-    expressions::PhysicalSortExpr,
+    expressions::{Avg, Column, PhysicalSortExpr},
     filter::FilterExec,
     hash_join::HashJoinExec,
     hash_utils::JoinType,
@@ -41,10 +43,14 @@ use datafusion::physical_plan::{
     projection::ProjectionExec,
     sort::{SortExec, SortOptions},
 };
-use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
+
+use datafusion::physical_plan::{AggregateExpr, ExecutionPlan, PhysicalExpr};
 use datafusion::prelude::CsvReadOptions;
 
+use protobuf::logical_expr_node::ExprType;
 use protobuf::physical_plan_node::PhysicalPlanType;
+
+use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
 
 impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
     type Error = BallistaError;
@@ -128,7 +134,55 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                 let input: Arc<dyn ExecutionPlan> = convert_box_required!(limit.input)?;
                 Ok(Arc::new(LocalLimitExec::new(input, limit.limit as usize)))
             }
-            PhysicalPlanType::HashAggregate(_) => unimplemented!(),
+            PhysicalPlanType::HashAggregate(hash_agg) => {
+                let input: Arc<dyn ExecutionPlan> = convert_box_required!(hash_agg.input)?;
+                let mode = protobuf::AggregateMode::from_i32(hash_agg.mode).ok_or_else(|| {
+                    proto_error(format!(
+                        "Received a HashAggregateNode message with unknown AggregateMode {}",
+                        hash_agg.mode
+                    ))
+                })?;
+                let agg_mode: AggregateMode = match mode {
+                    protobuf::AggregateMode::Partial => AggregateMode::Partial,
+                    protobuf::AggregateMode::Final => AggregateMode::Final,
+                };
+                let group = hash_agg
+                    .group_expr
+                    .iter()
+                    .map(|expr| {
+                        compile_expr(expr, &input.schema()).map(|e| (e, "unused".to_string()))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                let datafusion_planner = DefaultPhysicalPlanner::default();
+                let ctx_state = ExecutionContextState {
+                    datasources: Default::default(),
+                    scalar_functions: Default::default(),
+                    var_provider: Default::default(),
+                    aggregate_functions: Default::default(),
+                    config: ExecutionConfig::new(),
+                };
+
+                let agg_expr = hash_agg
+                    .aggr_expr
+                    .iter()
+                    .map(|expr| {
+                        let expr2: Expr = expr.try_into().unwrap();
+                        let logical_schema: DFSchema =
+                            input.schema().as_ref().clone().try_into().unwrap();
+                        datafusion_planner.create_aggregate_expr(
+                            &expr2,
+                            &logical_schema,
+                            input.schema().as_ref(),
+                            &ctx_state,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                Ok(Arc::new(HashAggregateExec::try_new(
+                    agg_mode, group, agg_expr, input,
+                )?))
+            }
             PhysicalPlanType::HashJoin(hashjoin) => {
                 let left: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.left)?;
                 let right: Arc<dyn ExecutionPlan> = convert_box_required!(hashjoin.right)?;

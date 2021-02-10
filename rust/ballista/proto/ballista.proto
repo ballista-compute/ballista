@@ -40,15 +40,9 @@ message LogicalExprNode {
     NegativeNode negative = 74;
     InListNode in_list = 75;
     bool wildcard = 76;
+    ScalarFunctionNode scalar_function = 77;
   }
 }
-
-
-
-
-
-
-
 
 message IsNull {
   LogicalExprNode expr = 1;
@@ -81,6 +75,47 @@ message InListNode {
   LogicalExprNode expr = 1;
   repeated LogicalExprNode list = 2;
   bool negated = 3;
+}
+
+enum ScalarFunction {
+  SQRT = 0;
+  SIN = 1;
+  COS = 2;
+  TAN = 3;
+  ASIN = 4;
+  ACOS = 5;
+  ATAN = 6;
+  EXP = 7;
+  LOG = 8;
+  LOG2 = 9;
+  LOG10 = 10;
+  FLOOR = 11;
+  CEIL = 12;
+  ROUND = 13;
+  TRUNC = 14;
+  ABS = 15;
+  SIGNUM = 16;
+  LENGTH = 17;
+  CONCAT = 18;
+  LOWER = 19;
+  UPPER = 20;
+  TRIM = 21;
+  LTRIM = 22;
+  RTRIM = 23;
+  TOTIMESTAMP = 24;
+  ARRAY = 25;
+  NULLIF = 26;
+  DATETRUNC = 27;
+  MD5 = 28;
+  SHA224 = 29;
+  SHA256 = 30;
+  SHA384 = 31;
+  SHA512 = 32;
+}
+
+message ScalarFunctionNode {
+  ScalarFunction fun = 1;
+  repeated LogicalExprNode expr = 2;
 }
 
 enum AggregateFunction {
@@ -324,13 +359,13 @@ message SelectionExecNode {
 enum AggregateMode {
   PARTIAL = 0;
   FINAL = 1;
-  COMPLETE = 2;
 }
 
 message HashAggregateExecNode {
   repeated LogicalExprNode group_expr = 1;
   repeated LogicalExprNode aggr_expr = 2;
   AggregateMode mode = 3;
+  PhysicalPlanNode input = 4;
 }
 
 message ShuffleReaderExecNode {

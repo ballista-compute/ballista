@@ -266,27 +266,6 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
     }
 }
 
-/*
-impl TryInto<Arc<dyn AggregateExpr>> for protobuf::LogicalExprNode {
-    type Error = BallistaError;
-    fn try_into(self) -> Result<Arc<dyn AggregateExpr>, Self::Error> {
-        let plan = self.expr_type.as_ref().ok_or_else(|| {
-            proto_error(format!(
-                "physical_plan::from_proto() Unsupported physical plan '{:?}'",
-                self
-            ))
-        })?;
-        match plan {
-            ExprType::AggregateExpr::Avg(a) => {
-                let agg_fn = a.aggr_function.try_into();
-                let expr = a.expr.try_into();
-                Ok(Arc::new(Avg::new(expr, "".to_string(), DataType::Float64))) // TODO
-            }
-        }
-    }
-}
-*/
-
 fn compile_expr(
     expr: &protobuf::LogicalExprNode,
     schema: &Schema,

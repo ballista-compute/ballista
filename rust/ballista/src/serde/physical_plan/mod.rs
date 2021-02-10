@@ -37,11 +37,11 @@ mod roundtrip_tests {
 
     fn roundtrip_test(exec_plan: Arc<dyn ExecutionPlan>) -> Result<()> {
         let proto: protobuf::PhysicalPlanNode = exec_plan.clone().try_into()?;
-        //let result_exec_plan: Arc<dyn ExecutionPlan> = (&proto).try_into()?;
-        //assert_eq!(
-        //   format!("{:?}", exec_plan),
-        //   format!("{:?}", result_exec_plan)
-        //);
+        let result_exec_plan: Arc<dyn ExecutionPlan> = (&proto).try_into()?;
+        assert_eq!(
+            format!("{:?}", exec_plan),
+            format!("{:?}", result_exec_plan)
+        );
         Ok(())
     }
 
@@ -88,7 +88,8 @@ mod roundtrip_tests {
 
     #[test]
     fn rountrip_hash_aggregate() -> Result<()> {
-        let groups: Vec<(Arc<dyn PhysicalExpr>, String)> = vec![(col("a"), "a".to_string())];
+        use arrow::datatypes::{DataType, Field, Schema};
+        let groups: Vec<(Arc<dyn PhysicalExpr>, String)> = vec![(col("a"), "unused".to_string())];
 
         let aggregates: Vec<Arc<dyn AggregateExpr>> = vec![Arc::new(Avg::new(
             col("b"),
@@ -96,11 +97,15 @@ mod roundtrip_tests {
             DataType::Float64,
         ))];
 
+        let field_a = Field::new("a", DataType::Int64, false);
+        let field_b = Field::new("b", DataType::Int64, false);
+        let schema = Schema::new(vec![field_a, field_b]);
+
         roundtrip_test(Arc::new(HashAggregateExec::try_new(
             AggregateMode::Final,
             groups.clone(),
             aggregates.clone(),
-            Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
+            Arc::new(EmptyExec::new(false, Arc::new(schema))),
         )?))
     }
 }

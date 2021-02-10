@@ -37,7 +37,7 @@ use datafusion::physical_plan::sort::SortExec;
 
 use datafusion::physical_plan::{
     empty::EmptyExec,
-    expressions::{Avg, Sum, BinaryExpr, Column},
+    expressions::{Avg, BinaryExpr, Column, Sum},
 };
 use datafusion::physical_plan::{AggregateExpr, ExecutionPlan, PhysicalExpr};
 
@@ -268,9 +268,13 @@ impl TryInto<protobuf::LogicalExprNode> for Arc<dyn AggregateExpr> {
         } else if self.as_any().downcast_ref::<Sum>().is_some() {
             Ok(protobuf::AggregateFunction::Sum.into())
         } else {
-            Err(BallistaError::NotImplemented(format!("Aggregate function not supported: {:?}", self)))
+            Err(BallistaError::NotImplemented(format!(
+                "Aggregate function not supported: {:?}",
+                self
+            )))
         }?;
-        let expressions: Vec<protobuf::LogicalExprNode> = self.expressions()
+        let expressions: Vec<protobuf::LogicalExprNode> = self
+            .expressions()
             .iter()
             .map(|e| e.clone().try_into())
             .collect::<Result<Vec<_>, BallistaError>>()?;

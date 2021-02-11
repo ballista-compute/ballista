@@ -107,10 +107,16 @@ jobs:
       run: cd rust/ballista && cargo test
     - name: Workspace rebuild for cache
       if: steps.cache-cargo.outputs.cache-hit != 'true'
-      #Do a full workspace rebuild so that the cache contains artifacts for all workspace members while avoid cache bloat due to version changes
+      #Do a full workspace rebuild so that the cache contains artifacts for all workspace members 
+      #Have to change directories to python to get .cargo/config to get properly read
+      #Required since pyo3 on mac needs additional compiler arguments
       run: |
         cargo clean
+        cd rust
         cargo build
+        cd ../python
+        cargo build
+
 
   Windows:
     runs-on: windows-2016

@@ -1,0 +1,2 @@
+[workspace]
+members = ["rust/ballista","rust/benchmarks/tpch" ,"python"]

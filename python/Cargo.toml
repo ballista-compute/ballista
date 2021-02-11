@@ -1,0 +1,59 @@
+[package]
+name = "ballista-py"
+version = "0.1.0"
+authors = ["Patrick J. More <patrickjmore@gmail.com>","Jorge C. Leitao <jorgecarleitao@gmail.com>"]
+license = "Apache-2.0"
+edition = "2018"
+
+
+[features]
+simd = ["ballista/simd"]
+snmalloc = ["snmalloc-rs"]
+
+
+
+[dependencies]
+ballista = {path = "../rust/ballista"}
+futures = "0.3"
+snmalloc-rs = {version = "0.2", features= ["cache-friendly"], optional = true}
+
+pyo3 = {version = "0.13", features = ["extension-module", "abi3"]}
+
+tokio = { version = "0.2", features = ["full"] }
+
+#Should be kept in line with datafusion's serde_json
+serde_json ="1.0.61"
+serde = "1.0"
+
+
+arrow = { git = "https://github.com/apache/arrow", rev="c3b972c" }
+datafusion = { git = "https://github.com/apache/arrow", rev="c3b972c" }
+
+
+[lib]
+name = "ballista"
+crate-type = ["cdylib"]
+
+
+
+[package.metadata.maturin]
+requires-dist = ["pyarrow>=1"]
+requires-python = ">=3.5"
+project-url = {ballista= "https://github.com/ballista-compute/ballista/tree/main/python"}
+classifier = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "License :: OSI Approved",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python",
+    "Programming Language :: Rust",
+]
+
+

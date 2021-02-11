@@ -43,7 +43,8 @@ jobs:
         python-version: '3.8'
     - name: Check typestub
       run: |
-        cd python 
+        cd python
+        cargo build 
         cd ..
         cp target/debug/libballista.so python/ci/ballista.so
         cd python/ci

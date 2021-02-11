@@ -1,6 +1,0 @@
-[workspace]
-
-members = [
-    "ballista",
-    "benchmarks/tpch",
-]

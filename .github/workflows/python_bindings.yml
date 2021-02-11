@@ -1,12 +1,11 @@
 name: Python Bindings
-on: [workflow_dispatch]
-#on: 
-#  push:
-#    paths:
-#    - python/**
-#  pull_request:
-#    paths:
-#    - python/**
+on: 
+  push:
+    paths:
+    - python/**
+  pull_request:
+    paths:
+    - python/**
 
 env:
   VCPKGRS_DYNAMIC: 1
@@ -18,22 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Set CARGO_VERSION environment variable
-      run: |
-        cargo_version_full=`cargo --version`
-        cargo_version_removed_prefix=${cargo_version_full#*cargo }
-        cargo_version=${cargo_version_removed_prefix% (*}
-        echo "CARGO_VERSION=$cargo_version" >> $GITHUB_ENV
-    - uses: actions/cache@v2
-      id: cache-cargo
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-v${{ env.CARGO_VERSION }}-${{ hashFiles('Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-v${{ env.CARGO_VERSION }}-
     - name: Lint bindings
       run: cd python && cargo clippy -- -D warnings
     - name: Check code formatted
@@ -50,12 +33,6 @@ jobs:
         cd python/ci
         python check_stub_exhaustiveness.py
         rm ballista.so
-    - name: Workspace rebuild for cache
-      if: steps.cache-cargo.outputs.cache-hit != 'true'
-      #Do a full workspace rebuild so that the cache contains artifacts for all workspace members 
-      run: |
-        cargo clean
-        cargo build
 
 
 
@@ -65,23 +42,6 @@ jobs:
     needs: [PreTestChecks]
     steps:
     - uses: actions/checkout@v2
-    - name: Set CARGO_VERSION environment variable
-      run: |
-        cargo_version_full=`cargo --version`
-        cargo_version_removed_prefix=${cargo_version_full#*cargo }
-        cargo_version=${cargo_version_removed_prefix% (*}
-        echo "CARGO_VERSION=$cargo_version" >> $GITHUB_ENV
-    - uses: actions/cache@v2
-      id: cache-cargo
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-v${{ env.CARGO_VERSION }}-${{ hashFiles('Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-v${{ env.CARGO_VERSION }}-
-  
     - uses: actions/setup-python@v2
       with:
         python-version: '3.7'
@@ -109,22 +69,6 @@ jobs:
     needs: [PreTestChecks]
     steps:
     - uses: actions/checkout@v2
-    - name: Set CARGO_VERSION environment variable
-      run: |
-        cargo_version_full=`cargo --version`
-        cargo_version_removed_prefix=${cargo_version_full#*cargo }
-        cargo_version=${cargo_version_removed_prefix% (*}
-        echo "CARGO_VERSION=$cargo_version" >> $GITHUB_ENV
-    - uses: actions/cache@v2
-      id: cache-cargo
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-v${{ env.CARGO_VERSION }}-${{ hashFiles('Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-v${{ env.CARGO_VERSION }}-
     - uses: actions/setup-python@v2
       with:
         python-version: '3.7'
@@ -138,12 +82,6 @@ jobs:
         cd python
         maturin develop
         python -m unittest discover tests
-    - name: Workspace rebuild for cache
-      if: steps.cache-cargo.outputs.cache-hit != 'true'
-      #Do a full workspace rebuild so that the cache contains artifacts for all workspace members 
-      run: |
-        cargo clean
-        cargo build
 
 
 
@@ -154,11 +92,6 @@ jobs:
     - uses: actions/checkout@v2
     - name: Setup environment variables
       run: |
-        #Setting up cargo version variable 
-        $full_version = cargo --version
-        $version = $full_version -replace ".*cargo " -replace " \(.*"
-        echo "CARGO_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
         #Setting up openssl version variable
         $package_md = vcpkg search openssl | Select-String -Pattern "^openssl\s+[^\s]+\s+.*$"
         if ($package_md.Count -gt 1){
@@ -171,16 +104,6 @@ jobs:
         $version = [regex]::match($package_md, '^openssl\s+([^\s]+)\s+.*$').Groups[1].Value
         echo "MOST_RECENT_OPENSSL_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-    - uses: actions/cache@v2
-      id: cache-cargo
-      with:
-        path: |
-          %USERPROFILE%\.cargo\registry
-          %USERPROFILE%\.cargo\git
-          target
-        key: ${{ runner.os }}-cargo-v${{ env.CARGO_VERSION }}-${{ hashFiles('Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-v${{ env.CARGO_VERSION }}-
     - uses: actions/cache@v2
       id: cache_openssl
       with:
@@ -205,12 +128,7 @@ jobs:
         cd python
         maturin develop
         python -m unittest discover tests
-    - name: Workspace rebuild for cache
-      if: steps.cache-cargo.outputs.cache-hit != 'true'
-      #Do a full workspace rebuild so that the cache contains artifacts for all workspace members 
-      run: |
-        cargo clean
-        cargo build
+
 
 
 

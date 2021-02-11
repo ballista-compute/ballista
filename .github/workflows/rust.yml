@@ -22,9 +22,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Lint Ballista
-      run: cd rust/ballista && cargo clippy -- -D warnings
+      run: cd rust && cargo clippy -- -D warnings
     - name: Check Ballista formatting
-      run: cd rust/ballista && cargo fmt -- --check
+      run: cd rust && cargo fmt -- --check
 
 
   Ubuntu:
@@ -33,9 +33,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Build Ballista
-      run: cd rust/ballista && cargo build
+      run: cd rust && cargo build
     - name: Run tests
-      run: cd rust/ballista && cargo test
+      run: cd rust && cargo test
 
   Mac:
     runs-on: macos-latest
@@ -43,9 +43,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Build Ballista
-      run: cd rust/ballista && cargo build
+      run: cd rust && cargo build
     - name: Run tests
-      run: cd rust/ballista && cargo test
+      run: cd rust && cargo test
 
 
 
@@ -82,10 +82,10 @@ jobs:
         vcpkg install openssl:x64-windows --binarysource="files,$abs_path,readwrite"
     - name: Build Ballista
       run: |
-        cd rust\ballista && cargo build
+        cd rust && cargo build
     - name: Run tests
       run: |
-        cd rust\ballista && cargo test
+        cd rust && cargo test
 
 
   

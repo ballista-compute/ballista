@@ -29,9 +29,8 @@ jobs:
       run: |
         cd python
         cargo build 
-        cd ..
         cp target/debug/libballista.so python/ci/ballista.so
-        cd python/ci
+        cd ci
         python check_stub_exhaustiveness.py
         rm ballista.so
 
@@ -56,12 +55,7 @@ jobs:
         cd python
         maturin develop
         python -m unittest discover tests
-    - name: Workspace rebuild for cache
-      if: steps.cache-cargo.outputs.cache-hit != 'true'
-      #Do a full workspace rebuild so that the cache contains artifacts for all workspace members 
-      run: |
-        cargo clean
-        cargo build
+
 
 
 

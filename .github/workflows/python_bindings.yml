@@ -6,6 +6,7 @@ on:
   pull_request:
     paths:
     - python/**
+  workflow_dispatch:
 
 env:
   VCPKGRS_DYNAMIC: 1

@@ -68,11 +68,13 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                 .iter()
                 .map(|expr| expr.0.clone().try_into())
                 .collect::<Result<Vec<_>, Self::Error>>()?;
+            let expr_name = exec.expr().iter().map(|expr| expr.1.clone()).collect();
             Ok(protobuf::PhysicalPlanNode {
                 physical_plan_type: Some(PhysicalPlanType::Projection(Box::new(
                     protobuf::ProjectionExecNode {
                         input: Some(Box::new(input)),
                         expr,
+                        expr_name,
                     },
                 ))),
             })

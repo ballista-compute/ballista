@@ -66,10 +66,10 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                 let exprs = projection
                     .expr
                     .iter()
-                    .map(|expr| {
-                        compile_expr(expr, &input.schema()).map(|e| (e, "unused".to_string()))
+                    .zip(projection.expr_name.iter())
+                    .map(|(expr, name)| {
+                        compile_expr(expr, &input.schema()).map(|e| (e, name.to_string()))
                     })
-                    // .map(|expr| expr.try_into().map(|e| (e, "unused".to_string())))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Arc::new(ProjectionExec::try_new(exprs, input)?))
             }
@@ -179,8 +179,6 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     debug!("Physical input schema field: {}", field.name());
                 }
 
-                //TODO: this currently fails to compile the aggregate expressions
-                // https://github.com/ballista-compute/ballista/issues/504
                 let physical_aggr_expr = logical_agg_expr
                     .iter()
                     .map(|expr| {

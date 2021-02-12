@@ -350,6 +350,7 @@ message EmptyExecNode {
 message ProjectionExecNode {
   PhysicalPlanNode input = 1;
   repeated LogicalExprNode expr = 2;
+  repeated string expr_name = 3;
 }
 
 message SelectionExecNode {

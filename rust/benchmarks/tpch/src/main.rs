@@ -159,9 +159,10 @@ async fn benchmark(opt: BenchmarkOpt) -> Result<()> {
     let mut millis = vec![];
 
     // run benchmark
+    let sql = get_query_sql(opt.query)?;
+    println!("Running benchmark with query {}:\n {}", opt.query, sql);
     for i in 0..opt.iterations {
         let start = Instant::now();
-        let sql = get_query_sql(opt.query)?;
         let df = ctx.sql(&sql)?;
 
         let mut batches = vec![];

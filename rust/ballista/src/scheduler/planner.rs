@@ -38,7 +38,7 @@ use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec
 use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
-use log::debug;
+use log::{debug, info};
 use uuid::Uuid;
 
 type SendableExecutionPlan = Pin<Box<dyn Future<Output = Result<Arc<dyn ExecutionPlan>>> + Send>>;
@@ -212,9 +212,7 @@ fn create_query_stage(
     plan: Arc<dyn ExecutionPlan>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     Ok(Arc::new(QueryStageExec::try_new(
-        *job_uuid,
-        stage_id,
-        plan.clone(),
+        *job_uuid, stage_id, plan,
     )?))
 }
 
@@ -225,7 +223,7 @@ async fn execute_query_stage(
     plan: Arc<dyn ExecutionPlan>,
     executors: Vec<ExecutorMeta>,
 ) -> Result<Vec<PartitionLocation>> {
-    debug!("execute_query_stage() stage_id={}", stage_id);
+    info!("execute_query_stage() stage_id={}", stage_id);
     pretty_print(plan.clone(), 0);
 
     let partition_count = plan.output_partitioning().partition_count();
@@ -234,16 +232,17 @@ async fn execute_query_stage(
     // TODO make this concurrent by executing all partitions at once instead of one at a time
 
     for child_partition in 0..partition_count {
+        debug!(
+            "execute_query_stage() stage_id={}, partition_id={}",
+            stage_id, child_partition
+        );
         let executor_meta = &executors[child_partition % executors.len()];
 
-        let mut client = BallistaClient::try_new(&executor_meta.host, executor_meta.port)
-            .await
-            .map_err(|e| DataFusionError::Execution(format!("Ballista Error: {:?}", e)))?;
+        let mut client = BallistaClient::try_new(&executor_meta.host, executor_meta.port).await?;
 
         let _partition_metadata = client
             .execute_partition(*job_uuid, stage_id, child_partition, plan.clone())
-            .await
-            .map_err(|e| DataFusionError::Execution(format!("Ballista Error: {:?}", e)))?;
+            .await?;
         meta.push(PartitionLocation {
             partition_id: PartitionId::new(*job_uuid, stage_id, child_partition),
             executor_meta: executor_meta.clone(),
@@ -259,11 +258,8 @@ async fn execute_query_stage(
 }
 
 pub fn pretty_print(plan: Arc<dyn ExecutionPlan>, indent: usize) {
-    for _ in 0..indent {
-        print!("  ");
-    }
     let operator_str = format!("{:?}", plan);
-    println!("{}", &operator_str[0..60]);
+    debug!("{}{:?}", "  ".repeat(indent), &operator_str[0..60]);
     plan.children()
         .iter()
         .for_each(|c| pretty_print(c.clone(), indent + 1));

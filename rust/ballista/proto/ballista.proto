@@ -366,6 +366,7 @@ message HashAggregateExecNode {
   repeated LogicalExprNode aggr_expr = 2;
   AggregateMode mode = 3;
   PhysicalPlanNode input = 4;
+  repeated string group_expr_name = 5;
 }
 
 message ShuffleReaderExecNode {

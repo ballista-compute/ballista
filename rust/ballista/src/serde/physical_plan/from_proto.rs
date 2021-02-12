@@ -43,15 +43,13 @@ use datafusion::physical_plan::{
     projection::ProjectionExec,
     sort::{SortExec, SortOptions},
 };
-
 use datafusion::physical_plan::{AggregateExpr, ExecutionPlan, PhysicalExpr};
 use datafusion::prelude::CsvReadOptions;
-
+use log::debug;
 use protobuf::logical_expr_node::ExprType;
 use protobuf::physical_plan_node::PhysicalPlanType;
 
 use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
-
 impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
     type Error = BallistaError;
 
@@ -149,9 +147,16 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                 let group = hash_agg
                     .group_expr
                     .iter()
-                    .map(|expr| {
-                        compile_expr(expr, &input.schema()).map(|e| (e, "unused".to_string()))
+                    .zip(hash_agg.group_expr_name.iter())
+                    .map(|(expr, name)| {
+                        compile_expr(expr, &input.schema()).map(|e| (e, name.to_string()))
                     })
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                let logical_agg_expr = hash_agg
+                    .aggr_expr
+                    .iter()
+                    .map(|expr| expr.try_into())
                     .collect::<Result<Vec<_>, _>>()?;
 
                 let datafusion_planner = DefaultPhysicalPlanner::default();
@@ -163,24 +168,37 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     config: ExecutionConfig::new(),
                 };
 
-                let agg_expr = hash_agg
-                    .aggr_expr
+                let physical_schema = input.schema();
+
+                let logical_schema: DFSchema = input.schema().as_ref().clone().try_into()?;
+
+                for field in logical_schema.fields() {
+                    debug!("Logical input schema field: {}", field.name());
+                }
+                for field in physical_schema.fields() {
+                    debug!("Physical input schema field: {}", field.name());
+                }
+
+                //TODO: this currently fails to compile the aggregate expressions
+                // https://github.com/ballista-compute/ballista/issues/504
+                let physical_aggr_expr = logical_agg_expr
                     .iter()
                     .map(|expr| {
-                        let expr2: Expr = expr.try_into().unwrap();
-                        let logical_schema: DFSchema =
-                            input.schema().as_ref().clone().try_into().unwrap();
+                        debug!("Compiling expression {:?}", expr);
                         datafusion_planner.create_aggregate_expr(
-                            &expr2,
+                            expr,
                             &logical_schema,
-                            input.schema().as_ref(),
+                            &physical_schema,
                             &ctx_state,
                         )
                     })
                     .collect::<Result<Vec<_>, _>>()?;
 
                 Ok(Arc::new(HashAggregateExec::try_new(
-                    agg_mode, group, agg_expr, input,
+                    agg_mode,
+                    group,
+                    physical_aggr_expr,
+                    input,
                 )?))
             }
             PhysicalPlanType::HashJoin(hashjoin) => {

@@ -138,6 +138,11 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                 .iter()
                 .map(|expr| expr.0.to_owned().try_into())
                 .collect::<Result<Vec<_>, BallistaError>>()?;
+            let group_names = exec
+                .group_expr()
+                .iter()
+                .map(|expr| expr.1.to_owned())
+                .collect();
             let agg = exec
                 .aggr_expr()
                 .iter()
@@ -152,6 +157,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                 physical_plan_type: Some(PhysicalPlanType::HashAggregate(Box::new(
                     protobuf::HashAggregateExecNode {
                         group_expr: groups,
+                        group_expr_name: group_names,
                         aggr_expr: agg,
                         mode: agg_mode as i32,
                         input: Some(Box::new(input)),

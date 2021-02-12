@@ -10,6 +10,8 @@ services:
     command: "/scheduler --config-backend etcd --etcd-urls etcd:2379 --bind-host 0.0.0.0 --port 50050"
     ports:
       - "50050:50050"
+    volumes:
+      - ./data:/data
     depends_on:
       - etcd
   ballista-executor:

@@ -189,7 +189,7 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
                     .and_then(|plan| datafusion_ctx.create_physical_plan(&plan))
                     .map_err(|e| {
                         let msg =
-                            format!("Could not retrieve data from configuration store: {}", e);
+                            format!("Could not build physical execution plan: {}", e);
                         error!("{}", msg);
                         tonic::Status::internal(msg)
                     }));

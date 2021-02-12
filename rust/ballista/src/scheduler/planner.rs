@@ -55,10 +55,16 @@ pub struct DistributedPlanner {
 }
 
 impl DistributedPlanner {
-    pub fn new(executors: Vec<ExecutorMeta>) -> Self {
-        Self {
-            executors,
-            next_stage_id: 0,
+    pub fn new(executors: Vec<ExecutorMeta>) -> Result<Self> {
+        if executors.is_empty() {
+            Err(BallistaError::General(
+                "DistributedPlanner requires at least one executor".to_owned(),
+            ))
+        } else {
+            Ok(Self {
+                executors,
+                next_stage_id: 0,
+            })
         }
     }
 }

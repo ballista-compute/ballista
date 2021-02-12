@@ -1,0 +1,131 @@
+name: Python Bindings
+on: 
+  push:
+    paths:
+    - python/**
+  pull_request:
+    paths:
+    - python/**
+  workflow_dispatch:
+
+env:
+  VCPKGRS_DYNAMIC: 1
+
+
+
+jobs:
+  PreTestChecks:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Lint bindings
+      run: cd python && cargo clippy -- -D warnings
+    - name: Check code formatted
+      run: cd python && cargo fmt -- --check
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+    - name: Check typestub
+      run: |
+        cd python
+        cargo build 
+        cp target/debug/libballista.so ci/ballista.so
+        cd ci
+        python check_stub_exhaustiveness.py
+        rm ballista.so
+
+
+
+  
+  Ubuntu:
+    runs-on: ubuntu-latest
+    needs: [PreTestChecks]
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.7'
+    - name: Install Python dependencies
+      run: python -m pip install --upgrade pip setuptools wheel
+    - name: Run tests
+      run: |
+        python -m venv venv
+        source venv/bin/activate
+        pip install maturin==0.9.0 toml==0.10.1 pyarrow==1.0.0
+        cd python
+        maturin develop
+        python -m unittest discover tests
+
+
+
+
+  Mac:
+    runs-on: macos-latest
+    needs: [PreTestChecks]
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.7'
+    - name: Install Python dependencies
+      run: python -m pip install --upgrade pip setuptools wheel
+    - name: Run tests
+      run: |
+        python -m venv venv
+        source venv/bin/activate
+        pip install maturin==0.9.0 toml==0.10.1 pyarrow==1.0.0
+        cd python
+        maturin develop
+        python -m unittest discover tests
+
+
+
+  Windows:
+    runs-on: windows-2016
+    needs: [PreTestChecks]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup environment variables
+      run: |
+        #Setting up openssl version variable
+        $package_md = vcpkg search openssl | Select-String -Pattern "^openssl\s+[^\s]+\s+.*$"
+        if ($package_md.Count -gt 1){
+            echo "::error::vcpkg found many packages matching regex instead of one: $package_md"
+        }
+        if ($package_md.Count -eq 0){
+          echo "::error::vcpkg could not find any packages matching the regex"
+        }
+        
+        $version = [regex]::match($package_md, '^openssl\s+([^\s]+)\s+.*$').Groups[1].Value
+        echo "MOST_RECENT_OPENSSL_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+    - uses: actions/cache@v2
+      id: cache_openssl
+      with:
+        path: |
+          vcpkg-cache
+        key: ${{ runner.os }}-cache-openssl-${{env.MOST_RECENT_OPENSSL_VERSION}}
+    - name: Prepare the Windows Build Environment
+      run: |
+        $abs_path = "{0}\vcpkg-cache" -f $pwd
+        vcpkg integrate install
+        vcpkg install openssl:x64-windows --binarysource="files,$abs_path,readwrite"
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.7'
+    - name: Install Python dependencies
+      run: python -m pip install --upgrade pip setuptools wheel
+    - name: Run tests
+      run: |
+        python -m venv venv
+        ./venv/Scripts/activate.ps1
+        pip install maturin==0.9.0 toml==0.10.1 pyarrow==1.0.0
+        cd python
+        maturin develop
+        python -m unittest discover tests
+
+
+
+
+
+

@@ -25,7 +25,7 @@ use crate::serde::protobuf::LogicalExprNode;
 use crate::serde::{proto_error, protobuf};
 use crate::{convert_box_required, convert_required};
 
-use arrow::datatypes::{DataType, Schema};
+use arrow::datatypes::{DataType, Schema, SchemaRef};
 use datafusion::execution::context::{ExecutionConfig, ExecutionContextState};
 use datafusion::logical_plan::{DFSchema, Expr};
 use datafusion::physical_plan::expressions::col;
@@ -168,9 +168,9 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     config: ExecutionConfig::new(),
                 };
 
-                let physical_schema = input.schema();
-
-                let logical_schema: DFSchema = input.schema().as_ref().clone().try_into()?;
+                let input_schema = hash_agg.input_schema.as_ref().unwrap().clone();
+                let physical_schema: SchemaRef = SchemaRef::new((&input_schema).try_into()?);
+                let logical_schema: DFSchema = input_schema.clone().try_into()?;
 
                 for field in logical_schema.fields() {
                     debug!("Logical input schema field: {}", field.name());
@@ -199,6 +199,7 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     group,
                     physical_aggr_expr,
                     input,
+                    Arc::new((&input_schema).try_into()?),
                 )?))
             }
             PhysicalPlanType::HashJoin(hashjoin) => {

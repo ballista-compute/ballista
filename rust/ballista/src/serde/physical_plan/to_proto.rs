@@ -152,6 +152,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                 AggregateMode::Partial => protobuf::AggregateMode::Partial,
                 AggregateMode::Final => protobuf::AggregateMode::Final,
             };
+            let input_schema = exec.input_schema();
             let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
             Ok(protobuf::PhysicalPlanNode {
                 physical_plan_type: Some(PhysicalPlanType::HashAggregate(Box::new(
@@ -161,6 +162,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                         aggr_expr: agg,
                         mode: agg_mode as i32,
                         input: Some(Box::new(input)),
+                        input_schema: Some(input_schema.as_ref().into()),
                     },
                 ))),
             })

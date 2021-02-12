@@ -87,7 +87,6 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow?rev=c3b972c#c3b972c8f7005e037bdb183914ad0853cd7f9cf5"
 dependencies = [
  "cfg_aliases",
  "chrono",
@@ -110,7 +109,6 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow?rev=c3b972c#c3b972c8f7005e037bdb183914ad0853cd7f9cf5"
 dependencies = [
  "arrow",
  "bytes 1.0.1",
@@ -207,7 +205,7 @@ dependencies = [
  "rand 0.8.3",
  "sled",
  "snmalloc-rs",
- "sqlparser",
+ "sqlparser 0.7.0",
  "structopt",
  "tempfile",
  "tokio 1.2.0",
@@ -592,7 +590,6 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow?rev=c3b972c#c3b972c8f7005e037bdb183914ad0853cd7f9cf5"
 dependencies = [
  "ahash 0.7.0",
  "arrow",
@@ -611,7 +608,7 @@ dependencies = [
  "pin-project-lite 0.2.4",
  "rustyline",
  "sha2",
- "sqlparser",
+ "sqlparser 0.8.0",
  "tokio 1.2.0",
 ]
 
@@ -1744,7 +1741,6 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow?rev=c3b972c#c3b972c8f7005e037bdb183914ad0853cd7f9cf5"
 dependencies = [
  "arrow",
  "base64 0.12.3",
@@ -2446,6 +2442,15 @@ name = "sqlparser"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a3da41f3ddf62cbf92635ace62dd037fad9a91c6871c514fbd404e2059f27d"
+dependencies = [
+ "log",
+]
+
+[[package]]
+name = "sqlparser"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b929a9577d01ee7cddb820696ed536868d81557d3c14363a7514d71add1d058"
 dependencies = [
  "log",
 ]

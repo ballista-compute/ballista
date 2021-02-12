@@ -99,13 +99,14 @@ mod roundtrip_tests {
 
         let field_a = Field::new("a", DataType::Int64, false);
         let field_b = Field::new("b", DataType::Int64, false);
-        let schema = Schema::new(vec![field_a, field_b]);
+        let schema = Arc::new(Schema::new(vec![field_a, field_b]));
 
         roundtrip_test(Arc::new(HashAggregateExec::try_new(
             AggregateMode::Final,
             groups.clone(),
             aggregates.clone(),
-            Arc::new(EmptyExec::new(false, Arc::new(schema))),
+            Arc::new(EmptyExec::new(false, schema.clone())),
+            schema,
         )?))
     }
 }

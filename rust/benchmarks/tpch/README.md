@@ -55,7 +55,7 @@ docker-compose up
 To run the benchmarks:
 
 ```bash
-cargo run benchmark --host localhost --port 50051 --query 1 --path $(pwd)/data --format tbl
+cargo run benchmark --host localhost --port 50050 --query 1 --path $(pwd)/data --format tbl
 ```
 
 This should produce the following output:

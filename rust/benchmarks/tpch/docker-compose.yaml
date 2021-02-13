@@ -8,6 +8,8 @@ services:
   ballista-scheduler:
     image: ballistacompute/ballista-rust:0.4.0-SNAPSHOT
     command: "/scheduler --config-backend etcd --etcd-urls etcd:2379 --bind-host 0.0.0.0 --port 50050"
+    environment:
+      - RUST_LOG=debug
     ports:
       - "50050:50050"
     depends_on:
@@ -15,6 +17,8 @@ services:
   ballista-executor:
     image: ballistacompute/ballista-rust:0.4.0-SNAPSHOT
     command: "/executor --bind-host 0.0.0.0 --port 50051 --scheduler-host ballista-scheduler"
+    environment:
+      - RUST_LOG=debug
     ports:
       - "50051:50051"
     volumes:

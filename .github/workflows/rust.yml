@@ -142,21 +142,24 @@ jobs:
       if: github.event_name != 'pull_request'
       run: docker push $IMAGE_NAME:${{ steps.extract_ref.outputs.ref }}
 
-#  IntegrationTests:
-#    runs-on: ubuntu-latest
-#    steps:
-#    - uses: actions/checkout@v2
-#    - name: Build images
-#      run: bash dev/build-rust.sh
-#    - name: Build benchmarks
-#      run: cd benchmarks/tpch && cargo build
-#    - name: Build integration test stack
-#      run: cd benchmarks/tpch && docker-compose up -d
-#    - name: Wait for executors to start
-#      uses: jakejarvis/wait-action@master
-#      with:
-#        time: "20s"
-#    - Generate TPC-H data
-#      run: cd benchmarks/tpch && ./tpch-gen.sh
-#    - name: Run integration tests
-#      run: cd benchmarks/tpch && cargo run benchmark --host localhost --port 50051 --query 12 --path data --format tbl
+  IntegrationTests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build images
+      run: bash dev/build-rust.sh
+    - name: Build benchmarks
+      run: cd benchmarks/tpch && cargo build
+    - name: Build integration test stack
+      run: cd benchmarks/tpch && docker-compose up -d
+    - name: Wait for executors to start
+      uses: jakejarvis/wait-action@master
+      with:
+        time: "20s"
+    - Generate benchmark data
+      run: cd benchmarks/tpch && ./tpch-gen.sh
+    - Move benchmark data
+      # hack to make benchmark and scheduler paths match up
+      run: mkdir /data && mv data/*.tbl /data
+    - name: Run integration tests
+      run: cd benchmarks/tpch && cargo run benchmark --host localhost --port 50050 --query 12 --path data --format tbl

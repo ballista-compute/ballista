@@ -1,12 +1,10 @@
 # Deploying Ballista with Kubernetes
 
 *NOTE: Ballista 0.4.0 is still under development and there are no published Docker images yet. Please refer to the
-[developer documentation](https://github.com/ballista-compute/ballista/tree/main/docs) for instructions on building
-Docker images locally.*
+[developer documentation](https://github.com/ballista-compute/ballista/tree/main/docs) for instructions on building Docker images locally.*
 
 You will need a Kubernetes cluster to deploy to. I recommend using 
-[Minikube](https://kubernetes.io/docs/tutorials/hello-minikube) for local testing, or Amazon's Elastic Kubernetes 
-Service (EKS). 
+[Minikube](https://kubernetes.io/docs/tutorials/hello-minikube) for local testing, or Amazon's Elastic Kubernetes Service (EKS). 
 
 These instructions are for using Minikube on Ubuntu.
 

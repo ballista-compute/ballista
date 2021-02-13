@@ -13,7 +13,6 @@ Run the following command to build all Docker images.
 ## Release Checklist
 
 - [ ] Run TPC-H benchmarks
-- [ ] Run examples
 
 ## Publishing Java artifacts to Maven Central
 

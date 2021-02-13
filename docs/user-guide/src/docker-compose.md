@@ -1,11 +1,9 @@
 # Installing Ballista with Docker Compose
 
 *NOTE: Ballista 0.4.0 is still under development and there are no published Docker images yet. Please refer to the
-[developer documentation](https://github.com/ballista-compute/ballista/tree/main/docs) for instructions on building 
-Docker images locally.*
+[developer documentation](https://github.com/ballista-compute/ballista/tree/main/docs) for instructions on building Docker images locally.*
 
-Docker Compose is a convenient way to launch executors when testing locally. This example `docker-compose.yaml` 
-demonstrates how to start a Ballista Rust executor and how to mount a data volume into the container.
+Docker Compose is a convenient way to launch executors when testing locally. Following Docker compose example demonstrates how to start a Ballista Rust executor and how to mount a data volume into the container.
 
 ```yaml
 version: '2.0'
@@ -33,8 +31,7 @@ services:
       - ballista-scheduler
 ```
 
-With the above content saved to a `docker-compose.yaml` file, the following command can be used to start the single node 
-cluster.
+With the above content saved to a `docker-compose.yaml` file, the following command can be used to start the single node cluster.
 
 ```bash
 docker-compose up

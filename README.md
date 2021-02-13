@@ -17,22 +17,6 @@ Ballista is a proof-of-concept distributed compute platform primarily implemente
 is built on an architecture that allows other programming languages (such as Python, C++, and Java) to be supported 
 as first-class citizens without paying a penalty for serialization costs.
 
-## Status
-
-With the release of Apache Arrow 3.0.0 there were many breaking changes in the Rust implementation (for good reason) 
-and as a result it has been necessary to re-implement the Rust executor and this work is ongoing.
-
-The current plan is to release version 0.4.0 once the following items are completed.
-
-- [x] Compile the Rust implementation against Arrow 3.0.0
-- [x] Get TPC-H benchmarks working against a single Ballista executor
-- [ ] Get TPC-H benchmarks working with distributed execution against a Ballista cluster
-
-To follow the progress of this work, please refer to the
-["This Week in Ballista"](https://ballistacompute.org/this-week-in-ballista/) blog.
-
-**For the latest stable version of Ballista, see [branch-0.3](https://github.com/ballista-compute/ballista/tree/branch-0.3)**.
-
 ## Technologies
 
 The foundational technologies in Ballista are:
@@ -70,9 +54,21 @@ in any programming language with minimal serialization overhead.
 
 ## Examples
 
-The following examples should help illustrate the current capabilities of Ballista
+The following examples should help illustrate the current capabilities of Ballista:
 
-- [TPC-H Benchmark](rust/benchmarks/tpch)
+-  [TPC-H Benchmarks (Rust)](rust/benchmarks/tpch)
+-  [TPC-H Benchmarks (Python)](python/examples/testquery.py)
+
+## Status
+
+- It is possible to run a subset of the benchmark queries against a distributed Ballista cluster running in 
+  standalone mode
+- We are working on the [remaining issues](https://github.com/ballista-compute/ballista/milestone/7) that are
+  planned for the 0.4.0 release  
+
+To follow the progress of this work, please refer to the
+["This Week in Ballista"](https://ballistacompute.org/this-week-in-ballista/) series of blog posts. Follow 
+[@BallistaCompute](https://twitter.com/BallistaCompute) on Twitter to receive notifications when the blog is updated. 
 
 ## Releases
 

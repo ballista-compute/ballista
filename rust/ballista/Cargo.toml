@@ -18,12 +18,10 @@ snmalloc = ["snmalloc-rs"]
 anyhow = "1"
 async-trait = "0.1.36"
 clap = "2"
-crossbeam = "0.7"
+# crossbeam = "0.7"
 env_logger = "0.8"
 etcd-client = "0.6"
 futures = "0.3"
-k8s-openapi = { version = "0.8.0", features = ["v1_13"] }
-kube = "0.35"
 log = "0.4"
 prost = "0.7"
 prost-types = "0.7"

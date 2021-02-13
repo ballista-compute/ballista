@@ -232,28 +232,34 @@ async fn execute_query_stage(
     info!("execute_query_stage() stage_id={}", stage_id);
     pretty_print(plan.clone(), 0);
 
+    let _job_uuid = *job_uuid;
     let partition_count = plan.output_partitioning().partition_count();
     let mut meta = Vec::with_capacity(partition_count);
-
-    // TODO make this concurrent by executing all partitions at once instead of one at a time
-
     for child_partition in 0..partition_count {
         debug!(
             "execute_query_stage() stage_id={}, partition_id={}",
             stage_id, child_partition
         );
         let executor_meta = &executors[child_partition % executors.len()];
-
-        let mut client = BallistaClient::try_new(&executor_meta.host, executor_meta.port).await?;
-
-        let _partition_metadata = client
-            .execute_partition(*job_uuid, stage_id, child_partition, plan.clone())
-            .await?;
         meta.push(PartitionLocation {
-            partition_id: PartitionId::new(*job_uuid, stage_id, child_partition),
+            partition_id: PartitionId::new(_job_uuid, stage_id, child_partition),
             executor_meta: executor_meta.clone(),
         });
     }
+
+    let mut executions = Vec::with_capacity(partition_count);
+    for child_partition in 0..partition_count {
+        let _plan = plan.clone();
+        let _executor_meta = executors[child_partition % executors.len()].clone();
+        executions.push(tokio::spawn(async move {
+            let mut client =
+                BallistaClient::try_new(&_executor_meta.host, _executor_meta.port).await?;
+            client
+                .execute_partition(_job_uuid, stage_id, child_partition, _plan)
+                .await
+        }));
+    }
+    futures::future::join_all(executions).await;
 
     debug!(
         "execute_query_stage() stage_id={} produced {:?}",

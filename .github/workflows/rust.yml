@@ -142,9 +142,9 @@ jobs:
       if: github.event_name != 'pull_request'
       run: docker push $IMAGE_NAME:${{ steps.extract_ref.outputs.ref }}
 
-  IntegrationTests:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: Run integration tests
-      run: bash dev/integration-tests.sh
+#  IntegrationTests:
+#    runs-on: ubuntu-latest
+#    steps:
+#    - uses: actions/checkout@v2
+#    - name: Run integration tests
+#      run: bash dev/integration-tests.sh

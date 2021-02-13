@@ -271,7 +271,7 @@ async fn execute_query_stage(
 
 pub fn pretty_print(plan: Arc<dyn ExecutionPlan>, indent: usize) {
     let operator_str = format!("{:?}", plan);
-    debug!("{}{:?}", "  ".repeat(indent), &operator_str[0..60]);
+    println!("{}{:?}", "  ".repeat(indent), &operator_str[0..60]);
     plan.children()
         .iter()
         .for_each(|c| pretty_print(c.clone(), indent + 1));
@@ -280,28 +280,51 @@ pub fn pretty_print(plan: Arc<dyn ExecutionPlan>, indent: usize) {
 #[cfg(test)]
 mod test {
     use crate::error::BallistaError;
-    use crate::scheduler::planner::DistributedPlanner;
+    use crate::executor::query_stage::QueryStageExec;
+    use crate::scheduler::planner::{pretty_print, DistributedPlanner};
+    use crate::serde::protobuf;
     use crate::serde::scheduler::ExecutorMeta;
     use crate::test_utils;
+    use crate::test_utils::{datafusion_test_context, TPCH_TABLES};
     use arrow::datatypes::DataType;
     use datafusion::execution::context::ExecutionContext;
     use datafusion::physical_plan::csv::CsvReadOptions;
+    use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
+    use datafusion::physical_plan::projection::ProjectionExec;
+    use datafusion::physical_plan::sort::SortExec;
+    use datafusion::physical_plan::ExecutionPlan;
     use datafusion::prelude::*;
+    use std::convert::TryInto;
+    use std::sync::Arc;
     use uuid::Uuid;
 
     #[test]
     fn test() -> Result<(), BallistaError> {
-        let mut ctx = ExecutionContext::new();
-        let schema = test_utils::get_tpch_schema("lineitem");
-        let options = CsvReadOptions::new()
-            .schema(&schema)
-            .delimiter(b'|')
-            .file_extension(".tbl");
-        let csv = ctx.read_csv("testdata/lineitem.tbl", options)?;
-        let df = csv.filter(
-            col("l_extendedprice")
-                .cast_to(&DataType::Float64, csv.schema())?
-                .lt(lit(std::f64::consts::PI)),
+        let mut ctx = datafusion_test_context("testdata")?;
+
+        // simplified form of TPC-H query 1
+        let df = ctx.sql(
+            "select
+    l_returnflag,
+    l_linestatus,
+    sum(l_quantity) as sum_qty,
+    sum(l_extendedprice) as sum_base_price,
+    sum(l_extendedprice * (1 - l_discount)) as sum_disc_price,
+    sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge,
+    avg(l_quantity) as avg_qty,
+    avg(l_extendedprice) as avg_price,
+    avg(l_discount) as avg_disc,
+    count(*) as count_order
+from
+    lineitem
+where
+        l_shipdate <= date '1998-09-02'
+group by
+    l_returnflag,
+    l_linestatus
+order by
+    l_returnflag,
+    l_linestatus;",
         )?;
 
         let plan = df.to_logical_plan();
@@ -314,12 +337,60 @@ mod test {
             port: 0,
         }])?;
         let job_uuid = Uuid::new_v4();
-        let _distributed_plan = planner.prepare_query_stages(&job_uuid, plan)?;
+        let distributed_plan = planner.prepare_query_stages(&job_uuid, plan)?;
 
-        //TODO inspect plan and check that
-        // 1. query stages are inserted in correct locations
-        // 2. query stages can be serialized and reconstructed without loss of information
+        /* EXPECTED
+
+        "SortExec { input: ProjectionExec { expr: [(Column { name: \"l"
+          "ProjectionExec { expr: [(Column { name: \"l_returnflag\" }, \"l"
+            "HashAggregateExec { mode: Final, group_expr: [(Column { name"
+              "QueryStageExec { job_uuid: 1ccbedba-0aed-4a6f-90cd-1bbb9e972"
+                "HashAggregateExec { mode: Partial, group_expr: [(Column { na"
+                  "CoalesceBatchesExec { input: FilterExec { predicate: BinaryE"
+                    "FilterExec { predicate: BinaryExpr { left: Column { name: \"l"
+                      "CsvExec { path: \"testdata/lineitem.tbl\", filenames: [\"testda"
+                 */
+
+        // TODO introduce macros or helper functions to make this concise
+
+        let sort = distributed_plan
+            .as_any()
+            .downcast_ref::<SortExec>()
+            .unwrap();
+
+        let child = sort.children()[0].clone();
+        let projection = child.as_any().downcast_ref::<ProjectionExec>().unwrap();
+
+        let child = projection.children()[0].clone();
+        let final_hash = child.as_any().downcast_ref::<HashAggregateExec>().unwrap();
+
+        let child = final_hash.children()[0].clone();
+        let query_stage = child.as_any().downcast_ref::<QueryStageExec>().unwrap();
+
+        let partial_hash = query_stage.children()[0].clone();
+        let partial_hash_serde = roundtrip_operator(partial_hash.clone())?;
+        let partial_hash = partial_hash
+            .as_any()
+            .downcast_ref::<HashAggregateExec>()
+            .unwrap();
+        let partial_hash_serde = partial_hash_serde
+            .as_any()
+            .downcast_ref::<HashAggregateExec>()
+            .unwrap();
+
+        assert_eq!(
+            format!("{:?}", partial_hash),
+            format!("{:?}", partial_hash_serde)
+        );
 
         Ok(())
+    }
+
+    fn roundtrip_operator(
+        plan: Arc<dyn ExecutionPlan>,
+    ) -> Result<Arc<dyn ExecutionPlan>, BallistaError> {
+        let proto: protobuf::PhysicalPlanNode = plan.clone().try_into()?;
+        let result_exec_plan: Arc<dyn ExecutionPlan> = (&proto).try_into()?;
+        Ok(result_exec_plan)
     }
 }

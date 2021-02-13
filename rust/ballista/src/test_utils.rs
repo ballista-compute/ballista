@@ -12,7 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::error::Result;
+
 use arrow::datatypes::{DataType, Field, Schema};
+use datafusion::execution::context::ExecutionContext;
+use datafusion::physical_plan::csv::CsvReadOptions;
+
+pub const TPCH_TABLES: &[&str] = &[
+    "part", "supplier", "partsupp", "customer", "orders", "lineitem", "nation", "region",
+];
+
+pub fn datafusion_test_context(path: &str) -> Result<ExecutionContext> {
+    let mut ctx = ExecutionContext::new();
+    for table in TPCH_TABLES {
+        let schema = get_tpch_schema(table);
+        let options = CsvReadOptions::new()
+            .schema(&schema)
+            .delimiter(b'|')
+            .has_header(false)
+            .file_extension(".tbl");
+        let filename = format!("{}/{}.tbl", path, table);
+        println!("{}", filename);
+        ctx.register_csv(table, &filename, options)?;
+    }
+    Ok(ctx)
+}
 
 pub fn get_tpch_schema(table: &str) -> Schema {
     // note that the schema intentionally uses signed integers so that any generated Parquet

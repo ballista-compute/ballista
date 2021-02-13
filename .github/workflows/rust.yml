@@ -159,7 +159,8 @@ jobs:
     - name: Generate benchmark data
       run: cd benchmarks/tpch && ./tpch-gen.sh
     - name: Move benchmark data
-      # hack to make benchmark and scheduler paths match up
+      # hack to make benchmark and scheduler paths identical until
+      # https://github.com/ballista-compute/ballista/issues/473 is implemented
       run: mkdir /data && mv data/*.tbl /data
     - name: Run integration tests
-      run: cd benchmarks/tpch && cargo run benchmark --host localhost --port 50050 --query 12 --path /data --format tbl
+      run: cd benchmarks/tpch && cargo run benchmark --host localhost --port 50050 --query 12 --path /data --format tbl --iterations 1

@@ -53,7 +53,7 @@ struct BenchmarkOpt {
     debug: bool,
 
     /// Number of iterations of each test run
-    #[structopt(long = "iterations", default_value = "3")]
+    #[structopt(long = "iterations", default_value = "1")]
     iterations: usize,
 
     /// Batch size when reading CSV or Parquet files

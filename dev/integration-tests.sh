@@ -1,12 +1,17 @@
 #!/bin/bash
+set -e
 ./dev/build-rust.sh
 pushd rust/benchmarks/tpch
 ./tpch-gen.sh
 
 # hack to make benchmark and scheduler paths identical until
 # https://github.com/ballista-compute/ballista/issues/473 is implemented
-mkdir /data 2>/dev/null
-cp data/*.tbl /data
+if [ ! -d "/data" ]
+then
+  echo "Attempting to create directory at /data"
+  mkdir /data
+fi
+cp -f data/*.tbl /data/
 
 docker-compose up -d
 sleep 10

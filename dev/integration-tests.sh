@@ -13,7 +13,6 @@ then
 fi
 cp -f data/*.tbl /data/
 
-
 docker-compose up -d
 sleep 10
 cargo run benchmark --host localhost --port 50050 --query 12 --path /data --format tbl --iterations 1

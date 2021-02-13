@@ -25,7 +25,7 @@ use crate::serde::protobuf::LogicalExprNode;
 use crate::serde::{proto_error, protobuf};
 use crate::{convert_box_required, convert_required};
 
-use arrow::datatypes::{DataType, Schema};
+use arrow::datatypes::{DataType, Schema, SchemaRef};
 use datafusion::execution::context::{ExecutionConfig, ExecutionContextState};
 use datafusion::logical_plan::{DFSchema, Expr};
 use datafusion::physical_plan::expressions::col;
@@ -43,15 +43,13 @@ use datafusion::physical_plan::{
     projection::ProjectionExec,
     sort::{SortExec, SortOptions},
 };
-
 use datafusion::physical_plan::{AggregateExpr, ExecutionPlan, PhysicalExpr};
 use datafusion::prelude::CsvReadOptions;
-
+use log::debug;
 use protobuf::logical_expr_node::ExprType;
 use protobuf::physical_plan_node::PhysicalPlanType;
 
 use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
-
 impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
     type Error = BallistaError;
 
@@ -68,10 +66,10 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                 let exprs = projection
                     .expr
                     .iter()
-                    .map(|expr| {
-                        compile_expr(expr, &input.schema()).map(|e| (e, "unused".to_string()))
+                    .zip(projection.expr_name.iter())
+                    .map(|(expr, name)| {
+                        compile_expr(expr, &input.schema()).map(|e| (e, name.to_string()))
                     })
-                    // .map(|expr| expr.try_into().map(|e| (e, "unused".to_string())))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Arc::new(ProjectionExec::try_new(exprs, input)?))
             }
@@ -149,9 +147,16 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                 let group = hash_agg
                     .group_expr
                     .iter()
-                    .map(|expr| {
-                        compile_expr(expr, &input.schema()).map(|e| (e, "unused".to_string()))
+                    .zip(hash_agg.group_expr_name.iter())
+                    .map(|(expr, name)| {
+                        compile_expr(expr, &input.schema()).map(|e| (e, name.to_string()))
                     })
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                let logical_agg_expr = hash_agg
+                    .aggr_expr
+                    .iter()
+                    .map(|expr| expr.try_into())
                     .collect::<Result<Vec<_>, _>>()?;
 
                 let datafusion_planner = DefaultPhysicalPlanner::default();
@@ -163,24 +168,36 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     config: ExecutionConfig::new(),
                 };
 
-                let agg_expr = hash_agg
-                    .aggr_expr
+                let input_schema = hash_agg.input_schema.as_ref().unwrap().clone();
+                let physical_schema: SchemaRef = SchemaRef::new((&input_schema).try_into()?);
+                let logical_schema: DFSchema = input_schema.clone().try_into()?;
+
+                for field in logical_schema.fields() {
+                    debug!("Logical input schema field: {}", field.name());
+                }
+                for field in physical_schema.fields() {
+                    debug!("Physical input schema field: {}", field.name());
+                }
+
+                let physical_aggr_expr = logical_agg_expr
                     .iter()
                     .map(|expr| {
-                        let expr2: Expr = expr.try_into().unwrap();
-                        let logical_schema: DFSchema =
-                            input.schema().as_ref().clone().try_into().unwrap();
+                        debug!("Compiling expression {:?}", expr);
                         datafusion_planner.create_aggregate_expr(
-                            &expr2,
+                            expr,
                             &logical_schema,
-                            input.schema().as_ref(),
+                            &physical_schema,
                             &ctx_state,
                         )
                     })
                     .collect::<Result<Vec<_>, _>>()?;
 
                 Ok(Arc::new(HashAggregateExec::try_new(
-                    agg_mode, group, agg_expr, input,
+                    agg_mode,
+                    group,
+                    physical_aggr_expr,
+                    input,
+                    Arc::new((&input_schema).try_into()?),
                 )?))
             }
             PhysicalPlanType::HashJoin(hashjoin) => {

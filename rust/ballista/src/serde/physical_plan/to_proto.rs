@@ -68,11 +68,13 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                 .iter()
                 .map(|expr| expr.0.clone().try_into())
                 .collect::<Result<Vec<_>, Self::Error>>()?;
+            let expr_name = exec.expr().iter().map(|expr| expr.1.clone()).collect();
             Ok(protobuf::PhysicalPlanNode {
                 physical_plan_type: Some(PhysicalPlanType::Projection(Box::new(
                     protobuf::ProjectionExecNode {
                         input: Some(Box::new(input)),
                         expr,
+                        expr_name,
                     },
                 ))),
             })
@@ -138,6 +140,11 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                 .iter()
                 .map(|expr| expr.0.to_owned().try_into())
                 .collect::<Result<Vec<_>, BallistaError>>()?;
+            let group_names = exec
+                .group_expr()
+                .iter()
+                .map(|expr| expr.1.to_owned())
+                .collect();
             let agg = exec
                 .aggr_expr()
                 .iter()
@@ -147,14 +154,17 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                 AggregateMode::Partial => protobuf::AggregateMode::Partial,
                 AggregateMode::Final => protobuf::AggregateMode::Final,
             };
+            let input_schema = exec.input_schema();
             let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
             Ok(protobuf::PhysicalPlanNode {
                 physical_plan_type: Some(PhysicalPlanType::HashAggregate(Box::new(
                     protobuf::HashAggregateExecNode {
                         group_expr: groups,
+                        group_expr_name: group_names,
                         aggr_expr: agg,
                         mode: agg_mode as i32,
                         input: Some(Box::new(input)),
+                        input_schema: Some(input_schema.as_ref().into()),
                     },
                 ))),
             })

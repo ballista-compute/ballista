@@ -55,7 +55,7 @@ pub struct DistributedPlanner {
 }
 
 impl DistributedPlanner {
-    pub fn new(executors: Vec<ExecutorMeta>) -> Result<Self> {
+    pub fn try_new(executors: Vec<ExecutorMeta>) -> Result<Self> {
         if executors.is_empty() {
             Err(BallistaError::General(
                 "DistributedPlanner requires at least one executor".to_owned(),
@@ -275,4 +275,51 @@ pub fn pretty_print(plan: Arc<dyn ExecutionPlan>, indent: usize) {
     plan.children()
         .iter()
         .for_each(|c| pretty_print(c.clone(), indent + 1));
+}
+
+#[cfg(test)]
+mod test {
+    use crate::error::BallistaError;
+    use crate::scheduler::planner::DistributedPlanner;
+    use crate::serde::scheduler::ExecutorMeta;
+    use crate::test_utils;
+    use arrow::datatypes::DataType;
+    use datafusion::execution::context::ExecutionContext;
+    use datafusion::physical_plan::csv::CsvReadOptions;
+    use datafusion::prelude::*;
+    use uuid::Uuid;
+
+    #[test]
+    fn test() -> Result<(), BallistaError> {
+        let mut ctx = ExecutionContext::new();
+        let schema = test_utils::get_tpch_schema("lineitem");
+        let options = CsvReadOptions::new()
+            .schema(&schema)
+            .delimiter(b'|')
+            .file_extension(".tbl");
+        let csv = ctx.read_csv("testdata/lineitem.tbl", options)?;
+        let df = csv.filter(
+            col("l_extendedprice")
+                .cast_to(&DataType::Float64, csv.schema())?
+                .lt(lit(std::f64::consts::PI)),
+        )?;
+
+        let plan = df.to_logical_plan();
+        let plan = ctx.optimize(&plan)?;
+        let plan = ctx.create_physical_plan(&plan)?;
+
+        let mut planner = DistributedPlanner::try_new(vec![ExecutorMeta {
+            id: "".to_string(),
+            host: "".to_string(),
+            port: 0,
+        }])?;
+        let job_uuid = Uuid::new_v4();
+        let _distributed_plan = planner.prepare_query_stages(&job_uuid, plan)?;
+
+        //TODO inspect plan and check that
+        // 1. query stages are inserted in correct locations
+        // 2. query stages can be serialized and reconstructed without loss of information
+
+        Ok(())
+    }
 }

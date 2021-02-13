@@ -209,7 +209,7 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
                         job_id_spawn, e
                     );
                 }
-                let mut planner = fail_job!(DistributedPlanner::new(executors).map_err(|e| {
+                let mut planner = fail_job!(DistributedPlanner::try_new(executors).map_err(|e| {
                     let msg = format!("Could not create distributed planner: {}", e);
                     error!("{}", msg);
                     tonic::Status::internal(msg)

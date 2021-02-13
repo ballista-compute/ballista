@@ -109,4 +109,37 @@ mod roundtrip_tests {
             schema,
         )?))
     }
+
+    #[test]
+    fn roundtrip_filter_with_not_and_in_list() -> Result<()> {
+        use arrow::datatypes::{DataType, Field, Schema};
+        use datafusion::logical_plan::Operator;
+        use datafusion::physical_plan::{
+            expressions::{binary, lit, InListExpr, NotExpr},
+            filter::FilterExec,
+        };
+        use datafusion::scalar::ScalarValue;
+        let field_a = Field::new("a", DataType::Boolean, false);
+        let field_b = Field::new("b", DataType::Int64, false);
+        let field_c = Field::new("c", DataType::Int64, false);
+        let schema = Arc::new(Schema::new(vec![
+            field_a.clone(),
+            field_b.clone(),
+            field_c.clone(),
+        ]));
+        let not = Arc::new(NotExpr::new(col("a")));
+        let in_list = Arc::new(InListExpr::new(
+            col("b"),
+            vec![
+                lit(ScalarValue::Int64(Some(1))),
+                lit(ScalarValue::Int64(Some(2))),
+            ],
+            false,
+        ));
+        let and = binary(not, Operator::And, in_list, &schema)?;
+        roundtrip_test(Arc::new(FilterExec::try_new(
+            and,
+            Arc::new(EmptyExec::new(false, schema.clone())),
+        )?))
+    }
 }

@@ -146,21 +146,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Build images
-      run: bash dev/build-rust.sh
-    - name: Build benchmarks
-      run: cd benchmarks/tpch && cargo build
-    - name: Build integration test stack
-      run: cd benchmarks/tpch && docker-compose up -d
-    - name: Wait for executors to start
-      uses: jakejarvis/wait-action@master
-      with:
-        time: "20s"
-    - name: Generate benchmark data
-      run: cd benchmarks/tpch && ./tpch-gen.sh
-    - name: Move benchmark data
-      # hack to make benchmark and scheduler paths identical until
-      # https://github.com/ballista-compute/ballista/issues/473 is implemented
-      run: mkdir /data && mv data/*.tbl /data
     - name: Run integration tests
-      run: cd benchmarks/tpch && cargo run benchmark --host localhost --port 50050 --query 12 --path /data --format tbl --iterations 1
+      run: bash dev/integration-tests.sh

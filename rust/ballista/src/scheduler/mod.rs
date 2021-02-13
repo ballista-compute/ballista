@@ -188,8 +188,7 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
                     .optimize(&plan)
                     .and_then(|plan| datafusion_ctx.create_physical_plan(&plan))
                     .map_err(|e| {
-                        let msg =
-                            format!("Could not build physical execution plan: {}", e);
+                        let msg = format!("Could not build physical execution plan: {}", e);
                         error!("{}", msg);
                         tonic::Status::internal(msg)
                     }));

@@ -72,7 +72,7 @@ in any programming language with minimal serialization overhead.
 
 The following examples should help illustrate the current capabilities of Ballista
 
-- [TPC-H Benchmark](https://github.com/ballista-compute/ballista/tree/main/benchmarks/tpch)
+- [TPC-H Benchmark](rust/benchmarks/tpch)
 
 ## Releases
 

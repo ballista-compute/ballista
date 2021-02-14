@@ -76,6 +76,7 @@ async fn main() -> Result<()> {
 
     if opt.version {
         print_version();
+        std::process::exit(0);
     }
 
     let namespace = opt.namespace;

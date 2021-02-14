@@ -17,7 +17,7 @@
 pub const BALLISTA_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn print_version() {
-    println!("Ballista bersion: {}", BALLISTA_VERSION)
+    println!("Ballista version: {}", BALLISTA_VERSION)
 }
 
 pub mod client;

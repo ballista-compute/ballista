@@ -145,6 +145,7 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     protobuf::AggregateMode::Partial => AggregateMode::Partial,
                     protobuf::AggregateMode::Final => AggregateMode::Final,
                 };
+
                 let group = hash_agg
                     .group_expr
                     .iter()
@@ -154,10 +155,11 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     })
                     .collect::<Result<Vec<_>, _>>()?;
 
-                let logical_agg_expr: Vec<Expr> = hash_agg
+                let logical_agg_expr: Vec<(Expr, String)> = hash_agg
                     .aggr_expr
                     .iter()
-                    .map(|expr| expr.try_into())
+                    .zip(hash_agg.aggr_expr_name.iter())
+                    .map(|(expr, name)| expr.try_into().map(|expr| (expr, name.clone())))
                     .collect::<Result<Vec<_>, _>>()?;
 
                 let df_planner = DefaultPhysicalPlanner::default();
@@ -171,20 +173,17 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
 
                 let input_schema = hash_agg.input_schema.as_ref().unwrap().clone();
                 let physical_schema: SchemaRef = SchemaRef::new((&input_schema).try_into()?);
-                let logical_schema: DFSchema = input_schema.clone().try_into()?;
+                // let logical_schema: DFSchema = input_schema.clone().try_into()?;
 
                 let mut physical_aggr_expr = vec![];
 
-                for (expr_node, expr) in hash_agg.aggr_expr.iter().zip(logical_agg_expr.iter()) {
+                for (expr, name) in &logical_agg_expr {
                     match expr {
-                        Expr::AggregateFunction {  fun, args, distinct } => {
+                        Expr::AggregateFunction {  fun, args, .. } => {
                             let arg = df_planner
                                 .create_physical_expr(&args[0], &physical_schema, &ctx_state)
                                 .map_err(|e| BallistaError::General(format!("{:?}", e)))?;
-
-                            let name = format!("{:?}", arg);
-                            let y = create_aggregate_expr(&fun, false, &[arg], &physical_schema, name)?;
-                            physical_aggr_expr.push(y);
+                            physical_aggr_expr.push(create_aggregate_expr(&fun, false, &[arg], &physical_schema, name.to_string())?);
                         }
                         _ => panic!()
                     }

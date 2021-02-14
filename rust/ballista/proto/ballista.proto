@@ -129,9 +129,6 @@ enum AggregateFunction {
 message AggregateExprNode {
   AggregateFunction aggr_function = 1;
   LogicalExprNode expr = 2;
-  // DataFusion has a bug where the name doesn't always match the expression's name
-  // https://issues.apache.org/jira/browse/ARROW-11622
-  string name = 3;
 }
 
 message BetweenNode {
@@ -371,8 +368,9 @@ message HashAggregateExecNode {
   AggregateMode mode = 3;
   PhysicalPlanNode input = 4;
   repeated string group_expr_name = 5;
+  repeated string aggr_expr_name = 6;
   // we need the input schema to the partial aggregate to pass to the final aggregate
-  Schema input_schema = 6;
+  Schema input_schema = 7;
 }
 
 message ShuffleReaderExecNode {

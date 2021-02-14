@@ -16,7 +16,10 @@ cp -f data/*.tbl /data/
 
 docker-compose up -d
 sleep 10
-cargo run benchmark --host localhost --port 50050 --query 12 --path /data --format tbl --iterations 1
+for query in 1 3 5 6 10 12
+do
+  cargo run benchmark --host localhost --port 50050 --query $query --path /data --format tbl --iterations 1
+done
 docker-compose down
 
 popd

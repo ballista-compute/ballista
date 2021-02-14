@@ -19,8 +19,16 @@ use tonic::transport::Server;
 #[macro_use]
 extern crate configure_me;
 
-#[allow(clippy::all)]
-include_config!("scheduler");
+#[allow(clippy::all, warnings)]
+mod config {
+    // Ideally we would use the include_config macro from configure_me, but then we cannot use
+    // #[allow(clippy::all)] to silence clippy warnings from the generated code
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/scheduler_configure_me_config.rs"
+    ));
+}
+use config::prelude::*;
 
 async fn start_server<T: ConfigBackendClient + Send + Sync + 'static>(
     config_backend: T,

@@ -39,8 +39,13 @@ use uuid::Uuid;
 #[macro_use]
 extern crate configure_me;
 
-#[allow(clippy::all)]
-include_config!("executor");
+#[allow(clippy::all, warnings)]
+mod config {
+    // Ideally we would use the include_config macro from configure_me, but then we cannot use
+    // #[allow(clippy::all)] to silence clippy warnings from the generated code
+    include!(concat!(env!("OUT_DIR"), "/executor_configure_me_config.rs"));
+}
+use config::prelude::*;
 
 async fn registration_loop(
     mut scheduler: SchedulerGrpcClient<Channel>,

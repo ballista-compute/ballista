@@ -14,9 +14,9 @@
 
 use std::{fs::File, pin::Pin};
 
+use crate::error::{BallistaError, Result};
 use crate::memory_stream::MemoryStream;
 
-use arrow::error::Result;
 use arrow::ipc::reader::FileReader;
 use arrow::ipc::writer::FileWriter;
 use arrow::record_batch::RecordBatch;
@@ -38,7 +38,12 @@ pub async fn write_stream_to_disk(
     stream: &mut Pin<Box<dyn RecordBatchStream + Send + Sync>>,
     path: &str,
 ) -> Result<PartitionStats> {
-    let file = File::create(&path)?;
+    let file = File::create(&path).map_err(|e| {
+        BallistaError::General(format!(
+            "Failed to create partition file at {}: {:?}",
+            path, e
+        ))
+    })?;
 
     let mut num_rows = 0;
     let mut num_batches = 0;
@@ -73,7 +78,12 @@ pub async fn write_stream_to_disk(
 pub async fn read_stream_from_disk(
     path: &str,
 ) -> Result<Pin<Box<dyn RecordBatchStream + Send + Sync>>> {
-    let file = File::open(&path)?;
+    let file = File::open(&path).map_err(|e| {
+        BallistaError::General(format!(
+            "Failed to open partition file at {}: {:?}",
+            path, e
+        ))
+    })?;
     let reader = FileReader::try_new(file)?;
     let schema = reader.schema();
     // TODO we should be able return a stream / iterator rather than load into memory first

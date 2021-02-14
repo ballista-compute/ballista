@@ -54,7 +54,7 @@ use protobuf::physical_plan_node::PhysicalPlanType;
 
 use crate::executor::shuffle_reader::ShuffleReaderExec;
 use crate::serde::{protobuf, BallistaError};
-use datafusion::physical_plan::functions::{ScalarFunctionExpr, BuiltinScalarFunction};
+use datafusion::physical_plan::functions::{BuiltinScalarFunction, ScalarFunctionExpr};
 use datafusion::physical_plan::merge::MergeExec;
 
 impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
@@ -435,7 +435,7 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
                 ))),
             })
         } else if let Some(expr) = expr.downcast_ref::<ScalarFunctionExpr>() {
-            let fun: BuiltinScalarFunction= BuiltinScalarFunction::from_str(expr.name())?;
+            let fun: BuiltinScalarFunction = BuiltinScalarFunction::from_str(expr.name())?;
             let fun: protobuf::ScalarFunction = (&fun).try_into()?;
             let expr: Vec<protobuf::LogicalExprNode> = expr
                 .args()

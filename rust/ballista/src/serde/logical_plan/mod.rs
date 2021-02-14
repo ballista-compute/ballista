@@ -23,6 +23,7 @@ mod roundtrip_tests {
     use crate::error::BallistaError;
     use arrow::datatypes::{DataType, Field, Schema};
     use core::panic;
+    use datafusion::physical_plan::functions::BuiltinScalarFunction::Sqrt;
     use datafusion::{
         logical_plan::{Expr, LogicalPlan, LogicalPlanBuilder},
         physical_plan::csv::CsvReadOptions,
@@ -31,7 +32,6 @@ mod roundtrip_tests {
     };
     use protobuf::arrow_type;
     use std::convert::TryInto;
-    use datafusion::physical_plan::functions::BuiltinScalarFunction::Sqrt;
 
     //Given a identity of a LogicalPlan converts it to protobuf and back, using debug formatting to test equality.
     macro_rules! roundtrip_test {
@@ -905,7 +905,7 @@ mod roundtrip_tests {
     fn roundtrip_sqrt() -> Result<()> {
         let test_expr = Expr::ScalarFunction {
             fun: Sqrt,
-            args: vec![col("col")]
+            args: vec![col("col")],
         };
         roundtrip_test!(test_expr, protobuf::LogicalExprNode, Expr);
 

@@ -997,10 +997,10 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
             Expr::ScalarVariable(_) => unimplemented!(),
             Expr::ScalarFunction { ref fun, ref args } => {
                 let fun: protobuf::ScalarFunction = fun.try_into()?;
-                let expr: Vec<protobuf::LogicalExprNode> = args
-                    .iter()
-                    .map(|e|Ok(e.try_into()?))
-                    .collect::<Result<Vec<protobuf::LogicalExprNode>, BallistaError>>()?;
+                let expr: Vec<protobuf::LogicalExprNode> =
+                    args.iter()
+                        .map(|e| Ok(e.try_into()?))
+                        .collect::<Result<Vec<protobuf::LogicalExprNode>, BallistaError>>()?;
                 Ok(protobuf::LogicalExprNode {
                     expr_type: Some(protobuf::logical_expr_node::ExprType::ScalarFunction(
                         protobuf::ScalarFunctionNode {
@@ -1009,7 +1009,7 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                         },
                     )),
                 })
-            },
+            }
             Expr::ScalarUDF { .. } => unimplemented!(),
             Expr::AggregateUDF { .. } => unimplemented!(),
             Expr::Not(expr) => {
@@ -1165,7 +1165,7 @@ impl TryFrom<&arrow::datatypes::DataType> for protobuf::ScalarType {
 impl TryInto<protobuf::ScalarFunction> for &BuiltinScalarFunction {
     type Error = BallistaError;
     fn try_into(self) -> Result<protobuf::ScalarFunction, Self::Error> {
-         match self {
+        match self {
             BuiltinScalarFunction::Sqrt => Ok(protobuf::ScalarFunction::Sqrt),
             BuiltinScalarFunction::Sin => Ok(protobuf::ScalarFunction::Sin),
             BuiltinScalarFunction::Cos => Ok(protobuf::ScalarFunction::Cos),
@@ -1204,4 +1204,3 @@ impl TryInto<protobuf::ScalarFunction> for &BuiltinScalarFunction {
         }
     }
 }
-

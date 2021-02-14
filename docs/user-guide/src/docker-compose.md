@@ -16,14 +16,14 @@ services:
     ports:
       - "2379:2379"
   ballista-scheduler:
-    image: ballistacompute/ballista-rust:0.4.0-SNAPSHOT
+    image: ballistacompute/ballista-rust:0.4.0-alpha-1
     command: "/scheduler --config-backend etcd --etcd-urls etcd:2379 --bind-host 0.0.0.0 --port 50050"
     ports:
       - "50050:50050"
     depends_on:
       - etcd
   ballista-executor:
-    image: ballistacompute/ballista-rust:0.4.0-SNAPSHOT
+    image: ballistacompute/ballista-rust:0.4.0-alpha-1
     command: "/executor --bind-host 0.0.0.0 --port 50051 --scheduler-host ballista-scheduler"
     ports:
       - "50051:50051"

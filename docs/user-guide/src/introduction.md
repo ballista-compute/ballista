@@ -1,7 +1,7 @@
 
 ## Overview
 
-Ballista is a distributed compute platform primarily implemented in Rust, using Apache Arrow as the memory model. It is 
+Ballista is a distributed compute platform primarily implemented in Rust, and powered by Apache Arrow. It is 
 built on an architecture that allows other programming languages to be supported as first-class citizens without paying
 a penalty for serialization costs.
 
@@ -12,7 +12,16 @@ The foundational technologies in Ballista are:
 - [Google Protocol Buffers](https://developers.google.com/protocol-buffers) for serializing query plans.
 - [Docker](https://www.docker.com/) for packaging up executors along with user-defined code.
 
-Ballista can be deployed in [Kubernetes](https://kubernetes.io/), or as a standalone cluster using [etcd](https://etcd.io/) for discovery.
+Ballista 0.4.0 is under active development, with a release due in March 2021. Ballista 0.3.0 no longer compiles due
+to changes in packed_simd.
+
+Ballista 0.4.0 will support the following cluster deployment modes:
+
+- **Local Mode**: Single process containing scheduler and executor, intended for local development testing
+- **Standalone**: Single scheduler process, supporting multiple executor processes that register with the scheduler
+- **Etcd**: Scheduler uses [etcd](https://etcd.io/) as a backing store, so that multiple scheduler instances can run 
+  concurrently
+- **Kubernetes**: Schedulers and executors will be deployed as stateful sets in [Kubernetes](https://kubernetes.io/)
 
 ## Architecture
 
@@ -35,3 +44,7 @@ Apache Spark in some cases, which means that more processing can fit on a single
 distributed compute.
 - The use of Apache Arrow as the memory model and network protocol means that data can be exchanged between executors 
 in any programming language with minimal serialization overhead.
+  
+## Status
+
+Ballista is at the proof-of-concept phase currently but is under active development by a growing community.

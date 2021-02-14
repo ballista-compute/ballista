@@ -14,17 +14,17 @@
 
 //! Support for distributed schedulers, such as Kubernetes
 
-pub mod etcd;
 pub mod planner;
-pub mod standalone;
+pub mod state;
 
-use log::{error, info, warn};
-use tonic::{Request, Response};
+use std::convert::TryInto;
 
-use crate::error::Result;
+use crate::executor::shuffle_reader::ShuffleReaderExec;
 use crate::serde::protobuf::{
-    scheduler_grpc_server::SchedulerGrpc, ExecutorMetadata, GetExecutorMetadataParams,
-    GetExecutorMetadataResult, RegisterExecutorParams, RegisterExecutorResult,
+    job_status, scheduler_grpc_server::SchedulerGrpc, CompletedJob, ExecuteQueryParams,
+    ExecuteQueryResult, ExecutorMetadata, FailedJob, GetExecutorMetadataParams,
+    GetExecutorMetadataResult, GetJobStatusParams, GetJobStatusResult, JobStatus,
+    PartitionLocation, QueuedJob, RegisterExecutorParams, RegisterExecutorResult, RunningJob,
 };
 use crate::serde::scheduler::ExecutorMeta;
 use clap::arg_enum;
@@ -47,29 +47,28 @@ impl parse_arg::ParseArgFromStr for ConfigBackend {
     }
 }
 
-/// A trait that contains the necessary methods to save and retrieve the state and configuration of a cluster.
-#[tonic::async_trait]
-pub trait ConfigBackendClient: Clone {
-    /// Retrieve the data associated with a specific key.
-    ///
-    /// An empty vec is returned if the key does not exist.
-    async fn get(&mut self, key: &str) -> Result<Vec<u8>>;
+use crate::{client::BallistaClient, error::Result, serde::scheduler::Action};
+use crate::{prelude::BallistaError, scheduler::planner::DistributedPlanner};
 
-    /// Retrieve all data associated with a specific key.
-    async fn get_from_prefix(&mut self, prefix: &str) -> Result<Vec<Vec<u8>>>;
+use arrow::datatypes::{Schema, SchemaRef};
+use datafusion::execution::context::ExecutionContext;
+use log::{debug, error, info, warn};
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use tonic::{Request, Response};
 
-    /// Saves the value into the provided key, overriding any previous data that might have been associated to that key.
-    async fn put(&mut self, key: String, value: Vec<u8>) -> Result<()>;
-}
+use self::state::{ConfigBackendClient, SchedulerState};
 
 pub struct SchedulerServer<Config: ConfigBackendClient> {
-    client: Config,
+    state: SchedulerState<Config>,
     namespace: String,
 }
 
 impl<Config: ConfigBackendClient> SchedulerServer<Config> {
-    pub fn new(client: Config, namespace: String) -> Self {
-        Self { client, namespace }
+    pub fn new(config: Config, namespace: String) -> Self {
+        Self {
+            state: SchedulerState::new(config),
+            namespace,
+        }
     }
 }
 
@@ -80,20 +79,12 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
         _request: Request<GetExecutorMetadataParams>,
     ) -> std::result::Result<Response<GetExecutorMetadataResult>, tonic::Status> {
         info!("Received get_executors_metadata request");
-        let mut client = self.client.clone();
-        let result = client
-            .get_from_prefix(&self.namespace)
+        let result = self
+            .state
+            .get_executors_metadata(self.namespace.as_str())
             .await
             .map_err(|e| {
-                let msg = format!("Could not retrieve data from configuration store: {}", e);
-                error!("{}", msg);
-                tonic::Status::internal(msg)
-            })?
-            .into_iter()
-            .map(|bytes| serde_json::from_slice::<ExecutorMeta>(&bytes))
-            .collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(|e| {
-                let msg = format!("Could not deserialize etcd value: {}", e);
+                let msg = format!("Error reading executors metadata: {}", e);
                 error!("{}", msg);
                 tonic::Status::internal(msg)
             })?
@@ -114,15 +105,11 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
         } = request.into_inner()
         {
             info!("Received register_executor request for {:?}", metadata);
-            let ExecutorMetadata { id, host, port } = metadata;
-            let key = format!("/ballista/{}/{}", self.namespace, id);
-            let value = format!("{}:{}", host, port);
-            self.client
-                .clone()
-                .put(key, value.into_bytes())
+            self.state
+                .save_executor_metadata(&self.namespace, metadata.into())
                 .await
                 .map_err(|e| {
-                    let msg = format!("Could not put etcd value: {}", e);
+                    let msg = format!("Could not save executor metadata: {}", e);
                     error!("{}", msg);
                     tonic::Status::internal(msg)
                 })?;
@@ -133,5 +120,172 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
                 "Missing metadata in request",
             ))
         }
+    }
+
+    async fn execute_logical_plan(
+        &self,
+        request: Request<ExecuteQueryParams>,
+    ) -> std::result::Result<Response<ExecuteQueryResult>, tonic::Status> {
+        if let ExecuteQueryParams {
+            logical_plan: Some(logical_plan),
+        } = request.into_inner()
+        {
+            info!("Received execute_logical_plan request");
+            let executors = self
+                .state
+                .get_executors_metadata(&self.namespace)
+                .await
+                .map_err(|e| {
+                    let msg = format!("Error reading executors metadata: {}", e);
+                    error!("{}", msg);
+                    tonic::Status::internal(msg)
+                })?;
+            debug!("Found executors: {:?}", executors);
+
+            // parse protobuf
+            let plan = (&logical_plan).try_into().map_err(|e| {
+                let msg = format!("Could not parse logical plan protobuf: {}", e);
+                error!("{}", msg);
+                tonic::Status::internal(msg)
+            })?;
+
+            debug!("Received plan for execution: {:?}", plan);
+
+            let job_id: String = {
+                let mut rng = thread_rng();
+                std::iter::repeat(())
+                    .map(|()| rng.sample(Alphanumeric))
+                    .map(char::from)
+                    .take(7)
+                    .collect()
+            };
+
+            // Save placeholder job metadata
+            self.state
+                .save_job_metadata(
+                    &self.namespace,
+                    &job_id,
+                    &JobStatus {
+                        status: Some(job_status::Status::Queued(QueuedJob {})),
+                    },
+                )
+                .await
+                .map_err(|e| {
+                    tonic::Status::internal(format!("Could not save job metadata: {}", e))
+                })?;
+
+            // TODO: handle errors once we have more job metadata
+            let namespace = self.namespace.to_owned();
+            let state = self.state.clone();
+            let job_id_spawn = job_id.clone();
+            tokio::spawn(async move {
+                // create physical plan using DataFusion
+                let datafusion_ctx = ExecutionContext::new();
+                macro_rules! fail_job {
+                    ($code :expr) => {{
+                        match $code {
+                            Err(error) => {
+                                warn!("Job {} failed with {}", job_id_spawn, error);
+                                state
+                                    .save_job_metadata(
+                                        &namespace,
+                                        &job_id_spawn,
+                                        &JobStatus {
+                                            status: Some(job_status::Status::Failed(FailedJob {
+                                                error: format!("{}", error),
+                                            })),
+                                        },
+                                    )
+                                    .await
+                                    .unwrap();
+                                return;
+                            }
+                            Ok(value) => value,
+                        }
+                    }};
+                };
+                let plan = fail_job!(datafusion_ctx
+                    .optimize(&plan)
+                    .and_then(|plan| datafusion_ctx.create_physical_plan(&plan))
+                    .map_err(|e| {
+                        let msg = format!("Could not create physical plan: {}", e);
+                        error!("{}", msg);
+                        tonic::Status::internal(msg)
+                    }));
+
+                // create distributed physical plan using Ballista
+                if let Err(e) = state
+                    .save_job_metadata(
+                        &namespace,
+                        &job_id_spawn,
+                        &JobStatus {
+                            status: Some(job_status::Status::Running(RunningJob {})),
+                        },
+                    )
+                    .await
+                {
+                    warn!(
+                        "Could not update job {} status to running: {}",
+                        job_id_spawn, e
+                    );
+                }
+                let mut planner = fail_job!(DistributedPlanner::new(executors).map_err(|e| {
+                    let msg = format!("Could not create distributed planner: {}", e);
+                    error!("{}", msg);
+                    tonic::Status::internal(msg)
+                }));
+                let plan = fail_job!(planner.execute_distributed_query(plan).await.map_err(|e| {
+                    let msg = format!("Could not execute distributed plan: {}", e);
+                    error!("{}", msg);
+                    tonic::Status::internal(msg)
+                }));
+
+                // save partition info into job's state
+                let plan = plan
+                    .as_any()
+                    .downcast_ref::<ShuffleReaderExec>()
+                    .expect("Expected plan final operator to be ShuffleReaderExec");
+                let mut partition_location = vec![];
+                for loc in &plan.partition_location {
+                    partition_location.push(loc.clone().try_into().unwrap());
+                }
+                state
+                    .save_job_metadata(
+                        &namespace,
+                        &job_id_spawn,
+                        &JobStatus {
+                            status: Some(job_status::Status::Completed(CompletedJob {
+                                partition_location,
+                            })),
+                        },
+                    )
+                    .await
+                    .unwrap();
+            });
+
+            Ok(Response::new(ExecuteQueryResult { job_id }))
+        } else {
+            Err(tonic::Status::internal("Error parsing request"))
+        }
+    }
+
+    async fn get_job_status(
+        &self,
+        request: Request<GetJobStatusParams>,
+    ) -> std::result::Result<Response<GetJobStatusResult>, tonic::Status> {
+        let job_id = request.into_inner().job_id;
+        info!("Received get_job_status request for job {}", job_id);
+        let job_meta = self
+            .state
+            .get_job_metadata(&self.namespace, &job_id)
+            .await
+            .map_err(|e| {
+                let msg = format!("Error reading job metadata: {}", e);
+                error!("{}", msg);
+                tonic::Status::internal(msg)
+            })?;
+        Ok(Response::new(GetJobStatusResult {
+            status: Some(job_meta),
+        }))
     }
 }

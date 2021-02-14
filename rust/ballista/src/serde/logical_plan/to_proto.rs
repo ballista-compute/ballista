@@ -494,7 +494,7 @@ impl TryFrom<&datafusion::scalar::ScalarValue> for protobuf::ScalarValue {
         use datafusion::scalar;
         use protobuf::scalar_value::Value;
         use protobuf::PrimitiveScalarType;
-        Ok(match val {
+        let scalar_val = match val {
             scalar::ScalarValue::Boolean(val) => {
                 create_proto_scalar(val, PrimitiveScalarType::Bool, |s| Value::BoolValue(*s))
             }
@@ -632,7 +632,14 @@ impl TryFrom<&datafusion::scalar::ScalarValue> for protobuf::ScalarValue {
                     Value::TimeNanosecondValue(*s)
                 })
             }
-        })
+            _ => {
+                return Err(proto_error(format!(
+                    "Error converting to Datatype to scalar type, {:?} is invalid as a datafusion scalar.",
+                    val
+                )))
+            }
+        };
+        Ok(scalar_val)
     }
 }
 
@@ -676,7 +683,7 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
                         })
                     }
                 };
-                let schema: protobuf::Schema = schema.as_ref().try_into()?;
+                let schema: protobuf::Schema = schema.as_ref().into();
 
                 let filters: Vec<protobuf::LogicalExprNode> = filters
                     .iter()
@@ -1118,17 +1125,15 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
     }
 }
 
-impl TryInto<protobuf::Schema> for &Schema {
-    type Error = BallistaError;
-
-    fn try_into(self) -> Result<protobuf::Schema, Self::Error> {
-        Ok(protobuf::Schema {
+impl Into<protobuf::Schema> for &Schema {
+    fn into(self) -> protobuf::Schema {
+        protobuf::Schema {
             columns: self
                 .fields()
                 .iter()
                 .map(protobuf::Field::from)
                 .collect::<Vec<_>>(),
-        })
+        }
     }
 }
 

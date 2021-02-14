@@ -1,0 +1,74 @@
+# Sets the values for BALLISTA_CARGO_DYLIB_NAME, BALLISTA_DYLIB_NAME, and BALLISTA_MAKE_PYTHON
+#BALLISTA_CARGO_DYLIB_NAME - name of the dylib after running cargo build, for linux this is libballista.so
+#BALLISTA_DYLIB_NAME - name of the dylib required for python to load, for linux this is ballista.so
+#BALLISTA_MAKE_PYTHON - command for python3 interpreter, set to python3 for linux and mac and python for windows
+env_scripts=['''
+#!@duckscript
+family_name = os_family 
+ballista_python = get_env BALLISTA_MAKE_PYTHON
+default_python = eq ${BALLISTA_MAKE_PYTHON} ""
+
+if eq ${family_name} "linux"
+    if ${default_python}
+        set_env BALLISTA_MAKE_PYTHON python3
+    end
+    set_env BALLISTA_CARGO_DYLIB_NAME libballista.so
+    set_env BALLISTA_DYLIB_NAME ballista.so
+elseif eq ${family_name} "mac"
+    if ${default_python}
+        set_env BALLISTA_MAKE_PYTHON python3
+    end
+    set_env BALLISTA_CARGO_DYLIB_NAME libballista.dylib
+    set_env BALLISTA_DYLIB_NAME ballista.dylib
+else
+    if ${default_python}
+        set_env BALLISTA_MAKE_PYTHON python3
+    end
+    set_env BALLISTA_CARGO_DYLIB_NAME libballista.dll
+    set_env BALLISTA_DYLIB_NAME ballista.pyd
+end
+''']
+
+
+
+#This task runs a stub check the steps required to do this are
+#Build dylib
+#Copy dylib into ./ci/ballista.{dylib_ext} where dylib_ext is .so for linux, pyd for windows, and dylib for mac
+#Changes directory into ./ci
+#Runs the script using the string in BALLISTA_MAKE_PYTHON as the python interpreter
+[tasks.stubcheck]
+script='''
+#!@duckscript
+cm_run_task cargo_build
+from_path = concat "../target/debug/" ${BALLISTA_CARGO_DYLIB_NAME}
+to_path = concat "./ci/" ${BALLISTA_DYLIB_NAME}
+cp  ${from_path} ${to_path}
+cd ci
+cm_run_task invoke_check_stub_py
+rm ballista.so
+'''
+
+
+[tasks.build-dylib]
+script = '''#!@duckscript
+cm_run_task cargo_build
+from_path = concat "../target/debug/" ${BALLISTA_CARGO_DYLIB_NAME}
+to_path = concat "./" ${BALLISTA_DYLIB_NAME}
+cp  ${from_path} ${to_path}'''
+
+
+[tasks.invoke_check_stub_py]
+command = "${BALLISTA_MAKE_PYTHON}"
+args = ["check_stub_exhaustiveness.py"]
+
+
+
+[tasks.cargo_build]
+command = "cargo"
+args=["build"]
+
+[tasks.cargo_build_release]
+command = "cargo"
+args=["build", "--release"]
+
+

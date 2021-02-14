@@ -14,9 +14,9 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+use arrow::datatypes::{Schema, SchemaRef};
 use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::ExecutionPlan;
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::protobuf;
@@ -61,7 +61,7 @@ impl PartitionId {
 }
 
 /// Meta-data for an executor, used when fetching shuffle partitions from other executors
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct ExecutorMeta {
     pub id: String,
     pub host: String,

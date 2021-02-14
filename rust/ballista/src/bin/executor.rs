@@ -25,7 +25,7 @@ use ballista::{
     executor::flight_service::BallistaFlightService,
     executor::{BallistaExecutor, ExecutorConfig},
     print_version,
-    scheduler::{standalone::StandaloneClient, SchedulerServer},
+    scheduler::{state::StandaloneClient, SchedulerServer},
     serde::protobuf::scheduler_grpc_server::SchedulerGrpcServer,
     serde::scheduler::ExecutorMeta,
     BALLISTA_VERSION,

@@ -14,9 +14,9 @@
 
 //! Client API for sending requests to executors.
 
-use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
+use std::{collections::HashMap, pin::Pin};
 
 use crate::error::{ballista_error, BallistaError, Result};
 use crate::memory_stream::MemoryStream;
@@ -29,9 +29,9 @@ use arrow::record_batch::RecordBatch;
 use arrow_flight::flight_service_client::FlightServiceClient;
 use arrow_flight::utils::flight_data_to_arrow_batch;
 use arrow_flight::Ticket;
-use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
+use datafusion::{logical_plan::LogicalPlan, physical_plan::RecordBatchStream};
 use log::debug;
 use prost::Message;
 use uuid::Uuid;
@@ -45,7 +45,7 @@ impl BallistaClient {
     /// Create a new BallistaClient to connect to the executor listening on the specified
     /// host and port
 
-    pub async fn try_new(host: &str, port: usize) -> Result<Self> {
+    pub async fn try_new(host: &str, port: u16) -> Result<Self> {
         let addr = format!("http://{}:{}", host, port);
         debug!("BallistaClient connecting to {}", addr);
         let flight_client = FlightServiceClient::connect(addr.clone())
@@ -62,7 +62,6 @@ impl BallistaClient {
     }
 
     /// Execute a logical query plan and retrieve the results
-
     pub async fn execute_query(&mut self, plan: &LogicalPlan) -> Result<SendableRecordBatchStream> {
         let action = Action::InteractiveQuery {
             plan: plan.to_owned(),
@@ -70,6 +69,8 @@ impl BallistaClient {
         };
 
         self.execute_action(&action).await
+
+        //Ok(Arc::new(CollectExec::new(final_stage)))
     }
 
     /// Execute one partition of a physical query plan against the executor
@@ -131,7 +132,6 @@ impl BallistaClient {
     }
 
     /// Execute an action and retrieve the results
-
     pub async fn execute_action(&mut self, action: &Action) -> Result<SendableRecordBatchStream> {
         let serialized_action: protobuf::Action = action.to_owned().try_into()?;
 

@@ -5,31 +5,25 @@ services:
     command: "etcd -advertise-client-urls http://etcd:2379 -listen-client-urls http://0.0.0.0:2379"
     ports:
       - "2379:2379"
-  ballista-scheduler:
-    image: ballistacompute/ballista-rust:0.4.0-SNAPSHOT
-    command: "/scheduler --config-backend etcd --etcd-urls etcd:2379 --bind-host 0.0.0.0 --port 50050"
-    ports:
-      - "50050:50050"
-    depends_on:
-      - etcd
+#  ballista-scheduler:
+#    image: ballistacompute/ballista-rust:0.4.0-SNAPSHOT
+#    command: "/scheduler --config-backend etcd --etcd-urls etcd:2379 --bind-host 0.0.0.0 --port 50050"
+#    environment:
+#      - RUST_LOG=debug
+#    ports:
+#      - "50050:50050"
+#    volumes:
+#      - ./data:/data
+#    depends_on:
+#      - etcd
   ballista-executor:
     image: ballistacompute/ballista-rust:0.4.0-SNAPSHOT
-    command: "/executor --bind-host 0.0.0.0 --port 50051 --scheduler-host ballista-scheduler"
+    command: "/executor --bind-host 0.0.0.0 --port 50051 --local"
+    environment:
+      - RUST_LOG=info
     ports:
+      - "50050:50050"
       - "50051:50051"
     volumes:
       - ./data:/data
-    depends_on:
-      - ballista-scheduler
-#  ballista-jvm:
-#    image: ballistacompute/ballista-jvm:0.4.0-SNAPSHOT
-#    ports:
-#      - "50052:50051"
-#    volumes:
-#      - /mnt/nyctaxi:/mnt/nyctaxi
-#  ballista-spark:
-#    image: ballistacompute/ballista-spark:0.4.0-SNAPSHOT
-#    ports:
-#      - "50053:50051"
-#    volumes:
-#      - ./data:/mnt/tpch
+

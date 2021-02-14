@@ -47,7 +47,7 @@ impl TryInto<protobuf::Action> for Action {
                 settings: vec![],
             }),
             Action::FetchPartition(partition_id) => Ok(protobuf::Action {
-                action_type: Some(ActionType::FetchPartition(partition_id.try_into()?)),
+                action_type: Some(ActionType::FetchPartition(partition_id.into())),
                 settings: vec![],
             }),
         }
@@ -68,15 +68,13 @@ impl TryInto<protobuf::ExecutePartition> for ExecutePartition {
     }
 }
 
-impl TryInto<protobuf::PartitionId> for PartitionId {
-    type Error = BallistaError;
-
-    fn try_into(self) -> Result<protobuf::PartitionId, Self::Error> {
-        Ok(protobuf::PartitionId {
+impl Into<protobuf::PartitionId> for PartitionId {
+    fn into(self) -> protobuf::PartitionId {
+        protobuf::PartitionId {
             job_uuid: self.job_uuid.to_string(),
             stage_id: self.stage_id as u32,
             partition_id: self.partition_id as u32,
-        })
+        }
     }
 }
 
@@ -85,7 +83,7 @@ impl TryInto<protobuf::PartitionLocation> for PartitionLocation {
 
     fn try_into(self) -> Result<protobuf::PartitionLocation, Self::Error> {
         Ok(protobuf::PartitionLocation {
-            partition_id: Some(self.partition_id.try_into()?),
+            partition_id: Some(self.partition_id.into()),
             executor_meta: Some(self.executor_meta.into()),
         })
     }

@@ -14,38 +14,43 @@
 
 //! Distributed execution context.
 
-use std::any::Any;
-use std::collections::HashMap;
-use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::{any::Any, pin::Pin};
+use std::{collections::HashMap, convert::TryInto};
+use std::{fs, time::Duration};
 
-use crate::client::BallistaClient;
-use crate::error::{BallistaError, Result};
-use crate::serde::scheduler::Action;
+use crate::serde::protobuf::scheduler_grpc_client::SchedulerGrpcClient;
+use crate::serde::protobuf::{
+    job_status, ExecuteQueryParams, ExecuteQueryResult, GetJobStatusParams, GetJobStatusResult,
+};
+use crate::serde::scheduler::{Action, ExecutorMeta};
+use crate::{client::BallistaClient, serde::scheduler};
+use crate::{
+    error::{BallistaError, Result},
+    memory_stream::MemoryStream,
+};
 
-use arrow::datatypes::SchemaRef;
-use datafusion::dataframe::DataFrame;
+use crate::scheduler::planner::DistributedPlanner;
+use arrow::datatypes::{Schema, SchemaRef};
 use datafusion::datasource::datasource::Statistics;
 use datafusion::datasource::TableProvider;
 use datafusion::error::Result as DFResult;
 use datafusion::execution::context::ExecutionContext;
 use datafusion::logical_plan::{DFSchema, Expr, LogicalPlan, Partitioning};
 use datafusion::physical_plan::csv::CsvReadOptions;
-use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
-use log::{debug, info};
-
-#[derive(Debug)]
-
-pub enum ClusterMeta {
-    Direct { host: String, port: usize }, //TODO add etcd and k8s options here
-}
+use datafusion::physical_plan::ExecutionPlan;
+use datafusion::{dataframe::DataFrame, physical_plan::RecordBatchStream};
+use log::{debug, error, info};
+use uuid::Uuid;
 
 #[allow(dead_code)]
 
 pub struct BallistaContextState {
-    /// Meta-data required for connecting to a scheduler instances in the cluster
-    cluster_meta: ClusterMeta,
+    /// Scheduler host
+    scheduler_host: String,
+    /// Scheduler port
+    scheduler_port: u16,
     /// Tables that have been registered with this context
     tables: HashMap<String, LogicalPlan>,
     /// General purpose settings
@@ -53,9 +58,14 @@ pub struct BallistaContextState {
 }
 
 impl BallistaContextState {
-    pub fn new(cluster_meta: ClusterMeta, settings: HashMap<String, String>) -> Self {
+    pub fn new(
+        scheduler_host: String,
+        scheduler_port: u16,
+        settings: HashMap<String, String>,
+    ) -> Self {
         Self {
-            cluster_meta,
+            scheduler_host,
+            scheduler_port,
             tables: HashMap::new(),
             settings,
         }
@@ -69,13 +79,9 @@ pub struct BallistaContext {
 }
 
 impl BallistaContext {
-    /// Create a context for executing queries against a remote Ballista executor instance
-    pub fn remote(host: &str, port: usize, settings: HashMap<String, String>) -> Self {
-        let meta = ClusterMeta::Direct {
-            host: host.to_owned(),
-            port,
-        };
-        let state = BallistaContextState::new(meta, settings);
+    /// Create a context for executing queries against a remote Ballista scheduler instance
+    pub fn remote(host: &str, port: u16, settings: HashMap<String, String>) -> Self {
+        let state = BallistaContextState::new(host.to_owned(), port, settings);
 
         Self {
             state: Arc::new(Mutex::new(state)),
@@ -203,28 +209,84 @@ impl BallistaDataFrame {
         Self { state, df }
     }
 
-    pub async fn collect(&self) -> Result<SendableRecordBatchStream> {
-        let (host, port) = {
+    pub async fn collect(&self) -> Result<Pin<Box<dyn RecordBatchStream + Send + Sync>>> {
+        let scheduler_url = {
             let state = self.state.lock().unwrap();
 
-            match &state.cluster_meta {
-                ClusterMeta::Direct { host, port, .. } => (host.to_owned(), *port),
-            }
+            format!("http://{}:{}", state.scheduler_host, state.scheduler_port)
         };
 
-        info!("Connecting to Ballista executor at {}:{}", host, port);
+        info!("Connecting to Ballista scheduler at {}", scheduler_url);
 
-        let mut client = BallistaClient::try_new(&host, port).await?;
+        let mut scheduler = SchedulerGrpcClient::connect(scheduler_url).await?;
+
         let plan = self.df.to_logical_plan();
+        let schema: Schema = plan.schema().as_ref().clone().into();
 
-        debug!("Sending logical plan to executor: {:?}", plan);
-
-        client
-            .execute_action(&Action::InteractiveQuery {
-                plan,
-                settings: Default::default(),
+        let job_id = scheduler
+            .execute_logical_plan(ExecuteQueryParams {
+                logical_plan: Some((&plan).try_into()?),
             })
-            .await
+            .await?
+            .into_inner()
+            .job_id;
+
+        loop {
+            let GetJobStatusResult { status } = scheduler
+                .get_job_status(GetJobStatusParams {
+                    job_id: job_id.clone(),
+                })
+                .await?
+                .into_inner();
+            let status = status.and_then(|s| s.status).ok_or_else(|| {
+                BallistaError::Internal("Received empty status message".to_owned())
+            })?;
+            let wait_future = tokio::time::sleep(Duration::from_secs(5));
+            match status {
+                job_status::Status::Queued(_) => {
+                    info!("Job {} still queued...", job_id);
+                    wait_future.await;
+                }
+                job_status::Status::Running(_) => {
+                    info!("Job {} is running...", job_id);
+                    wait_future.await;
+                }
+                job_status::Status::Failed(err) => {
+                    let msg = format!("Job {} failed: {}", job_id, err.error);
+                    error!("{}", msg);
+                    break Err(BallistaError::General(msg));
+                }
+                job_status::Status::Completed(completed) => {
+                    // TODO: use streaming. Probably need to change the signature of fetch_partition to achieve that
+                    let mut result = vec![];
+                    for location in completed.partition_location {
+                        let metadata = location.executor_meta.ok_or_else(|| {
+                            BallistaError::Internal("Received empty executor metadata".to_owned())
+                        })?;
+                        let partition_id = location.partition_id.ok_or_else(|| {
+                            BallistaError::Internal("Received empty partition id".to_owned())
+                        })?;
+                        let mut ballista_client =
+                            BallistaClient::try_new(metadata.host.as_str(), metadata.port as u16)
+                                .await?;
+                        result.append(
+                            &mut ballista_client
+                                .fetch_partition(
+                                    &Uuid::parse_str(&partition_id.job_uuid).unwrap(),
+                                    partition_id.stage_id as usize,
+                                    partition_id.partition_id as usize,
+                                )
+                                .await?,
+                        );
+                    }
+                    break Ok(Box::pin(MemoryStream::try_new(
+                        result,
+                        Arc::new(schema),
+                        None,
+                    )?));
+                }
+            };
+        }
     }
 
     pub fn select_columns(&self, columns: &[&str]) -> Result<BallistaDataFrame> {

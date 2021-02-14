@@ -32,16 +32,18 @@ pub type Result<T> = result::Result<T, BallistaError>;
 pub enum BallistaError {
     NotImplemented(String),
     General(String),
+    Internal(String),
     ArrowError(ArrowError),
     DataFusionError(DataFusionError),
     SqlError(parser::ParserError),
     IoError(io::Error),
     // ReqwestError(reqwest::Error),
     //HttpError(http::Error),
-    KubeAPIError(kube::error::Error),
-    KubeAPIRequestError(k8s_openapi::RequestError),
-    KubeAPIResponseError(k8s_openapi::ResponseError),
+    // KubeAPIError(kube::error::Error),
+    // KubeAPIRequestError(k8s_openapi::RequestError),
+    // KubeAPIResponseError(k8s_openapi::ResponseError),
     TonicError(tonic::transport::Error),
+    GrpcError(tonic::Status),
 }
 
 impl<T> Into<Result<T>> for BallistaError {
@@ -105,23 +107,23 @@ impl From<sled::Error> for BallistaError {
 //     }
 // }
 
-impl From<kube::error::Error> for BallistaError {
-    fn from(e: kube::error::Error) -> Self {
-        BallistaError::KubeAPIError(e)
-    }
-}
+// impl From<kube::error::Error> for BallistaError {
+//     fn from(e: kube::error::Error) -> Self {
+//         BallistaError::KubeAPIError(e)
+//     }
+// }
 
-impl From<k8s_openapi::RequestError> for BallistaError {
-    fn from(e: k8s_openapi::RequestError) -> Self {
-        BallistaError::KubeAPIRequestError(e)
-    }
-}
+// impl From<k8s_openapi::RequestError> for BallistaError {
+//     fn from(e: k8s_openapi::RequestError) -> Self {
+//         BallistaError::KubeAPIRequestError(e)
+//     }
+// }
 
-impl From<k8s_openapi::ResponseError> for BallistaError {
-    fn from(e: k8s_openapi::ResponseError) -> Self {
-        BallistaError::KubeAPIResponseError(e)
-    }
-}
+// impl From<k8s_openapi::ResponseError> for BallistaError {
+//     fn from(e: k8s_openapi::ResponseError) -> Self {
+//         BallistaError::KubeAPIResponseError(e)
+//     }
+// }
 
 impl From<tonic::transport::Error> for BallistaError {
     fn from(e: tonic::transport::Error) -> Self {
@@ -129,11 +131,11 @@ impl From<tonic::transport::Error> for BallistaError {
     }
 }
 
-// impl From<tonic::status::Status> for BallistaError {
-//     fn from(e: tonic::status::Status) -> Self {
-//         BallistaError::TonicError(e)
-//     }
-// }
+impl From<tonic::Status> for BallistaError {
+    fn from(e: tonic::Status) -> Self {
+        BallistaError::GrpcError(e)
+    }
+}
 
 impl Display for BallistaError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -146,14 +148,16 @@ impl Display for BallistaError {
             BallistaError::IoError(ref desc) => write!(f, "IO error: {}", desc),
             // BallistaError::ReqwestError(ref desc) => write!(f, "Reqwest error: {}", desc),
             // BallistaError::HttpError(ref desc) => write!(f, "HTTP error: {}", desc),
-            BallistaError::KubeAPIError(ref desc) => write!(f, "Kube API error: {}", desc),
-            BallistaError::KubeAPIRequestError(ref desc) => {
-                write!(f, "KubeAPI request error: {}", desc)
-            }
-            BallistaError::KubeAPIResponseError(ref desc) => {
-                write!(f, "KubeAPI response error: {}", desc)
-            }
+            // BallistaError::KubeAPIError(ref desc) => write!(f, "Kube API error: {}", desc),
+            // BallistaError::KubeAPIRequestError(ref desc) => {
+            //     write!(f, "KubeAPI request error: {}", desc)
+            // }
+            // BallistaError::KubeAPIResponseError(ref desc) => {
+            //     write!(f, "KubeAPI response error: {}", desc)
+            // }
             BallistaError::TonicError(desc) => write!(f, "Tonic error: {}", desc),
+            BallistaError::GrpcError(desc) => write!(f, "Grpc error: {}", desc),
+            BallistaError::Internal(desc) => write!(f, "Internal Ballista error: {}", desc),
         }
     }
 }

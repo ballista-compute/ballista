@@ -19,6 +19,7 @@
 //!
 //! This is a modified version of the DataFusion version of these benchmarks.
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -29,10 +30,8 @@ use arrow::datatypes::{DataType, Field, Schema};
 use arrow::util::pretty;
 use ballista::prelude::*;
 use datafusion::prelude::*;
-
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
-use std::collections::HashMap;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -43,7 +42,7 @@ struct BenchmarkOpt {
 
     /// Ballista executor port
     #[structopt(long = "port")]
-    port: usize,
+    port: u16,
 
     /// Query number
     #[structopt(long)]
@@ -54,7 +53,7 @@ struct BenchmarkOpt {
     debug: bool,
 
     /// Number of iterations of each test run
-    #[structopt(long = "iterations", default_value = "3")]
+    #[structopt(long = "iterations", default_value = "1")]
     iterations: usize,
 
     /// Batch size when reading CSV or Parquet files
@@ -160,9 +159,10 @@ async fn benchmark(opt: BenchmarkOpt) -> Result<()> {
     let mut millis = vec![];
 
     // run benchmark
+    let sql = get_query_sql(opt.query)?;
+    println!("Running benchmark with query {}:\n {}", opt.query, sql);
     for i in 0..opt.iterations {
         let start = Instant::now();
-        let sql = get_query_sql(opt.query)?;
         let df = ctx.sql(&sql)?;
 
         let mut batches = vec![];

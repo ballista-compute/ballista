@@ -76,7 +76,7 @@ impl FlightService for BallistaFlightService {
 
         match &action {
             BallistaAction::InteractiveQuery { plan, .. } => {
-                debug!("InteractiveQuery {:?}", plan);
+                info!("InteractiveQuery {:?}", plan);
 
                 let results = self
                     .executor

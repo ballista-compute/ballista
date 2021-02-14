@@ -35,7 +35,7 @@ pub(crate) fn decode_protobuf(bytes: &[u8]) -> Result<BallistaAction, BallistaEr
     let mut buf = Cursor::new(bytes);
 
     protobuf::Action::decode(&mut buf)
-        .map_err(|e| BallistaError::General(format!("{:?}", e)))
+        .map_err(|e| BallistaError::Internal(format!("{:?}", e)))
         .and_then(|node| node.try_into())
 }
 

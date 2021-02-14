@@ -7,8 +7,8 @@ use ballista::BALLISTA_VERSION;
 use ballista::{
     print_version,
     scheduler::{
-        etcd::EtcdClient, standalone::StandaloneClient, ConfigBackend, ConfigBackendClient,
-        SchedulerServer,
+        state::{ConfigBackendClient, EtcdClient, StandaloneClient},
+        ConfigBackend, SchedulerServer,
     },
     serde::protobuf::scheduler_grpc_server::SchedulerGrpcServer,
 };

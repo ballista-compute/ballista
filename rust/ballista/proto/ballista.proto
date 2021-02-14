@@ -40,15 +40,9 @@ message LogicalExprNode {
     NegativeNode negative = 74;
     InListNode in_list = 75;
     bool wildcard = 76;
+    ScalarFunctionNode scalar_function = 77;
   }
 }
-
-
-
-
-
-
-
 
 message IsNull {
   LogicalExprNode expr = 1;
@@ -81,6 +75,47 @@ message InListNode {
   LogicalExprNode expr = 1;
   repeated LogicalExprNode list = 2;
   bool negated = 3;
+}
+
+enum ScalarFunction {
+  SQRT = 0;
+  SIN = 1;
+  COS = 2;
+  TAN = 3;
+  ASIN = 4;
+  ACOS = 5;
+  ATAN = 6;
+  EXP = 7;
+  LOG = 8;
+  LOG2 = 9;
+  LOG10 = 10;
+  FLOOR = 11;
+  CEIL = 12;
+  ROUND = 13;
+  TRUNC = 14;
+  ABS = 15;
+  SIGNUM = 16;
+  LENGTH = 17;
+  CONCAT = 18;
+  LOWER = 19;
+  UPPER = 20;
+  TRIM = 21;
+  LTRIM = 22;
+  RTRIM = 23;
+  TOTIMESTAMP = 24;
+  ARRAY = 25;
+  NULLIF = 26;
+  DATETRUNC = 27;
+  MD5 = 28;
+  SHA224 = 29;
+  SHA256 = 30;
+  SHA384 = 31;
+  SHA512 = 32;
+}
+
+message ScalarFunctionNode {
+  ScalarFunction fun = 1;
+  repeated LogicalExprNode expr = 2;
 }
 
 enum AggregateFunction {
@@ -315,6 +350,7 @@ message EmptyExecNode {
 message ProjectionExecNode {
   PhysicalPlanNode input = 1;
   repeated LogicalExprNode expr = 2;
+  repeated string expr_name = 3;
 }
 
 message SelectionExecNode {
@@ -324,13 +360,16 @@ message SelectionExecNode {
 enum AggregateMode {
   PARTIAL = 0;
   FINAL = 1;
-  COMPLETE = 2;
 }
 
 message HashAggregateExecNode {
   repeated LogicalExprNode group_expr = 1;
   repeated LogicalExprNode aggr_expr = 2;
   AggregateMode mode = 3;
+  PhysicalPlanNode input = 4;
+  repeated string group_expr_name = 5;
+  // we need the input schema to the partial aggregate to pass to the final aggregate
+  Schema input_schema = 6;
 }
 
 message ShuffleReaderExecNode {
@@ -424,11 +463,52 @@ message RegisterExecutorParams {
 
 message RegisterExecutorResult {}
 
+message ExecuteQueryParams {
+  LogicalPlanNode logical_plan = 1;
+}
+
+message ExecuteQueryResult {
+  string job_id = 1;
+}
+
+message GetJobStatusParams {
+  string job_id = 1;
+}
+
+message CompletedJob {
+  repeated PartitionLocation partition_location = 1;
+}
+
+message QueuedJob {}
+
+// TODO: add progress report
+message RunningJob {}
+
+message FailedJob {
+  string error = 1;
+}
+
+message JobStatus {
+  oneof status {
+    QueuedJob queued = 1;
+    RunningJob running = 2;
+    FailedJob failed = 3;
+    CompletedJob completed = 4;
+  }
+}
+
+message GetJobStatusResult {
+  JobStatus status = 1;
+}
 
 service SchedulerGrpc {
   rpc GetExecutorsMetadata (GetExecutorMetadataParams) returns (GetExecutorMetadataResult) {}
 
   rpc RegisterExecutor (RegisterExecutorParams) returns (RegisterExecutorResult) {}
+
+  rpc ExecuteLogicalPlan (ExecuteQueryParams) returns (ExecuteQueryResult) {}
+
+  rpc GetJobStatus (GetJobStatusParams) returns (GetJobStatusResult) {}
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

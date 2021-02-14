@@ -302,10 +302,7 @@ impl TryInto<protobuf::LogicalExprNode> for Arc<dyn AggregateExpr> {
         let expressions: Vec<protobuf::LogicalExprNode> = self
             .expressions()
             .iter()
-            .map(|e| {
-                println!("phys expr {:?}", e);
-                e.clone().try_into()
-            })
+            .map(|e| e.clone().try_into())
             .collect::<Result<Vec<_>, BallistaError>>()?;
         Ok(protobuf::LogicalExprNode {
             expr_type: Some(protobuf::logical_expr_node::ExprType::AggregateExpr(

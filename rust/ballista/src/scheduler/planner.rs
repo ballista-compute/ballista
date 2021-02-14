@@ -271,7 +271,7 @@ async fn execute_query_stage(
 
 pub fn pretty_print(plan: Arc<dyn ExecutionPlan>, indent: usize) {
     let operator_str = format!("{:?}", plan);
-    println!("{}{:?}", "  ".repeat(indent), &operator_str[0..60]);
+    debug!("{}{:?}", "  ".repeat(indent), &operator_str[0..60]);
     plan.children()
         .iter()
         .for_each(|c| pretty_print(c.clone(), indent + 1));
@@ -356,16 +356,8 @@ mod test {
         let partial_hash_serde = roundtrip_operator(partial_hash.clone())?;
 
         let partial_hash = downcast_exec!(partial_hash, HashAggregateExec);
-        for expr in partial_hash.aggr_expr() {
-            println!("old {:?}", expr);
-        }
-
         let partial_hash_serde = downcast_exec!(partial_hash_serde, HashAggregateExec);
-        for expr in partial_hash_serde.aggr_expr() {
-            println!("new {:?}", expr);
-        }
 
-        //TODO this fails due to https://github.com/ballista-compute/ballista/issues/508
         assert_eq!(
             format!("{:?}", partial_hash),
             format!("{:?}", partial_hash_serde)

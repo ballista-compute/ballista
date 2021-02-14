@@ -28,7 +28,9 @@ use crate::{convert_box_required, convert_required};
 use arrow::datatypes::{DataType, Schema, SchemaRef};
 use datafusion::execution::context::{ExecutionConfig, ExecutionContextState};
 use datafusion::logical_plan::{DFSchema, Expr};
+use datafusion::physical_plan::aggregates::{create_aggregate_expr, AggregateFunction};
 use datafusion::physical_plan::expressions::col;
+use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
 use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
 use datafusion::physical_plan::{
     coalesce_batches::CoalesceBatchesExec,
@@ -44,12 +46,10 @@ use datafusion::physical_plan::{
     sort::{SortExec, SortOptions},
 };
 use datafusion::physical_plan::{AggregateExpr, ExecutionPlan, PhysicalExpr};
-use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
 use datafusion::prelude::CsvReadOptions;
 use log::debug;
 use protobuf::logical_expr_node::ExprType;
 use protobuf::physical_plan_node::PhysicalPlanType;
-use datafusion::physical_plan::aggregates::{create_aggregate_expr, AggregateFunction};
 
 impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
     type Error = BallistaError;
@@ -173,19 +173,28 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
 
                 let input_schema = hash_agg.input_schema.as_ref().unwrap().clone();
                 let physical_schema: SchemaRef = SchemaRef::new((&input_schema).try_into()?);
-                // let logical_schema: DFSchema = input_schema.clone().try_into()?;
 
                 let mut physical_aggr_expr = vec![];
 
                 for (expr, name) in &logical_agg_expr {
                     match expr {
-                        Expr::AggregateFunction {  fun, args, .. } => {
+                        Expr::AggregateFunction { fun, args, .. } => {
                             let arg = df_planner
                                 .create_physical_expr(&args[0], &physical_schema, &ctx_state)
                                 .map_err(|e| BallistaError::General(format!("{:?}", e)))?;
-                            physical_aggr_expr.push(create_aggregate_expr(&fun, false, &[arg], &physical_schema, name.to_string())?);
+                            physical_aggr_expr.push(create_aggregate_expr(
+                                &fun,
+                                false,
+                                &[arg],
+                                &physical_schema,
+                                name.to_string(),
+                            )?);
                         }
-                        _ => panic!()
+                        _ => {
+                            return Err(BallistaError::General(
+                                "Invalid expression for HashAggregateExec".to_string(),
+                            ))
+                        }
                     }
                 }
                 Ok(Arc::new(HashAggregateExec::try_new(

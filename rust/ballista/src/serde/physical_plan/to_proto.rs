@@ -156,8 +156,6 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                 .map(|expr| expr.field().unwrap().name().clone())
                 .collect();
 
-            println!("to_proto names: {:?}", agg_names);
-
             let agg_mode = match exec.mode() {
                 AggregateMode::Partial => protobuf::AggregateMode::Partial,
                 AggregateMode::Final => protobuf::AggregateMode::Final,
@@ -420,7 +418,6 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
                 )),
             })
         } else if let Some(cast) = expr.downcast_ref::<CastExpr>() {
-            println!("to_proto {:?}", cast);
             Ok(protobuf::LogicalExprNode {
                 expr_type: Some(protobuf::logical_expr_node::ExprType::Cast(Box::new(
                     protobuf::CastNode {

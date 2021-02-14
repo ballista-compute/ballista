@@ -15,8 +15,8 @@
 //! Serde code to convert from protocol buffers to Rust data structures.
 
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::sync::Arc;
-use std::{convert::TryInto, unimplemented};
 
 use crate::error::BallistaError;
 use crate::executor::shuffle_reader::ShuffleReaderExec;
@@ -113,7 +113,6 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     max_concurrency,
                 )?))
             }
-            PhysicalPlanType::Selection(_) => unimplemented!(),
             PhysicalPlanType::CoalesceBatches(coalesce_batches) => {
                 let input: Arc<dyn ExecutionPlan> = convert_box_required!(coalesce_batches.input)?;
                 Ok(Arc::new(CoalesceBatchesExec::new(

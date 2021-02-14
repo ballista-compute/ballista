@@ -14,33 +14,33 @@ option java_outer_classname = "BallistaProto";
 message LogicalExprNode {
   oneof ExprType {
     // column references
-    string column_name = 10;
+    string column_name = 1;
     
     // alias
-    AliasNode alias = 14;
+    AliasNode alias = 2;
 
-    ScalarValue literal = 15;
+    ScalarValue literal = 3;
 
 
     // binary expressions
-    BinaryExprNode binary_expr = 40;
+    BinaryExprNode binary_expr = 4;
     
     // aggregate expressions
-    AggregateExprNode aggregate_expr = 50;
+    AggregateExprNode aggregate_expr = 5;
     
     // null checks
-    IsNull is_null_expr = 60;
-    IsNotNull is_not_null_expr = 61;
-    Not not_expr = 62;
+    IsNull is_null_expr = 6;
+    IsNotNull is_not_null_expr = 7;
+    Not not_expr = 8;
     
-    BetweenNode between = 70;
-    CaseNode case_ = 71;
-    CastNode cast = 72;
-    SortExprNode sort = 73;
-    NegativeNode negative = 74;
-    InListNode in_list = 75;
-    bool wildcard = 76;
-    ScalarFunctionNode scalar_function = 77;
+    BetweenNode between = 9;
+    CaseNode case_ = 10;
+    CastNode cast = 11;
+    SortExprNode sort = 12;
+    NegativeNode negative = 13;
+    InListNode in_list = 14;
+    bool wildcard = 15;
+    ScalarFunctionNode scalar_function = 16;
   }
 }
 
@@ -163,18 +163,18 @@ message SortExprNode {
 // LogicalPlan is a nested type
 message LogicalPlanNode {
   oneof LogicalPlanType {
-    CsvTableScanNode csv_scan = 10;
-    ParquetTableScanNode parquet_scan = 11;
-    ProjectionNode projection = 20;
-    SelectionNode selection = 21;
-    LimitNode limit = 22;
-    AggregateNode aggregate = 23;
-    JoinNode join = 24;
-    SortNode sort = 25;
-    RepartitionNode repartition = 26;
-    EmptyRelationNode empty_relation = 27;
-    CreateExternalTableNode create_external_table = 28;
-    ExplainNode explain = 29;
+    CsvTableScanNode csv_scan = 1;
+    ParquetTableScanNode parquet_scan = 2;
+    ProjectionNode projection = 3;
+    SelectionNode selection = 4;
+    LimitNode limit = 5;
+    AggregateNode aggregate = 6;
+    JoinNode join = 7;
+    SortNode sort = 8;
+    RepartitionNode repartition = 9;
+    EmptyRelationNode empty_relation = 10;
+    CreateExternalTableNode create_external_table = 11;
+    ExplainNode explain = 12;
   }
 }
 
@@ -225,8 +225,8 @@ message RepartitionNode{
 }
 
 message HashRepartition{
-  repeated LogicalExprNode hash_expr = 2;
-  uint64 batch_size = 1;
+  repeated LogicalExprNode hash_expr = 1;
+  uint64 batch_size = 2;
 }
 
 message EmptyRelationNode{
@@ -282,6 +282,10 @@ message LimitNode {
   uint32 limit = 2;
 }
 
+message SelectionExecNode {
+  LogicalExprNode expr = 1;
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Ballista Physical Plan
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -293,7 +297,6 @@ message PhysicalPlanNode {
     CsvScanExecNode csv_scan = 2;
     EmptyExecNode empty = 3;
     ProjectionExecNode projection = 4;
-    SelectionExecNode selection = 5;
     GlobalLimitExecNode global_limit = 6;
     LocalLimitExecNode local_limit = 7;
     HashAggregateExecNode hash_aggregate = 8;
@@ -352,10 +355,6 @@ message ProjectionExecNode {
   PhysicalPlanNode input = 1;
   repeated LogicalExprNode expr = 2;
   repeated string expr_name = 3;
-}
-
-message SelectionExecNode {
-  LogicalExprNode expr = 2;
 }
 
 enum AggregateMode {
@@ -597,27 +596,27 @@ message ScalarListValue{
 
 message ScalarValue{
     oneof value{
-        bool   bool_value = 35;
-        string utf8_value = 20;
-        string large_utf8_value = 40;
-        int32  int8_value = 21;
-        int32  int16_value = 22;
-        int32  int32_value = 23;
-        int64  int64_value = 24;
-        uint32 uint8_value = 25;
-        uint32 uint16_value = 26;
-        uint32 uint32_value = 27;
-        uint64 uint64_value = 28;
-        float  float32_value = 29;
-        double float64_value = 30;
+        bool   bool_value = 1;
+        string utf8_value = 2;
+        string large_utf8_value = 3;
+        int32  int8_value = 4;
+        int32  int16_value = 5;
+        int32  int32_value = 6;
+        int64  int64_value = 7;
+        uint32 uint8_value = 8;
+        uint32 uint16_value = 9;
+        uint32 uint32_value = 10;
+        uint64 uint64_value = 11;
+        float  float32_value = 12;
+        double float64_value = 13;
         //Literal Date32 value always has a unit of day
-        int32  date_32_value = 32;
-        int64  time_microsecond_value = 33;
-        int64  time_nanosecond_value = 34;
-        ScalarListValue list_value = 37;
-        ScalarType null_list_value = 39; 
+        int32  date_32_value = 14;
+        int64  time_microsecond_value = 15;
+        int64  time_nanosecond_value = 16;
+        ScalarListValue list_value = 17;
+        ScalarType null_list_value = 18;
 
-        PrimitiveScalarType null_value = 31;
+        PrimitiveScalarType null_value = 19;
     }
 }
 

@@ -259,7 +259,25 @@ async fn execute_query_stage(
                 .await
         }));
     }
-    futures::future::join_all(executions).await;
+
+    // wait for all partitions to complete
+    let results = futures::future::join_all(executions).await;
+
+    // check for errors
+    for result in results {
+        match result {
+            Ok(partition_result) => {
+                let final_result = partition_result?;
+                debug!("Query stage partition result: {:?}", final_result);
+            }
+            Err(e) => {
+                return Err(BallistaError::General(format!(
+                    "Query stage {} failed: {:?}",
+                    stage_id, e
+                )))
+            }
+        }
+    }
 
     debug!(
         "execute_query_stage() stage_id={} produced {:?}",

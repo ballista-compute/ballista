@@ -30,6 +30,9 @@ pub mod prelude;
 pub mod scheduler;
 pub mod utils;
 
+#[cfg(test)]
+pub mod test_utils;
+
 #[macro_use]
 
 pub mod serde;

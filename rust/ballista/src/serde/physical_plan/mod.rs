@@ -24,10 +24,11 @@ mod roundtrip_tests {
     use datafusion::physical_plan::ColumnarValue;
     use datafusion::physical_plan::{
         empty::EmptyExec,
-        expressions::{Avg, Column},
+        expressions::{Avg, Column, PhysicalSortExpr},
         hash_aggregate::{AggregateMode, HashAggregateExec},
         hash_join::HashJoinExec,
         limit::{GlobalLimitExec, LocalLimitExec},
+        sort::SortExec,
         ExecutionPlan,
     };
     use datafusion::physical_plan::{AggregateExpr, Distribution, Partitioning, PhysicalExpr};
@@ -140,6 +141,36 @@ mod roundtrip_tests {
         roundtrip_test(Arc::new(FilterExec::try_new(
             and,
             Arc::new(EmptyExec::new(false, schema.clone())),
+        )?))
+    }
+
+    #[test]
+    fn roundtrip_sort() -> Result<()> {
+        use arrow::compute::kernels::sort::SortOptions;
+        use arrow::datatypes::{DataType, Field, Schema};
+        let field_a = Field::new("a", DataType::Boolean, false);
+        let field_b = Field::new("b", DataType::Int64, false);
+        let schema = Arc::new(Schema::new(vec![field_a.clone(), field_b.clone()]));
+        let sort_exprs = vec![
+            PhysicalSortExpr {
+                expr: col("a"),
+                options: SortOptions {
+                    descending: true,
+                    nulls_first: false,
+                },
+            },
+            PhysicalSortExpr {
+                expr: col("b"),
+                options: SortOptions {
+                    descending: false,
+                    nulls_first: true,
+                },
+            },
+        ];
+        roundtrip_test(Arc::new(SortExec::try_new(
+            sort_exprs,
+            Arc::new(EmptyExec::new(false, schema.clone())),
+            1,
         )?))
     }
 }

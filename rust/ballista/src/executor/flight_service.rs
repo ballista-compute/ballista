@@ -122,7 +122,7 @@ impl FlightService for BallistaFlightService {
                 // stream results to disk
                 let info = utils::write_stream_to_disk(&mut stream, &path)
                     .await
-                    .map_err(|e| from_arrow_err(&e))?;
+                    .map_err(|e| from_ballista_err(&e))?;
 
                 info!(
                     "Executed partition in {} seconds. Statistics: {:?}",
@@ -157,7 +157,7 @@ impl FlightService for BallistaFlightService {
                 info!("FetchPartition {:?} reading {}", partition_id, path);
                 let mut stream = utils::read_stream_from_disk(path)
                     .await
-                    .map_err(|e| from_arrow_err(&e))?;
+                    .map_err(|e| from_ballista_err(&e))?;
 
                 // TODO should be able to stream end to end rather than load into memory here
                 let mut batches = vec![];

@@ -1,11 +1,8 @@
 # Deployment
 
-Ballista 0.4.0 will support the following cluster deployment modes:
+Ballista is packaged as Docker images. Refer to the following guides to create a Ballista cluster:
 
-- [Local Mode](local-mode.md): Single process containing scheduler and executor, intended for local development testing
-- [Standalone](standalone.md): Single scheduler process, supporting multiple executor processes that register with the scheduler
-- [Etcd](standalone.md): Scheduler uses [etcd](https://etcd.io/) as a backing support, so that multiple scheduler instances can run
-  concurrently
-- [Kubernetes](kubernetes.md): Schedulers and executors will be deployed as stateful sets in [Kubernetes](https://kubernetes.io/)
-
+- [Create a cluster using Docker](standalone.md)
+- [Create a cluster using Docker Compose](docker-compose.md)
+- [Create a cluster using Kubernetes](kubernetes.md)
 

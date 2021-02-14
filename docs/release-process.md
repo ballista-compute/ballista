@@ -2,18 +2,13 @@
 
 These instructions are for project maintainers wishing to create public releases of Ballista.
 
-## Build All Artifacts
-
-Run the following command to build all Docker images.
-
-```bash
-./dev/build-all.sh
-```
-
-## Release Checklist
-
-- [ ] Run TPC-H benchmarks
-- [ ] Run examples
+- Create a `release-0.4` branch or merge latest from `main` into an existing `release-0.4` branch.
+- Update version numbers using `./dev/bump-version.sh`
+- Run integration tests with `./dev/integration-tests.sh`
+- Push changes
+- Create `v0.4.x` release tag from the `release-0.4` branch
+- Publish Docker images
+- Publish crate if possible (if we're using a published version of Arrow)
 
 ## Publishing Java artifacts to Maven Central
 

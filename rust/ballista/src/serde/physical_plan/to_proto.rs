@@ -54,6 +54,7 @@ use protobuf::physical_plan_node::PhysicalPlanType;
 use crate::executor::shuffle_reader::ShuffleReaderExec;
 use crate::serde::{protobuf, BallistaError};
 use datafusion::physical_plan::functions::ScalarFunctionExpr;
+use datafusion::physical_plan::merge::MergeExec;
 
 impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
     type Error = BallistaError;
@@ -150,6 +151,12 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                 .iter()
                 .map(|expr| expr.to_owned().try_into())
                 .collect::<Result<Vec<_>, BallistaError>>()?;
+            let agg_names = exec
+                .aggr_expr()
+                .iter()
+                .map(|expr| expr.field().unwrap().name().clone())
+                .collect();
+
             let agg_mode = match exec.mode() {
                 AggregateMode::Partial => protobuf::AggregateMode::Partial,
                 AggregateMode::Final => protobuf::AggregateMode::Final,
@@ -162,6 +169,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                         group_expr: groups,
                         group_expr_name: group_names,
                         aggr_expr: agg,
+                        aggr_expr_name: agg_names,
                         mode: agg_mode as i32,
                         input: Some(Box::new(input)),
                         input_schema: Some(input_schema.as_ref().into()),
@@ -242,6 +250,15 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                         schema: Some(exec.schema().as_ref().into()),
                     },
                 )),
+            })
+        } else if let Some(exec) = plan.downcast_ref::<MergeExec>() {
+            let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;
+            Ok(protobuf::PhysicalPlanNode {
+                physical_plan_type: Some(PhysicalPlanType::Merge(Box::new(
+                    protobuf::MergeExecNode {
+                        input: Some(Box::new(input)),
+                    },
+                ))),
             })
         } else if let Some(exec) = plan.downcast_ref::<SortExec>() {
             let input: protobuf::PhysicalPlanNode = exec.input().to_owned().try_into()?;

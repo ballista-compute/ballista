@@ -1,30 +1,74 @@
-## Deploying a Ballista standalone cluster using etcd
+## Deploying a standalone Ballista cluster
 
-*NOTE:* Ballista 0.4.0 is still under development and this page is out of date.
+### Start a Scheduler
 
-Ballista can use etcd for discovery, making it easy to create a cluster on a local development environment, or on 
-any networked computers.
-
-# Installing etcd
-
-Please refer to the [etcd](https://etcd.io/) web site for installation instructions. Etcd version 3.4.9 or later is 
-recommended.
-
-# Installing Ballista
-
-Simply start one or more schedulers using the following syntax:
+Start a scheduler using the following syntax:
 
 ```bash
-cargo run --release --bin scheduler -- --mode etcd --etcd-urls localhost:2379 --external-host localhost --port 50051 
+docker run --network=host \
+  -d ballistacompute/ballista-rust:0.4.0-alpha-1 \
+  /scheduler --port 50050
 ```
 
-Simply start one or more executors using the following syntax:
+Run `docker ps` to check that the process is running:
+
+```
+$ docker ps
+CONTAINER ID   IMAGE                                         COMMAND                  CREATED         STATUS         PORTS     NAMES
+59452ce72138   ballistacompute/ballista-rust:0.4.0-alpha-1   "/scheduler --port 5…"   6 seconds ago   Up 5 seconds             affectionate_hofstadter
+```
+
+Run `docker logs CONTAINER_ID` to check the output from the process:
+
+```
+$ docker logs 59452ce72138
+[2021-02-14T18:32:20Z INFO  scheduler] Ballista v0.4.0-alpha-1 Scheduler listening on 0.0.0.0:50050
+```
+
+### Start executors
+
+Start one or more executor processes. Each executor process will need to listen on a different port.
 
 ```bash
-cargo run --release --bin executor -- --mode etcd --etcd-urls localhost:2379 --external-host localhost --port 50051 
-cargo run --release --bin executor -- --mode etcd --etcd-urls localhost:2379 --external-host localhost --port 50052 
+docker run --network=host \
+  -d ballistacompute/ballista-rust:0.4.0-alpha-1 \
+  /executor --external-host localhost --port 50051 
+```
+
+Use `docker ps` to check that both the scheduer and executor(s) are now running:
+
+```
+$ docker ps
+CONTAINER ID   IMAGE                                         COMMAND                  CREATED         STATUS         PORTS     NAMES
+0746ce262a19   ballistacompute/ballista-rust:0.4.0-alpha-1   "/executor --externa…"   2 seconds ago   Up 1 second              naughty_mclean
+59452ce72138   ballistacompute/ballista-rust:0.4.0-alpha-1   "/scheduler --port 5…"   4 minutes ago   Up 4 minutes             affectionate_hofstadter
+```
+
+Use `docker logs CONTAINER_ID` to check the output from the executor(s):
+
+```
+$ docker logs 0746ce262a19
+[2021-02-14T18:36:25Z INFO  executor] Running with config: ExecutorConfig { host: "localhost", port: 50051, work_dir: "/tmp/.tmpVRFSvn", concurrent_tasks: 4 }
+[2021-02-14T18:36:25Z INFO  executor] Ballista v0.4.0-alpha-1 Rust Executor listening on 0.0.0.0:50051
+[2021-02-14T18:36:25Z INFO  executor] Starting registration with scheduler
 ```
 
 The external host and port will be registered with the scheduler. The executors will discover other executors by 
-requesting the list of executors from the scheduler.
- 
+requesting a list of executors from the scheduler.
+
+### Using etcd as backing store
+
+_NOTE: This functionality is currently experimental_
+
+Ballista can optionally use [etcd](https://etcd.io/) as a backing store for the scheduler. 
+
+```bash
+docker run --network=host \
+  -d ballistacompute/ballista-rust:0.4.0-alpha-1 \
+  /scheduler --port 50050 \
+  --config-backend etcd \
+  --etcd-urls etcd:2379
+```
+
+Please refer to the [etcd](https://etcd.io/) web site for installation instructions. Etcd version 3.4.9 or later is 
+recommended.

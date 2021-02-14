@@ -55,7 +55,7 @@ pub struct DistributedPlanner {
 }
 
 impl DistributedPlanner {
-    pub fn new(executors: Vec<ExecutorMeta>) -> Result<Self> {
+    pub fn try_new(executors: Vec<ExecutorMeta>) -> Result<Self> {
         if executors.is_empty() {
             Err(BallistaError::General(
                 "DistributedPlanner requires at least one executor".to_owned(),
@@ -125,12 +125,12 @@ impl DistributedPlanner {
             let ctx = ExecutionContext::new();
             Ok(ctx.create_physical_plan(&adapter.logical_plan)?)
         } else if let Some(merge) = execution_plan.as_any().downcast_ref::<MergeExec>() {
-            let child = merge.children()[0].clone();
-            Ok(Arc::new(QueryStageExec::try_new(
+            let query_stage = Arc::new(QueryStageExec::try_new(
                 *job_uuid,
                 self.next_stage_id(),
-                child,
-            )?))
+                merge.children()[0].clone(),
+            )?);
+            Ok(merge.with_new_children(vec![query_stage])?)
         } else if let Some(agg) = execution_plan.as_any().downcast_ref::<HashAggregateExec>() {
             //TODO should insert query stages in more generic way based on partitioning metadata
             // and not specifically for this operator
@@ -259,7 +259,25 @@ async fn execute_query_stage(
                 .await
         }));
     }
-    futures::future::join_all(executions).await;
+
+    // wait for all partitions to complete
+    let results = futures::future::join_all(executions).await;
+
+    // check for errors
+    for result in results {
+        match result {
+            Ok(partition_result) => {
+                let final_result = partition_result?;
+                debug!("Query stage partition result: {:?}", final_result);
+            }
+            Err(e) => {
+                return Err(BallistaError::General(format!(
+                    "Query stage {} failed: {:?}",
+                    stage_id, e
+                )))
+            }
+        }
+    }
 
     debug!(
         "execute_query_stage() stage_id={} produced {:?}",
@@ -275,4 +293,102 @@ pub fn pretty_print(plan: Arc<dyn ExecutionPlan>, indent: usize) {
     plan.children()
         .iter()
         .for_each(|c| pretty_print(c.clone(), indent + 1));
+}
+
+#[cfg(test)]
+mod test {
+    use crate::error::BallistaError;
+    use crate::executor::query_stage::QueryStageExec;
+    use crate::scheduler::planner::{pretty_print, DistributedPlanner};
+    use crate::serde::protobuf;
+    use crate::serde::scheduler::ExecutorMeta;
+    use crate::test_utils;
+    use crate::test_utils::{datafusion_test_context, TPCH_TABLES};
+    use arrow::datatypes::DataType;
+    use datafusion::execution::context::ExecutionContext;
+    use datafusion::physical_plan::csv::CsvReadOptions;
+    use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
+    use datafusion::physical_plan::projection::ProjectionExec;
+    use datafusion::physical_plan::sort::SortExec;
+    use datafusion::physical_plan::ExecutionPlan;
+    use datafusion::prelude::*;
+    use std::convert::TryInto;
+    use std::sync::Arc;
+    use uuid::Uuid;
+
+    macro_rules! downcast_exec {
+        ($exec: expr, $ty: ty) => {
+            $exec.as_any().downcast_ref::<$ty>().unwrap()
+        };
+    }
+
+    #[test]
+    fn test() -> Result<(), BallistaError> {
+        let mut ctx = datafusion_test_context("testdata")?;
+
+        // simplified form of TPC-H query 1
+        let df = ctx.sql(
+            "select l_returnflag, sum(l_extendedprice * 1) as sum_disc_price
+            from lineitem
+            group by l_returnflag
+            order by l_returnflag",
+        )?;
+
+        let plan = df.to_logical_plan();
+        let plan = ctx.optimize(&plan)?;
+        let plan = ctx.create_physical_plan(&plan)?;
+
+        let mut planner = DistributedPlanner::try_new(vec![ExecutorMeta {
+            id: "".to_string(),
+            host: "".to_string(),
+            port: 0,
+        }])?;
+        let job_uuid = Uuid::new_v4();
+        let distributed_plan = planner.prepare_query_stages(&job_uuid, plan)?;
+
+        /* EXPECTED
+
+        "SortExec { input: ProjectionExec { expr: [(Column { name: \"l"
+          "ProjectionExec { expr: [(Column { name: \"l_returnflag\" }, \"l"
+            "HashAggregateExec { mode: Final, group_expr: [(Column { name"
+              "QueryStageExec { job_uuid: 1ccbedba-0aed-4a6f-90cd-1bbb9e972"
+                "HashAggregateExec { mode: Partial, group_expr: [(Column { na"
+                  "CoalesceBatchesExec { input: FilterExec { predicate: BinaryE"
+                    "FilterExec { predicate: BinaryExpr { left: Column { name: \"l"
+                      "CsvExec { path: \"testdata/lineitem.tbl\", filenames: [\"testda"
+                 */
+
+        let sort = downcast_exec!(distributed_plan, SortExec);
+
+        let projection = sort.children()[0].clone();
+        let projection = downcast_exec!(projection, ProjectionExec);
+
+        let final_hash = projection.children()[0].clone();
+        let final_hash = downcast_exec!(final_hash, HashAggregateExec);
+
+        let query_stage = final_hash.children()[0].clone();
+        let query_stage = downcast_exec!(query_stage, QueryStageExec);
+
+        let partial_hash = query_stage.children()[0].clone();
+
+        let partial_hash_serde = roundtrip_operator(partial_hash.clone())?;
+
+        let partial_hash = downcast_exec!(partial_hash, HashAggregateExec);
+        let partial_hash_serde = downcast_exec!(partial_hash_serde, HashAggregateExec);
+
+        assert_eq!(
+            format!("{:?}", partial_hash),
+            format!("{:?}", partial_hash_serde)
+        );
+
+        Ok(())
+    }
+
+    fn roundtrip_operator(
+        plan: Arc<dyn ExecutionPlan>,
+    ) -> Result<Arc<dyn ExecutionPlan>, BallistaError> {
+        let proto: protobuf::PhysicalPlanNode = plan.clone().try_into()?;
+        let result_exec_plan: Arc<dyn ExecutionPlan> = (&proto).try_into()?;
+        Ok(result_exec_plan)
+    }
 }

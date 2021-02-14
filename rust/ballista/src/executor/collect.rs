@@ -23,6 +23,7 @@ use crate::utils;
 
 use arrow::datatypes::SchemaRef;
 use async_trait::async_trait;
+use datafusion::error::DataFusionError;
 use datafusion::physical_plan::{ExecutionPlan, Partitioning};
 use datafusion::{error::Result, physical_plan::RecordBatchStream};
 
@@ -75,7 +76,9 @@ impl ExecutionPlan for CollectExec {
         let mut batches = vec![];
         for i in 0..num_partitions {
             let mut stream = self.plan.execute(i).await?;
-            let partition_results = utils::collect_stream(&mut stream).await?;
+            let partition_results = utils::collect_stream(&mut stream)
+                .await
+                .map_err(|e| DataFusionError::Execution(format!("BallistaError: {:?}", e)))?;
             batches.extend_from_slice(&partition_results);
         }
         Ok(Box::pin(MemoryStream::try_new(

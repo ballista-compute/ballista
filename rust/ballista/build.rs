@@ -14,12 +14,17 @@
 extern crate configure_me_codegen;
 
 fn main() -> Result<(), String> {
+    // for use in docker build where file changes can be wonky
+    println!("cargo:rerun-if-env-changed=FORCE_REBUILD");
+
     println!("cargo:rerun-if-changed=proto/ballista.proto");
     tonic_build::configure()
         .compile(&["proto/ballista.proto"], &["proto"])
         .map_err(|e| format!("protobuf compilation failed: {}", e))
         .unwrap();
 
+    println!("cargo:rerun-if-changed=src/bin/executor_config_spec.toml");
+    println!("cargo:rerun-if-changed=src/bin/scheduler_config_spec.toml");
     configure_me_codegen::build_script_auto()
         .map_err(|e| format!("configure_me code generation failed: {}", e))
 }

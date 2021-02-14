@@ -3,27 +3,34 @@ services:
   etcd:
     image: quay.io/coreos/etcd:v3.4.9
     command: "etcd -advertise-client-urls http://etcd:2379 -listen-client-urls http://0.0.0.0:2379"
-    ports:
-      - "2379:2379"
-#  ballista-scheduler:
-#    image: ballistacompute/ballista-rust:0.4.0-SNAPSHOT
-#    command: "/scheduler --config-backend etcd --etcd-urls etcd:2379 --bind-host 0.0.0.0 --port 50050"
-#    environment:
-#      - RUST_LOG=debug
-#    ports:
-#      - "50050:50050"
-#    volumes:
-#      - ./data:/data
-#    depends_on:
-#      - etcd
-  ballista-executor:
+  ballista-scheduler:
     image: ballistacompute/ballista-rust:0.4.0-SNAPSHOT
-    command: "/executor --bind-host 0.0.0.0 --port 50051 --local"
+    command: "/scheduler --config-backend etcd --etcd-urls etcd:2379 --bind-host 0.0.0.0 --port 50050"
     environment:
-      - RUST_LOG=info
-    ports:
-      - "50050:50050"
-      - "50051:50051"
+      - RUST_LOG=debug
     volumes:
       - ./data:/data
+    depends_on:
+      - etcd
+  ballista-executor:
+    image: ballistacompute/ballista-rust:0.4.0-SNAPSHOT
+    command: "/executor --bind-host 0.0.0.0 --port 50051 --external-host ballista-executor --scheduler-host ballista-scheduler"
+    environment:
+      - RUST_LOG=info
+    volumes:
+      - ./data:/data
+    depends_on:
+      - ballista-scheduler
+  ballista-client:
+    image: ballistacompute/ballista-rust:0.4.0-SNAPSHOT
+    command: "/bin/sh" # do nothing
+    working_dir: /ballista/benchmarks/tpch
+    environment:
+      - RUST_LOG=info
+    volumes:
+      - ./data:/data
+      - ../..:/ballista
+    depends_on:
+      - ballista-scheduler
+      - ballista-executor
 

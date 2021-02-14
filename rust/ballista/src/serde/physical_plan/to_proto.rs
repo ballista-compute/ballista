@@ -295,13 +295,17 @@ impl TryInto<protobuf::LogicalExprNode> for Arc<dyn AggregateExpr> {
         let expressions: Vec<protobuf::LogicalExprNode> = self
             .expressions()
             .iter()
-            .map(|e| e.clone().try_into())
+            .map(|e| {
+                println!("phys expr {:?}", e);
+                e.clone().try_into()
+            })
             .collect::<Result<Vec<_>, BallistaError>>()?;
         Ok(protobuf::LogicalExprNode {
             expr_type: Some(protobuf::logical_expr_node::ExprType::AggregateExpr(
                 Box::new(protobuf::AggregateExprNode {
                     aggr_function,
                     expr: Some(Box::new(expressions[0].clone())),
+                    name: self.field()?.name().clone()
                 }),
             )),
         })
@@ -408,6 +412,7 @@ impl TryFrom<Arc<dyn PhysicalExpr>> for protobuf::LogicalExprNode {
                 )),
             })
         } else if let Some(cast) = expr.downcast_ref::<CastExpr>() {
+            println!("to_proto {:?}", cast);
             Ok(protobuf::LogicalExprNode {
                 expr_type: Some(protobuf::logical_expr_node::ExprType::Cast(Box::new(
                     protobuf::CastNode {

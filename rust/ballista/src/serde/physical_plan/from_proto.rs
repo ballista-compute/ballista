@@ -44,12 +44,13 @@ use datafusion::physical_plan::{
     sort::{SortExec, SortOptions},
 };
 use datafusion::physical_plan::{AggregateExpr, ExecutionPlan, PhysicalExpr};
+use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
 use datafusion::prelude::CsvReadOptions;
 use log::debug;
 use protobuf::logical_expr_node::ExprType;
 use protobuf::physical_plan_node::PhysicalPlanType;
+use datafusion::physical_plan::aggregates::{create_aggregate_expr, AggregateFunction};
 
-use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
 impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
     type Error = BallistaError;
 
@@ -153,13 +154,13 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     })
                     .collect::<Result<Vec<_>, _>>()?;
 
-                let logical_agg_expr = hash_agg
+                let logical_agg_expr: Vec<Expr> = hash_agg
                     .aggr_expr
                     .iter()
                     .map(|expr| expr.try_into())
                     .collect::<Result<Vec<_>, _>>()?;
 
-                let datafusion_planner = DefaultPhysicalPlanner::default();
+                let df_planner = DefaultPhysicalPlanner::default();
                 let ctx_state = ExecutionContextState {
                     datasources: Default::default(),
                     scalar_functions: Default::default(),
@@ -172,26 +173,22 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                 let physical_schema: SchemaRef = SchemaRef::new((&input_schema).try_into()?);
                 let logical_schema: DFSchema = input_schema.clone().try_into()?;
 
-                for field in logical_schema.fields() {
-                    debug!("Logical input schema field: {}", field.name());
-                }
-                for field in physical_schema.fields() {
-                    debug!("Physical input schema field: {}", field.name());
-                }
+                let mut physical_aggr_expr = vec![];
 
-                let physical_aggr_expr = logical_agg_expr
-                    .iter()
-                    .map(|expr| {
-                        debug!("Compiling expression {:?}", expr);
-                        datafusion_planner.create_aggregate_expr(
-                            expr,
-                            &logical_schema,
-                            &physical_schema,
-                            &ctx_state,
-                        )
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
+                for (expr_node, expr) in hash_agg.aggr_expr.iter().zip(logical_agg_expr.iter()) {
+                    match expr {
+                        Expr::AggregateFunction {  fun, args, distinct } => {
+                            let arg = df_planner
+                                .create_physical_expr(&args[0], &physical_schema, &ctx_state)
+                                .map_err(|e| BallistaError::General(format!("{:?}", e)))?;
 
+                            let name = format!("{:?}", arg);
+                            let y = create_aggregate_expr(&fun, false, &[arg], &physical_schema, name)?;
+                            physical_aggr_expr.push(y);
+                        }
+                        _ => panic!()
+                    }
+                }
                 Ok(Arc::new(HashAggregateExec::try_new(
                     agg_mode,
                     group,

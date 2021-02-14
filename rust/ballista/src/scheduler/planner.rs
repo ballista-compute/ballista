@@ -352,15 +352,24 @@ mod test {
         let query_stage = downcast_exec!(query_stage, QueryStageExec);
 
         let partial_hash = query_stage.children()[0].clone();
+
         let partial_hash_serde = roundtrip_operator(partial_hash.clone())?;
-        let _partial_hash = downcast_exec!(partial_hash, HashAggregateExec);
-        let _partial_hash_serde = downcast_exec!(partial_hash_serde, HashAggregateExec);
+
+        let partial_hash = downcast_exec!(partial_hash, HashAggregateExec);
+        for expr in partial_hash.aggr_expr() {
+            println!("old {:?}", expr);
+        }
+
+        let partial_hash_serde = downcast_exec!(partial_hash_serde, HashAggregateExec);
+        for expr in partial_hash_serde.aggr_expr() {
+            println!("new {:?}", expr);
+        }
 
         //TODO this fails due to https://github.com/ballista-compute/ballista/issues/508
-        // assert_eq!(
-        //     format!("{:?}", partial_hash),
-        //     format!("{:?}", partial_hash_serde)
-        // );
+        assert_eq!(
+            format!("{:?}", partial_hash),
+            format!("{:?}", partial_hash_serde)
+        );
 
         Ok(())
     }

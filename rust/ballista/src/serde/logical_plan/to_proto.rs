@@ -988,6 +988,7 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                 let aggregate_expr = Box::new(protobuf::AggregateExprNode {
                     aggr_function: aggr_function.into(),
                     expr: Some(Box::new(arg.try_into()?)),
+                    name: "".to_owned()
                 });
                 Ok(protobuf::LogicalExprNode {
                     expr_type: Some(ExprType::AggregateExpr(aggregate_expr)),

@@ -16,6 +16,10 @@
 #![allow(unused_imports)]
 pub const BALLISTA_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+pub fn print_version() {
+    println!("Ballista bersion: {}", BALLISTA_VERSION)
+}
+
 pub mod client;
 pub mod columnar_batch;
 pub mod context;

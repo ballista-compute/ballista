@@ -5,47 +5,22 @@ use std::net::SocketAddr;
 use anyhow::{Context, Result};
 use ballista::BALLISTA_VERSION;
 use ballista::{
+    print_version,
     scheduler::{
-        etcd::EtcdClient, standalone::StandaloneClient, ConfigBackendClient, SchedulerServer,
+        etcd::EtcdClient, standalone::StandaloneClient, ConfigBackend, ConfigBackendClient,
+        SchedulerServer,
     },
     serde::protobuf::scheduler_grpc_server::SchedulerGrpcServer,
 };
-use clap::arg_enum;
+
 use log::info;
-use structopt::StructOpt;
 use tonic::transport::Server;
 
-arg_enum! {
-    #[derive(Debug)]
-    enum ConfigBackend {
-        Etcd,
-        Standalone
-    }
-}
+#[macro_use]
+extern crate configure_me;
 
-#[derive(StructOpt, Debug)]
-#[structopt(name = "scheduler")]
-struct Opt {
-    /// The configuration backend for the scheduler.
-    #[structopt(short, long, possible_values = &ConfigBackend::variants(), case_insensitive = true, default_value = "Standalone")]
-    config_backend: ConfigBackend,
-
-    /// Namespace for the ballista cluster that this scheduler will join.
-    #[structopt(long, default_value = "ballista")]
-    namespace: String,
-
-    /// etcd urls for use when discovery mode is `etcd`
-    #[structopt(long, default_value = "localhost:2379")]
-    etcd_urls: String,
-
-    /// Local host name or IP address to bind to
-    #[structopt(long, default_value = "0.0.0.0")]
-    bind_host: String,
-
-    /// bind port
-    #[structopt(short, long, default_value = "50050")]
-    port: u16,
-}
+#[allow(clippy::all)]
+include_config!("scheduler");
 
 async fn start_server<T: ConfigBackendClient + Send + Sync + 'static>(
     config_backend: T,
@@ -68,8 +43,15 @@ async fn start_server<T: ConfigBackendClient + Send + Sync + 'static>(
 async fn main() -> Result<()> {
     env_logger::init();
 
-    // parse command-line arguments
-    let opt = Opt::from_args();
+    // parse options
+    let (opt, _remaining_args) =
+        Config::including_optional_config_files(&["/etc/ballista/scheduler.toml"]).unwrap_or_exit();
+
+    if opt.version {
+        print_version();
+    }
+    println!("{}", opt.namespace);
+
     let namespace = opt.namespace;
     let bind_host = opt.bind_host;
     let port = opt.port;

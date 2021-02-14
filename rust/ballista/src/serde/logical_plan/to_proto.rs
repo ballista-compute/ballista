@@ -35,6 +35,7 @@ use protobuf::{
 };
 
 use super::super::proto_error;
+use datafusion::physical_plan::functions::BuiltinScalarFunction;
 
 impl protobuf::IntervalUnit {
     pub fn from_arrow_interval_unit(interval_unit: &arrow::datatypes::IntervalUnit) -> Self {
@@ -994,7 +995,21 @@ impl TryInto<protobuf::LogicalExprNode> for &Expr {
                 })
             }
             Expr::ScalarVariable(_) => unimplemented!(),
-            Expr::ScalarFunction { .. } => unimplemented!(),
+            Expr::ScalarFunction { ref fun, ref args } => {
+                let fun: protobuf::ScalarFunction = fun.try_into()?;
+                let expr: Vec<protobuf::LogicalExprNode> = args
+                    .iter()
+                    .map(|e|Ok(e.try_into()?))
+                    .collect::<Result<Vec<protobuf::LogicalExprNode>, BallistaError>>()?;
+                Ok(protobuf::LogicalExprNode {
+                    expr_type: Some(protobuf::logical_expr_node::ExprType::ScalarFunction(
+                        protobuf::ScalarFunctionNode {
+                            fun: fun.into(),
+                            expr,
+                        },
+                    )),
+                })
+            },
             Expr::ScalarUDF { .. } => unimplemented!(),
             Expr::AggregateUDF { .. } => unimplemented!(),
             Expr::Not(expr) => {
@@ -1146,3 +1161,47 @@ impl TryFrom<&arrow::datatypes::DataType> for protobuf::ScalarType {
         })
     }
 }
+
+impl TryInto<protobuf::ScalarFunction> for &BuiltinScalarFunction {
+    type Error = BallistaError;
+    fn try_into(self) -> Result<protobuf::ScalarFunction, Self::Error> {
+         match self {
+            BuiltinScalarFunction::Sqrt => Ok(protobuf::ScalarFunction::Sqrt),
+            BuiltinScalarFunction::Sin => Ok(protobuf::ScalarFunction::Sin),
+            BuiltinScalarFunction::Cos => Ok(protobuf::ScalarFunction::Cos),
+            BuiltinScalarFunction::Tan => Ok(protobuf::ScalarFunction::Tan),
+            BuiltinScalarFunction::Asin => Ok(protobuf::ScalarFunction::Asin),
+            BuiltinScalarFunction::Acos => Ok(protobuf::ScalarFunction::Acos),
+            BuiltinScalarFunction::Atan => Ok(protobuf::ScalarFunction::Atan),
+            BuiltinScalarFunction::Exp => Ok(protobuf::ScalarFunction::Exp),
+            BuiltinScalarFunction::Log => Ok(protobuf::ScalarFunction::Log),
+            BuiltinScalarFunction::Log10 => Ok(protobuf::ScalarFunction::Log10),
+            BuiltinScalarFunction::Floor => Ok(protobuf::ScalarFunction::Floor),
+            BuiltinScalarFunction::Ceil => Ok(protobuf::ScalarFunction::Ceil),
+            BuiltinScalarFunction::Round => Ok(protobuf::ScalarFunction::Round),
+            BuiltinScalarFunction::Trunc => Ok(protobuf::ScalarFunction::Trunc),
+            BuiltinScalarFunction::Abs => Ok(protobuf::ScalarFunction::Abs),
+            BuiltinScalarFunction::Length => Ok(protobuf::ScalarFunction::Length),
+            BuiltinScalarFunction::Concat => Ok(protobuf::ScalarFunction::Concat),
+            BuiltinScalarFunction::Lower => Ok(protobuf::ScalarFunction::Lower),
+            BuiltinScalarFunction::Upper => Ok(protobuf::ScalarFunction::Upper),
+            BuiltinScalarFunction::Trim => Ok(protobuf::ScalarFunction::Trim),
+            BuiltinScalarFunction::Ltrim => Ok(protobuf::ScalarFunction::Ltrim),
+            BuiltinScalarFunction::Rtrim => Ok(protobuf::ScalarFunction::Rtrim),
+            BuiltinScalarFunction::ToTimestamp => Ok(protobuf::ScalarFunction::Totimestamp),
+            BuiltinScalarFunction::Array => Ok(protobuf::ScalarFunction::Array),
+            BuiltinScalarFunction::NullIf => Ok(protobuf::ScalarFunction::Nullif),
+            BuiltinScalarFunction::DateTrunc => Ok(protobuf::ScalarFunction::Datetrunc),
+            BuiltinScalarFunction::MD5 => Ok(protobuf::ScalarFunction::Md5),
+            BuiltinScalarFunction::SHA224 => Ok(protobuf::ScalarFunction::Sha224),
+            BuiltinScalarFunction::SHA256 => Ok(protobuf::ScalarFunction::Sha256),
+            BuiltinScalarFunction::SHA384 => Ok(protobuf::ScalarFunction::Sha384),
+            BuiltinScalarFunction::SHA512 => Ok(protobuf::ScalarFunction::Sha512),
+            _ => Err(BallistaError::General(format!(
+                "logical_plan::to_proto() unsupported scalar function {:?}",
+                self
+            ))),
+        }
+    }
+}
+

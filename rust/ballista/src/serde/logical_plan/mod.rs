@@ -31,6 +31,7 @@ mod roundtrip_tests {
     };
     use protobuf::arrow_type;
     use std::convert::TryInto;
+    use datafusion::physical_plan::functions::BuiltinScalarFunction::Sqrt;
 
     //Given a identity of a LogicalPlan converts it to protobuf and back, using debug formatting to test equality.
     macro_rules! roundtrip_test {
@@ -895,6 +896,17 @@ mod roundtrip_tests {
     fn roundtrip_wildcard() -> Result<()> {
         let test_expr = Expr::Wildcard;
 
+        roundtrip_test!(test_expr, protobuf::LogicalExprNode, Expr);
+
+        Ok(())
+    }
+
+    #[test]
+    fn roundtrip_sqrt() -> Result<()> {
+        let test_expr = Expr::ScalarFunction {
+            fun: Sqrt,
+            args: vec![col("col")]
+        };
         roundtrip_test!(test_expr, protobuf::LogicalExprNode, Expr);
 
         Ok(())

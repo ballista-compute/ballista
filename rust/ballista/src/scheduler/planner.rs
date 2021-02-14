@@ -125,12 +125,12 @@ impl DistributedPlanner {
             let ctx = ExecutionContext::new();
             Ok(ctx.create_physical_plan(&adapter.logical_plan)?)
         } else if let Some(merge) = execution_plan.as_any().downcast_ref::<MergeExec>() {
-            let child = merge.children()[0].clone();
-            Ok(Arc::new(QueryStageExec::try_new(
+            let query_stage = Arc::new(QueryStageExec::try_new(
                 *job_uuid,
                 self.next_stage_id(),
-                child,
-            )?))
+                merge.children()[0].clone(),
+            )?);
+            Ok(merge.with_new_children(vec![query_stage])?)
         } else if let Some(agg) = execution_plan.as_any().downcast_ref::<HashAggregateExec>() {
             //TODO should insert query stages in more generic way based on partitioning metadata
             // and not specifically for this operator

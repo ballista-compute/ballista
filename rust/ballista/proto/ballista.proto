@@ -291,17 +291,18 @@ message PhysicalPlanNode {
   oneof PhysicalPlanType {
     ParquetScanExecNode parquet_scan = 1;
     CsvScanExecNode csv_scan = 2;
-    EmptyExecNode empty = 11;
-    ProjectionExecNode projection = 20;
-    SelectionExecNode selection = 21;
-    GlobalLimitExecNode global_limit = 22;
-    LocalLimitExecNode local_limit = 23;
-    HashAggregateExecNode hash_aggregate = 30;
-    HashJoinExecNode hash_join = 31;
-    ShuffleReaderExecNode shuffle_reader = 40;
-    SortExecNode sort = 50;
-    CoalesceBatchesExecNode coalesce_batches = 51;
-    FilterExecNode filter = 52;
+    EmptyExecNode empty = 3;
+    ProjectionExecNode projection = 4;
+    SelectionExecNode selection = 5;
+    GlobalLimitExecNode global_limit = 6;
+    LocalLimitExecNode local_limit = 7;
+    HashAggregateExecNode hash_aggregate = 8;
+    HashJoinExecNode hash_join = 9;
+    ShuffleReaderExecNode shuffle_reader = 10;
+    SortExecNode sort = 11;
+    CoalesceBatchesExecNode coalesce_batches = 12;
+    FilterExecNode filter = 13;
+    MergeExecNode merge = 14;
   }
 }
 
@@ -396,6 +397,10 @@ message SortExecNode {
 message CoalesceBatchesExecNode {
   PhysicalPlanNode input = 1;
   uint32 target_batch_size = 2;
+}
+
+message MergeExecNode {
+  PhysicalPlanNode input = 1;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

@@ -31,6 +31,7 @@ use datafusion::logical_plan::{DFSchema, Expr};
 use datafusion::physical_plan::aggregates::{create_aggregate_expr, AggregateFunction};
 use datafusion::physical_plan::expressions::col;
 use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
+use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
 use datafusion::physical_plan::{
     coalesce_batches::CoalesceBatchesExec,
@@ -119,6 +120,10 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     input,
                     coalesce_batches.target_batch_size as usize,
                 )))
+            }
+            PhysicalPlanType::Merge(merge) => {
+                let input: Arc<dyn ExecutionPlan> = convert_box_required!(merge.input)?;
+                Ok(Arc::new(MergeExec::new(input)))
             }
             PhysicalPlanType::GlobalLimit(limit) => {
                 let input: Arc<dyn ExecutionPlan> = convert_box_required!(limit.input)?;

@@ -29,14 +29,19 @@ use crate::serde::scheduler::ExecutorMeta;
 use crate::serde::scheduler::PartitionId;
 use crate::utils;
 
+use crate::utils::format_plan;
 use arrow::record_batch::RecordBatch;
 use datafusion::error::DataFusionError;
 use datafusion::execution::context::ExecutionContext;
 use datafusion::logical_plan::LogicalPlan;
+use datafusion::physical_plan::csv::CsvExec;
+use datafusion::physical_plan::expressions::Column;
 use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
 use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::merge::MergeExec;
-use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
+use datafusion::physical_plan::{
+    AggregateExpr, ExecutionPlan, PhysicalExpr, SendableRecordBatchStream,
+};
 use log::{debug, info};
 use uuid::Uuid;
 
@@ -97,7 +102,7 @@ impl DistributedPlanner {
         let execution_plans = self.plan_query_stages(&job_uuid, execution_plan)?;
 
         for plan in &execution_plans {
-            pretty_print(plan.clone(), 0);
+            println!("{}", format_plan(plan.clone(), 0));
         }
 
         execute(execution_plans, self.executors.clone()).await
@@ -275,8 +280,11 @@ async fn execute_query_stage(
     plan: Arc<dyn ExecutionPlan>,
     executors: Vec<ExecutorMeta>,
 ) -> Result<Vec<PartitionLocation>> {
-    info!("execute_query_stage() stage_id={}", stage_id);
-    pretty_print(plan.clone(), 0);
+    info!(
+        "execute_query_stage() stage_id={}\n{}",
+        stage_id,
+        format_plan(plan.clone(), 0)
+    );
 
     let _job_uuid = *job_uuid;
     let partition_count = plan.output_partitioning().partition_count();
@@ -333,22 +341,15 @@ async fn execute_query_stage(
     Ok(meta)
 }
 
-pub fn pretty_print(plan: Arc<dyn ExecutionPlan>, indent: usize) {
-    let operator_str = format!("{:?}", plan);
-    debug!("{}{:?}", "  ".repeat(indent), &operator_str[0..60]);
-    plan.children()
-        .iter()
-        .for_each(|c| pretty_print(c.clone(), indent + 1));
-}
-
 #[cfg(test)]
 mod test {
     use crate::scheduler::execution_plans::QueryStageExec;
-    use crate::scheduler::planner::{pretty_print, DistributedPlanner};
+    use crate::scheduler::planner::DistributedPlanner;
     use crate::serde::protobuf;
     use crate::serde::scheduler::ExecutorMeta;
     use crate::test_utils;
     use crate::test_utils::{datafusion_test_context, TPCH_TABLES};
+    use crate::utils::format_plan;
     use crate::{error::BallistaError, scheduler::execution_plans::UnresolvedShuffleExec};
     use arrow::datatypes::DataType;
     use datafusion::execution::context::ExecutionContext;

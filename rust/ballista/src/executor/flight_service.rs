@@ -21,10 +21,9 @@ use std::task::{Context, Poll};
 use std::time::Instant;
 
 use crate::executor::BallistaExecutor;
-use crate::scheduler::planner::pretty_print;
 use crate::serde::decode_protobuf;
 use crate::serde::scheduler::Action as BallistaAction;
-use crate::utils;
+use crate::utils::{self, format_plan};
 
 use crate::error::BallistaError;
 use crate::memory_stream::MemoryStream;
@@ -83,8 +82,13 @@ impl FlightService for BallistaFlightService {
 
         match &action {
             BallistaAction::ExecutePartition(partition) => {
-                info!("ExecutePartition {:?}", partition);
-                pretty_print(partition.plan.clone(), 0);
+                info!(
+                    "ExecutePartition: job={}, stage={}, partition={}\n{}",
+                    partition.job_uuid,
+                    partition.stage_id,
+                    partition.partition_id,
+                    format_plan(partition.plan.clone(), 0)
+                );
 
                 let mut path = PathBuf::from(&self.executor.config.work_dir);
                 path.push(&format!("{}", partition.job_uuid));

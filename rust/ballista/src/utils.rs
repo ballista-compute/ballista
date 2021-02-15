@@ -28,6 +28,7 @@ use datafusion::physical_plan::csv::CsvExec;
 use datafusion::physical_plan::expressions::{BinaryExpr, Column, Literal};
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
+use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::{AggregateExpr, ExecutionPlan, PhysicalExpr, RecordBatchStream};
@@ -107,6 +108,12 @@ pub fn format_plan(plan: &dyn ExecutionPlan, indent: usize) -> Result<String> {
                 .iter()
                 .map(|e| format_agg_expr(e.as_ref()))
                 .collect::<Result<Vec<String>>>()?
+        )
+    } else if let Some(exec) = plan.as_any().downcast_ref::<HashJoinExec>() {
+        format!(
+            "HashJoinExec: joinType={:?}, on={:?}",
+            exec.join_type(),
+            exec.on()
         )
     } else if let Some(exec) = plan.as_any().downcast_ref::<ParquetExec>() {
         format!("ParquetExec: partitions={}", exec.partitions().len())

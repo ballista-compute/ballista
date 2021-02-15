@@ -87,7 +87,7 @@ impl FlightService for BallistaFlightService {
                     partition.job_uuid,
                     partition.stage_id,
                     partition.partition_id,
-                    format_plan(partition.plan.clone(), 0).map_err(|e| from_ballista_err(&e))?
+                    format_plan(partition.plan.as_ref(), 0).map_err(|e| from_ballista_err(&e))?
                 );
 
                 let mut path = PathBuf::from(&self.executor.config.work_dir);

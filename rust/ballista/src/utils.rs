@@ -18,7 +18,7 @@ use std::{fs::File, pin::Pin};
 use crate::error::{BallistaError, Result};
 use crate::memory_stream::MemoryStream;
 
-use crate::scheduler::execution_plans::QueryStageExec;
+use crate::scheduler::execution_plans::{QueryStageExec, UnresolvedShuffleExec};
 use arrow::ipc::reader::FileReader;
 use arrow::ipc::writer::FileWriter;
 use arrow::record_batch::RecordBatch;
@@ -95,7 +95,7 @@ pub async fn collect_stream(
     Ok(batches)
 }
 
-pub fn format_plan(plan: Arc<dyn ExecutionPlan>, indent: usize) -> Result<String> {
+pub fn format_plan(plan: &dyn ExecutionPlan, indent: usize) -> Result<String> {
     let operator_str = if let Some(exec) = plan.as_any().downcast_ref::<HashAggregateExec>() {
         format!(
             "HashAggregateExec: groupBy={:?}, aggrExpr={:?}",
@@ -111,7 +111,11 @@ pub fn format_plan(plan: Arc<dyn ExecutionPlan>, indent: usize) -> Result<String
     } else if let Some(exec) = plan.as_any().downcast_ref::<ParquetExec>() {
         format!("ParquetExec: partitions={}", exec.partitions().len())
     } else if let Some(exec) = plan.as_any().downcast_ref::<CsvExec>() {
-        format!("CsvExec: {}", &exec.path())
+        format!(
+            "CsvExec: {}; partitions={}",
+            &exec.path(),
+            exec.output_partitioning().partition_count()
+        )
     } else if let Some(exec) = plan.as_any().downcast_ref::<FilterExec>() {
         format!("FilterExec: {}", format_expr(exec.predicate().as_ref()))
     } else if let Some(exec) = plan.as_any().downcast_ref::<QueryStageExec>() {
@@ -119,6 +123,8 @@ pub fn format_plan(plan: Arc<dyn ExecutionPlan>, indent: usize) -> Result<String
             "QueryStageExec: job={}, stage={}",
             exec.job_uuid, exec.stage_id
         )
+    } else if let Some(exec) = plan.as_any().downcast_ref::<UnresolvedShuffleExec>() {
+        format!("UnresolvedShuffleExec: stages={:?}", exec.query_stage_ids)
     } else if let Some(exec) = plan.as_any().downcast_ref::<CoalesceBatchesExec>() {
         format!(
             "CoalesceBatchesExec: batchSize={}",
@@ -136,7 +142,7 @@ pub fn format_plan(plan: Arc<dyn ExecutionPlan>, indent: usize) -> Result<String
         &operator_str,
         plan.children()
             .iter()
-            .map(|c| format_plan(c.clone(), indent + 1))
+            .map(|c| format_plan(c.as_ref(), indent + 1))
             .collect::<Result<Vec<String>>>()?
             .join("\n")
     ))

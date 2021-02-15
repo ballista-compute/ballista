@@ -31,9 +31,8 @@ pub fn datafusion_test_context(path: &str) -> Result<ExecutionContext> {
             .delimiter(b'|')
             .has_header(false)
             .file_extension(".tbl");
-        let filename = format!("{}/{}.tbl", path, table);
-        println!("{}", filename);
-        ctx.register_csv(table, &filename, options)?;
+        let dir = format!("{}/{}", path, table);
+        ctx.register_csv(table, &dir, options)?;
     }
     Ok(ctx)
 }

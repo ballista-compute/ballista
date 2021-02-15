@@ -155,7 +155,13 @@ impl DistributedPlanner {
         } else if let Some(merge) = execution_plan.as_any().downcast_ref::<MergeExec>() {
             let query_stage =
                 create_query_stage(job_uuid, self.next_stage_id(), merge.children()[0].clone())?;
-            Ok((merge.with_new_children(vec![query_stage])?, stages))
+            let unresolved_shuffle = Arc::new(UnresolvedShuffleExec::new(
+                vec![query_stage.stage_id],
+                query_stage.schema(),
+                query_stage.output_partitioning().partition_count(),
+            ));
+            stages.push(query_stage);
+            Ok((merge.with_new_children(vec![unresolved_shuffle])?, stages))
         } else if let Some(agg) = execution_plan.as_any().downcast_ref::<HashAggregateExec>() {
             //TODO should insert query stages in more generic way based on partitioning metadata
             // and not specifically for this operator
@@ -352,13 +358,13 @@ mod test {
     use crate::utils::format_plan;
     use crate::{error::BallistaError, scheduler::execution_plans::UnresolvedShuffleExec};
     use arrow::datatypes::DataType;
-    use datafusion::execution::context::ExecutionContext;
     use datafusion::physical_plan::csv::CsvReadOptions;
     use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
     use datafusion::physical_plan::projection::ProjectionExec;
     use datafusion::physical_plan::sort::SortExec;
     use datafusion::physical_plan::ExecutionPlan;
     use datafusion::prelude::*;
+    use datafusion::{execution::context::ExecutionContext, physical_plan::merge::MergeExec};
     use std::convert::TryInto;
     use std::sync::Arc;
     use uuid::Uuid;
@@ -392,19 +398,27 @@ mod test {
         }])?;
         let job_uuid = Uuid::new_v4();
         let stages = planner.plan_query_stages(&job_uuid, plan)?;
+        for stage in &stages {
+            println!("{}", format_plan(stage.as_ref(), 0)?);
+        }
 
-        /* EXPECTED
-        "QueryStageExec  { job_uuid: 1ccbedba-0aed-4a6f-90cd-1bbb9e972"
-          "SortExec { input: ProjectionExec { expr: [(Column { name: \"l"
-            "ProjectionExec { expr: [(Column { name: \"l_returnflag\" }, \"l"
-              "HashAggregateExec { mode: Final, group_expr: [(Column { name"
-                "UnresolvedShuffleExec { query_stage_ids: Vec(1)"
-        "QueryStageExec { job_uuid: 1ccbedba-0aed-4a6f-90cd-1bbb9e972"
-          "HashAggregateExec { mode: Partial, group_expr: [(Column { na"
-            "CsvExec { path: \"testdata/lineitem.tbl\", filenames: [\"testda"
+        /* Expected result:
+        QueryStageExec: job=f011432e-e424-4016-915d-e3d8b84f6dbd, stage=1
+         HashAggregateExec: groupBy=["l_returnflag"], aggrExpr=["SUM(l_extendedprice Multiply Int64(1)) [\"l_extendedprice * CAST(1 AS Float64)\"]"]
+          CsvExec: testdata/lineitem; partitions=2
+
+        QueryStageExec: job=f011432e-e424-4016-915d-e3d8b84f6dbd, stage=2
+         MergeExec
+          UnresolvedShuffleExec: stages=[1]
+
+        QueryStageExec: job=f011432e-e424-4016-915d-e3d8b84f6dbd, stage=3
+         SortExec { input: ProjectionExec { expr: [(Column { name: "l_returnflag" }, "l_returnflag"), (Column { name: "SUM(l_ext
+          ProjectionExec { expr: [(Column { name: "l_returnflag" }, "l_returnflag"), (Column { name: "SUM(l_extendedprice Multip
+           HashAggregateExec: groupBy=["l_returnflag"], aggrExpr=["SUM(l_extendedprice Multiply Int64(1)) [\"l_extendedprice * CAST(1 AS Float64)\"]"]
+            UnresolvedShuffleExec: stages=[2]
         */
-        
-        let sort = stages[1].children()[0].clone();
+
+        let sort = stages[2].children()[0].clone();
         let sort = downcast_exec!(sort, SortExec);
 
         let projection = sort.children()[0].clone();
@@ -415,6 +429,13 @@ mod test {
         let final_hash = downcast_exec!(final_hash, HashAggregateExec);
 
         let unresolved_shuffle = final_hash.children()[0].clone();
+        let unresolved_shuffle = downcast_exec!(unresolved_shuffle, UnresolvedShuffleExec);
+        assert_eq!(unresolved_shuffle.query_stage_ids, vec![2]);
+
+        let merge_exec = stages[1].children()[0].clone();
+        let merge_exec = downcast_exec!(merge_exec, MergeExec);
+
+        let unresolved_shuffle = merge_exec.children()[0].clone();
         let unresolved_shuffle = downcast_exec!(unresolved_shuffle, UnresolvedShuffleExec);
         assert_eq!(unresolved_shuffle.query_stage_ids, vec![1]);
 

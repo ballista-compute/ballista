@@ -47,9 +47,11 @@ use log::{debug, info};
 use tokio::task;
 use tonic::{Request, Response, Status, Streaming};
 
+type FlightDataSender = Sender<Option<Result<FlightData, Status>>>;
+type FlightDataReceiver = Receiver<Option<Result<FlightData, Status>>>;
+
 /// Service implementing the Apache Arrow Flight Protocol
 #[derive(Clone)]
-
 pub struct BallistaFlightService {
     executor: Arc<BallistaExecutor>,
 }
@@ -172,21 +174,24 @@ impl FlightService for BallistaFlightService {
                     .map_err(|e| from_ballista_err(&e))?;
                 let reader = FileReader::try_new(file).map_err(|e| from_arrow_err(&e))?;
                 let schema = reader.schema();
-                let schema_flight_data = arrow_flight::utils::flight_data_from_arrow_schema(
-                    schema.as_ref(),
-                    &options,
-                );
 
-                let (response_tx, response_rx): (
-                    Sender<Option<Result<FlightData, Status>>>,
-                    Receiver<Option<Result<FlightData, Status>>>,
-                ) = bounded(2);
+                // TODO make queue size configurable
+                let (response_tx, response_rx): (FlightDataSender, FlightDataReceiver) =
+                    bounded(32);
 
                 task::spawn_blocking(move || {
+                    // TODO fix error handling
+
+                    let schema_flight_data = arrow_flight::utils::flight_data_from_arrow_schema(
+                        schema.as_ref(),
+                        &options,
+                    );
+                    response_tx.send(Some(Ok(schema_flight_data))).unwrap();
                     for batch in reader {
-                        let mut batch_flight_data: Vec<_> = batch
+                        let batch_flight_data: Vec<_> = batch
                             .map(|b| create_flight_iter(&b, &options).collect())
-                            .map_err(|e| from_arrow_err(&e)).unwrap(); //TODO err
+                            .map_err(|e| from_arrow_err(&e))
+                            .unwrap();
 
                         for batch in &batch_flight_data {
                             response_tx.send(Some(batch.clone())).unwrap();
@@ -195,12 +200,10 @@ impl FlightService for BallistaFlightService {
                     response_tx.send(None).unwrap();
                 });
 
-                let flights = Box::pin(FlightDataStream {
-                    schema: schema.clone(),
-                    response_rx
-                });
+                let flights = Box::pin(FlightDataStream { response_rx });
 
-                Ok(Response::new(flights) as Self::DoGetStream)
+                unimplemented!()
+                //Ok(Response::new(flights) as Self::DoGetStream)
             }
         }
     }
@@ -288,19 +291,14 @@ fn create_flight_iter(
     )
 }
 
-
 struct FlightDataStream {
-    schema: SchemaRef,
     response_rx: Receiver<Option<Result<FlightData, Status>>>,
 }
 
 impl Stream for FlightDataStream {
     type Item = Result<FlightData, Status>;
 
-    fn poll_next(
-        self: std::pin::Pin<&mut Self>,
-        _: &mut Context<'_>,
-    ) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: std::pin::Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.response_rx.recv() {
             Ok(batch) => Poll::Ready(batch),
             // RecvError means receiver has exited and closed the channel
@@ -308,12 +306,6 @@ impl Stream for FlightDataStream {
         }
     }
 }
-
-// impl RecordBatchStream for FooStream {
-//     fn schema(&self) -> SchemaRef {
-//         self.schema.clone()
-//     }
-// }
 
 fn from_arrow_err(e: &ArrowError) -> Status {
     Status::internal(format!("ArrowError: {:?}", e))

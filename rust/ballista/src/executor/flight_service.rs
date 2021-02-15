@@ -202,12 +202,9 @@ impl FlightService for BallistaFlightService {
                     response_tx.send(None).unwrap();
                 });
 
-                let flights = FlightDataStream { response_rx };
-
-                //type FlightDataReceiver = Receiver<Option<Result<FlightData, Status>>>;
-                //type BoxedFlightStream<T> = Pin<Box<dyn Stream<Item = Result<T, Status>> + Send + Sync + 'static>>;
-
-                Ok(Response::new(flights) as Self::DoGetStream)
+                let flights: BoxedFlightStream<FlightData> =
+                    Box::pin(FlightDataStream { response_rx });
+                Ok(Response::new(flights as Self::DoGetStream))
             }
         }
     }

@@ -43,7 +43,8 @@ use crossbeam::channel::{bounded, Receiver, RecvError, Sender};
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::RecordBatchStream;
 use futures::{Stream, StreamExt};
-use log::{debug, info};
+use log::{debug, info, warn};
+use std::io::{Read, Seek};
 use tokio::task;
 use tonic::{Request, Response, Status, Streaming};
 
@@ -161,8 +162,6 @@ impl FlightService for BallistaFlightService {
                 path.push("data.arrow");
                 let path = path.to_str().unwrap();
 
-                let options = arrow::ipc::writer::IpcWriteOptions::default();
-
                 info!("FetchPartition {:?} reading {}", partition_id, path);
                 let file = File::open(&path)
                     .map_err(|e| {
@@ -174,36 +173,18 @@ impl FlightService for BallistaFlightService {
                     .map_err(|e| from_ballista_err(&e))?;
                 let reader = FileReader::try_new(file).map_err(|e| from_arrow_err(&e))?;
 
-                // TODO make queue size configurable
-                let (response_tx, response_rx): (FlightDataSender, FlightDataReceiver) =
-                    bounded(32);
+                let (tx, rx): (FlightDataSender, FlightDataReceiver) = bounded(2);
 
                 // Arrow IPC reader does not implement Sync + Send so we need to use a channel
                 // to communicate
                 task::spawn_blocking(move || {
-                    // TODO fix error handling
-
-                    let schema_flight_data = arrow_flight::utils::flight_data_from_arrow_schema(
-                        reader.schema().as_ref(),
-                        &options,
-                    );
-                    response_tx.send(Some(Ok(schema_flight_data))).unwrap();
-
-                    for batch in reader {
-                        let batch_flight_data: Vec<_> = batch
-                            .map(|b| create_flight_iter(&b, &options).collect())
-                            .map_err(|e| from_arrow_err(&e))
-                            .unwrap();
-
-                        for batch in &batch_flight_data {
-                            response_tx.send(Some(batch.clone())).unwrap();
-                        }
+                    if let Err(e) = stream_flight_data(reader, tx) {
+                        warn!("Error streaming results: {:?}", e);
                     }
-                    response_tx.send(None).unwrap();
                 });
 
                 Ok(Response::new(
-                    Box::pin(FlightDataStream::new(response_rx)) as Self::DoGetStream
+                    Box::pin(FlightDataStream::new(rx)) as Self::DoGetStream
                 ))
             }
         }
@@ -290,6 +271,35 @@ fn create_flight_iter(
             .chain(std::iter::once(flight_batch))
             .map(Ok),
     )
+}
+
+fn stream_flight_data<T>(reader: FileReader<T>, tx: FlightDataSender) -> Result<(), Status>
+where
+    T: Read + Seek,
+{
+    let options = arrow::ipc::writer::IpcWriteOptions::default();
+    let schema_flight_data =
+        arrow_flight::utils::flight_data_from_arrow_schema(reader.schema().as_ref(), &options);
+    send_response(&tx, Some(Ok(schema_flight_data)))?;
+
+    for batch in reader {
+        let batch_flight_data: Vec<_> = batch
+            .map(|b| create_flight_iter(&b, &options).collect())
+            .map_err(|e| from_arrow_err(&e))?;
+        for batch in &batch_flight_data {
+            send_response(&tx, Some(batch.clone()))?;
+        }
+    }
+    send_response(&tx, None)?;
+    Ok(())
+}
+
+fn send_response(
+    tx: &FlightDataSender,
+    data: Option<Result<FlightData, Status>>,
+) -> Result<(), Status> {
+    tx.send(data)
+        .map_err(|e| Status::internal(format!("{:?}", e)))
 }
 
 struct FlightDataStream {

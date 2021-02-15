@@ -14,22 +14,23 @@
 
 //! Implementation of the Apache Arrow Flight protocol that wraps an executor.
 
+use std::fs::File;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Instant;
 
+use crate::error::BallistaError;
 use crate::executor::BallistaExecutor;
+use crate::memory_stream::MemoryStream;
 use crate::serde::decode_protobuf;
 use crate::serde::scheduler::Action as BallistaAction;
 use crate::utils::{self, format_plan};
 
-use crate::error::BallistaError;
-use crate::memory_stream::MemoryStream;
 use arrow::array::{ArrayRef, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
-use arrow::error::ArrowError;
+use arrow::error::{ArrowError, Result as ArrowResult};
 use arrow::ipc::reader::FileReader;
 use arrow::ipc::writer::IpcWriteOptions;
 use arrow::record_batch::RecordBatch;
@@ -38,11 +39,12 @@ use arrow_flight::{
     FlightDescriptor, FlightInfo, HandshakeRequest, HandshakeResponse, PutResult, SchemaResult,
     Ticket,
 };
+use crossbeam::channel::{bounded, Receiver, RecvError, Sender};
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::RecordBatchStream;
 use futures::{Stream, StreamExt};
 use log::{debug, info};
-use std::fs::File;
+use tokio::task;
 use tonic::{Request, Response, Status, Streaming};
 
 /// Service implementing the Apache Arrow Flight Protocol
@@ -169,25 +171,36 @@ impl FlightService for BallistaFlightService {
                     })
                     .map_err(|e| from_ballista_err(&e))?;
                 let reader = FileReader::try_new(file).map_err(|e| from_arrow_err(&e))?;
+                let schema = reader.schema();
                 let schema_flight_data = arrow_flight::utils::flight_data_from_arrow_schema(
-                    reader.schema().as_ref(),
+                    schema.as_ref(),
                     &options,
                 );
-                let mut flights: Vec<Result<FlightData, Status>> = vec![Ok(schema_flight_data)];
 
-                // TODO we should be able return a stream / iterator rather than load into memory first
-                // but we probably need to use channels because the Arrow IPC FileReader does not implement
-                // Sync + Send
-                for batch in reader {
-                    let mut batch_flight_data: Vec<_> = batch
-                        .map(|b| create_flight_iter(&b, &options).collect())
-                        .map_err(|e| from_arrow_err(&e))?;
-                    flights.append(&mut batch_flight_data);
-                }
-                info!("Loaded {} batches into memory", flights.len());
+                let (response_tx, response_rx): (
+                    Sender<Option<Result<FlightData, Status>>>,
+                    Receiver<Option<Result<FlightData, Status>>>,
+                ) = bounded(2);
 
-                let output = futures::stream::iter(flights);
-                Ok(Response::new(Box::pin(output) as Self::DoGetStream))
+                task::spawn_blocking(move || {
+                    for batch in reader {
+                        let mut batch_flight_data: Vec<_> = batch
+                            .map(|b| create_flight_iter(&b, &options).collect())
+                            .map_err(|e| from_arrow_err(&e)).unwrap(); //TODO err
+
+                        for batch in &batch_flight_data {
+                            response_tx.send(Some(batch.clone())).unwrap();
+                        }
+                    }
+                    response_tx.send(None).unwrap();
+                });
+
+                let flights = Box::pin(FlightDataStream {
+                    schema: schema.clone(),
+                    response_rx
+                });
+
+                Ok(Response::new(flights) as Self::DoGetStream)
             }
         }
     }
@@ -274,6 +287,33 @@ fn create_flight_iter(
             .map(Ok),
     )
 }
+
+
+struct FlightDataStream {
+    schema: SchemaRef,
+    response_rx: Receiver<Option<Result<FlightData, Status>>>,
+}
+
+impl Stream for FlightDataStream {
+    type Item = Result<FlightData, Status>;
+
+    fn poll_next(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        match self.response_rx.recv() {
+            Ok(batch) => Poll::Ready(batch),
+            // RecvError means receiver has exited and closed the channel
+            Err(RecvError) => Poll::Ready(None),
+        }
+    }
+}
+
+// impl RecordBatchStream for FooStream {
+//     fn schema(&self) -> SchemaRef {
+//         self.schema.clone()
+//     }
+// }
 
 fn from_arrow_err(e: &ArrowError) -> Status {
     Status::internal(format!("ArrowError: {:?}", e))

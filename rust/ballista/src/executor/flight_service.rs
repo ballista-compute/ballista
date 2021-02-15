@@ -173,20 +173,22 @@ impl FlightService for BallistaFlightService {
                     })
                     .map_err(|e| from_ballista_err(&e))?;
                 let reader = FileReader::try_new(file).map_err(|e| from_arrow_err(&e))?;
-                let schema = reader.schema();
 
                 // TODO make queue size configurable
                 let (response_tx, response_rx): (FlightDataSender, FlightDataReceiver) =
                     bounded(32);
 
+                // Arrow IPC reader does not implement Sync + Send so we need to use a channel
+                // to communicate
                 task::spawn_blocking(move || {
                     // TODO fix error handling
 
                     let schema_flight_data = arrow_flight::utils::flight_data_from_arrow_schema(
-                        schema.as_ref(),
+                        reader.schema().as_ref(),
                         &options,
                     );
                     response_tx.send(Some(Ok(schema_flight_data))).unwrap();
+
                     for batch in reader {
                         let batch_flight_data: Vec<_> = batch
                             .map(|b| create_flight_iter(&b, &options).collect())
@@ -200,10 +202,12 @@ impl FlightService for BallistaFlightService {
                     response_tx.send(None).unwrap();
                 });
 
-                let flights = Box::pin(FlightDataStream { response_rx });
+                let flights = FlightDataStream { response_rx };
 
-                unimplemented!()
-                //Ok(Response::new(flights) as Self::DoGetStream)
+                //type FlightDataReceiver = Receiver<Option<Result<FlightData, Status>>>;
+                //type BoxedFlightStream<T> = Pin<Box<dyn Stream<Item = Result<T, Status>> + Send + Sync + 'static>>;
+
+                Ok(Response::new(flights) as Self::DoGetStream)
             }
         }
     }
@@ -292,15 +296,19 @@ fn create_flight_iter(
 }
 
 struct FlightDataStream {
-    response_rx: Receiver<Option<Result<FlightData, Status>>>,
+    response_rx: FlightDataReceiver,
 }
+
+unsafe impl Sync for FlightDataStream {}
+unsafe impl Send for FlightDataStream {}
 
 impl Stream for FlightDataStream {
     type Item = Result<FlightData, Status>;
 
     fn poll_next(self: std::pin::Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.response_rx.recv() {
-            Ok(batch) => Poll::Ready(batch),
+            Ok(Some(batch)) => Poll::Ready(Some(batch)),
+            Ok(None) => Poll::Ready(None),
             // RecvError means receiver has exited and closed the channel
             Err(RecvError) => Poll::Ready(None),
         }

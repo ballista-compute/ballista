@@ -202,9 +202,9 @@ impl FlightService for BallistaFlightService {
                     response_tx.send(None).unwrap();
                 });
 
-                let flights: BoxedFlightStream<FlightData> =
-                    Box::pin(FlightDataStream { response_rx });
-                Ok(Response::new(flights as Self::DoGetStream))
+                Ok(Response::new(
+                    Box::pin(FlightDataStream::new(response_rx)) as Self::DoGetStream
+                ))
             }
         }
     }
@@ -296,16 +296,18 @@ struct FlightDataStream {
     response_rx: FlightDataReceiver,
 }
 
-unsafe impl Sync for FlightDataStream {}
-unsafe impl Send for FlightDataStream {}
+impl FlightDataStream {
+    fn new(response_rx: FlightDataReceiver) -> Self {
+        Self { response_rx }
+    }
+}
 
 impl Stream for FlightDataStream {
     type Item = Result<FlightData, Status>;
 
     fn poll_next(self: std::pin::Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.response_rx.recv() {
-            Ok(Some(batch)) => Poll::Ready(Some(batch)),
-            Ok(None) => Poll::Ready(None),
+            Ok(maybe_batch) => Poll::Ready(maybe_batch),
             // RecvError means receiver has exited and closed the channel
             Err(RecvError) => Poll::Ready(None),
         }

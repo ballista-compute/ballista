@@ -17,6 +17,7 @@
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 use std::time::Instant;
 
 use crate::executor::BallistaExecutor;
@@ -25,9 +26,12 @@ use crate::serde::decode_protobuf;
 use crate::serde::scheduler::Action as BallistaAction;
 use crate::utils;
 
+use crate::error::BallistaError;
+use crate::memory_stream::MemoryStream;
 use arrow::array::{ArrayRef, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::error::ArrowError;
+use arrow::ipc::writer::IpcWriteOptions;
 use arrow::record_batch::RecordBatch;
 use arrow_flight::{
     flight_service_server::FlightService, Action, ActionType, Criteria, Empty, FlightData,
@@ -35,6 +39,7 @@ use arrow_flight::{
     Ticket,
 };
 use datafusion::error::DataFusionError;
+use datafusion::physical_plan::RecordBatchStream;
 use futures::{Stream, StreamExt};
 use log::{debug, info};
 use tonic::{Request, Response, Status, Streaming};
@@ -75,27 +80,6 @@ impl FlightService for BallistaFlightService {
         let action = decode_protobuf(&ticket.ticket).map_err(|e| from_ballista_err(&e))?;
 
         match &action {
-            BallistaAction::InteractiveQuery { plan, .. } => {
-                info!("InteractiveQuery {:?}", plan);
-
-                let results = self
-                    .executor
-                    .execute_logical_plan(&plan)
-                    .await
-                    .map_err(|e| from_ballista_err(&e))?;
-
-                if results.is_empty() {
-                    return Err(Status::internal("There were no results from ticket"));
-                }
-                debug!("Received {} record batches", results.len());
-
-                let df_schema = plan.schema();
-                let arrow_schema: Schema = df_schema.clone().as_ref().clone().into();
-
-                let flights = create_flight_data(Arc::new(arrow_schema), results);
-                let output = futures::stream::iter(flights);
-                Ok(Response::new(Box::pin(output) as Self::DoGetStream))
-            }
             BallistaAction::ExecutePartition(partition) => {
                 info!("ExecutePartition {:?}", partition);
                 pretty_print(partition.plan.clone(), 0);
@@ -138,7 +122,20 @@ impl FlightService for BallistaFlightService {
                 let schema = Arc::new(Schema::new(vec![Field::new("path", DataType::Utf8, false)]));
 
                 let results = vec![RecordBatch::try_new(schema.clone(), vec![path]).unwrap()];
-                let flights = create_flight_data(schema, results);
+                // add an initial FlightData message that sends schema
+                let options = arrow::ipc::writer::IpcWriteOptions::default();
+                let schema_flight_data =
+                    arrow_flight::utils::flight_data_from_arrow_schema(schema.as_ref(), &options);
+
+                let mut flights: Vec<Result<FlightData, Status>> = vec![Ok(schema_flight_data)];
+
+                let mut batches: Vec<Result<FlightData, Status>> = results
+                    .iter()
+                    .flat_map(|batch| create_flight_iter(batch, &options))
+                    .collect();
+
+                // append batch vector to schema vector, so that the first message sent is the schema
+                flights.append(&mut batches);
                 let output = futures::stream::iter(flights);
 
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
@@ -165,7 +162,22 @@ impl FlightService for BallistaFlightService {
                     batches.push(batch.map_err(|e| from_arrow_err(&e))?);
                 }
 
-                let flights = create_flight_data(stream.schema(), batches);
+                // add an initial FlightData message that sends schema
+                let options = arrow::ipc::writer::IpcWriteOptions::default();
+                let schema_flight_data = arrow_flight::utils::flight_data_from_arrow_schema(
+                    stream.schema().as_ref(),
+                    &options,
+                );
+
+                let mut flights: Vec<Result<FlightData, Status>> = vec![Ok(schema_flight_data)];
+
+                let mut batches: Vec<Result<FlightData, Status>> = batches
+                    .iter()
+                    .flat_map(|batch| create_flight_iter(batch, &options))
+                    .collect();
+
+                // append batch vector to schema vector, so that the first message sent is the schema
+                flights.append(&mut batches);
                 let output = futures::stream::iter(flights);
 
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
@@ -240,34 +252,20 @@ impl FlightService for BallistaFlightService {
     }
 }
 
-/// Convert a result set into flight data
-fn create_flight_data(
-    schema: SchemaRef,
-    results: Vec<RecordBatch>,
-) -> Vec<Result<FlightData, Status>> {
-    // add an initial FlightData message that sends schema
-    let options = arrow::ipc::writer::IpcWriteOptions::default();
-    let schema_flight_data =
-        arrow_flight::utils::flight_data_from_arrow_schema(schema.as_ref(), &options);
-
-    let mut flights: Vec<Result<FlightData, Status>> = vec![Ok(schema_flight_data)];
-
-    let mut batches: Vec<Result<FlightData, Status>> = results
-        .iter()
-        .flat_map(|batch| {
-            let (flight_dictionaries, flight_batch) =
-                arrow_flight::utils::flight_data_from_arrow_batch(batch, &options);
-            flight_dictionaries
-                .into_iter()
-                .chain(std::iter::once(flight_batch))
-                .map(Ok)
-        })
-        .collect();
-
-    // append batch vector to schema vector, so that the first message sent is the schema
-    flights.append(&mut batches);
-
-    flights
+/// Convert a single RecordBatch into an iterator of FlightData (containing
+/// dictionaries and batches)
+fn create_flight_iter(
+    batch: &RecordBatch,
+    options: &IpcWriteOptions,
+) -> Box<dyn Iterator<Item = Result<FlightData, Status>>> {
+    let (flight_dictionaries, flight_batch) =
+        arrow_flight::utils::flight_data_from_arrow_batch(batch, &options);
+    Box::new(
+        flight_dictionaries
+            .into_iter()
+            .chain(std::iter::once(flight_batch))
+            .map(Ok),
+    )
 }
 
 fn from_arrow_err(e: &ArrowError) -> Status {

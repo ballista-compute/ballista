@@ -61,18 +61,6 @@ impl BallistaClient {
         Ok(Self { flight_client })
     }
 
-    /// Execute a logical query plan and retrieve the results
-    pub async fn execute_query(&mut self, plan: &LogicalPlan) -> Result<SendableRecordBatchStream> {
-        let action = Action::InteractiveQuery {
-            plan: plan.to_owned(),
-            settings: HashMap::new(),
-        };
-
-        self.execute_action(&action).await
-
-        //Ok(Arc::new(CollectExec::new(final_stage)))
-    }
-
     /// Execute one partition of a physical query plan against the executor
     pub async fn execute_partition(
         &mut self,

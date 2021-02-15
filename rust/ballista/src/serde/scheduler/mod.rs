@@ -28,14 +28,6 @@ pub mod to_proto;
 #[derive(Debug, Clone)]
 
 pub enum Action {
-    /// Execute the query and return the results
-    InteractiveQuery {
-        /// Logical plan to execute
-        plan: LogicalPlan,
-        /// Settings that can be used to control certain aspects of query execution, such as
-        /// batch sizes
-        settings: HashMap<String, String>,
-    },
     /// Execute a query and store the results in memory
     ExecutePartition(ExecutePartition),
     /// Collect a shuffle partition

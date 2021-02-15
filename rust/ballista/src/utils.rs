@@ -75,25 +75,6 @@ pub async fn write_stream_to_disk(
     })
 }
 
-pub async fn read_stream_from_disk(
-    path: &str,
-) -> Result<Pin<Box<dyn RecordBatchStream + Send + Sync>>> {
-    let file = File::open(&path).map_err(|e| {
-        BallistaError::General(format!(
-            "Failed to open partition file at {}: {:?}",
-            path, e
-        ))
-    })?;
-    let reader = FileReader::try_new(file)?;
-    let schema = reader.schema();
-    // TODO we should be able return a stream / iterator rather than load into memory first
-    let mut batches = vec![];
-    for batch in reader {
-        batches.push(batch?);
-    }
-    Ok(Box::pin(MemoryStream::try_new(batches, schema, None)?))
-}
-
 pub async fn collect_stream(
     stream: &mut Pin<Box<dyn RecordBatchStream + Send + Sync>>,
 ) -> Result<Vec<RecordBatch>> {

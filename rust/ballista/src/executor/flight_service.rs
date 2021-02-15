@@ -31,6 +31,7 @@ use crate::memory_stream::MemoryStream;
 use arrow::array::{ArrayRef, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::error::ArrowError;
+use arrow::ipc::reader::FileReader;
 use arrow::ipc::writer::IpcWriteOptions;
 use arrow::record_batch::RecordBatch;
 use arrow_flight::{
@@ -42,6 +43,7 @@ use datafusion::error::DataFusionError;
 use datafusion::physical_plan::RecordBatchStream;
 use futures::{Stream, StreamExt};
 use log::{debug, info};
+use std::fs::File;
 use tonic::{Request, Response, Status, Streaming};
 
 /// Service implementing the Apache Arrow Flight Protocol
@@ -151,35 +153,36 @@ impl FlightService for BallistaFlightService {
                 path.push("data.arrow");
                 let path = path.to_str().unwrap();
 
-                info!("FetchPartition {:?} reading {}", partition_id, path);
-                let mut stream = utils::read_stream_from_disk(path)
-                    .await
-                    .map_err(|e| from_ballista_err(&e))?;
-
-                // TODO should be able to stream end to end rather than load into memory here
-                let mut batches = vec![];
-                while let Some(batch) = stream.next().await {
-                    batches.push(batch.map_err(|e| from_arrow_err(&e))?);
-                }
-
-                // add an initial FlightData message that sends schema
                 let options = arrow::ipc::writer::IpcWriteOptions::default();
+
+                info!("FetchPartition {:?} reading {}", partition_id, path);
+                let file = File::open(&path)
+                    .map_err(|e| {
+                        BallistaError::General(format!(
+                            "Failed to open partition file at {}: {:?}",
+                            path, e
+                        ))
+                    })
+                    .map_err(|e| from_ballista_err(&e))?;
+                let reader = FileReader::try_new(file).map_err(|e| from_arrow_err(&e))?;
                 let schema_flight_data = arrow_flight::utils::flight_data_from_arrow_schema(
-                    stream.schema().as_ref(),
+                    reader.schema().as_ref(),
                     &options,
                 );
-
                 let mut flights: Vec<Result<FlightData, Status>> = vec![Ok(schema_flight_data)];
 
-                let mut batches: Vec<Result<FlightData, Status>> = batches
-                    .iter()
-                    .flat_map(|batch| create_flight_iter(batch, &options))
-                    .collect();
+                // TODO we should be able return a stream / iterator rather than load into memory first
+                // but we probably need to use channels because the Arrow IPC FileReader does not implement
+                // Sync + Send
+                for batch in reader {
+                    let mut batch_flight_data: Vec<_> = batch
+                        .map(|b| create_flight_iter(&b, &options).collect())
+                        .map_err(|e| from_arrow_err(&e))?;
+                    flights.append(&mut batch_flight_data);
+                }
+                info!("Loaded {} batches into memory", flights.len());
 
-                // append batch vector to schema vector, so that the first message sent is the schema
-                flights.append(&mut batches);
                 let output = futures::stream::iter(flights);
-
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
         }

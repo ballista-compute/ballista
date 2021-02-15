@@ -102,7 +102,7 @@ impl DistributedPlanner {
         let execution_plans = self.plan_query_stages(&job_uuid, execution_plan)?;
 
         for plan in &execution_plans {
-            println!("{}", format_plan(plan.clone(), 0));
+            println!("{}", format_plan(plan.clone(), 0)?);
         }
 
         execute(execution_plans, self.executors.clone()).await
@@ -283,7 +283,7 @@ async fn execute_query_stage(
     info!(
         "execute_query_stage() stage_id={}\n{}",
         stage_id,
-        format_plan(plan.clone(), 0)
+        format_plan(plan.clone(), 0)?
     );
 
     let _job_uuid = *job_uuid;

@@ -22,6 +22,7 @@ use crate::scheduler::execution_plans::QueryStageExec;
 use arrow::ipc::reader::FileReader;
 use arrow::ipc::writer::FileWriter;
 use arrow::record_batch::RecordBatch;
+use datafusion::logical_plan::Operator;
 use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
 use datafusion::physical_plan::csv::CsvExec;
 use datafusion::physical_plan::expressions::{BinaryExpr, Column, Literal};
@@ -94,7 +95,7 @@ pub async fn collect_stream(
     Ok(batches)
 }
 
-pub fn format_plan(plan: Arc<dyn ExecutionPlan>, indent: usize) -> String {
+pub fn format_plan(plan: Arc<dyn ExecutionPlan>, indent: usize) -> Result<String> {
     let operator_str = if let Some(exec) = plan.as_any().downcast_ref::<HashAggregateExec>() {
         format!(
             "HashAggregateExec: groupBy={:?}, aggrExpr={:?}",
@@ -105,7 +106,7 @@ pub fn format_plan(plan: Arc<dyn ExecutionPlan>, indent: usize) -> String {
             exec.aggr_expr()
                 .iter()
                 .map(|e| format_agg_expr(e.as_ref()))
-                .collect::<Result<Vec<String>>>()
+                .collect::<Result<Vec<String>>>()?
         )
     } else if let Some(exec) = plan.as_any().downcast_ref::<ParquetExec>() {
         format!("ParquetExec: partitions={}", exec.partitions().len())
@@ -129,16 +130,16 @@ pub fn format_plan(plan: Arc<dyn ExecutionPlan>, indent: usize) -> String {
         let str = format!("{:?}", plan);
         String::from(&str[0..120])
     };
-    format!(
+    Ok(format!(
         "{}{}\n{}",
         "  ".repeat(indent),
         &operator_str,
         plan.children()
             .iter()
             .map(|c| format_plan(c.clone(), indent + 1))
-            .collect::<Vec<String>>()
+            .collect::<Result<Vec<String>>>()?
             .join("\n")
-    )
+    ))
 }
 
 pub fn format_agg_expr(expr: &dyn AggregateExpr) -> Result<String> {

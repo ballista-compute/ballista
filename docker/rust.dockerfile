@@ -26,8 +26,10 @@ COPY rust/ballista/build.rs /tmp/ballista/
 RUN true
 COPY rust/ballista/src/ /tmp/ballista/src/
 # force build.rs to run to generate configure_me code.
+RUN apt-get -y install cmake
 ENV FORCE_REBUILD='true'
-RUN cargo build $RELEASE_FLAG
+ARG BUILD_FEATURES='--features snmalloc'
+RUN cargo build $RELEASE_FLAG $BUILD_FEATURES 
 
 # put the executor on /executor (need to be copied from different places depending on FLAG)
 ENV RELEASE_FLAG=${RELEASE_FLAG}

@@ -100,13 +100,12 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
             }
             PhysicalPlanType::ParquetScan(scan) => {
                 let projection = scan.projection.iter().map(|i| *i as usize).collect();
-                let batch_size = 32768;
                 let filenames: Vec<&str> = scan.filename.iter().map(|s| s.as_str()).collect();
                 Ok(Arc::new(ParquetExec::try_from_files(
                     &filenames,
                     Some(projection),
                     None,
-                    batch_size,
+                    scan.batch_size as usize,
                     scan.num_partitions as usize,
                 )?))
             }

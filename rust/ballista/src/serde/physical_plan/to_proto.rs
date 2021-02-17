@@ -235,6 +235,7 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                             .map(|n| *n as u32)
                             .collect(),
                         num_partitions: exec.partitions().len() as u32,
+                        batch_size: exec.batch_size() as u32
                     },
                 )),
             })

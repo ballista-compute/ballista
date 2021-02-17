@@ -18,7 +18,7 @@ pub fn wrap_df(df: ballista::context::BallistaDataFrame) -> BPyDataFrame {
 impl BPyBallistaContext {
     #[new]
     #[args(host = "\"localhost\"", port = "50051", kwds = "**")]
-    pub fn new(host: &str, port: usize, kwds: Option<&pyo3::types::PyDict>) -> PyResult<Self> {
+    pub fn new(host: &str, port: u16, kwds: Option<&pyo3::types::PyDict>) -> PyResult<Self> {
         let settings = match kwds {
             Some(kwargs) => kwargs
                 .iter()

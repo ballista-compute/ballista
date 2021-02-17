@@ -317,6 +317,7 @@ message FilterExecNode {
 message ParquetScanExecNode {
   repeated string filename = 1;
   repeated uint32 projection = 2;
+  uint32 num_partitions = 3;
 }
 
 message CsvScanExecNode {

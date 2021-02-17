@@ -58,6 +58,8 @@ use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use tonic::{Request, Response};
 
 use self::state::{ConfigBackendClient, SchedulerState};
+use crate::utils::format_plan;
+use std::time::Instant;
 
 pub struct SchedulerServer<Config: ConfigBackendClient> {
     state: SchedulerState<Config>,
@@ -205,6 +207,9 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
                         }
                     }};
                 };
+
+                let start = Instant::now();
+
                 let plan = fail_job!(datafusion_ctx
                     .optimize(&plan)
                     .and_then(|plan| datafusion_ctx.create_physical_plan(&plan))
@@ -213,6 +218,11 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
                         error!("{}", msg);
                         tonic::Status::internal(msg)
                     }));
+
+                info!(
+                    "DataFusion created physical plan in {} seconds",
+                    start.elapsed().as_secs(),
+                );
 
                 // create distributed physical plan using Ballista
                 if let Err(e) = state

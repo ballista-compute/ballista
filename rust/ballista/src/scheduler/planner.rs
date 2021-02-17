@@ -43,6 +43,7 @@ use datafusion::physical_plan::{
     AggregateExpr, ExecutionPlan, PhysicalExpr, SendableRecordBatchStream,
 };
 use log::{debug, info};
+use std::time::Instant;
 use uuid::Uuid;
 
 type SendableExecutionPlan = Pin<Box<dyn Future<Output = Result<Arc<dyn ExecutionPlan>>> + Send>>;
@@ -75,20 +76,6 @@ impl DistributedPlanner {
 }
 
 impl DistributedPlanner {
-    /// Execute a logical plan using distributed query execution and collect the results into a
-    /// vector of [RecordBatch].
-    pub async fn collect(
-        &mut self,
-        logical_plan: &LogicalPlan,
-    ) -> Result<SendableRecordBatchStream> {
-        let datafusion_ctx = ExecutionContext::new();
-        let plan = datafusion_ctx.optimize(logical_plan)?;
-        let plan = datafusion_ctx.create_physical_plan(&plan)?;
-        let plan = self.execute_distributed_query(plan).await?;
-        let plan = Arc::new(CollectExec::new(plan));
-        plan.execute(0).await.map_err(|e| e.into())
-    }
-
     /// Execute a distributed query against a cluster, leaving the final results on the
     /// executors. The [ExecutionPlan] returned by this method is guaranteed to be a
     /// [ShuffleReaderExec] that can be used to fetch the final results from the executors
@@ -99,10 +86,17 @@ impl DistributedPlanner {
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let job_uuid = Uuid::new_v4();
 
+        let now = Instant::now();
         let execution_plans = self.plan_query_stages(&job_uuid, execution_plan)?;
 
+        info!(
+            "DistributedPlanner created {} execution plans in {} seconds:",
+            execution_plans.len(),
+            now.elapsed().as_secs()
+        );
+
         for plan in &execution_plans {
-            println!("{}", format_plan(plan.as_ref(), 0)?);
+            info!("{}", format_plan(plan.as_ref(), 0)?);
         }
 
         execute(execution_plans, self.executors.clone()).await

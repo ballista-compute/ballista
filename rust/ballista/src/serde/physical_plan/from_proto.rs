@@ -100,17 +100,14 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
             }
             PhysicalPlanType::ParquetScan(scan) => {
                 let projection = scan.projection.iter().map(|i| *i as usize).collect();
-                // TODO we don't care what the DataFusion batch size was because Ballista will
-                // have its own configs. Hard-code for now.
                 let batch_size = 32768;
-                let max_concurrency = 8;
                 let filenames: Vec<&str> = scan.filename.iter().map(|s| s.as_str()).collect();
                 Ok(Arc::new(ParquetExec::try_from_files(
                     &filenames,
                     Some(projection),
                     None,
                     batch_size,
-                    max_concurrency,
+                    scan.num_partitions as usize,
                 )?))
             }
             PhysicalPlanType::CoalesceBatches(coalesce_batches) => {

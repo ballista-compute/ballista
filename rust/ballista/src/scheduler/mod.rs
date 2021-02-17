@@ -52,7 +52,7 @@ use crate::{prelude::BallistaError, scheduler::planner::DistributedPlanner};
 use execution_plans::ShuffleReaderExec;
 
 use arrow::datatypes::{Schema, SchemaRef};
-use datafusion::execution::context::ExecutionContext;
+use datafusion::execution::context::{ExecutionConfig, ExecutionContext};
 use log::{debug, error, info, warn};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use tonic::{Request, Response};

@@ -123,11 +123,7 @@ mod roundtrip_tests {
         let field_a = Field::new("a", DataType::Boolean, false);
         let field_b = Field::new("b", DataType::Int64, false);
         let field_c = Field::new("c", DataType::Int64, false);
-        let schema = Arc::new(Schema::new(vec![
-            field_a.clone(),
-            field_b.clone(),
-            field_c.clone(),
-        ]));
+        let schema = Arc::new(Schema::new(vec![field_a, field_b, field_c]));
         let not = Arc::new(NotExpr::new(col("a")));
         let in_list = Arc::new(InListExpr::new(
             col("b"),

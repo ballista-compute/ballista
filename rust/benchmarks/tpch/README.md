@@ -43,6 +43,14 @@ You can add SIMD/snmalloc/LTO flags to improve speed (with longer build times):
 RUST_LOG=info RUSTFLAGS='-C target-cpu=native -C lto -C codegen-units=1 -C embed-bitcode' cargo run --release --bin executor --features "simd snmalloc" --target x86_64-unknown-linux-gnu
 ```
 
+To run the benchmarks:
+
+```bash
+cargo run benchmark --host localhost --port 50050 --query 1 --path $(pwd)/data --format tbl
+```
+
+## Running the Benchmarks on docker-compose
+
 To start a Rust scheduler and executor using Docker Compose:
 
 ```bash
@@ -52,13 +60,15 @@ cd $BALLISTA_HOME/rust/benchmarks/tpch
 docker-compose up
 ```
 
-To run the benchmarks:
+Then you can run the benchmark with:
 
 ```bash
-cargo run benchmark --host localhost --port 50050 --query 1 --path $(pwd)/data --format tbl
+docker-compose run ballista-client cargo run benchmark --host ballista-scheduler --port 50050 --query 1 --path /data --format tbl
 ```
 
-This should produce the following output:
+## Expected output
+
+The result of query 1 should produce the following output:
 
 ```
 +--------------+--------------+----------+--------------------+--------------------+--------------------+--------------------+--------------------+----------------------+-------------+

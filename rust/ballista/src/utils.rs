@@ -12,15 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::sync::Arc;
 use std::{fs::File, pin::Pin};
 
 use crate::error::{BallistaError, Result};
 use crate::memory_stream::MemoryStream;
 
+use crate::scheduler::execution_plans::{QueryStageExec, UnresolvedShuffleExec};
 use arrow::ipc::reader::FileReader;
 use arrow::ipc::writer::FileWriter;
 use arrow::record_batch::RecordBatch;
-use datafusion::physical_plan::RecordBatchStream;
+use datafusion::logical_plan::Operator;
+use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
+use datafusion::physical_plan::csv::CsvExec;
+use datafusion::physical_plan::expressions::{BinaryExpr, Column, Literal};
+use datafusion::physical_plan::filter::FilterExec;
+use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
+use datafusion::physical_plan::hash_join::HashJoinExec;
+use datafusion::physical_plan::merge::MergeExec;
+use datafusion::physical_plan::parquet::ParquetExec;
+use datafusion::physical_plan::{AggregateExpr, ExecutionPlan, PhysicalExpr, RecordBatchStream};
 use futures::StreamExt;
 
 /// Summary of executed partition
@@ -75,25 +86,6 @@ pub async fn write_stream_to_disk(
     })
 }
 
-pub async fn read_stream_from_disk(
-    path: &str,
-) -> Result<Pin<Box<dyn RecordBatchStream + Send + Sync>>> {
-    let file = File::open(&path).map_err(|e| {
-        BallistaError::General(format!(
-            "Failed to open partition file at {}: {:?}",
-            path, e
-        ))
-    })?;
-    let reader = FileReader::try_new(file)?;
-    let schema = reader.schema();
-    // TODO we should be able return a stream / iterator rather than load into memory first
-    let mut batches = vec![];
-    for batch in reader {
-        batches.push(batch?);
-    }
-    Ok(Box::pin(MemoryStream::try_new(batches, schema, None)?))
-}
-
 pub async fn collect_stream(
     stream: &mut Pin<Box<dyn RecordBatchStream + Send + Sync>>,
 ) -> Result<Vec<RecordBatch>> {
@@ -102,4 +94,94 @@ pub async fn collect_stream(
         batches.push(batch?);
     }
     Ok(batches)
+}
+
+pub fn format_plan(plan: &dyn ExecutionPlan, indent: usize) -> Result<String> {
+    let operator_str = if let Some(exec) = plan.as_any().downcast_ref::<HashAggregateExec>() {
+        format!(
+            "HashAggregateExec: groupBy={:?}, aggrExpr={:?}",
+            exec.group_expr()
+                .iter()
+                .map(|e| format_expr(e.0.as_ref()))
+                .collect::<Vec<String>>(),
+            exec.aggr_expr()
+                .iter()
+                .map(|e| format_agg_expr(e.as_ref()))
+                .collect::<Result<Vec<String>>>()?
+        )
+    } else if let Some(exec) = plan.as_any().downcast_ref::<HashJoinExec>() {
+        format!(
+            "HashJoinExec: joinType={:?}, on={:?}",
+            exec.join_type(),
+            exec.on()
+        )
+    } else if let Some(exec) = plan.as_any().downcast_ref::<ParquetExec>() {
+        let mut num_files = 0;
+        for part in exec.partitions() {
+            num_files += part.filenames().len();
+        }
+        format!(
+            "ParquetExec: partitions={}, files={}",
+            exec.partitions().len(),
+            num_files
+        )
+    } else if let Some(exec) = plan.as_any().downcast_ref::<CsvExec>() {
+        format!(
+            "CsvExec: {}; partitions={}",
+            &exec.path(),
+            exec.output_partitioning().partition_count()
+        )
+    } else if let Some(exec) = plan.as_any().downcast_ref::<FilterExec>() {
+        format!("FilterExec: {}", format_expr(exec.predicate().as_ref()))
+    } else if let Some(exec) = plan.as_any().downcast_ref::<QueryStageExec>() {
+        format!(
+            "QueryStageExec: job={}, stage={}",
+            exec.job_uuid, exec.stage_id
+        )
+    } else if let Some(exec) = plan.as_any().downcast_ref::<UnresolvedShuffleExec>() {
+        format!("UnresolvedShuffleExec: stages={:?}", exec.query_stage_ids)
+    } else if let Some(exec) = plan.as_any().downcast_ref::<CoalesceBatchesExec>() {
+        format!(
+            "CoalesceBatchesExec: batchSize={}",
+            exec.target_batch_size()
+        )
+    } else if plan.as_any().downcast_ref::<MergeExec>().is_some() {
+        "MergeExec".to_string()
+    } else {
+        let str = format!("{:?}", plan);
+        String::from(&str[0..120])
+    };
+    Ok(format!(
+        "{}{}\n{}",
+        "  ".repeat(indent),
+        &operator_str,
+        plan.children()
+            .iter()
+            .map(|c| format_plan(c.as_ref(), indent + 1))
+            .collect::<Result<Vec<String>>>()?
+            .join("\n")
+    ))
+}
+
+pub fn format_agg_expr(expr: &dyn AggregateExpr) -> Result<String> {
+    Ok(format!(
+        "{} {:?}",
+        expr.field()?.name(),
+        expr.expressions()
+            .iter()
+            .map(|e| format_expr(e.as_ref()))
+            .collect::<Vec<String>>()
+    ))
+}
+
+pub fn format_expr(expr: &dyn PhysicalExpr) -> String {
+    if let Some(e) = expr.as_any().downcast_ref::<Column>() {
+        e.name().to_string()
+    } else if let Some(e) = expr.as_any().downcast_ref::<Literal>() {
+        e.to_string()
+    } else if let Some(e) = expr.as_any().downcast_ref::<BinaryExpr>() {
+        format!("{} {} {}", e.left(), e.op(), e.right())
+    } else {
+        format!("{}", expr)
+    }
 }

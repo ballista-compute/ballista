@@ -6,7 +6,9 @@ WORKDIR /tmp/ballista
 RUN cargo fetch
 
 # Compile Ballista dependencies
-RUN mkdir -p /tmp/ballista/src/bin/ && echo 'fn main() {}' >> /tmp/ballista/src/bin/executor.rs
+# the build script generates code based on the config specs
+# we make fake config specs here so we don't need to modify build.rs to build only our dependencies
+RUN mkdir -p /tmp/ballista/src/bin/ && echo 'fn main() {}' >> /tmp/ballista/src/bin/executor.rs && echo "" >> /tmp/ballista/src/bin/executor_config_spec.toml && echo "" >> /tmp/ballista/src/bin/scheduler_config_spec.toml
 RUN mkdir -p /tmp/ballista/proto
 COPY rust/ballista/proto/ballista.proto /tmp/ballista/proto/
 COPY rust/ballista/build.rs /tmp/ballista/
@@ -15,7 +17,7 @@ ARG RELEASE_FLAG=--release
 RUN cargo build $RELEASE_FLAG
 
 #TODO relly need to copy whole project in, not just ballista crate, so we pick up the correct Cargo.lock
-RUN rm -rf /tmp/ballista/Cargo.lock /tmp/ballista/src
+RUN rm -rf /tmp/ballista/Cargo.lock /tmp/ballista/src/
 
 COPY rust/ballista/Cargo.toml /tmp/ballista/
 COPY rust/ballista/build.rs /tmp/ballista/
@@ -23,8 +25,11 @@ COPY rust/ballista/build.rs /tmp/ballista/
 # The suggested fix is to use this hack
 RUN true
 COPY rust/ballista/src/ /tmp/ballista/src/
-
-RUN cargo build $RELEASE_FLAG
+# force build.rs to run to generate configure_me code.
+RUN apt-get -y install cmake
+ENV FORCE_REBUILD='true'
+ARG BUILD_FEATURES='--features snmalloc'
+RUN cargo build $RELEASE_FLAG $BUILD_FEATURES 
 
 # put the executor on /executor (need to be copied from different places depending on FLAG)
 ENV RELEASE_FLAG=${RELEASE_FLAG}

@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! ShuffleReaderExec reads partitions that have already been materialized by an executor.
-
 use std::sync::Arc;
 use std::{any::Any, pin::Pin};
 

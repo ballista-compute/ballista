@@ -1,15 +1,9 @@
-#!/usr/bin/env bash
+#!/bin/bash
+set -e
 
-# Start Ballista executors
-docker-compose up -d
+# This bash script is meant to be run inside the docker-compose environment. Check the README for instructions
 
-# Wait for executors to start
-sleep 20
-
-# Run integration tests
-cargo run benchmark --host localhost --port 50051 --query 12 --path data --format tbl
-#cargo run benchmark --host localhost --port 50052 --query 12 --path data --format tbl
-#cargo run benchmark --host localhost --port 50053 --query 12 --path data --format tbl
-
-# Stop Ballista servers
-docker-compose down
+for query in 1 3 5 6 10 12
+do
+  cargo run benchmark --host ballista-scheduler --port 50050 --query $query --path /data --format tbl --iterations 1
+done

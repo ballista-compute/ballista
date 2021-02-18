@@ -1,12 +1,9 @@
 # Deploying Ballista with Kubernetes
 
-*NOTE: Ballista 0.4.0 is still under development and there are no published Docker images yet. Please refer to the
-[developer documentation](https://github.com/ballista-compute/ballista/tree/main/docs) for instructions on building
-Docker images locally.*
+**NOTE: These instructions need updating for 0.4.0-alpha-1**
 
 You will need a Kubernetes cluster to deploy to. I recommend using 
-[Minikube](https://kubernetes.io/docs/tutorials/hello-minikube) for local testing, or Amazon's Elastic Kubernetes 
-Service (EKS). 
+[Minikube](https://kubernetes.io/docs/tutorials/hello-minikube) for local testing, or Amazon's Elastic Kubernetes Service (EKS). 
 
 These instructions are for using Minikube on Ubuntu.
 
@@ -174,7 +171,7 @@ spec:
       - name: ballista
         image: ballistacompute/ballista-rust:0.4.0-alpha-1
         command: ["/executor"]
-        args: ["--mode=k8s", "--external-host=0.0.0.0", "--port=50051", "--concurrent-tasks=2"]
+        args: ["--external-host=0.0.0.0", "--port=50051"]
         resources:
           requests:
             cpu: "1"

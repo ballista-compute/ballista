@@ -28,8 +28,6 @@ use tonic::transport::Channel;
 
 pub mod collect;
 pub mod flight_service;
-pub mod query_stage;
-pub mod shuffle_reader;
 
 #[cfg(feature = "snmalloc")]
 #[global_allocator]
@@ -65,22 +63,5 @@ pub struct BallistaExecutor {
 impl BallistaExecutor {
     pub fn new(config: ExecutorConfig, scheduler: SchedulerGrpcClient<Channel>) -> Self {
         Self { config, scheduler }
-    }
-
-    pub async fn execute_logical_plan(&self, plan: &LogicalPlan) -> Result<Vec<RecordBatch>> {
-        info!("Running interactive query");
-        debug!("Logical plan: {:?}", plan);
-        // execute with DataFusion for now until distributed execution is in place
-        let ctx = ExecutionContext::new();
-
-        // create the query plan
-        let plan = ctx.optimize(&plan).and_then(|plan| {
-            debug!("Optimized logical plan: {:?}", plan);
-            ctx.create_physical_plan(&plan)
-        })?;
-
-        debug!("Physical plan: {:?}", plan);
-        // execute the query
-        collect(plan.clone()).await.map_err(|e| e.into())
     }
 }

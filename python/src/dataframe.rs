@@ -105,7 +105,7 @@ impl BPyDataFrame {
     }
 
     fn collect(&self, _py: Python) -> PyResult<PyObject> {
-        let mut rt = tokio::runtime::Runtime::new().map_err(util::wrap_err)?;
+        let rt = tokio::runtime::Runtime::new().map_err(util::wrap_err)?;
         let batches: Vec<RecordBatch> =
             rt.block_on(self.async_collect()).map_err(util::wrap_err)?;
         to_py(&batches)

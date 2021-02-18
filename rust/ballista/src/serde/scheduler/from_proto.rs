@@ -28,17 +28,6 @@ impl TryInto<Action> for protobuf::Action {
 
     fn try_into(self) -> Result<Action, Self::Error> {
         match self.action_type {
-            Some(ActionType::Query(query)) => {
-                let mut settings = HashMap::new();
-                let plan: LogicalPlan = (&query).try_into()?;
-                for setting in &self.settings {
-                    settings.insert(setting.key.to_owned(), setting.value.to_owned());
-                    for setting in &self.settings {
-                        settings.insert(setting.key.to_owned(), setting.value.to_owned());
-                    }
-                }
-                Ok(Action::InteractiveQuery { plan, settings })
-            }
             Some(ActionType::ExecutePartition(partition)) => {
                 // TODO remove unwraps
                 Ok(Action::ExecutePartition(ExecutePartition::new(

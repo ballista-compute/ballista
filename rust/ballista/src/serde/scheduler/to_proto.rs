@@ -25,23 +25,6 @@ impl TryInto<protobuf::Action> for Action {
 
     fn try_into(self) -> Result<protobuf::Action, Self::Error> {
         match self {
-            Action::InteractiveQuery {
-                ref plan,
-                ref settings,
-            } => {
-                let settings = settings
-                    .iter()
-                    .map(|e| protobuf::KeyValuePair {
-                        key: e.0.to_string(),
-                        value: e.1.to_string(),
-                    })
-                    .collect();
-
-                Ok(protobuf::Action {
-                    action_type: Some(ActionType::Query(plan.try_into()?)),
-                    settings,
-                })
-            }
             Action::ExecutePartition(partition) => Ok(protobuf::Action {
                 action_type: Some(ActionType::ExecutePartition(partition.try_into()?)),
                 settings: vec![],

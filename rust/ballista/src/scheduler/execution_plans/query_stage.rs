@@ -12,11 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! QueryStageExec represents a section of a query plan that has consistent partitioning and
-//! can be executed as one unit with each partition being executed in parallel. The output of
-//! a query stage either forms the input of another query stage or can be the final result of
-//! a query.
-
 use std::sync::Arc;
 use std::{any::Any, pin::Pin};
 

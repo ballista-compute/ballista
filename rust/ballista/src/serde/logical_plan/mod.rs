@@ -23,6 +23,7 @@ mod roundtrip_tests {
     use crate::error::BallistaError;
     use arrow::datatypes::{DataType, Field, Schema};
     use core::panic;
+    use datafusion::physical_plan::functions::BuiltinScalarFunction::Sqrt;
     use datafusion::{
         logical_plan::{Expr, LogicalPlan, LogicalPlanBuilder},
         physical_plan::csv::CsvReadOptions,
@@ -895,6 +896,17 @@ mod roundtrip_tests {
     fn roundtrip_wildcard() -> Result<()> {
         let test_expr = Expr::Wildcard;
 
+        roundtrip_test!(test_expr, protobuf::LogicalExprNode, Expr);
+
+        Ok(())
+    }
+
+    #[test]
+    fn roundtrip_sqrt() -> Result<()> {
+        let test_expr = Expr::ScalarFunction {
+            fun: Sqrt,
+            args: vec![col("col")],
+        };
         roundtrip_test!(test_expr, protobuf::LogicalExprNode, Expr);
 
         Ok(())

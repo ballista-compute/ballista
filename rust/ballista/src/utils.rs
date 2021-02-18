@@ -19,6 +19,10 @@ use crate::error::{BallistaError, Result};
 use crate::memory_stream::MemoryStream;
 
 use crate::scheduler::execution_plans::{QueryStageExec, UnresolvedShuffleExec};
+use arrow::array::{
+    ArrayBuilder, ArrayRef, StructArray, StructBuilder, UInt64Array, UInt64Builder,
+};
+use arrow::datatypes::{DataType, Field};
 use arrow::ipc::reader::FileReader;
 use arrow::ipc::writer::FileWriter;
 use arrow::record_batch::RecordBatch;
@@ -33,14 +37,109 @@ use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::{AggregateExpr, ExecutionPlan, PhysicalExpr, RecordBatchStream};
 use futures::StreamExt;
+use std::collections::HashMap;
+use std::ops::Deref;
 
 /// Summary of executed partition
 #[derive(Debug, Copy, Clone)]
 pub struct PartitionStats {
-    num_rows: usize,
-    num_batches: usize,
-    num_bytes: usize,
-    null_count: usize,
+    num_rows: u64,
+    num_batches: u64,
+    num_bytes: u64,
+    null_count: u64,
+}
+
+impl PartitionStats {
+    // pub fn to_hash_map(&self) -> HashMap<String, String>{
+    //     let mut metadata: HashMap<String, String> = HashMap::new();
+    //     metadata.insert("num_rows".to_string(), self.num_rows.to_string());
+    //     metadata.insert("num_batches".to_string(), self.num_batches.to_string());
+    //     metadata.insert("num_bytes".to_string(), self.num_bytes.to_string());
+    //     metadata.insert("null_count".to_string(), self.null_count.to_string());
+    //     return metadata
+    // }
+    //
+    // pub fn from_hash_map(map: &HashMap<String, String>) -> Result<Self>{
+    //     return Ok(PartitionStats {
+    //         num_rows: map.get("num_rows")?.parse()?,
+    //         num_batches: map.get("num_batches")?.parse()?,
+    //         num_bytes: map.get("num_bytes")?.parse()?,
+    //         null_count: map.get("null_count")?.parse()?,
+    //     })
+    // }
+
+    pub fn arrow_struct_repr(self) -> Field {
+        Field::new(
+            "partition_stats",
+            DataType::Struct(vec![
+                Field::new("num_rows", DataType::UInt64, false),
+                Field::new("num_batches", DataType::UInt64, false),
+                Field::new("num_bytes", DataType::UInt64, false),
+                Field::new("null_count", DataType::UInt64, false),
+            ]),
+            false,
+        )
+    }
+
+    pub fn to_arrow_arrayref(&self) -> Arc<StructArray> {
+        let mut field_builders = Vec::new();
+
+        let mut num_rows_builder = UInt64Builder::new(1);
+        num_rows_builder.append_value(self.num_rows).unwrap();
+        field_builders.push(Box::new(num_rows_builder) as Box<dyn ArrayBuilder>);
+
+        let mut num_batches_builder = UInt64Builder::new(1);
+        num_batches_builder.append_value(self.num_batches).unwrap();
+        field_builders.push(Box::new(num_batches_builder) as Box<dyn ArrayBuilder>);
+
+        let mut num_bytes_builder = UInt64Builder::new(1);
+        num_bytes_builder.append_value(self.num_bytes).unwrap();
+        field_builders.push(Box::new(num_bytes_builder) as Box<dyn ArrayBuilder>);
+
+        let mut null_count_builder = UInt64Builder::new(1);
+        null_count_builder.append_value(self.null_count).unwrap();
+        field_builders.push(Box::new(null_count_builder) as Box<dyn ArrayBuilder>);
+
+        let mut struct_builder = StructBuilder::new(vec![self.arrow_struct_repr()], field_builders);
+        Arc::new(struct_builder.finish())
+    }
+
+    pub fn from_arrow_struct_array(struct_array: &StructArray) -> PartitionStats {
+        return PartitionStats {
+            num_rows: struct_array
+                .column_by_name("num_rows")
+                .expect("from_arrow_struct_array expected a field num_rows")
+                .as_any()
+                .downcast_ref::<UInt64Array>()
+                .expect("from_arrow_struct_array expected num_rows to be a UInt64Array")
+                .value(0)
+                .to_owned(),
+            num_batches: struct_array
+                .column_by_name("num_batches")
+                .expect("from_arrow_struct_array expected a field num_batches")
+                .as_any()
+                .downcast_ref::<UInt64Array>()
+                .expect("from_arrow_struct_array expected num_batches to be a UInt64Array")
+                .value(0)
+                .to_owned(),
+            num_bytes: struct_array
+                .column_by_name("num_bytes")
+                .expect("from_arrow_struct_array expected a field num_bytes")
+                .as_any()
+                .downcast_ref::<UInt64Array>()
+                .expect("from_arrow_struct_array expected num_bytes to be a UInt64Array")
+                .value(0)
+                .to_owned(),
+            null_count: struct_array
+                .column_by_name("null_count")
+                .expect("from_arrow_struct_array expected a field null_count")
+                .as_any()
+                .downcast_ref::<UInt64Array>()
+                .expect("from_arrow_struct_array expected null_count to be a UInt64Array")
+                .value(0)
+                .to_owned(),
+        };
+    }
 }
 
 /// Stream data to disk in Arrow IPC format
@@ -79,10 +178,10 @@ pub async fn write_stream_to_disk(
     }
     writer.finish()?;
     Ok(PartitionStats {
-        num_rows,
+        num_rows: num_rows as u64,
         num_batches,
-        num_bytes,
-        null_count,
+        num_bytes: num_bytes as u64,
+        null_count: null_count as u64,
     })
 }
 

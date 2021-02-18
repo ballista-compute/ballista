@@ -20,6 +20,7 @@ use datafusion::physical_plan::ExecutionPlan;
 use uuid::Uuid;
 
 use super::protobuf;
+use crate::utils::PartitionStats;
 
 pub mod from_proto;
 pub mod to_proto;
@@ -123,12 +124,14 @@ impl ExecutePartition {
 pub struct ExecutePartitionResult {
     /// Path containing results for this partition
     path: String,
+    stats: PartitionStats,
 }
 
 impl ExecutePartitionResult {
-    pub fn new(path: &str) -> Self {
+    pub fn new(path: &str, stats: PartitionStats) -> Self {
         Self {
             path: path.to_owned(),
+            stats: stats
         }
     }
 

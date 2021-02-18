@@ -26,7 +26,7 @@ use crate::executor::BallistaExecutor;
 use crate::memory_stream::MemoryStream;
 use crate::serde::decode_protobuf;
 use crate::serde::scheduler::Action as BallistaAction;
-use crate::utils::{self, format_plan};
+use crate::utils::{self, format_plan, PartitionStats};
 
 use arrow::array::{ArrayRef, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
@@ -44,6 +44,7 @@ use datafusion::error::DataFusionError;
 use datafusion::physical_plan::RecordBatchStream;
 use futures::{Stream, StreamExt};
 use log::{debug, info, warn};
+use std::collections::HashMap;
 use std::io::{Read, Seek};
 use tokio::task;
 use tonic::{Request, Response, Status, Streaming};
@@ -130,9 +131,14 @@ impl FlightService for BallistaFlightService {
                 c0.append_value(&path).unwrap();
                 let path: ArrayRef = Arc::new(c0.finish());
 
-                let schema = Arc::new(Schema::new(vec![Field::new("path", DataType::Utf8, false)]));
+                let schema = Arc::new(Schema::new(vec![
+                    Field::new("path", DataType::Utf8, false),
+                    info.arrow_struct_repr(),
+                ]));
+                let stats: ArrayRef = info.to_arrow_arrayref();
 
-                let results = vec![RecordBatch::try_new(schema.clone(), vec![path]).unwrap()];
+                let results =
+                    vec![RecordBatch::try_new(schema.clone(), vec![path, stats]).unwrap()];
                 // add an initial FlightData message that sends schema
                 let options = arrow::ipc::writer::IpcWriteOptions::default();
                 let schema_flight_data =

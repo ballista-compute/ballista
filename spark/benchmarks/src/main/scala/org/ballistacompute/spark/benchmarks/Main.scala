@@ -49,7 +49,7 @@ object Main {
 
     val spark: SparkSession = SparkSession.builder
       .appName("Ballista Spark Benchmarks")
-      .master("local[*]")
+      .master("local[8]")
       .getOrCreate()
 
     conf.subcommand match {

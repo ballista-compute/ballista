@@ -215,7 +215,15 @@ pub fn format_plan(plan: &dyn ExecutionPlan, indent: usize) -> Result<String> {
             exec.on()
         )
     } else if let Some(exec) = plan.as_any().downcast_ref::<ParquetExec>() {
-        format!("ParquetExec: partitions={}", exec.partitions().len())
+        let mut num_files = 0;
+        for part in exec.partitions() {
+            num_files += part.filenames().len();
+        }
+        format!(
+            "ParquetExec: partitions={}, files={}",
+            exec.partitions().len(),
+            num_files
+        )
     } else if let Some(exec) = plan.as_any().downcast_ref::<CsvExec>() {
         format!(
             "CsvExec: {}; partitions={}",

@@ -1,6 +1,6 @@
 # Deploying Ballista with Kubernetes
 
-**NOTE: These instructions need updating for 0.4.0-alpha-1**
+**NOTE: These instructions need updating for 0.4.0-alpha-2**
 
 You will need a Kubernetes cluster to deploy to. I recommend using 
 [Minikube](https://kubernetes.io/docs/tutorials/hello-minikube) for local testing, or Amazon's Elastic Kubernetes Service (EKS). 
@@ -169,7 +169,7 @@ spec:
     spec:
       containers:
       - name: ballista
-        image: ballistacompute/ballista-rust:0.4.0-alpha-1
+        image: ballistacompute/ballista-rust:0.4.0-alpha-2
         command: ["/executor"]
         args: ["--external-host=0.0.0.0", "--port=50051"]
         resources:

@@ -2,7 +2,7 @@
 name = "ballista"
 description = "Ballista Distributed Compute"
 license = "Apache-2.0"
-version = "0.4.0-alpha-1"
+version = "0.4.0-alpha-2"
 homepage = "https://github.com/ballista-compute/ballista"
 repository = "https://github.com/ballista-compute/ballista"
 authors = ["Andy Grove <andygrove73@gmail.com>"]

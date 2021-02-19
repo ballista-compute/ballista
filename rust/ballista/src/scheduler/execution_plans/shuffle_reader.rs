@@ -90,7 +90,7 @@ impl ExecutionPlan for ShuffleReaderExec {
 
         let batches = client
             .fetch_partition(
-                &partition_location.partition_id.job_uuid,
+                &partition_location.partition_id.job_id,
                 partition_location.partition_id.stage_id,
                 partition,
             )

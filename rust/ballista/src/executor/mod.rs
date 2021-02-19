@@ -57,12 +57,11 @@ impl ExecutorConfig {
 #[allow(dead_code)]
 pub struct BallistaExecutor {
     pub(crate) config: ExecutorConfig,
-    scheduler: SchedulerGrpcClient<Channel>,
 }
 
 impl BallistaExecutor {
-    pub fn new(config: ExecutorConfig, scheduler: SchedulerGrpcClient<Channel>) -> Self {
-        Self { config, scheduler }
+    pub fn new(config: ExecutorConfig) -> Self {
+        Self { config }
     }
 
     pub async fn execute_logical_plan(&self, plan: &LogicalPlan) -> Result<Vec<RecordBatch>> {

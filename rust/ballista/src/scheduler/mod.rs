@@ -18,13 +18,13 @@ pub mod execution_plans;
 pub mod planner;
 pub mod state;
 
-use std::convert::TryInto;
+use std::{convert::TryInto, sync::Arc};
 
 use crate::serde::protobuf::{
     job_status, scheduler_grpc_server::SchedulerGrpc, CompletedJob, ExecuteQueryParams,
     ExecuteQueryResult, ExecutorMetadata, FailedJob, GetExecutorMetadataParams,
     GetExecutorMetadataResult, GetJobStatusParams, GetJobStatusResult, JobStatus,
-    PartitionLocation, QueuedJob, RegisterExecutorParams, RegisterExecutorResult, RunningJob,
+    PartitionId, PartitionLocation, PhysicalPlanNode, PollWorkParams, PollWorkResult, QueuedJob, RunningJob, TaskDefinition, TaskStatus
 };
 use crate::serde::scheduler::ExecutorMeta;
 use clap::arg_enum;
@@ -52,20 +52,20 @@ use crate::{prelude::BallistaError, scheduler::planner::DistributedPlanner};
 use execution_plans::ShuffleReaderExec;
 
 use arrow::datatypes::{Schema, SchemaRef};
-use datafusion::execution::context::ExecutionContext;
+use datafusion::{execution::context::ExecutionContext, physical_plan::ExecutionPlan};
 use log::{debug, error, info, warn};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use tonic::{Request, Response};
 
 use self::state::{ConfigBackendClient, SchedulerState};
 
-pub struct SchedulerServer<Config: ConfigBackendClient> {
-    state: SchedulerState<Config>,
+pub struct SchedulerServer {
+    state: SchedulerState,
     namespace: String,
 }
 
-impl<Config: ConfigBackendClient> SchedulerServer<Config> {
-    pub fn new(config: Config, namespace: String) -> Self {
+impl SchedulerServer {
+    pub fn new(config: Arc<dyn ConfigBackendClient>, namespace: String) -> Self {
         Self {
             state: SchedulerState::new(config),
             namespace,
@@ -74,7 +74,7 @@ impl<Config: ConfigBackendClient> SchedulerServer<Config> {
 }
 
 #[tonic::async_trait]
-impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for SchedulerServer<T> {
+impl SchedulerGrpc for SchedulerServer {
     async fn get_executors_metadata(
         &self,
         _request: Request<GetExecutorMetadataParams>,
@@ -97,26 +97,77 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
         }))
     }
 
-    async fn register_executor(
+    async fn poll_work(
         &self,
-        request: Request<RegisterExecutorParams>,
-    ) -> std::result::Result<Response<RegisterExecutorResult>, tonic::Status> {
-        if let RegisterExecutorParams {
+        request: Request<PollWorkParams>,
+    ) -> std::result::Result<Response<PollWorkResult>, tonic::Status> {
+        if let PollWorkParams {
             metadata: Some(metadata),
+            can_accept_task,
+            task_status,
         } = request.into_inner()
         {
-            info!("Received register_executor request for {:?}", metadata);
+            debug!("Received poll_work request for {:?}", metadata);
+            let metadata: ExecutorMeta = metadata.into();
+            let mut lock = self.state.lock().await.map_err(|e| {
+                let msg = format!("Could not lock the state: {}", e);
+                error!("{}", msg);
+                tonic::Status::internal(msg)
+            })?;
             self.state
-                .save_executor_metadata(&self.namespace, metadata.into())
+                .save_executor_metadata(&self.namespace, metadata.clone())
                 .await
                 .map_err(|e| {
                     let msg = format!("Could not save executor metadata: {}", e);
                     error!("{}", msg);
                     tonic::Status::internal(msg)
                 })?;
-            Ok(Response::new(RegisterExecutorResult {}))
+            let task_status_empty = task_status.is_empty();
+            for task_status in task_status {
+                self.state
+                    .save_task_status(&self.namespace, &task_status)
+                    .await
+                    .map_err(|e| {
+                        let msg = format!("Could not save task status: {}", e);
+                        error!("{}", msg);
+                        tonic::Status::internal(msg)
+                    })?;
+            }
+            let task = if can_accept_task {
+                let plan = self
+                    .state
+                    .assign_next_schedulable_task(&self.namespace, &metadata.id)
+                    .await
+                    .map_err(|e| {
+                        let msg = format!("Error finding next assignable task: {}", e);
+                        error!("{}", msg);
+                        tonic::Status::internal(msg)
+                    })?;
+                if plan.is_some() {
+                    info!("Sending new task to {}", metadata.id);
+                }
+                plan
+                    .map(|(status, plan)| TaskDefinition {
+                        plan: Some(plan.try_into().unwrap()),
+                        task_id: Some(PartitionId {
+                            job_id: status.job_id,
+                            stage_id: status.stage_id,
+                            partition_id: status.partition_id, 
+                        }),
+                    })
+            } else {
+                None
+            };
+            // TODO: this should probably happen asynchronously with a watch on etc/sled
+            if !task_status_empty {
+                if let Err(e) = self.state.synchronize_job_status(&self.namespace).await {
+                    warn!("Could not synchronize jobs and tasks state: {}", e);
+                }
+            }
+            lock.unlock().await;
+            Ok(Response::new(PollWorkResult { task }))
         } else {
-            warn!("Received invalid executor registration request");
+            warn!("Received invalid executor poll_work request");
             Err(tonic::Status::invalid_argument(
                 "Missing metadata in request",
             ))
@@ -175,7 +226,6 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
                     tonic::Status::internal(format!("Could not save job metadata: {}", e))
                 })?;
 
-            // TODO: handle errors once we have more job metadata
             let namespace = self.namespace.to_owned();
             let state = self.state.clone();
             let job_id_spawn = job_id.clone();
@@ -235,33 +285,35 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
                     error!("{}", msg);
                     tonic::Status::internal(msg)
                 }));
-                let plan = fail_job!(planner.execute_distributed_query(plan).await.map_err(|e| {
-                    let msg = format!("Could not execute distributed plan: {}", e);
+                let stages = fail_job!(planner.plan_query_stages(&job_id_spawn, plan).map_err(|e| {
+                    let msg = format!("Could not plan query stages: {}", e);
                     error!("{}", msg);
                     tonic::Status::internal(msg)
                 }));
 
-                // save partition info into job's state
-                let plan = plan
-                    .as_any()
-                    .downcast_ref::<ShuffleReaderExec>()
-                    .expect("Expected plan final operator to be ShuffleReaderExec");
-                let mut partition_location = vec![];
-                for loc in &plan.partition_location {
-                    partition_location.push(loc.clone().try_into().unwrap());
+                // save stages into state
+                for stage in stages {
+                    fail_job!(state.save_stage_plan(&namespace, &job_id_spawn, stage.stage_id, stage.child.clone()).await.map_err(|e| {
+                        let msg = format!("Could not save stage plan: {}", e);
+                        error!("{}", msg);
+                        tonic::Status::internal(msg)
+                    }));
+                    let num_partitions = stage.output_partitioning().partition_count();
+                    for partition_id in 0..num_partitions {
+                        let pending_status = TaskStatus {
+                            job_id: job_id_spawn.clone(),
+                            stage_id: stage.stage_id as u32,
+                            partition_id: partition_id as u32,
+                            status: None,
+
+                        };
+                        fail_job!(state.save_task_status(&namespace, &pending_status).await.map_err(|e| {
+                            let msg = format!("Could not save task status: {}", e);
+                            error!("{}", msg);
+                            tonic::Status::internal(msg)
+                        }));
+                    }
                 }
-                state
-                    .save_job_metadata(
-                        &namespace,
-                        &job_id_spawn,
-                        &JobStatus {
-                            status: Some(job_status::Status::Completed(CompletedJob {
-                                partition_location,
-                            })),
-                        },
-                    )
-                    .await
-                    .unwrap();
             });
 
             Ok(Response::new(ExecuteQueryResult { job_id }))

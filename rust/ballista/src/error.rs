@@ -28,7 +28,6 @@ pub type Result<T> = result::Result<T, BallistaError>;
 
 /// Ballista error
 #[derive(Debug)]
-
 pub enum BallistaError {
     NotImplemented(String),
     General(String),
@@ -44,6 +43,7 @@ pub enum BallistaError {
     // KubeAPIResponseError(k8s_openapi::ResponseError),
     TonicError(tonic::transport::Error),
     GrpcError(tonic::Status),
+    TokioError(tokio::task::JoinError)
 }
 
 impl<T> Into<Result<T>> for BallistaError {
@@ -137,6 +137,12 @@ impl From<tonic::Status> for BallistaError {
     }
 }
 
+impl From<tokio::task::JoinError> for BallistaError {
+    fn from(e: tokio::task::JoinError) -> Self {
+        BallistaError::TokioError(e)
+    }
+}
+
 impl Display for BallistaError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -158,6 +164,7 @@ impl Display for BallistaError {
             BallistaError::TonicError(desc) => write!(f, "Tonic error: {}", desc),
             BallistaError::GrpcError(desc) => write!(f, "Grpc error: {}", desc),
             BallistaError::Internal(desc) => write!(f, "Internal Ballista error: {}", desc),
+            BallistaError::TokioError(desc) => write!(f, "Tokio join error: {}", desc),
         }
     }
 }

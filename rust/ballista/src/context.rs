@@ -272,7 +272,7 @@ impl BallistaDataFrame {
                         result.append(
                             &mut ballista_client
                                 .fetch_partition(
-                                    &Uuid::parse_str(&partition_id.job_uuid).unwrap(),
+                                    &partition_id.job_id,
                                     partition_id.stage_id as usize,
                                     partition_id.partition_id as usize,
                                 )

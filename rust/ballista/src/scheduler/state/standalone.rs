@@ -12,17 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use crate::error::{ballista_error, Result};
 use crate::scheduler::state::ConfigBackendClient;
 
 use log::warn;
+use tokio::sync::{Mutex, MutexGuard};
+
+use super::Lock;
 
 /// A [`ConfigBackendClient`] implementation that uses file-based storage to save cluster configuration.
 #[derive(Clone)]
 pub struct StandaloneClient {
     db: sled::Db,
+    lock: Arc<Mutex<()>>,
 }
 
 impl StandaloneClient {
@@ -30,6 +34,7 @@ impl StandaloneClient {
     pub fn try_new<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
         Ok(Self {
             db: sled::open(path)?,
+            lock: Arc::new(Mutex::new(())),
         })
     }
 
@@ -37,13 +42,14 @@ impl StandaloneClient {
     pub fn try_new_temporary() -> Result<Self> {
         Ok(Self {
             db: sled::Config::new().temporary(true).open()?,
+            lock: Arc::new(Mutex::new(())),
         })
     }
 }
 
 #[tonic::async_trait]
 impl ConfigBackendClient for StandaloneClient {
-    async fn get(&mut self, key: &str) -> Result<Vec<u8>> {
+    async fn get(&self, key: &str) -> Result<Vec<u8>> {
         Ok(self
             .db
             .get(key)
@@ -52,22 +58,24 @@ impl ConfigBackendClient for StandaloneClient {
             .unwrap_or_default())
     }
 
-    async fn get_from_prefix(&mut self, prefix: &str) -> Result<Vec<Vec<u8>>> {
+    async fn get_from_prefix(&self, prefix: &str) -> Result<Vec<(String, Vec<u8>)>> {
         Ok(self
             .db
             .scan_prefix(prefix)
-            .map(|v| v.map(|(_key, value)| value.to_vec()))
+            .map(|v| {
+                v.map(|(key, value)| {
+                    (
+                        std::str::from_utf8(&key).unwrap().to_owned(),
+                        value.to_vec(),
+                    )
+                })
+            })
             .collect::<std::result::Result<Vec<_>, _>>()
             .map_err(|e| ballista_error(&format!("sled error {:?}", e)))?)
     }
 
     // TODO: support lease_time. See https://github.com/spacejam/sled/issues/1119 for how to approach this
-    async fn put(
-        &mut self,
-        key: String,
-        value: Vec<u8>,
-        _lease_time: Option<Duration>,
-    ) -> Result<()> {
+    async fn put(&self, key: String, value: Vec<u8>, _lease_time: Option<Duration>) -> Result<()> {
         self.db
             .insert(key, value)
             .map_err(|e| {
@@ -75,6 +83,10 @@ impl ConfigBackendClient for StandaloneClient {
                 ballista_error("sled insert failed")
             })
             .map(|_| ())
+    }
+
+    async fn lock(&self) -> Result<Box<dyn Lock>> {
+        Ok(Box::new(self.lock.clone().lock_owned().await))
     }
 }
 
@@ -91,7 +103,7 @@ mod tests {
 
     #[tokio::test]
     async fn put_read() -> Result<(), Box<dyn std::error::Error>> {
-        let mut client = create_instance()?;
+        let client = create_instance()?;
         let key = "key";
         let value = "value".as_bytes();
         client.put(key.to_owned(), value.to_vec(), None).await?;
@@ -101,7 +113,7 @@ mod tests {
 
     #[tokio::test]
     async fn read_empty() -> Result<(), Box<dyn std::error::Error>> {
-        let mut client = create_instance()?;
+        let client = create_instance()?;
         let key = "key";
         let empty: &[u8] = &[];
         assert_eq!(client.get(key).await?, empty);
@@ -110,7 +122,7 @@ mod tests {
 
     #[tokio::test]
     async fn read_prefix() -> Result<(), Box<dyn std::error::Error>> {
-        let mut client = create_instance()?;
+        let client = create_instance()?;
         let key = "key";
         let value = "value".as_bytes();
         client
@@ -119,7 +131,13 @@ mod tests {
         client
             .put(format!("{}/2", key), value.to_vec(), None)
             .await?;
-        assert_eq!(client.get_from_prefix(key).await?, vec![value, value]);
+        assert_eq!(
+            client.get_from_prefix(key).await?,
+            vec![
+                ("key/1".to_owned(), value.to_vec()),
+                ("key/2".to_owned(), value.to_vec())
+            ]
+        );
         Ok(())
     }
 }

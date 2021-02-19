@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::sync::Arc;
 
-use crate::error::BallistaError;
+use crate::{error::BallistaError, scheduler::execution_plans::UnresolvedShuffleExec};
 use crate::scheduler::execution_plans::ShuffleReaderExec;
 use crate::scheduler::planner::PartitionLocation;
 use crate::serde::protobuf::LogicalExprNode;
@@ -287,6 +287,14 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     .collect::<Result<Vec<_>, _>>()?;
                 // Update concurrency here in the future
                 Ok(Arc::new(SortExec::try_new(exprs, input, 1)?))
+            }
+            PhysicalPlanType::Unresolved(unresolved_shuffle) => {
+                let schema = Arc::new(convert_required!(unresolved_shuffle.schema)?);
+                Ok(Arc::new(UnresolvedShuffleExec {
+                    query_stage_ids: unresolved_shuffle.query_stage_ids.iter().map(|id| *id as usize).collect(),
+                    schema,
+                    partition_count: unresolved_shuffle.partition_count as usize,
+                }))
             }
         }
     }

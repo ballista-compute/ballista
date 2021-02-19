@@ -35,17 +35,17 @@ pub enum Action {
 }
 
 /// Unique identifier for the output partition of an operator.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PartitionId {
-    pub(crate) job_uuid: Uuid,
+    pub(crate) job_id: String,
     pub(crate) stage_id: usize,
     pub(crate) partition_id: usize,
 }
 
 impl PartitionId {
-    pub fn new(job_uuid: Uuid, stage_id: usize, partition_id: usize) -> Self {
+    pub fn new(job_id: &str, stage_id: usize, partition_id: usize) -> Self {
         Self {
-            job_uuid,
+            job_id: job_id.to_string(),
             stage_id,
             partition_id,
         }
@@ -53,7 +53,7 @@ impl PartitionId {
 }
 
 /// Meta-data for an executor, used when fetching shuffle partitions from other executors
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExecutorMeta {
     pub id: String,
     pub host: String,
@@ -85,7 +85,7 @@ impl From<protobuf::ExecutorMetadata> for ExecutorMeta {
 #[derive(Debug, Clone)]
 pub struct ExecutePartition {
     /// Unique ID representing this query execution
-    pub(crate) job_uuid: Uuid,
+    pub(crate) job_id: String,
     /// Unique ID representing this query stage within the overall query
     pub(crate) stage_id: usize,
     /// The partition to execute. The same plan could be sent to multiple executors and each
@@ -99,14 +99,14 @@ pub struct ExecutePartition {
 
 impl ExecutePartition {
     pub fn new(
-        job_uuid: Uuid,
+        job_id: String,
         stage_id: usize,
         partition_id: usize,
         plan: Arc<dyn ExecutionPlan>,
         shuffle_locations: HashMap<PartitionId, ExecutorMeta>,
     ) -> Self {
         Self {
-            job_uuid,
+            job_id,
             stage_id,
             partition_id,
             plan,
@@ -115,7 +115,7 @@ impl ExecutePartition {
     }
 
     pub fn key(&self) -> String {
-        format!("{}.{}.{}", self.job_uuid, self.stage_id, self.partition_id)
+        format!("{}.{}.{}", self.job_id, self.stage_id, self.partition_id)
     }
 }
 

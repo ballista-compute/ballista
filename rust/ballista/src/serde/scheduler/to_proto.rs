@@ -42,7 +42,7 @@ impl TryInto<protobuf::ExecutePartition> for ExecutePartition {
 
     fn try_into(self) -> Result<protobuf::ExecutePartition, Self::Error> {
         Ok(protobuf::ExecutePartition {
-            job_uuid: self.job_uuid.to_string(),
+            job_id: self.job_id,
             stage_id: self.stage_id as u32,
             partition_id: self.partition_id as u32,
             plan: Some(self.plan.try_into()?),
@@ -54,7 +54,7 @@ impl TryInto<protobuf::ExecutePartition> for ExecutePartition {
 impl Into<protobuf::PartitionId> for PartitionId {
     fn into(self) -> protobuf::PartitionId {
         protobuf::PartitionId {
-            job_uuid: self.job_uuid.to_string(),
+            job_id: self.job_id,
             stage_id: self.stage_id as u32,
             partition_id: self.partition_id as u32,
         }

@@ -31,7 +31,7 @@ impl TryInto<Action> for protobuf::Action {
             Some(ActionType::ExecutePartition(partition)) => {
                 // TODO remove unwraps
                 Ok(Action::ExecutePartition(ExecutePartition::new(
-                    Uuid::parse_str(&partition.job_uuid).unwrap(),
+                    partition.job_id,
                     partition.stage_id as usize,
                     partition.partition_id as usize,
                     partition.plan.as_ref().unwrap().try_into()?,
@@ -53,7 +53,7 @@ impl TryInto<PartitionId> for protobuf::PartitionId {
 
     fn try_into(self) -> Result<PartitionId, Self::Error> {
         Ok(PartitionId::new(
-            Uuid::parse_str(&self.job_uuid).unwrap(),
+            &self.job_id,
             self.stage_id as usize,
             self.partition_id as usize,
         ))

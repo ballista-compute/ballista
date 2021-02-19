@@ -1,6 +1,6 @@
 //! Ballista Rust scheduler binary.
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::{Context, Result};
 use ballista::BALLISTA_VERSION;
@@ -30,8 +30,8 @@ mod config {
 }
 use config::prelude::*;
 
-async fn start_server<T: ConfigBackendClient + Send + Sync + 'static>(
-    config_backend: T,
+async fn start_server(
+    config_backend: Arc<dyn ConfigBackendClient>,
     namespace: String,
     addr: SocketAddr,
 ) -> Result<()> {
@@ -68,20 +68,19 @@ async fn main() -> Result<()> {
     let addr = format!("{}:{}", bind_host, port);
     let addr = addr.parse()?;
 
-    match opt.config_backend {
+    let client: Arc<dyn ConfigBackendClient> = match opt.config_backend {
         ConfigBackend::Etcd => {
             let etcd = etcd_client::Client::connect(&[opt.etcd_urls], None)
                 .await
                 .context("Could not connect to etcd")?;
-            let client = EtcdClient::new(etcd);
-            start_server(client, namespace, addr).await?;
+                Arc::new(EtcdClient::new(etcd))
         }
         ConfigBackend::Standalone => {
             // TODO: Use a real file and make path is configurable
-            let client = StandaloneClient::try_new_temporary()
-                .context("Could not create standalone config backend")?;
-            start_server(client, namespace, addr).await?;
+            Arc::new(StandaloneClient::try_new_temporary()
+                .context("Could not create standalone config backend")?)
         }
     };
+    start_server(client, namespace, addr).await?;
     Ok(())
 }

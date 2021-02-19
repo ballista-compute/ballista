@@ -14,13 +14,11 @@
 
 //! Ballista Rust executor binary.
 
-use std::{sync::Arc, time::Duration};
+use std::{convert::TryInto, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
 use arrow_flight::flight_service_server::FlightServiceServer;
-use ballista::serde::protobuf::{
-    self, scheduler_grpc_client::SchedulerGrpcClient, RegisterExecutorParams,
-};
+use ballista::{client::BallistaClient, serde::protobuf::{self, FailedTask, PartitionId, PollWorkParams, TaskStatus, scheduler_grpc_client::SchedulerGrpcClient, task_status}};
 use ballista::{
     executor::flight_service::BallistaFlightService,
     executor::{BallistaExecutor, ExecutorConfig},
@@ -30,9 +28,12 @@ use ballista::{
     serde::scheduler::ExecutorMeta,
     BALLISTA_VERSION,
 };
+use datafusion::physical_plan::ExecutionPlan;
 use futures::future::MaybeDone;
-use log::{info, warn};
+use log::{debug, info, warn};
+use protobuf::CompletedTask;
 use tempfile::TempDir;
+use tokio::sync::Mutex;
 use tonic::transport::{Channel, Server};
 use uuid::Uuid;
 
@@ -47,22 +48,83 @@ mod config {
 }
 use config::prelude::*;
 
-async fn registration_loop(
+async fn poll_loop(
     mut scheduler: SchedulerGrpcClient<Channel>,
+    executor_client: BallistaClient,
     executor_meta: ExecutorMeta,
 ) {
     let executor_meta: protobuf::ExecutorMetadata = executor_meta.into();
+    let running_task: Arc<Mutex<Option<(PartitionId, Option<ballista::error::Result<()>>)>>> = Arc::new(Mutex::new(None));
     loop {
-        info!("Starting registration with scheduler");
+        debug!("Starting registration with scheduler");
+        let mut task_status = vec![];
+        let mut running_task_guard = running_task.lock().await;
+        if let Some((task_id, result)) = &*running_task_guard {
+            let task_id = task_id.clone();
+            match result {
+                Some(Ok(_)) => {
+                    info!("Current task finished");
+                    *running_task_guard = None;
+                    task_status.push(TaskStatus {
+                        job_id: task_id.job_id,
+                        stage_id: task_id.stage_id,
+                        partition_id: task_id.partition_id,
+                        status: Some(task_status::Status::Completed(CompletedTask { executor_id: executor_meta.id.clone() } )),
+                    });
+                }
+                Some(Err(e)) => {
+                    let error_msg = e.to_string();
+                    info!("Current task failed: {}", error_msg);
+                    *running_task_guard = None;
+                    task_status.push(TaskStatus {
+                        job_id: task_id.job_id,
+                        stage_id: task_id.stage_id,
+                        partition_id: task_id.partition_id,
+                        status: Some(task_status::Status::Failed(FailedTask { error: format!("Task failed due to Tokio error: {}", error_msg)} )),
+                    });
+                },
+                None => {
+                    info!("Current task still in progress");
+                }
+            }
+        }
+        drop(running_task_guard);
         let registration_result = scheduler
-            .register_executor(RegisterExecutorParams {
+            .poll_work(PollWorkParams {
                 metadata: Some(executor_meta.clone()),
+                can_accept_task: running_task.lock().await.is_none(), // TODO: honor concurrent_tasks setting. right now each execution runs a single task at a time
+                task_status,
             })
             .await;
-        if let Err(error) = registration_result {
-            warn!("Executor registration failed. If this continues to happen the executor might be marked as dead by the scheduler. Error: {}", error);
+        match registration_result {
+            Ok(result) => {
+                if let Some(task) = result.into_inner().task {
+                    info!("Received task {:?}", task.task_id.as_ref().unwrap());
+                    let plan: Arc<dyn ExecutionPlan> = (&task.plan.unwrap()).try_into().unwrap();
+                    let task_id = task.task_id.unwrap();
+                    // TODO: This is a convoluted way of executing the task. We should move the task
+                    // execution code outside of the FlightService (data plane) into the control plane.
+                    let mut executor_client = executor_client.clone();
+                    let task_id_clone = task_id.clone();
+                    let running_task = running_task.clone();
+                    tokio::spawn(async move {
+                        let r = executor_client.execute_partition(
+                            task_id_clone.job_id.clone(),
+                            task_id_clone.stage_id as usize,
+                            task_id_clone.partition_id as usize,
+                            plan,
+                        ).await;
+                        info!("DONE WITH CURRENT TASK: {:?}", r);
+                        let mut running_task = running_task.lock().await;
+                        *running_task = Some((task_id_clone, Some(r.map(|_| ()))));
+                    });
+                }
+            }
+            Err(error) => {
+                warn!("Executor registration failed. If this continues to happen the executor might be marked as dead by the scheduler. Error: {}", error);
+            }
         }
-        tokio::time::sleep(Duration::from_secs(15)).await;
+        tokio::time::sleep(Duration::from_millis(250)).await;
     }
 }
 
@@ -109,7 +171,7 @@ async fn main() -> Result<()> {
 
     let executor_meta = ExecutorMeta {
         id: Uuid::new_v4().to_string(), // assign this executor a unique ID
-        host: external_host,
+        host: external_host.clone(),
         port,
     };
 
@@ -117,7 +179,7 @@ async fn main() -> Result<()> {
         info!("Running in local mode. Scheduler will be run in-proc");
         let client = StandaloneClient::try_new_temporary()
             .context("Could not create standalone config backend")?;
-        let server = SchedulerGrpcServer::new(SchedulerServer::new(client, namespace));
+        let server = SchedulerGrpcServer::new(SchedulerServer::new(Arc::new(client), namespace));
         let addr = format!("{}:{}", bind_host, scheduler_port);
         let addr = addr
             .parse()
@@ -155,7 +217,7 @@ async fn main() -> Result<()> {
     let scheduler = SchedulerGrpcClient::connect(scheduler_url)
         .await
         .context("Could not connect to scheduler")?;
-    let executor = Arc::new(BallistaExecutor::new(config, scheduler.clone()));
+    let executor = Arc::new(BallistaExecutor::new(config));
     let service = BallistaFlightService::new(executor);
 
     let server = FlightServiceServer::new(service);
@@ -164,7 +226,8 @@ async fn main() -> Result<()> {
         BALLISTA_VERSION, addr
     );
     let server_future = tokio::spawn(Server::builder().add_service(server).serve(addr));
-    tokio::spawn(registration_loop(scheduler, executor_meta));
+    let client = BallistaClient::try_new(&external_host, port).await?;
+    tokio::spawn(poll_loop(scheduler, client, executor_meta));
 
     server_future
         .await

@@ -306,7 +306,14 @@ message PhysicalPlanNode {
     CoalesceBatchesExecNode coalesce_batches = 12;
     FilterExecNode filter = 13;
     MergeExecNode merge = 14;
+    UnresolvedShuffleExecNode unresolved = 15;
   }
+}
+
+message UnresolvedShuffleExecNode {
+  repeated uint32 query_stage_ids = 1;
+  Schema schema = 2;
+  uint32 partition_count = 3;
 }
 
 message FilterExecNode {
@@ -429,7 +436,7 @@ message Action {
 }
 
 message ExecutePartition {
-  string job_uuid = 1;
+  string job_id = 1;
   uint32 stage_id = 2;
   uint32 partition_id = 3;
   PhysicalPlanNode plan = 4;
@@ -445,7 +452,7 @@ message PartitionLocation {
 
 // Unique identifier for a materialized partition of data
 message PartitionId {
-  string job_uuid = 1;
+  string job_id = 1;
   uint32 stage_id = 2;
   uint32 partition_id = 4;
 }
@@ -462,11 +469,45 @@ message GetExecutorMetadataResult {
   repeated ExecutorMetadata metadata = 1;
 }
 
-message RegisterExecutorParams {
-  ExecutorMetadata metadata = 1;
+message RunningTask {
+  string executor_id = 1;
 }
 
-message RegisterExecutorResult {}
+message FailedTask {
+  string error = 1;
+}
+
+message CompletedTask {
+  string executor_id = 1;
+}
+
+// TODO: Maybe it would be a good idea to use PartitionId as a field member?
+message TaskStatus {
+  string job_id = 1;
+  uint32 stage_id = 2;
+  uint32 partition_id = 3;
+  oneof status {
+    RunningTask running = 4;
+    FailedTask failed = 5;
+    CompletedTask completed = 6;
+  }
+}
+
+message PollWorkParams {
+  ExecutorMetadata metadata = 1;
+  bool can_accept_task = 2;
+  // All tasks must be reported until they reach the failed or completed state
+  repeated TaskStatus task_status = 3;
+}
+
+message TaskDefinition {
+  PartitionId task_id = 1;
+  PhysicalPlanNode plan = 2;
+}
+
+message PollWorkResult {
+  TaskDefinition task = 1;
+}
 
 message ExecuteQueryParams {
   LogicalPlanNode logical_plan = 1;
@@ -509,7 +550,8 @@ message GetJobStatusResult {
 service SchedulerGrpc {
   rpc GetExecutorsMetadata (GetExecutorMetadataParams) returns (GetExecutorMetadataResult) {}
 
-  rpc RegisterExecutor (RegisterExecutorParams) returns (RegisterExecutorResult) {}
+  // Executors must poll the scheduler for heartbeat and to receive tasks
+  rpc PollWork (PollWorkParams) returns (PollWorkResult) {}
 
   rpc ExecuteLogicalPlan (ExecuteQueryParams) returns (ExecuteQueryResult) {}
 

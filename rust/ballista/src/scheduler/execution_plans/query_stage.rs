@@ -28,7 +28,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone)]
 pub struct QueryStageExec {
     /// Unique ID for the job (query) that this stage is a part of
-    pub(crate) job_uuid: Uuid,
+    pub(crate) job_id: String,
     /// Unique query stage ID within the job
     pub(crate) stage_id: usize,
     /// Physical execution plan for this query stage
@@ -37,9 +37,9 @@ pub struct QueryStageExec {
 
 impl QueryStageExec {
     /// Create a new query stage
-    pub fn try_new(job_uuid: Uuid, stage_id: usize, child: Arc<dyn ExecutionPlan>) -> Result<Self> {
+    pub fn try_new(job_id: String, stage_id: usize, child: Arc<dyn ExecutionPlan>) -> Result<Self> {
         Ok(Self {
-            job_uuid,
+            job_id,
             stage_id,
             child,
         })
@@ -70,7 +70,7 @@ impl ExecutionPlan for QueryStageExec {
     ) -> Result<Arc<dyn ExecutionPlan>> {
         assert!(children.len() == 1);
         Ok(Arc::new(QueryStageExec::try_new(
-            self.job_uuid,
+            self.job_id.clone(),
             self.stage_id,
             children[0].clone(),
         )?))

@@ -128,7 +128,7 @@ pub fn format_plan(plan: &dyn ExecutionPlan, indent: usize) -> Result<String> {
     } else if let Some(exec) = plan.as_any().downcast_ref::<QueryStageExec>() {
         format!(
             "QueryStageExec: job={}, stage={}",
-            exec.job_uuid, exec.stage_id
+            exec.job_id, exec.stage_id
         )
     } else if let Some(exec) = plan.as_any().downcast_ref::<UnresolvedShuffleExec>() {
         format!("UnresolvedShuffleExec: stages={:?}", exec.query_stage_ids)

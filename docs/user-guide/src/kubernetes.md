@@ -1,89 +1,30 @@
 # Deploying Ballista with Kubernetes
 
-**NOTE: These instructions need updating for 0.4.0-alpha-1**
+Ballista can be deployed to any Kubernetes cluster using the following instructions. These instructions assume that
+you are already comfortable with managing Kubernetes deployments.
 
-You will need a Kubernetes cluster to deploy to. I recommend using 
-[Minikube](https://kubernetes.io/docs/tutorials/hello-minikube) for local testing, or Amazon's Elastic Kubernetes Service (EKS). 
+The k8s deployment consists of:
 
-These instructions are for using Minikube on Ubuntu.
+- k8s stateful set for one or more scheduler processes
+- k8s stateful set for one or more executor processes
+- k8s service to route traffic to the schedulers
+- k8s persistent volume and persistent volume claims to make local data accessible to Ballista
 
-## Create a Minikube cluster
+## Limitations
 
-Create a Minikube cluster using the docker driver.
+Ballista is at an early stage of development and therefore has some significant limitations:
 
-```bash
-minikube start --driver=docker --cpus=12
-```
+- There is no support for shared object stores such as S3. All data must exist locally on each node in the 
+  cluster, including where any client process runs  (until 
+  [#473](https://github.com/ballista-compute/ballista/issues/473) is resolved).
+- Only a single scheduler instance is currently supported unless the scheduler is configured to use `etcd` as a 
+  backing store.
 
-## Permissions
+## Create Persistent Volume and Persistent Volume Claim 
 
-Ballista will need permissions to list pods. We will apply the following yaml to create `list-pods` cluster role and 
-bind it to the default service account in the current namespace.
-
-```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: list-pods
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs: ["get", "watch", "list", "create", "edit", "delete"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: ballista-list-pods
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: list-pods
-subjects:
-- kind: ServiceAccount
-  name: default
-  namespace: default
-```
-
-```bash
-kubectl apply -f rbac.yaml
-```
-
-You should see the following output:
-
-```bash
-clusterrole.rbac.authorization.k8s.io/list-pods created
-clusterrolebinding.rbac.authorization.k8s.io/ballista-list-pods created
-```
-
-## Mounting a volume
-
-First, we need to mount the host data directory into the Minikube VM. This examples assumes that the local data 
-directory is `/mnt/` and that we are going to mount it to the same path in the pod.
-
-```bash
-minikube mount /mnt:/mnt
-```
-
-You should see output similar to this:
-
-```bash
-Mounting host path /mnt/ into VM as /mnt ...
-  Mount type:   <no value>
-  User ID:      docker
-  Group ID:     docker
-  Version:      9p2000.L
-  Message Size: 262144
-  Permissions:  755 (-rwxr-xr-x)
-  Options:      map[]
-  Bind Address: 172.17.0.1:43715
-    Userspace file server: ufs starting
-Successfully mounted /mnt/ to /mnt
-```
-
-Next, we will apply the following yaml to create a persistent volume and a persistent volume claim so that the 
-specified host directory is available to the containers.
+Copy the following yaml to a `pv.yaml` file and apply to the cluster to create a persistent volume and a persistent 
+volume claim so that the specified host directory is available to the containers. This is where any data should be 
+located so that Ballista can execute queries against it.
 
 ```yaml
 apiVersion: v1
@@ -114,7 +55,7 @@ spec:
       storage: 3Gi
 ```
 
-Create a persistent volume.
+To apply this yaml:
 
 ```bash
 kubectl apply -f pv.yaml
@@ -123,64 +64,52 @@ kubectl apply -f pv.yaml
 You should see the following output:
 
 ```bash
-persistentvolume/nyctaxi-pv created
-persistentvolumeclaim/nyctaxi-pv-claim created
+persistentvolume/data-pv created
+persistentvolumeclaim/data-pv-claim created
 ```
 
-## Creating the Ballista cluster
+## Deploying Ballista Scheduler and Executors
 
-We will apply the following yaml to create a service and a stateful set of twelve Rust executors. Note that can you 
-simply change the docker image name from `ballistacompute/ballista-rust` to `ballistacompute/ballista-jvm` 
-or `ballistacompute/ballista-spark` to use the JVM or Spark executor instead. 
-
-This definition will create six executors, using 1-2GB each. If you are running on a computer with limited memory 
-available then you may want to reduce the number of replicas.
+Copy the following yaml to a `cluster.yaml` file.
 
 ```yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: ballista
+  name: ballista-scheduler
   labels:
-    app: ballista
+    app: ballista-scheduler
 spec:
   ports:
-    - port: 50051
-      name: flight
+    - port: 50050
+      name: scheduler
   clusterIP: None
   selector:
-    app: ballista
+    app: ballista-scheduler
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: ballista
+  name: ballista-scheduler
 spec:
-  serviceName: "ballista"
-  replicas: 6
+  serviceName: "ballista-scheduler"
+  replicas: 1
   selector:
     matchLabels:
-      app: ballista
+      app: ballista-scheduler
   template:
     metadata:
       labels:
-        app: ballista
+        app: ballista-scheduler
         ballista-cluster: ballista
     spec:
       containers:
-      - name: ballista
-        image: ballistacompute/ballista-rust:0.4.0-alpha-1
-        command: ["/executor"]
-        args: ["--external-host=0.0.0.0", "--port=50051"]
-        resources:
-          requests:
-            cpu: "1"
-            memory: "1024Mi"
-          limits:
-            cpu: "2"
-            memory: "2048Mi"
+      - name: ballista-scheduler
+        image: ballistacompute/ballista-rust:0.4.0-alpha-2
+        command: ["/scheduler"]
+        args: ["--port=50050"]
         ports:
-          - containerPort: 50051
+          - containerPort: 50050
             name: flight
         volumeMounts:
           - mountPath: /mnt
@@ -189,53 +118,75 @@ spec:
       - name: data
         persistentVolumeClaim:
           claimName: data-pv-claim
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ballista-executor
+spec:
+  serviceName: "ballista-scheduler"
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ballista-executor
+  template:
+    metadata:
+      labels:
+        app: ballista-executor
+        ballista-cluster: ballista
+    spec:
+      containers:
+        - name: ballista-executor
+          image: ballistacompute/ballista-rust:0.4.0-alpha-2
+          command: ["/executor"]
+          args: ["--port=50051", "--scheduler-host=ballista-scheduler", "--scheduler-port=50050", "--external-host=$(MY_POD_IP)"]
+          env:
+            - name: MY_POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP            
+          ports:
+            - containerPort: 50051
+              name: flight
+          volumeMounts:
+            - mountPath: /mnt
+              name: data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: data-pv-claim
 ```
-
-Run the following kubectl command to deploy the Ballista cluster.
 
 ```bash
-kubectl apply -f ballista-cluster.yaml
+$ kubectl apply -f cluster.yaml
 ```
 
-You should see the following output:
+This should show the following output:
 
 ```
-service/ballista created
-statefulset.apps/ballista created
+service/ballista-scheduler created
+statefulset.apps/ballista-scheduler created
+statefulset.apps/ballista-executor created
 ```
 
-Run the `kubectl get pods` command to confirm that the pods are running. It will take a few seconds for all of the pods to start.
-
-```
-kubectl get pods
-NAME          READY   STATUS    RESTARTS   AGE
-ballista-0    1/1     Running   0          37s
-ballista-1    1/1     Running   0          33s
-ballista-10   1/1     Running   0          16s
-ballista-11   1/1     Running   0          15s
-ballista-2    1/1     Running   0          32s
-ballista-3    1/1     Running   0          30s
-ballista-4    1/1     Running   0          28s
-ballista-5    1/1     Running   0          27s
-ballista-6    1/1     Running   0          24s
-ballista-7    1/1     Running   0          22s
-ballista-8    1/1     Running   0          20s
-ballista-9    1/1     Running   0          18s
-```
-
-## Port Forwarding
-
-Run the following command to expose the service so that clients can submit queries to the cluster.
+You can also check status by running `kubectl get pods`:
 
 ```bash
-kubectl port-forward service/ballista 50051:50051
+$ kubectl get pods
+NAME                   READY   STATUS    RESTARTS   AGE
+busybox                1/1     Running   0          16m
+ballista-scheduler-0   1/1     Running   0          42s
+ballista-executor-0    1/1     Running   2          42s
+ballista-executor-1    1/1     Running   0          26s
 ```
 
-You should see the following output:
+You can view the scheduler logs with `kubectl logs ballista-scheduler-0`:
 
 ```
-Forwarding from 127.0.0.1:50051 -> 50051
-Forwarding from [::1]:50051 -> 50051
+$ kubectl logs ballista-scheduler-0
+[2021-02-19T00:24:01Z INFO  scheduler] Ballista v0.4.0-alpha-2 Scheduler listening on 0.0.0.0:50050
+[2021-02-19T00:24:16Z INFO  ballista::scheduler] Received register_executor request for ExecutorMetadata { id: "b5e81711-1c5c-46ec-8522-d8b359793188", host: "10.1.23.149", port: 50051 }
+[2021-02-19T00:24:17Z INFO  ballista::scheduler] Received register_executor request for ExecutorMetadata { id: "816e4502-a876-4ed8-b33f-86d243dcf63f", host: "10.1.23.150", port: 50051 }
 ```
 
 ## Deleting the Ballista cluster
@@ -243,5 +194,5 @@ Forwarding from [::1]:50051 -> 50051
 Run the following kubectl command to delete the cluster.
 
 ```bash
-kubectl delete -f ballista-cluster.yaml
+kubectl delete -f cluster.yaml
 ```

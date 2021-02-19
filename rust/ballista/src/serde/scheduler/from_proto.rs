@@ -36,9 +36,11 @@ impl TryInto<Action> for protobuf::Action {
                     partition
                         .plan
                         .as_ref()
-                        .ok_or_else(|| BallistaError::General(
-                            "PhysicalPlanNode in ExecutePartition is missing".to_owned(),
-                        ))?
+                        .ok_or_else(|| {
+                            BallistaError::General(
+                                "PhysicalPlanNode in ExecutePartition is missing".to_owned(),
+                            )
+                        })?
                         .try_into()?,
                     HashMap::new(),
                 )))
@@ -72,15 +74,19 @@ impl TryInto<PartitionLocation> for protobuf::PartitionLocation {
         Ok(PartitionLocation {
             partition_id: self
                 .partition_id
-                .ok_or_else(|| BallistaError::General(
-                    "partition_id in PartitionLocation is missing.".to_owned(),
-                ))?
+                .ok_or_else(|| {
+                    BallistaError::General(
+                        "partition_id in PartitionLocation is missing.".to_owned(),
+                    )
+                })?
                 .try_into()?,
             executor_meta: self
                 .executor_meta
-                .ok_or_else(|| BallistaError::General(
-                    "executor_meta in PartitionLocation is missing".to_owned(),
-                ))?
+                .ok_or_else(|| {
+                    BallistaError::General(
+                        "executor_meta in PartitionLocation is missing".to_owned(),
+                    )
+                })?
                 .into(),
         })
     }

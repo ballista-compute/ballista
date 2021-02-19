@@ -508,10 +508,26 @@ message GetJobStatusResult {
   JobStatus status = 1;
 }
 
+message GetFileMetadataParams {
+  string path = 1;
+  FileType file_type = 2;
+}
+
+message GetFileMetadataResult {
+  Schema schema = 1;
+  repeated FilePartitionMetadata partitions = 2;
+}
+
+message FilePartitionMetadata {
+  repeated string filename = 1;
+}
+
 service SchedulerGrpc {
   rpc GetExecutorsMetadata (GetExecutorMetadataParams) returns (GetExecutorMetadataResult) {}
 
   rpc RegisterExecutor (RegisterExecutorParams) returns (RegisterExecutorResult) {}
+
+  rpc GetFileMetadata (GetFileMetadataParams) returns (GetFileMetadataResult) {}
 
   rpc ExecuteLogicalPlan (ExecuteQueryParams) returns (ExecuteQueryResult) {}
 

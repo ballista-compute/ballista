@@ -36,7 +36,7 @@ impl TryInto<Action> for protobuf::Action {
                     partition
                         .plan
                         .as_ref()
-                        .ok_or(BallistaError::General(
+                        .ok_or_else(|| BallistaError::General(
                             "PhysicalPlanNode in ExecutePartition is missing".to_owned(),
                         ))?
                         .try_into()?,
@@ -72,13 +72,13 @@ impl TryInto<PartitionLocation> for protobuf::PartitionLocation {
         Ok(PartitionLocation {
             partition_id: self
                 .partition_id
-                .ok_or(BallistaError::General(
+                .ok_or_else(|| BallistaError::General(
                     "partition_id in PartitionLocation is missing.".to_owned(),
                 ))?
                 .try_into()?,
             executor_meta: self
                 .executor_meta
-                .ok_or(BallistaError::General(
+                .ok_or_else(|| BallistaError::General(
                     "executor_meta in PartitionLocation is missing".to_owned(),
                 ))?
                 .into(),
@@ -90,9 +90,9 @@ fn parse_job_uuid(job_uuid: &str) -> Result<Uuid, BallistaError> {
     if let Ok(parsed_uuid) = Uuid::parse_str(&job_uuid) {
         Ok(parsed_uuid)
     } else {
-        return Err(BallistaError::General(format!(
+        Err(BallistaError::General(format!(
             "Invalid job_uuid {}",
             job_uuid
-        )));
+        )))
     }
 }

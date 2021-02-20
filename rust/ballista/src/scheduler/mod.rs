@@ -354,7 +354,7 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
         request: Request<GetJobStatusParams>,
     ) -> std::result::Result<Response<GetJobStatusResult>, tonic::Status> {
         let job_id = request.into_inner().job_id;
-        info!("Received get_job_status request for job {}", job_id);
+        debug!("Received get_job_status request for job {}", job_id);
         let job_meta = self
             .state
             .get_job_metadata(&self.namespace, &job_id)

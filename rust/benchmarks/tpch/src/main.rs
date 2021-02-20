@@ -164,18 +164,18 @@ async fn benchmark(opt: BenchmarkOpt) -> Result<()> {
     for i in 0..opt.iterations {
         let start = Instant::now();
         let df = ctx.sql(&sql)?;
-
         let mut batches = vec![];
         let mut stream = df.collect().await?;
         while let Some(result) = stream.next().await {
             let batch = result?;
             batches.push(batch);
         }
-        pretty::print_batches(&batches)?;
-
         let elapsed = start.elapsed().as_secs_f64() * 1000.0;
         millis.push(elapsed as f64);
         println!("Query {} iteration {} took {:.1} ms", opt.query, i, elapsed);
+        if opt.debug {
+            pretty::print_batches(&batches)?;
+        }
     }
 
     let avg = millis.iter().sum::<f64>() / millis.len() as f64;

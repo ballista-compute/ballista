@@ -49,6 +49,17 @@ pub struct PartitionStats {
     null_count: u64,
 }
 
+impl Default for PartitionStats {
+    fn default() -> Self {
+        Self {
+            num_rows: 0,
+            num_batches: 0,
+            num_bytes: 0,
+            null_count: 0,
+        }
+    }
+}
+
 impl PartitionStats {
     pub fn arrow_struct_repr(self) -> Field {
         Field::new(

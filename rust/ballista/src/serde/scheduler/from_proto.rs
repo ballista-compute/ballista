@@ -20,6 +20,7 @@ use crate::serde::protobuf;
 use crate::serde::protobuf::action::ActionType;
 use crate::serde::scheduler::{Action, ExecutePartition, PartitionId};
 
+use crate::utils::PartitionStats;
 use datafusion::logical_plan::LogicalPlan;
 use uuid::Uuid;
 
@@ -88,6 +89,7 @@ impl TryInto<PartitionLocation> for protobuf::PartitionLocation {
                     )
                 })?
                 .into(),
+            stats: PartitionStats::new(self.row_count, 0, 0, 0),
         })
     }
 }

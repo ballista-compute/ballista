@@ -43,10 +43,21 @@ use std::ops::Deref;
 /// Summary of executed partition
 #[derive(Debug, Copy, Clone)]
 pub struct PartitionStats {
-    num_rows: u64,
+    pub(crate) num_rows: u64,
     num_batches: u64,
     num_bytes: u64,
     null_count: u64,
+}
+
+impl PartitionStats {
+    pub fn new(num_rows: u64, num_batches: u64, num_bytes: u64, null_count: u64) -> Self {
+        Self {
+            num_rows,
+            num_batches,
+            num_bytes,
+            null_count,
+        }
+    }
 }
 
 impl Default for PartitionStats {

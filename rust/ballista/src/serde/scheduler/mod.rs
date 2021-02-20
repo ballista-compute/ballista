@@ -127,7 +127,7 @@ impl ExecutePartition {
 pub struct ExecutePartitionResult {
     /// Path containing results for this partition
     path: String,
-    stats: PartitionStats,
+    pub(crate) stats: PartitionStats,
 }
 
 impl ExecutePartitionResult {

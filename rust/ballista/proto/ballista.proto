@@ -443,6 +443,7 @@ message ExecutePartition {
 message PartitionLocation {
   PartitionId partition_id = 1;
   ExecutorMetadata executor_meta = 2;
+  uint64 row_count = 3;
 }
 
 // Unique identifier for a materialized partition of data

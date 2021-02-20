@@ -29,7 +29,7 @@ use crate::serde::scheduler::ExecutorMeta;
 use crate::serde::scheduler::PartitionId;
 use crate::utils;
 
-use crate::utils::format_plan;
+use crate::utils::{format_plan, PartitionStats};
 use arrow::record_batch::RecordBatch;
 use datafusion::error::DataFusionError;
 use datafusion::execution::context::ExecutionContext;
@@ -44,6 +44,7 @@ use datafusion::physical_plan::{
 };
 use log::{debug, info};
 use std::time::Instant;
+use tokio::task::JoinHandle;
 use uuid::Uuid;
 
 type SendableExecutionPlan = Pin<Box<dyn Future<Output = Result<Arc<dyn ExecutionPlan>>> + Send>>;
@@ -53,6 +54,7 @@ type PartialQueryStageResult = (Arc<dyn ExecutionPlan>, Vec<Arc<QueryStageExec>>
 pub struct PartitionLocation {
     pub(crate) partition_id: PartitionId,
     pub(crate) executor_meta: ExecutorMeta,
+    pub(crate) stats: PartitionStats,
 }
 
 pub struct DistributedPlanner {
@@ -289,7 +291,6 @@ async fn execute_query_stage(
 
     let _job_uuid = *job_uuid;
     let partition_count = plan.output_partitioning().partition_count();
-    let mut meta = Vec::with_capacity(partition_count);
 
     let partition_chunks: Vec<Vec<usize>> = (0..partition_count)
         .collect::<Vec<usize>>()
@@ -302,18 +303,8 @@ async fn execute_query_stage(
         partition_chunks.len()
     );
 
-    // build metadata for partition locations
-    for i in 0..partition_chunks.len() {
-        let executor_meta = &executors[i % executors.len()];
-        for part in &partition_chunks[i] {
-            meta.push(PartitionLocation {
-                partition_id: PartitionId::new(_job_uuid, stage_id, *part),
-                executor_meta: executor_meta.clone(),
-            });
-        }
-    }
-
-    let mut executions = Vec::with_capacity(partition_count);
+    let mut executions: Vec<JoinHandle<Result<Vec<PartitionLocation>>>> =
+        Vec::with_capacity(partition_count);
     for i in 0..partition_chunks.len() {
         let _plan = plan.clone();
         let executor_meta = executors[i % executors.len()].clone();
@@ -321,9 +312,18 @@ async fn execute_query_stage(
         executions.push(tokio::spawn(async move {
             let mut client =
                 BallistaClient::try_new(&executor_meta.host, executor_meta.port).await?;
-            client
-                .execute_partition(_job_uuid, stage_id, partition_ids, _plan)
-                .await
+            let stats = client
+                .execute_partition(_job_uuid, stage_id, partition_ids.clone(), _plan)
+                .await?;
+            let mut meta = Vec::with_capacity(partition_ids.len());
+            for part in &partition_ids {
+                meta.push(PartitionLocation {
+                    partition_id: PartitionId::new(_job_uuid, stage_id, *part),
+                    executor_meta: executor_meta.clone(),
+                    stats: stats[*part].stats,
+                });
+            }
+            Ok(meta)
         }));
     }
 
@@ -331,11 +331,14 @@ async fn execute_query_stage(
     let results = futures::future::join_all(executions).await;
 
     // check for errors
+    let mut meta = Vec::with_capacity(partition_count);
+
     for result in results {
         match result {
             Ok(partition_result) => {
                 let final_result = partition_result?;
                 debug!("Query stage partition result: {:?}", final_result);
+                meta.extend(final_result);
             }
             Err(e) => {
                 return Err(BallistaError::General(format!(

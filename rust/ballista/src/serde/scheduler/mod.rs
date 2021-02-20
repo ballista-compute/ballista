@@ -131,7 +131,7 @@ impl ExecutePartitionResult {
     pub fn new(path: &str, stats: PartitionStats) -> Self {
         Self {
             path: path.to_owned(),
-            stats: stats
+            stats,
         }
     }
 

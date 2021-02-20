@@ -112,6 +112,7 @@ impl DistributedPlanner {
         job_uuid: &Uuid,
         execution_plan: Arc<dyn ExecutionPlan>,
     ) -> Result<Vec<Arc<QueryStageExec>>> {
+        info!("planning query stages");
         let (new_plan, mut stages) = self.plan_query_stages_internal(job_uuid, execution_plan)?;
         stages.push(create_query_stage(
             job_uuid,

@@ -50,35 +50,20 @@ pub struct PartitionStats {
 }
 
 impl PartitionStats {
-    // pub fn to_hash_map(&self) -> HashMap<String, String>{
-    //     let mut metadata: HashMap<String, String> = HashMap::new();
-    //     metadata.insert("num_rows".to_string(), self.num_rows.to_string());
-    //     metadata.insert("num_batches".to_string(), self.num_batches.to_string());
-    //     metadata.insert("num_bytes".to_string(), self.num_bytes.to_string());
-    //     metadata.insert("null_count".to_string(), self.null_count.to_string());
-    //     return metadata
-    // }
-    //
-    // pub fn from_hash_map(map: &HashMap<String, String>) -> Result<Self>{
-    //     return Ok(PartitionStats {
-    //         num_rows: map.get("num_rows")?.parse()?,
-    //         num_batches: map.get("num_batches")?.parse()?,
-    //         num_bytes: map.get("num_bytes")?.parse()?,
-    //         null_count: map.get("null_count")?.parse()?,
-    //     })
-    // }
-
     pub fn arrow_struct_repr(self) -> Field {
         Field::new(
             "partition_stats",
-            DataType::Struct(vec![
-                Field::new("num_rows", DataType::UInt64, false),
-                Field::new("num_batches", DataType::UInt64, false),
-                Field::new("num_bytes", DataType::UInt64, false),
-                Field::new("null_count", DataType::UInt64, false),
-            ]),
+            DataType::Struct(self.arrow_struct_fields()),
             false,
         )
+    }
+    fn arrow_struct_fields(self) -> Vec<Field> {
+        vec![
+            Field::new("num_rows", DataType::UInt64, false),
+            Field::new("num_batches", DataType::UInt64, false),
+            Field::new("num_bytes", DataType::UInt64, false),
+            Field::new("null_count", DataType::UInt64, false),
+        ]
     }
 
     pub fn to_arrow_arrayref(&self) -> Arc<StructArray> {
@@ -100,7 +85,8 @@ impl PartitionStats {
         null_count_builder.append_value(self.null_count).unwrap();
         field_builders.push(Box::new(null_count_builder) as Box<dyn ArrayBuilder>);
 
-        let mut struct_builder = StructBuilder::new(vec![self.arrow_struct_repr()], field_builders);
+        let mut struct_builder = StructBuilder::new(self.arrow_struct_fields(), field_builders);
+        struct_builder.append(true).unwrap();
         Arc::new(struct_builder.finish())
     }
 

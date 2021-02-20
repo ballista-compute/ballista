@@ -136,6 +136,8 @@ impl FlightService for BallistaFlightService {
                     info.arrow_struct_repr(),
                 ]));
                 let stats: ArrayRef = info.to_arrow_arrayref();
+                info!("stats len {}", stats.len());
+                info!("[ath] len {}", path.len());
 
                 let results =
                     vec![RecordBatch::try_new(schema.clone(), vec![path, stats]).unwrap()];

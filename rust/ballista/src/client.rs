@@ -23,6 +23,7 @@ use crate::memory_stream::MemoryStream;
 use crate::serde::protobuf::{self};
 use crate::serde::scheduler::{Action, ExecutePartition, ExecutePartitionResult, PartitionId};
 
+use crate::utils::PartitionStats;
 use arrow::array::{StringArray, StructArray};
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
@@ -35,7 +36,6 @@ use datafusion::{logical_plan::LogicalPlan, physical_plan::RecordBatchStream};
 use log::debug;
 use prost::Message;
 use uuid::Uuid;
-use crate::utils::PartitionStats;
 
 /// Client for interacting with Ballista executors.
 pub struct BallistaClient {
@@ -105,7 +105,10 @@ impl BallistaClient {
             .downcast_ref::<StructArray>()
             .expect("execute_partition expected column 1 to be a StructArray");
 
-        Ok(ExecutePartitionResult::new(path.value(0), PartitionStats::from_arrow_struct_array(stats)))
+        Ok(ExecutePartitionResult::new(
+            path.value(0),
+            PartitionStats::from_arrow_struct_array(stats),
+        ))
     }
 
     /// Fetch a partition from an executor

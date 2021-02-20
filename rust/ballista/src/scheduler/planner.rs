@@ -290,27 +290,39 @@ async fn execute_query_stage(
     let _job_uuid = *job_uuid;
     let partition_count = plan.output_partitioning().partition_count();
     let mut meta = Vec::with_capacity(partition_count);
-    for child_partition in 0..partition_count {
-        debug!(
-            "execute_query_stage() stage_id={}, partition_id={}",
-            stage_id, child_partition
-        );
-        let executor_meta = &executors[child_partition % executors.len()];
-        meta.push(PartitionLocation {
-            partition_id: PartitionId::new(_job_uuid, stage_id, child_partition),
-            executor_meta: executor_meta.clone(),
-        });
+
+    let partition_chunks: Vec<Vec<usize>> = (0..partition_count)
+        .collect::<Vec<usize>>()
+        .chunks(partition_count / executors.len())
+        .map(|r| r.to_vec())
+        .collect();
+
+    info!(
+        "Executing query stage with {} chunks of partition ranges",
+        partition_chunks.len()
+    );
+
+    // build metadata for partition locations
+    for i in 0..partition_chunks.len() {
+        let executor_meta = &executors[i % executors.len()];
+        for part in &partition_chunks[i] {
+            meta.push(PartitionLocation {
+                partition_id: PartitionId::new(_job_uuid, stage_id, *part),
+                executor_meta: executor_meta.clone(),
+            });
+        }
     }
 
     let mut executions = Vec::with_capacity(partition_count);
-    for child_partition in 0..partition_count {
+    for i in 0..partition_chunks.len() {
         let _plan = plan.clone();
-        let _executor_meta = executors[child_partition % executors.len()].clone();
+        let executor_meta = executors[i % executors.len()].clone();
+        let partition_ids = partition_chunks[i].to_vec();
         executions.push(tokio::spawn(async move {
             let mut client =
-                BallistaClient::try_new(&_executor_meta.host, _executor_meta.port).await?;
+                BallistaClient::try_new(&executor_meta.host, executor_meta.port).await?;
             client
-                .execute_partition(_job_uuid, stage_id, vec![child_partition], _plan)
+                .execute_partition(_job_uuid, stage_id, partition_ids, _plan)
                 .await
         }));
     }

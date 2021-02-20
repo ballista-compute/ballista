@@ -236,16 +236,20 @@ pub fn format_plan(plan: &dyn ExecutionPlan, indent: usize) -> Result<String> {
         let str = format!("{:?}", plan);
         String::from(&str[0..120])
     };
-    Ok(format!(
-        "{}{}\n{}",
-        "  ".repeat(indent),
-        &operator_str,
-        plan.children()
-            .iter()
-            .map(|c| format_plan(c.as_ref(), indent + 1))
-            .collect::<Result<Vec<String>>>()?
-            .join("\n")
-    ))
+
+    let children_str = plan
+        .children()
+        .iter()
+        .map(|c| format_plan(c.as_ref(), indent + 1))
+        .collect::<Result<Vec<String>>>()?
+        .join("\n");
+
+    let indent_str = "  ".repeat(indent);
+    if plan.children().is_empty() {
+        Ok(format!("{}{}{}", indent_str, &operator_str, children_str))
+    } else {
+        Ok(format!("{}{}\n{}", indent_str, &operator_str, children_str))
+    }
 }
 
 pub fn format_agg_expr(expr: &dyn AggregateExpr) -> Result<String> {

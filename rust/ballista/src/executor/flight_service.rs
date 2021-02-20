@@ -125,7 +125,8 @@ impl FlightService for BallistaFlightService {
                         .map_err(|e| from_ballista_err(&e))?;
 
                     info!(
-                        "Executed partition in {} seconds. Statistics: {:?}",
+                        "Executed partition {} in {} seconds. Statistics: {:?}",
+                        part,
                         now.elapsed().as_secs(),
                         stats
                     );

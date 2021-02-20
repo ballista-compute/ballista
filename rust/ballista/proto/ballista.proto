@@ -474,6 +474,10 @@ message ExecuteQueryParams {
   LogicalPlanNode logical_plan = 1;
 }
 
+message ExecuteSqlParams {
+  string sql = 1;
+}
+
 message ExecuteQueryResult {
   string job_id = 1;
 }
@@ -530,6 +534,8 @@ service SchedulerGrpc {
   rpc GetFileMetadata (GetFileMetadataParams) returns (GetFileMetadataResult) {}
 
   rpc ExecuteLogicalPlan (ExecuteQueryParams) returns (ExecuteQueryResult) {}
+
+  rpc ExecuteSQL (ExecuteSqlParams) returns (ExecuteQueryResult) {}
 
   rpc GetJobStatus (GetJobStatusParams) returns (GetJobStatusResult) {}
 }

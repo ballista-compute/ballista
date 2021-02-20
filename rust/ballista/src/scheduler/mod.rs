@@ -24,8 +24,8 @@ use std::fmt;
 
 use crate::serde::protobuf::{
     job_status, scheduler_grpc_server::SchedulerGrpc, CompletedJob, ExecuteQueryParams,
-    ExecuteQueryResult, ExecutorMetadata, FailedJob, FilePartitionMetadata, FileType,
-    GetExecutorMetadataParams, GetExecutorMetadataResult, GetFileMetadataParams,
+    ExecuteQueryResult, ExecuteSqlParams, ExecutorMetadata, FailedJob, FilePartitionMetadata,
+    FileType, GetExecutorMetadataParams, GetExecutorMetadataResult, GetFileMetadataParams,
     GetFileMetadataResult, GetJobStatusParams, GetJobStatusResult, JobStatus, PartitionLocation,
     QueuedJob, RegisterExecutorParams, RegisterExecutorResult, RunningJob,
 };
@@ -167,6 +167,31 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
                 "get_file_metadata unsupported file type",
             )),
         }
+    }
+
+    async fn execute_sql(
+        &self,
+        request: Request<ExecuteSqlParams>,
+    ) -> std::result::Result<Response<ExecuteQueryResult>, tonic::Status> {
+        let ExecuteSqlParams { sql } = request.into_inner();
+        info!("Received execute_sql request: {}", sql);
+
+        //TODO we can't just create a new context because we need a context that has
+        // tables registered from previous SQL statements that have been executed
+
+        let mut ctx = ExecutionContext::new();
+        let df = ctx.sql(&sql).map_err(|e| {
+            let msg = format!("Error executing SQL: {}", e);
+            error!("{}", msg);
+            tonic::Status::internal(msg)
+        })?;
+        let _logical_plan = df.to_logical_plan();
+
+        //TODO delegate to the logic that already exists in execute_logical_plan
+
+        Err(tonic::Status::unimplemented(
+            "execute_sql not implemented yet",
+        ))
     }
 
     async fn execute_logical_plan(

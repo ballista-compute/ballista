@@ -1,11 +1,13 @@
 # Ballista Developer Documentation
 
 This directory contains documentation for developers that are contributing to Ballista. If you are looking for 
-end-user documentation for a published release, please start with the [user guide](https://ballistacompute.org/docs/).
+end-user documentation for a published release, please start with the 
+[Ballista User Guide](https://ballistacompute.org/docs/) instead.
 
-## Architevture & Design
+## Architecture & Design
 
-- Overview of [distributed query execution](query-execution.md)
+- Read the [Architecture Overview](architecture.md) to get an understanding of the scheduler and executor 
+  processes and how distributed query execution works.
 
 ## Build, Test, Release
 

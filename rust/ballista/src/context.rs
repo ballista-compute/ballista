@@ -142,7 +142,7 @@ impl BallistaContext {
         for (name, plan) in &state.tables {
             let plan = ctx.optimize(plan)?;
             let execution_plan = ctx.create_physical_plan(&plan)?;
-            ctx.register_table(name, Box::new(DFTableAdapter::new(plan, execution_plan)))
+            ctx.register_table(name, Arc::new(DFTableAdapter::new(plan, execution_plan)));
         }
         let df = ctx.sql(sql)?;
         Ok(BallistaDataFrame::from(self.state.clone(), df))

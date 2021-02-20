@@ -32,7 +32,7 @@ impl TryInto<Action> for protobuf::Action {
                 Ok(Action::ExecutePartition(ExecutePartition::new(
                     parse_job_uuid(&partition.job_uuid)?,
                     partition.stage_id as usize,
-                    partition.partition_id as usize,
+                    partition.partition_id.iter().map(|n| *n as usize).collect(),
                     partition
                         .plan
                         .as_ref()

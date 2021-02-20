@@ -310,7 +310,7 @@ async fn execute_query_stage(
             let mut client =
                 BallistaClient::try_new(&_executor_meta.host, _executor_meta.port).await?;
             client
-                .execute_partition(_job_uuid, stage_id, child_partition, _plan)
+                .execute_partition(_job_uuid, stage_id, vec![child_partition], _plan)
                 .await
         }));
     }

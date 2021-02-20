@@ -44,7 +44,7 @@ impl TryInto<protobuf::ExecutePartition> for ExecutePartition {
         Ok(protobuf::ExecutePartition {
             job_uuid: self.job_uuid.to_string(),
             stage_id: self.stage_id as u32,
-            partition_id: self.partition_id as u32,
+            partition_id: self.partition_id.iter().map(|n| *n as u32).collect(),
             plan: Some(self.plan.try_into()?),
             partition_location: vec![],
         })

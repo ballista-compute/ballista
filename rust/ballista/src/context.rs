@@ -241,7 +241,7 @@ impl BallistaDataFrame {
             let status = status.and_then(|s| s.status).ok_or_else(|| {
                 BallistaError::Internal("Received empty status message".to_owned())
             })?;
-            let wait_future = tokio::time::sleep(Duration::from_secs(5));
+            let wait_future = tokio::time::sleep(Duration::from_millis(100));
             match status {
                 job_status::Status::Queued(_) => {
                     info!("Job {} still queued...", job_id);

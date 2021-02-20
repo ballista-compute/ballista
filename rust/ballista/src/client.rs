@@ -67,7 +67,7 @@ impl BallistaClient {
         &mut self,
         job_uuid: Uuid,
         stage_id: usize,
-        partition_id: usize,
+        partition_id: Vec<usize>,
         plan: Arc<dyn ExecutionPlan>,
     ) -> Result<ExecutePartitionResult> {
         let action = Action::ExecutePartition(ExecutePartition {

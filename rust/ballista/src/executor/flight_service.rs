@@ -89,74 +89,80 @@ impl FlightService for BallistaFlightService {
         match &action {
             BallistaAction::ExecutePartition(partition) => {
                 info!(
-                    "ExecutePartition: job={}, stage={}, partition={}\n{}",
+                    "ExecutePartition: job={}, stage={}, partition={:?}\n{}",
                     partition.job_uuid,
                     partition.stage_id,
                     partition.partition_id,
                     format_plan(partition.plan.as_ref(), 0).map_err(|e| from_ballista_err(&e))?
                 );
 
-                let mut path = PathBuf::from(&self.executor.config.work_dir);
-                path.push(&format!("{}", partition.job_uuid));
-                path.push(&format!("{}", partition.stage_id));
-                path.push(&format!("{}", partition.partition_id));
-                std::fs::create_dir_all(&path)?;
-
-                path.push("data.arrow");
-                let path = path.to_str().unwrap();
-                info!("Writing results to {}", path);
-
-                let now = Instant::now();
-
-                // execute the query partition
-                let mut stream = partition
-                    .plan
-                    .execute(partition.partition_id)
-                    .await
-                    .map_err(|e| from_datafusion_err(&e))?;
-
-                // stream results to disk
-                let info = utils::write_stream_to_disk(&mut stream, &path)
-                    .await
-                    .map_err(|e| from_ballista_err(&e))?;
-
-                info!(
-                    "Executed partition in {} seconds. Statistics: {:?}",
-                    now.elapsed().as_secs(),
-                    info
-                );
-
-                // build result set with summary of the partition execution status
-                let mut c0 = StringBuilder::new(1);
-                c0.append_value(&path).unwrap();
-                let path: ArrayRef = Arc::new(c0.finish());
-
-                let schema = Arc::new(Schema::new(vec![
-                    Field::new("path", DataType::Utf8, false),
-                    info.arrow_struct_repr(),
-                ]));
-                let stats: ArrayRef = info.to_arrow_arrayref();
-                info!("stats len {}", stats.len());
-                info!("[ath] len {}", path.len());
-
-                let results =
-                    vec![RecordBatch::try_new(schema.clone(), vec![path, stats]).unwrap()];
-                // add an initial FlightData message that sends schema
+                let mut flights: Vec<Result<FlightData, Status>> = vec![];
                 let options = arrow::ipc::writer::IpcWriteOptions::default();
-                let schema_flight_data =
-                    arrow_flight::utils::flight_data_from_arrow_schema(schema.as_ref(), &options);
 
-                let mut flights: Vec<Result<FlightData, Status>> = vec![Ok(schema_flight_data)];
+                for part in &partition.partition_id {
+                    let mut path = PathBuf::from(&self.executor.config.work_dir);
+                    path.push(&format!("{}", partition.job_uuid));
+                    path.push(&format!("{}", partition.stage_id));
+                    path.push(&format!("{}", *part));
+                    std::fs::create_dir_all(&path)?;
 
-                let mut batches: Vec<Result<FlightData, Status>> = results
-                    .iter()
-                    .flat_map(|batch| create_flight_iter(batch, &options))
-                    .collect();
+                    path.push("data.arrow");
+                    let path = path.to_str().unwrap();
+                    info!("Writing results to {}", path);
 
-                // append batch vector to schema vector, so that the first message sent is the schema
-                flights.append(&mut batches);
+                    let now = Instant::now();
+
+                    // execute the query partition
+                    let mut stream = partition
+                        .plan
+                        .execute(*part)
+                        .await
+                        .map_err(|e| from_datafusion_err(&e))?;
+
+                    // stream results to disk
+                    let stats = utils::write_stream_to_disk(&mut stream, &path)
+                        .await
+                        .map_err(|e| from_ballista_err(&e))?;
+
+                    info!(
+                        "Executed partition in {} seconds. Statistics: {:?}",
+                        now.elapsed().as_secs(),
+                        stats
+                    );
+
+                    let schema = Arc::new(Schema::new(vec![
+                        Field::new("path", DataType::Utf8, false),
+                        stats.arrow_struct_repr(),
+                    ]));
+
+                    // build result set with summary of the partition execution status
+                    let mut c0 = StringBuilder::new(1);
+                    c0.append_value(&path).unwrap();
+                    let path: ArrayRef = Arc::new(c0.finish());
+
+                    let stats: ArrayRef = stats.to_arrow_arrayref();
+                    let results =
+                        vec![RecordBatch::try_new(schema.clone(), vec![path, stats]).unwrap()];
+
+                    if flights.is_empty() {
+                        // add an initial FlightData message that sends schema
+                        let schema_flight_data = arrow_flight::utils::flight_data_from_arrow_schema(
+                            schema.as_ref(),
+                            &options,
+                        );
+                        flights.push(Ok(schema_flight_data));
+                    }
+
+                    let mut batches: Vec<Result<FlightData, Status>> = results
+                        .iter()
+                        .flat_map(|batch| create_flight_iter(batch, &options))
+                        .collect();
+
+                    // append batch vector to schema vector, so that the first message sent is the schema
+                    flights.append(&mut batches);
+                }
+
                 let output = futures::stream::iter(flights);
-
                 Ok(Response::new(Box::pin(output) as Self::DoGetStream))
             }
             BallistaAction::FetchPartition(partition_id) => {

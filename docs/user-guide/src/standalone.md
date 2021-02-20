@@ -6,7 +6,7 @@ Start a scheduler using the following syntax:
 
 ```bash
 docker run --network=host \
-  -d ballistacompute/ballista-rust:0.4.0-alpha-2 \
+  -d ballistacompute/ballista-rust:0.4.0 \
   /scheduler --port 50050
 ```
 
@@ -15,14 +15,14 @@ Run `docker ps` to check that the process is running:
 ```
 $ docker ps
 CONTAINER ID   IMAGE                                         COMMAND                  CREATED         STATUS         PORTS     NAMES
-59452ce72138   ballistacompute/ballista-rust:0.4.0-alpha-2   "/scheduler --port 5…"   6 seconds ago   Up 5 seconds             affectionate_hofstadter
+59452ce72138   ballistacompute/ballista-rust:0.4.0   "/scheduler --port 5…"   6 seconds ago   Up 5 seconds             affectionate_hofstadter
 ```
 
 Run `docker logs CONTAINER_ID` to check the output from the process:
 
 ```
 $ docker logs 59452ce72138
-[2021-02-14T18:32:20Z INFO  scheduler] Ballista v0.4.0-alpha-2 Scheduler listening on 0.0.0.0:50050
+[2021-02-14T18:32:20Z INFO  scheduler] Ballista v0.4.0 Scheduler listening on 0.0.0.0:50050
 ```
 
 ### Start executors
@@ -31,7 +31,7 @@ Start one or more executor processes. Each executor process will need to listen 
 
 ```bash
 docker run --network=host \
-  -d ballistacompute/ballista-rust:0.4.0-alpha-2 \
+  -d ballistacompute/ballista-rust:0.4.0 \
   /executor --external-host localhost --port 50051 
 ```
 
@@ -40,8 +40,8 @@ Use `docker ps` to check that both the scheduer and executor(s) are now running:
 ```
 $ docker ps
 CONTAINER ID   IMAGE                                         COMMAND                  CREATED         STATUS         PORTS     NAMES
-0746ce262a19   ballistacompute/ballista-rust:0.4.0-alpha-2   "/executor --externa…"   2 seconds ago   Up 1 second              naughty_mclean
-59452ce72138   ballistacompute/ballista-rust:0.4.0-alpha-2   "/scheduler --port 5…"   4 minutes ago   Up 4 minutes             affectionate_hofstadter
+0746ce262a19   ballistacompute/ballista-rust:0.4.0   "/executor --externa…"   2 seconds ago   Up 1 second              naughty_mclean
+59452ce72138   ballistacompute/ballista-rust:0.4.0   "/scheduler --port 5…"   4 minutes ago   Up 4 minutes             affectionate_hofstadter
 ```
 
 Use `docker logs CONTAINER_ID` to check the output from the executor(s):
@@ -49,7 +49,7 @@ Use `docker logs CONTAINER_ID` to check the output from the executor(s):
 ```
 $ docker logs 0746ce262a19
 [2021-02-14T18:36:25Z INFO  executor] Running with config: ExecutorConfig { host: "localhost", port: 50051, work_dir: "/tmp/.tmpVRFSvn", concurrent_tasks: 4 }
-[2021-02-14T18:36:25Z INFO  executor] Ballista v0.4.0-alpha-2 Rust Executor listening on 0.0.0.0:50051
+[2021-02-14T18:36:25Z INFO  executor] Ballista v0.4.0 Rust Executor listening on 0.0.0.0:50051
 [2021-02-14T18:36:25Z INFO  executor] Starting registration with scheduler
 ```
 
@@ -64,7 +64,7 @@ Ballista can optionally use [etcd](https://etcd.io/) as a backing store for the 
 
 ```bash
 docker run --network=host \
-  -d ballistacompute/ballista-rust:0.4.0-alpha-2 \
+  -d ballistacompute/ballista-rust:0.4.0 \
   /scheduler --port 50050 \
   --config-backend etcd \
   --etcd-urls etcd:2379

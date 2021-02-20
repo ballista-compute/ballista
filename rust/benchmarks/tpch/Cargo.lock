@@ -207,7 +207,7 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
 name = "ballista"
-version = "0.4.0-alpha-2"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "arrow",
@@ -3138,7 +3138,7 @@ dependencies = [
 
 [[package]]
 name = "tpch"
-version = "0.4.0-alpha-2"
+version = "0.4.0"
 dependencies = [
  "arrow",
  "arrow-flight",

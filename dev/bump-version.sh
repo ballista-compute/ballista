@@ -1,7 +1,7 @@
 #!/bin/bash
 
 OLD_VERSION=0.3.1-SNAPSHOT
-NEW_VERSION=0.4.0-alpha-2
+NEW_VERSION=0.4.0
 
 set -e
 

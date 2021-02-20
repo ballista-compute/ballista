@@ -43,6 +43,11 @@ public class FlightStatement implements java.sql.Statement {
   @Override
   public ResultSet executeQuery(String query) throws SQLException {
 
+    //TODO this now needs updating to send a regular gRPC request to the scheduler to
+    // submit the query and will then need call GetJobStatus until the query is complete
+    // and to fetch the locations of the result data. It will then need to send a "get"
+    // request to each executor with results to fetch the data
+
     FlightClient client = FlightClient.builder()
         .allocator(new RootAllocator(Long.MAX_VALUE))
         .location(Location.forGrpcInsecure(flightConnection.host, flightConnection.port))

@@ -941,6 +941,7 @@ fn from_proto_binary_op(op: &str) -> Result<Operator, BallistaError> {
         "Minus" => Ok(Operator::Minus),
         "Multiply" => Ok(Operator::Multiply),
         "Divide" => Ok(Operator::Divide),
+        "Like" => Ok(Operator::Like),
         other => Err(proto_error(format!(
             "Unsupported binary operator '{:?}'",
             other

@@ -23,7 +23,8 @@ use crate::memory_stream::MemoryStream;
 use crate::serde::protobuf::{self};
 use crate::serde::scheduler::{Action, ExecutePartition, ExecutePartitionResult, PartitionId};
 
-use arrow::array::StringArray;
+use crate::utils::PartitionStats;
+use arrow::array::{StringArray, StructArray};
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use arrow_flight::flight_service_client::FlightServiceClient;
@@ -66,9 +67,9 @@ impl BallistaClient {
         &mut self,
         job_uuid: Uuid,
         stage_id: usize,
-        partition_id: usize,
+        partition_id: Vec<usize>,
         plan: Arc<dyn ExecutionPlan>,
-    ) -> Result<ExecutePartitionResult> {
+    ) -> Result<Vec<ExecutePartitionResult>> {
         let action = Action::ExecutePartition(ExecutePartition {
             job_uuid,
             stage_id,
@@ -79,26 +80,33 @@ impl BallistaClient {
         let stream = self.execute_action(&action).await?;
         let batches = collect(stream).await?;
 
-        if batches.len() != 1 {
-            return Err(BallistaError::General(
-                "execute_partition received wrong number of result batches".to_owned(),
-            ));
-        }
+        batches
+            .iter()
+            .map(|batch| {
+                if batch.num_rows() != 1 {
+                    Err(BallistaError::General(
+                        "execute_partition received wrong number of rows".to_owned(),
+                    ))
+                } else {
+                    let path = batch
+                        .column(0)
+                        .as_any()
+                        .downcast_ref::<StringArray>()
+                        .expect("execute_partition expected column 0 to be a StringArray");
 
-        let batch = &batches[0];
-        if batch.num_rows() != 1 {
-            return Err(BallistaError::General(
-                "execute_partition received wrong number of rows".to_owned(),
-            ));
-        }
+                    let stats = batch
+                        .column(1)
+                        .as_any()
+                        .downcast_ref::<StructArray>()
+                        .expect("execute_partition expected column 1 to be a StructArray");
 
-        let path = batch
-            .column(0)
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .expect("execute_partition expected column 0 to be a StringArray");
-
-        Ok(ExecutePartitionResult::new(path.value(0)))
+                    Ok(ExecutePartitionResult::new(
+                        path.value(0),
+                        PartitionStats::from_arrow_struct_array(stats),
+                    ))
+                }
+            })
+            .collect::<Result<Vec<_>>>()
     }
 
     /// Fetch a partition from an executor

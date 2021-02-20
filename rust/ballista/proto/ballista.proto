@@ -433,7 +433,7 @@ message Action {
 message ExecutePartition {
   string job_uuid = 1;
   uint32 stage_id = 2;
-  uint32 partition_id = 3;
+  repeated uint32 partition_id = 3;
   PhysicalPlanNode plan = 4;
   // The task could need to read partitions from other executors
   repeated PartitionLocation partition_location = 5;
@@ -474,6 +474,10 @@ message ExecuteQueryParams {
   LogicalPlanNode logical_plan = 1;
 }
 
+message ExecuteSqlParams {
+  string sql = 1;
+}
+
 message ExecuteQueryResult {
   string job_id = 1;
 }
@@ -508,12 +512,30 @@ message GetJobStatusResult {
   JobStatus status = 1;
 }
 
+message GetFileMetadataParams {
+  string path = 1;
+  FileType file_type = 2;
+}
+
+message GetFileMetadataResult {
+  Schema schema = 1;
+  repeated FilePartitionMetadata partitions = 2;
+}
+
+message FilePartitionMetadata {
+  repeated string filename = 1;
+}
+
 service SchedulerGrpc {
   rpc GetExecutorsMetadata (GetExecutorMetadataParams) returns (GetExecutorMetadataResult) {}
 
   rpc RegisterExecutor (RegisterExecutorParams) returns (RegisterExecutorResult) {}
 
+  rpc GetFileMetadata (GetFileMetadataParams) returns (GetFileMetadataResult) {}
+
   rpc ExecuteLogicalPlan (ExecuteQueryParams) returns (ExecuteQueryResult) {}
+
+  rpc ExecuteSQL (ExecuteSqlParams) returns (ExecuteQueryResult) {}
 
   rpc GetJobStatus (GetJobStatusParams) returns (GetJobStatusResult) {}
 }

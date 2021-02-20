@@ -142,7 +142,7 @@ impl BallistaContext {
         for (name, plan) in &state.tables {
             let plan = ctx.optimize(plan)?;
             let execution_plan = ctx.create_physical_plan(&plan)?;
-            ctx.register_table(name, Box::new(DFTableAdapter::new(plan, execution_plan)))
+            ctx.register_table(name, Arc::new(DFTableAdapter::new(plan, execution_plan)));
         }
         let df = ctx.sql(sql)?;
         Ok(BallistaDataFrame::from(self.state.clone(), df))
@@ -241,7 +241,7 @@ impl BallistaDataFrame {
             let status = status.and_then(|s| s.status).ok_or_else(|| {
                 BallistaError::Internal("Received empty status message".to_owned())
             })?;
-            let wait_future = tokio::time::sleep(Duration::from_secs(5));
+            let wait_future = tokio::time::sleep(Duration::from_millis(100));
             match status {
                 job_status::Status::Queued(_) => {
                     info!("Job {} still queued...", job_id);

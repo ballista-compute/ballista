@@ -64,7 +64,6 @@ mod roundtrip_tests {
         roundtrip_test(Arc::new(GlobalLimitExec::new(
             Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
             25,
-            0,
         )))
     }
 
@@ -166,7 +165,6 @@ mod roundtrip_tests {
         roundtrip_test(Arc::new(SortExec::try_new(
             sort_exprs,
             Arc::new(EmptyExec::new(false, schema.clone())),
-            1,
         )?))
     }
 }

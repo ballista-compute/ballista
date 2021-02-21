@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::fs::File;
 use std::sync::Arc;
 use std::{any::Any, pin::Pin};
 
@@ -19,14 +20,16 @@ use crate::client::BallistaClient;
 use crate::memory_stream::MemoryStream;
 use crate::scheduler::planner::PartitionLocation;
 
+use crate::executor::flight_service::{create_flight_iter, from_arrow_err};
 use arrow::datatypes::SchemaRef;
+use arrow::ipc::reader::FileReader;
 use async_trait::async_trait;
 use datafusion::physical_plan::{ExecutionPlan, Partitioning};
 use datafusion::{
     error::{DataFusionError, Result},
     physical_plan::RecordBatchStream,
 };
-use log::info;
+use log::{debug, info};
 
 /// ShuffleReaderExec reads partitions that have already been materialized by an executor.
 #[derive(Debug, Clone)]
@@ -81,6 +84,38 @@ impl ExecutionPlan for ShuffleReaderExec {
         info!("ShuffleReaderExec::execute({})", partition);
         let partition_location = &self.partition_location[partition];
 
+        // optimize to read local shuffle files when possible, to avoid the overhead of
+        // encodingin Flight format and streaming over the network
+        match &partition_location.path {
+            Some(path) => {
+                match File::open(path.as_str()) {
+                    Ok(file) => {
+                        info!("Reading local shuffle file {}", path);
+
+                        let reader = FileReader::try_new(file)?;
+                        let mut batches = vec![];
+
+                        //TODO we should stream the results, not load into memory!
+                        for batch in reader {
+                            batches.push(batch.unwrap()) // TODO unwrap
+                        }
+
+                        return Ok(Box::pin(MemoryStream::try_new(
+                            batches,
+                            self.schema(),
+                            None,
+                        )?));
+                    }
+                    _ => {
+                        debug!("Could not open file at {}", path);
+                    }
+                }
+            }
+            _ => {
+                debug!("No path specified");
+            }
+        }
+
         let mut client = BallistaClient::try_new(
             &partition_location.executor_meta.host,
             partition_location.executor_meta.port,
@@ -88,6 +123,7 @@ impl ExecutionPlan for ShuffleReaderExec {
         .await
         .map_err(|e| DataFusionError::Execution(format!("Ballista Error: {:?}", e)))?;
 
+        //TODO we should stream the results, not load into memory!
         let batches = client
             .fetch_partition(
                 &partition_location.partition_id.job_uuid,

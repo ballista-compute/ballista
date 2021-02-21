@@ -126,7 +126,7 @@ impl ExecutePartition {
 #[derive(Debug)]
 pub struct ExecutePartitionResult {
     /// Path containing results for this partition
-    path: String,
+    pub(crate) path: String,
     pub(crate) stats: PartitionStats,
 }
 

@@ -89,6 +89,7 @@ impl TryInto<PartitionLocation> for protobuf::PartitionLocation {
                     )
                 })?
                 .into(),
+            path: Some(self.path),
             stats: PartitionStats::new(self.row_count, 0, 0, 0),
         })
     }

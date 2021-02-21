@@ -54,6 +54,8 @@ type PartialQueryStageResult = (Arc<dyn ExecutionPlan>, Vec<Arc<QueryStageExec>>
 pub struct PartitionLocation {
     pub(crate) partition_id: PartitionId,
     pub(crate) executor_meta: ExecutorMeta,
+    /// Optional path for partition results. Partitions won't always be persisted to disk.
+    pub(crate) path: Option<String>,
     pub(crate) stats: PartitionStats,
 }
 
@@ -320,6 +322,7 @@ async fn execute_query_stage(
                 meta.push(PartitionLocation {
                     partition_id: PartitionId::new(_job_uuid, stage_id, *part),
                     executor_meta: executor_meta.clone(),
+                    path: Some(stats[*part].path.to_string()),
                     stats: stats[*part].stats,
                 });
             }

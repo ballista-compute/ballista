@@ -68,6 +68,7 @@ impl TryInto<protobuf::PartitionLocation> for PartitionLocation {
         Ok(protobuf::PartitionLocation {
             partition_id: Some(self.partition_id.into()),
             executor_meta: Some(self.executor_meta.into()),
+            path: self.path.unwrap().to_string(), //TODO unwrap
             row_count: self.stats.num_rows,
         })
     }

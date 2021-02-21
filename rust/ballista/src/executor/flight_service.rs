@@ -299,7 +299,7 @@ impl FlightService for BallistaFlightService {
 
 /// Convert a single RecordBatch into an iterator of FlightData (containing
 /// dictionaries and batches)
-fn create_flight_iter(
+pub fn create_flight_iter(
     batch: &RecordBatch,
     options: &IpcWriteOptions,
 ) -> Box<dyn Iterator<Item = Result<FlightData, Status>>> {
@@ -364,7 +364,7 @@ impl Stream for FlightDataStream {
     }
 }
 
-fn from_arrow_err(e: &ArrowError) -> Status {
+pub fn from_arrow_err(e: &ArrowError) -> Status {
     Status::internal(format!("ArrowError: {:?}", e))
 }
 

@@ -29,12 +29,19 @@ impl TryInto<Action> for protobuf::Action {
     fn try_into(self) -> Result<Action, Self::Error> {
         match self.action_type {
             Some(ActionType::ExecutePartition(partition)) => {
-                // TODO remove unwraps
                 Ok(Action::ExecutePartition(ExecutePartition::new(
                     partition.job_id,
                     partition.stage_id as usize,
-                    partition.partition_id as usize,
-                    partition.plan.as_ref().unwrap().try_into()?,
+                    partition.partition_id.iter().map(|n| *n as usize).collect(),
+                    partition
+                        .plan
+                        .as_ref()
+                        .ok_or_else(|| {
+                            BallistaError::General(
+                                "PhysicalPlanNode in ExecutePartition is missing".to_owned(),
+                            )
+                        })?
+                        .try_into()?,
                     HashMap::new(),
                 )))
             }
@@ -65,8 +72,22 @@ impl TryInto<PartitionLocation> for protobuf::PartitionLocation {
 
     fn try_into(self) -> Result<PartitionLocation, Self::Error> {
         Ok(PartitionLocation {
-            partition_id: self.partition_id.unwrap().try_into()?,
-            executor_meta: self.executor_meta.unwrap().into(),
+            partition_id: self
+                .partition_id
+                .ok_or_else(|| {
+                    BallistaError::General(
+                        "partition_id in PartitionLocation is missing.".to_owned(),
+                    )
+                })?
+                .try_into()?,
+            executor_meta: self
+                .executor_meta
+                .ok_or_else(|| {
+                    BallistaError::General(
+                        "executor_meta in PartitionLocation is missing".to_owned(),
+                    )
+                })?
+                .into(),
         })
     }
 }

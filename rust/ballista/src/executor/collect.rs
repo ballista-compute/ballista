@@ -16,16 +16,20 @@
 //! vector of [RecordBatch].
 
 use std::sync::Arc;
+use std::task::{Context, Poll};
 use std::{any::Any, pin::Pin};
 
-use crate::memory_stream::MemoryStream;
-use crate::utils;
-
 use arrow::datatypes::SchemaRef;
+use arrow::error::Result as ArrowResult;
+use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use datafusion::error::DataFusionError;
-use datafusion::physical_plan::{ExecutionPlan, Partitioning};
+use datafusion::physical_plan::{ExecutionPlan, Partitioning, SendableRecordBatchStream};
 use datafusion::{error::Result, physical_plan::RecordBatchStream};
+use futures::stream::SelectAll;
+use futures::Stream;
+use log::warn;
+use tokio::task;
 
 /// The CollectExec operator retrieves results from the cluster and returns them as a single
 /// vector of [RecordBatch].
@@ -69,22 +73,51 @@ impl ExecutionPlan for CollectExec {
         &self,
         partition: usize,
     ) -> Result<Pin<Box<dyn RecordBatchStream + Send + Sync>>> {
-        // TODO reimplement this to use true streaming end to end rather than fetch
-        // into memory and then re-stream
         assert_eq!(0, partition);
         let num_partitions = self.plan.output_partitioning().partition_count();
-        let mut batches = vec![];
+
+        let mut futures = Vec::with_capacity(num_partitions);
         for i in 0..num_partitions {
-            let mut stream = self.plan.execute(i).await?;
-            let partition_results = utils::collect_stream(&mut stream)
-                .await
-                .map_err(|e| DataFusionError::Execution(format!("BallistaError: {:?}", e)))?;
-            batches.extend_from_slice(&partition_results);
+            futures.push(self.plan.execute(i));
         }
-        Ok(Box::pin(MemoryStream::try_new(
-            batches,
-            self.schema(),
-            None,
-        )?))
+
+        let mut streams = Vec::with_capacity(num_partitions);
+        for result in futures::future::join_all(futures).await {
+            match result {
+                Ok(stream) => {
+                    streams.push(stream);
+                }
+                Err(e) => {
+                    return Err(DataFusionError::Execution(format!(
+                        "BallistaError: {:?}",
+                        e
+                    )));
+                }
+            }
+        }
+
+        Ok(Box::pin(MergedRecordBatchStream {
+            schema: self.schema(),
+            select_all: Box::pin(futures::stream::select_all(streams)),
+        }))
+    }
+}
+
+struct MergedRecordBatchStream {
+    schema: SchemaRef,
+    select_all: Pin<Box<SelectAll<SendableRecordBatchStream>>>,
+}
+
+impl Stream for MergedRecordBatchStream {
+    type Item = ArrowResult<RecordBatch>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.select_all.as_mut().poll_next(cx)
+    }
+}
+
+impl RecordBatchStream for MergedRecordBatchStream {
+    fn schema(&self) -> SchemaRef {
+        self.schema.clone()
     }
 }

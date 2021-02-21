@@ -100,17 +100,13 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
             }
             PhysicalPlanType::ParquetScan(scan) => {
                 let projection = scan.projection.iter().map(|i| *i as usize).collect();
-                // TODO we don't care what the DataFusion batch size was because Ballista will
-                // have its own configs. Hard-code for now.
-                let batch_size = 32768;
-                let max_concurrency = 8;
                 let filenames: Vec<&str> = scan.filename.iter().map(|s| s.as_str()).collect();
                 Ok(Arc::new(ParquetExec::try_from_files(
                     &filenames,
                     Some(projection),
                     None,
-                    batch_size,
-                    max_concurrency,
+                    scan.batch_size as usize,
+                    scan.num_partitions as usize,
                 )?))
             }
             PhysicalPlanType::CoalesceBatches(coalesce_batches) => {
@@ -126,12 +122,7 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
             }
             PhysicalPlanType::GlobalLimit(limit) => {
                 let input: Arc<dyn ExecutionPlan> = convert_box_required!(limit.input)?;
-                Ok(Arc::new(GlobalLimitExec::new(
-                    input,
-                    limit.limit as usize,
-                    0,
-                )))
-                // TODO: concurrency param doesn't seem to be used in datafusion. not sure how to fill this in
+                Ok(Arc::new(GlobalLimitExec::new(input, limit.limit as usize)))
             }
             PhysicalPlanType::LocalLimit(limit) => {
                 let input: Arc<dyn ExecutionPlan> = convert_box_required!(limit.input)?;
@@ -286,7 +277,7 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 // Update concurrency here in the future
-                Ok(Arc::new(SortExec::try_new(exprs, input, 1)?))
+                Ok(Arc::new(SortExec::try_new(exprs, input)?))
             }
             PhysicalPlanType::Unresolved(unresolved_shuffle) => {
                 let schema = Arc::new(convert_required!(unresolved_shuffle.schema)?);

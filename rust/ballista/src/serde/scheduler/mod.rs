@@ -20,6 +20,7 @@ use datafusion::physical_plan::ExecutionPlan;
 use uuid::Uuid;
 
 use super::protobuf;
+use crate::utils::PartitionStats;
 
 pub mod from_proto;
 pub mod to_proto;
@@ -88,9 +89,9 @@ pub struct ExecutePartition {
     pub(crate) job_id: String,
     /// Unique ID representing this query stage within the overall query
     pub(crate) stage_id: usize,
-    /// The partition to execute. The same plan could be sent to multiple executors and each
-    /// executor will execute a single partition per QueryStageTask
-    pub(crate) partition_id: usize,
+    /// The partitions to execute. The same plan could be sent to multiple executors and each
+    /// executor will execute a range of partitions per QueryStageTask
+    pub(crate) partition_id: Vec<usize>,
     /// The physical plan for this query stage
     pub(crate) plan: Arc<dyn ExecutionPlan>,
     /// Location of shuffle partitions that this query stage may depend on
@@ -101,7 +102,7 @@ impl ExecutePartition {
     pub fn new(
         job_id: String,
         stage_id: usize,
-        partition_id: usize,
+        partition_id: Vec<usize>,
         plan: Arc<dyn ExecutionPlan>,
         shuffle_locations: HashMap<PartitionId, ExecutorMeta>,
     ) -> Self {
@@ -115,7 +116,10 @@ impl ExecutePartition {
     }
 
     pub fn key(&self) -> String {
-        format!("{}.{}.{}", self.job_id, self.stage_id, self.partition_id)
+        format!(
+            "{}.{}.{:?}",
+            self.job_id, self.stage_id, self.partition_id
+        )
     }
 }
 
@@ -123,12 +127,14 @@ impl ExecutePartition {
 pub struct ExecutePartitionResult {
     /// Path containing results for this partition
     path: String,
+    stats: PartitionStats,
 }
 
 impl ExecutePartitionResult {
-    pub fn new(path: &str) -> Self {
+    pub fn new(path: &str, stats: PartitionStats) -> Self {
         Self {
             path: path.to_owned(),
+            stats,
         }
     }
 

@@ -43,6 +43,7 @@ use datafusion::physical_plan::{
     AggregateExpr, ExecutionPlan, PhysicalExpr, SendableRecordBatchStream,
 };
 use log::{debug, info};
+use std::time::Instant;
 use uuid::Uuid;
 
 type SendableExecutionPlan = Pin<Box<dyn Future<Output = Result<Arc<dyn ExecutionPlan>>> + Send>>;
@@ -75,21 +76,6 @@ impl DistributedPlanner {
 }
 
 impl DistributedPlanner {
-    /// Execute a logical plan using distributed query execution and collect the results into a
-    /// vector of [RecordBatch].
-    pub async fn collect(
-        &mut self,
-        logical_plan: &LogicalPlan,
-    ) -> Result<SendableRecordBatchStream> {
-        let datafusion_ctx = ExecutionContext::new();
-        let plan = datafusion_ctx.optimize(logical_plan)?;
-        let plan = datafusion_ctx.create_physical_plan(&plan)?;
-        let job_id = Uuid::new_v4().to_string();
-        let plan = self.execute_distributed_query(job_id, plan).await?;
-        let plan = Arc::new(CollectExec::new(plan));
-        plan.execute(0).await.map_err(|e| e.into())
-    }
-
     /// Execute a distributed query against a cluster, leaving the final results on the
     /// executors. The [ExecutionPlan] returned by this method is guaranteed to be a
     /// [ShuffleReaderExec] that can be used to fetch the final results from the executors
@@ -99,10 +85,17 @@ impl DistributedPlanner {
         job_id: String,
         execution_plan: Arc<dyn ExecutionPlan>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
+        let now = Instant::now();
         let execution_plans = self.plan_query_stages(&job_id, execution_plan)?;
 
+        info!(
+            "DistributedPlanner created {} execution plans in {} seconds:",
+            execution_plans.len(),
+            now.elapsed().as_secs()
+        );
+
         for plan in &execution_plans {
-            println!("{}", format_plan(plan.as_ref(), 0)?);
+            info!("{}", format_plan(plan.as_ref(), 0)?);
         }
 
         execute(execution_plans, self.executors.clone()).await
@@ -118,6 +111,7 @@ impl DistributedPlanner {
         job_id: &str,
         execution_plan: Arc<dyn ExecutionPlan>,
     ) -> Result<Vec<Arc<QueryStageExec>>> {
+        info!("planning query stages");
         let (new_plan, mut stages) = self.plan_query_stages_internal(job_id, execution_plan)?;
         stages.push(create_query_stage(
             job_id.to_string(),
@@ -310,28 +304,40 @@ async fn execute_query_stage(
 
     let partition_count = plan.output_partitioning().partition_count();
     let mut meta = Vec::with_capacity(partition_count);
-    for child_partition in 0..partition_count {
-        debug!(
-            "execute_query_stage() stage_id={}, partition_id={}",
-            stage_id, child_partition
-        );
-        let executor_meta = &executors[child_partition % executors.len()];
-        meta.push(PartitionLocation {
-            partition_id: PartitionId::new(job_id, stage_id, child_partition),
-            executor_meta: executor_meta.clone(),
-        });
+
+    let partition_chunks: Vec<Vec<usize>> = (0..partition_count)
+        .collect::<Vec<usize>>()
+        .chunks(partition_count / executors.len())
+        .map(|r| r.to_vec())
+        .collect();
+
+    info!(
+        "Executing query stage with {} chunks of partition ranges",
+        partition_chunks.len()
+    );
+
+    // build metadata for partition locations
+    for i in 0..partition_chunks.len() {
+        let executor_meta = &executors[i % executors.len()];
+        for part in &partition_chunks[i] {
+            meta.push(PartitionLocation {
+                partition_id: PartitionId::new(job_id, stage_id, *part),
+                executor_meta: executor_meta.clone(),
+            });
+        }
     }
 
     let mut executions = Vec::with_capacity(partition_count);
-    for child_partition in 0..partition_count {
+    for i in 0..partition_chunks.len() {
         let plan = plan.clone();
-        let executor_meta = executors[child_partition % executors.len()].clone();
-        let job_id = job_id.to_string();
+        let executor_meta = executors[i % executors.len()].clone();
+        let partition_ids = partition_chunks[i].to_vec();
+        let job_id = job_id.to_owned();
         executions.push(tokio::spawn(async move {
             let mut client =
                 BallistaClient::try_new(&executor_meta.host, executor_meta.port).await?;
             client
-                .execute_partition(job_id, stage_id, child_partition, plan)
+                .execute_partition(job_id, stage_id, partition_ids, plan)
                 .await
         }));
     }

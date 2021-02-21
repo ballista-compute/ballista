@@ -13,7 +13,7 @@
 
 ## Overview
 
-Ballista is a proof-of-concept distributed compute platform primarily implemented in Rust, powered by Apache Arrow. It 
+Ballista is a distributed compute platform primarily implemented in Rust, powered by Apache Arrow. It 
 is built on an architecture that allows other programming languages (such as Python, C++, and Java) to be supported 
 as first-class citizens without paying a penalty for serialization costs.
 
@@ -27,8 +27,9 @@ transfer between processes.
 - [Google Protocol Buffers](https://developers.google.com/protocol-buffers) for serializing query plans.
 - [Docker](https://www.docker.com/) for packaging up executors along with user-defined code.
 
-Ballista can be deployed in [Kubernetes](https://kubernetes.io/), or as a standalone cluster using 
-[etcd](https://etcd.io/) for discovery.
+Ballista can be deployed as a standalone cluster and also supports [Kubernetes](https://kubernetes.io/). In either 
+case, the scheduler can be configured to use [etcd](https://etcd.io/) as a backing store to (eventually) provide 
+redundancy in the case of a scheduler failing.
 
 ## Architecture
 
@@ -59,14 +60,9 @@ The following examples should help illustrate the current capabilities of Ballis
 -  [TPC-H Benchmarks (Rust)](rust/benchmarks/tpch)
 -  [TPC-H Benchmarks (Python)](python/examples/testquery.py)
 
-## Status
+## Project Status
 
-- It is possible to run a subset of the benchmark queries against a distributed Ballista cluster running in 
-  standalone mode
-- We are working on the [remaining issues](https://github.com/ballista-compute/ballista/milestone/7) that are
-  planned for the 0.4.0 release  
-
-To follow the progress of this work, please refer to the
+To follow the progress of this project, please refer to the
 ["This Week in Ballista"](https://ballistacompute.org/this-week-in-ballista/) series of blog posts. Follow 
 [@BallistaCompute](https://twitter.com/BallistaCompute) on Twitter to receive notifications when the blog is updated. 
 

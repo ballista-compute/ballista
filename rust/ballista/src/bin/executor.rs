@@ -111,7 +111,7 @@ async fn poll_loop(
                         let r = executor_client.execute_partition(
                             task_id_clone.job_id.clone(),
                             task_id_clone.stage_id as usize,
-                            task_id_clone.partition_id as usize,
+                            vec![task_id_clone.partition_id as usize],
                             plan,
                         ).await;
                         info!("DONE WITH CURRENT TASK: {:?}", r);

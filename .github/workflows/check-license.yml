@@ -1,0 +1,17 @@
+name: Check ASL License
+on:
+  push:
+    paths:
+      - rust/**
+  pull_request:
+    paths:
+      - rust**
+  workflow_dispatch:
+    
+jobs:
+  CheckLicenses:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Run license check
+      run: python ./dev/ci/check-asl-header.py

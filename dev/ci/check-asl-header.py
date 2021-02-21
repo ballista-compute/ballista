@@ -17,6 +17,8 @@ def main():
     count += check('rust/**/examples/**/*.rs', pattern, exclude_list)
     count += check('**/*.java', pattern, exclude_list)
     count += check('**/*.scala', pattern, exclude_list)
+    count += check('python/**/*.py', pattern, exclude_list)
+    count += check('python/**/*.pyi', pattern, exclude_list)
 
     if count > 0:
         print("Found {} files missing ASL header".format(count))

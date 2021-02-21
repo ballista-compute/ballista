@@ -1,8 +1,5 @@
 name: Check ASL License
-on:
-  push
-  pull_request:
-  workflow_dispatch:
+on: [push, pull_request]
     
 jobs:
   CheckLicenses:

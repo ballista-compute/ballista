@@ -7,7 +7,7 @@ on:
     paths:
       - rust**
   workflow_dispatch:
-    
+
 
 # Note, toolchain version must match the rustup version: either "nightly" or "nightly-YYYY-MM-DD"
 # and must contain the toolchain for the OS at the end.

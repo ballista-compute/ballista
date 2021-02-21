@@ -492,7 +492,12 @@ fn typechecked_scalar_value_conversion(
 
         (Value::NullValue(i32_enum), required_scalar_type) => {
             if *i32_enum == *required_scalar_type as i32 {
-                let pb_scalar_type = PrimitiveScalarType::from_i32(*i32_enum).unwrap();
+                let pb_scalar_type = PrimitiveScalarType::from_i32(*i32_enum).ok_or_else(|| {
+                    BallistaError::General(format!(
+                        "Invalid i32_enum={} when converting with PrimitiveScalarType::from_i32()",
+                        *i32_enum
+                    ))
+                })?;
                 let scalar_value: ScalarValue = match pb_scalar_type {
                     PrimitiveScalarType::Bool => ScalarValue::Boolean(None),
                     PrimitiveScalarType::Uint8 => ScalarValue::UInt8(None),

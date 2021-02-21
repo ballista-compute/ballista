@@ -155,8 +155,11 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
             let agg_names = exec
                 .aggr_expr()
                 .iter()
-                .map(|expr| expr.field().unwrap().name().clone())
-                .collect();
+                .map(|expr| match expr.field() {
+                    Ok(field) => Ok(field.name().clone()),
+                    Err(e) => Err(BallistaError::DataFusionError(e)),
+                })
+                .collect::<Result<_, Self::Error>>()?;
 
             let agg_mode = match exec.mode() {
                 AggregateMode::Partial => protobuf::AggregateMode::Partial,
@@ -197,7 +200,9 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                 ))),
             })
         } else if let Some(exec) = plan.downcast_ref::<CsvExec>() {
-            let delimiter = [*exec.delimiter().unwrap()];
+            let delimiter = [*exec.delimiter().ok_or_else(|| {
+                BallistaError::General("Delimeter is not set for CsvExec".to_owned())
+            })?];
             let delimiter = std::str::from_utf8(&delimiter)
                 .map_err(|_| BallistaError::General("Invalid CSV delimiter".to_owned()))?;
 
@@ -207,7 +212,11 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                     filename: exec.filenames().to_vec(),
                     projection: exec
                         .projection()
-                        .unwrap()
+                        .ok_or_else(|| {
+                            BallistaError::General(
+                                "projection in CsvExec dosn not exist.".to_owned(),
+                            )
+                        })?
                         .iter()
                         .map(|n| *n as u32)
                         .collect(),

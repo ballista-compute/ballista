@@ -17,6 +17,11 @@ stage cannot start until its child query stages have completed.
 Each query stage has one or more partitions that can be processed in parallel by the available 
 executors in the cluster. This is the basic unit of scalability in Ballista.
 
+The following diagram shows the flow of requests and responses between the client, scheduler, and executor 
+processes. 
+
+![Query Execution Flow](images/query-execution.png)
+
 ## Scheduler Process
 
 The scheduler process implements a gRPC interface (defined in 
@@ -24,7 +29,7 @@ The scheduler process implements a gRPC interface (defined in
 
 | Method               | Description                                                          |
 |----------------------|----------------------------------------------------------------------|
-| ExecuteLogicalPlan   | Submit a logical query plan for execution                            |
+| ExecuteQuery         | Submit a logical query plan or SQL query for execution               |
 | GetExecutorsMetadata | Retrieves a list of executors that have registered with a scheduler  |
 | GetFileMetadata      | Retrieve metadata about files available in the cluster file system   |
 | GetJobStatus         | Get the status of a submitted query                                  |

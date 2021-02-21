@@ -512,8 +512,10 @@ message PollWorkResult {
 }
 
 message ExecuteQueryParams {
-  LogicalPlanNode logical_plan = 1;
-}
+  oneof query {
+    LogicalPlanNode logical_plan = 1;
+    string sql = 2;
+  }}
 
 message ExecuteSqlParams {
   string sql = 1;
@@ -575,9 +577,7 @@ service SchedulerGrpc {
 
   rpc GetFileMetadata (GetFileMetadataParams) returns (GetFileMetadataResult) {}
 
-  rpc ExecuteLogicalPlan (ExecuteQueryParams) returns (ExecuteQueryResult) {}
-
-  rpc ExecuteSQL (ExecuteSqlParams) returns (ExecuteQueryResult) {}
+  rpc ExecuteQuery (ExecuteQueryParams) returns (ExecuteQueryResult) {}
 
   rpc GetJobStatus (GetJobStatusParams) returns (GetJobStatusResult) {}
 }

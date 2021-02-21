@@ -23,12 +23,12 @@ use std::fmt;
 use std::{convert::TryInto, sync::Arc};
 
 use crate::serde::protobuf::{
-    job_status, scheduler_grpc_server::SchedulerGrpc, CompletedJob, ExecuteQueryParams,
-    ExecuteQueryResult, ExecuteSqlParams, ExecutorMetadata, FailedJob, FilePartitionMetadata,
-    FileType, GetExecutorMetadataParams, GetExecutorMetadataResult, GetFileMetadataParams,
-    GetFileMetadataResult, GetJobStatusParams, GetJobStatusResult, JobStatus, PartitionId,
-    PartitionLocation, PollWorkParams, PollWorkResult, QueuedJob, RunningJob, TaskDefinition,
-    TaskStatus,
+    execute_query_params::Query, job_status, scheduler_grpc_server::SchedulerGrpc, CompletedJob,
+    ExecuteQueryParams, ExecuteQueryResult, ExecuteSqlParams, ExecutorMetadata, FailedJob,
+    FilePartitionMetadata, FileType, GetExecutorMetadataParams, GetExecutorMetadataResult,
+    GetFileMetadataParams, GetFileMetadataResult, GetJobStatusParams, GetJobStatusResult,
+    JobStatus, PartitionId, PartitionLocation, PollWorkParams, PollWorkResult, QueuedJob,
+    RunningJob, TaskDefinition, TaskStatus,
 };
 use crate::serde::scheduler::ExecutorMeta;
 
@@ -220,40 +220,33 @@ impl SchedulerGrpc for SchedulerServer {
         }
     }
 
-    async fn execute_sql(
-        &self,
-        request: Request<ExecuteSqlParams>,
-    ) -> std::result::Result<Response<ExecuteQueryResult>, tonic::Status> {
-        let ExecuteSqlParams { sql } = request.into_inner();
-        info!("Received execute_sql request: {}", sql);
-
-        //TODO we can't just create a new context because we need a context that has
-        // tables registered from previous SQL statements that have been executed
-
-        let mut ctx = ExecutionContext::new();
-        let df = ctx.sql(&sql).map_err(|e| {
-            let msg = format!("Error executing SQL: {}", e);
-            error!("{}", msg);
-            tonic::Status::internal(msg)
-        })?;
-        let _logical_plan = df.to_logical_plan();
-
-        //TODO delegate to the logic that already exists in execute_logical_plan
-
-        Err(tonic::Status::unimplemented(
-            "execute_sql not implemented yet",
-        ))
-    }
-
-    async fn execute_logical_plan(
+    async fn execute_query(
         &self,
         request: Request<ExecuteQueryParams>,
     ) -> std::result::Result<Response<ExecuteQueryResult>, tonic::Status> {
-        if let ExecuteQueryParams {
-            logical_plan: Some(logical_plan),
-        } = request.into_inner()
-        {
-            info!("Received execute_logical_plan request");
+        if let ExecuteQueryParams { query: Some(query) } = request.into_inner() {
+            let plan = match query {
+                Query::LogicalPlan(logical_plan) => {
+                    // parse protobuf
+                    (&logical_plan).try_into().map_err(|e| {
+                        let msg = format!("Could not parse logical plan protobuf: {}", e);
+                        error!("{}", msg);
+                        tonic::Status::internal(msg)
+                    })?
+                }
+                Query::Sql(sql) => {
+                    //TODO we can't just create a new context because we need a context that has
+                    // tables registered from previous SQL statements that have been executed
+                    let mut ctx = ExecutionContext::new();
+                    let df = ctx.sql(&sql).map_err(|e| {
+                        let msg = format!("Error parsing SQL: {}", e);
+                        error!("{}", msg);
+                        tonic::Status::internal(msg)
+                    })?;
+                    df.to_logical_plan()
+                }
+            };
+            debug!("Received plan for execution: {:?}", plan);
             let executors = self
                 .state
                 .get_executors_metadata(&self.namespace)
@@ -264,15 +257,6 @@ impl SchedulerGrpc for SchedulerServer {
                     tonic::Status::internal(msg)
                 })?;
             debug!("Found executors: {:?}", executors);
-
-            // parse protobuf
-            let plan = (&logical_plan).try_into().map_err(|e| {
-                let msg = format!("Could not parse logical plan protobuf: {}", e);
-                error!("{}", msg);
-                tonic::Status::internal(msg)
-            })?;
-
-            debug!("Received plan for execution: {:?}", plan);
 
             let job_id: String = {
                 let mut rng = thread_rng();

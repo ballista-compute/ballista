@@ -77,7 +77,14 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
             }
             PhysicalPlanType::Filter(filter) => {
                 let input: Arc<dyn ExecutionPlan> = convert_box_required!(filter.input)?;
-                let predicate = compile_expr(filter.expr.as_ref().unwrap(), &input.schema())?;
+                let predicate = compile_expr(
+                    filter.expr.as_ref().ok_or_else(|| {
+                        BallistaError::General(
+                            "filter (FilterExecNode) in PhysicalPlanNode is missing.".to_owned(),
+                        )
+                    })?,
+                    &input.schema(),
+                )?;
                 Ok(Arc::new(FilterExec::try_new(predicate, input)?))
             }
             PhysicalPlanType::CsvScan(scan) => {
@@ -171,7 +178,15 @@ impl TryInto<Arc<dyn ExecutionPlan>> for &protobuf::PhysicalPlanNode {
                     config: ExecutionConfig::new(),
                 };
 
-                let input_schema = hash_agg.input_schema.as_ref().unwrap().clone();
+                let input_schema = hash_agg
+                    .input_schema
+                    .as_ref()
+                    .ok_or_else(|| {
+                        BallistaError::General(
+                            "input_schema in HashAggregateNode is missing.".to_owned(),
+                        )
+                    })?
+                    .clone();
                 let physical_schema: SchemaRef = SchemaRef::new((&input_schema).try_into()?);
 
                 let mut physical_aggr_expr = vec![];

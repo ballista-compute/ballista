@@ -22,7 +22,8 @@ use std::{fs, time::Duration};
 
 use crate::serde::protobuf::scheduler_grpc_client::SchedulerGrpcClient;
 use crate::serde::protobuf::{
-    job_status, ExecuteQueryParams, ExecuteQueryResult, GetJobStatusParams, GetJobStatusResult,
+    execute_query_params::Query, job_status, ExecuteQueryParams, ExecuteQueryResult,
+    GetJobStatusParams, GetJobStatusResult,
 };
 use crate::serde::scheduler::{Action, ExecutorMeta};
 use crate::{client::BallistaClient, serde::scheduler};
@@ -224,8 +225,8 @@ impl BallistaDataFrame {
         let schema: Schema = plan.schema().as_ref().clone().into();
 
         let job_id = scheduler
-            .execute_logical_plan(ExecuteQueryParams {
-                logical_plan: Some((&plan).try_into()?),
+            .execute_query(ExecuteQueryParams {
+                query: Some(Query::LogicalPlan((&plan).try_into()?)),
             })
             .await?
             .into_inner()

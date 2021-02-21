@@ -73,12 +73,14 @@ async fn main() -> Result<()> {
             let etcd = etcd_client::Client::connect(&[opt.etcd_urls], None)
                 .await
                 .context("Could not connect to etcd")?;
-                Arc::new(EtcdClient::new(etcd))
+            Arc::new(EtcdClient::new(etcd))
         }
         ConfigBackend::Standalone => {
             // TODO: Use a real file and make path is configurable
-            Arc::new(StandaloneClient::try_new_temporary()
-                .context("Could not create standalone config backend")?)
+            Arc::new(
+                StandaloneClient::try_new_temporary()
+                    .context("Could not create standalone config backend")?,
+            )
         }
     };
     start_server(client, namespace, addr).await?;

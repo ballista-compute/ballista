@@ -18,7 +18,13 @@ use std::{convert::TryInto, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
 use arrow_flight::flight_service_server::FlightServiceServer;
-use ballista::{client::BallistaClient, serde::protobuf::{self, FailedTask, PartitionId, PollWorkParams, TaskStatus, scheduler_grpc_client::SchedulerGrpcClient, task_status}};
+use ballista::{
+    client::BallistaClient,
+    serde::protobuf::{
+        self, scheduler_grpc_client::SchedulerGrpcClient, task_status, FailedTask, PartitionId,
+        PollWorkParams, TaskStatus,
+    },
+};
 use ballista::{
     executor::flight_service::BallistaFlightService,
     executor::{BallistaExecutor, ExecutorConfig},
@@ -48,18 +54,23 @@ mod config {
 }
 use config::prelude::*;
 
+struct CurrentTaskInformation {
+    task_id: PartitionId,
+    result: Option<ballista::error::Result<()>>,
+}
+
 async fn poll_loop(
     mut scheduler: SchedulerGrpcClient<Channel>,
     executor_client: BallistaClient,
     executor_meta: ExecutorMeta,
 ) {
     let executor_meta: protobuf::ExecutorMetadata = executor_meta.into();
-    let running_task: Arc<Mutex<Option<(PartitionId, Option<ballista::error::Result<()>>)>>> = Arc::new(Mutex::new(None));
+    let running_task: Arc<Mutex<Option<CurrentTaskInformation>>> = Arc::new(Mutex::new(None));
     loop {
         debug!("Starting registration with scheduler");
         let mut task_status = vec![];
         let mut running_task_guard = running_task.lock().await;
-        if let Some((task_id, result)) = &*running_task_guard {
+        if let Some(CurrentTaskInformation { task_id, result }) = &*running_task_guard {
             let task_id = task_id.clone();
             match result {
                 Some(Ok(_)) => {
@@ -69,7 +80,9 @@ async fn poll_loop(
                         job_id: task_id.job_id,
                         stage_id: task_id.stage_id,
                         partition_id: task_id.partition_id,
-                        status: Some(task_status::Status::Completed(CompletedTask { executor_id: executor_meta.id.clone() } )),
+                        status: Some(task_status::Status::Completed(CompletedTask {
+                            executor_id: executor_meta.id.clone(),
+                        })),
                     });
                 }
                 Some(Err(e)) => {
@@ -80,9 +93,11 @@ async fn poll_loop(
                         job_id: task_id.job_id,
                         stage_id: task_id.stage_id,
                         partition_id: task_id.partition_id,
-                        status: Some(task_status::Status::Failed(FailedTask { error: format!("Task failed due to Tokio error: {}", error_msg)} )),
+                        status: Some(task_status::Status::Failed(FailedTask {
+                            error: format!("Task failed due to Tokio error: {}", error_msg),
+                        })),
                     });
-                },
+                }
                 None => {
                     info!("Current task still in progress");
                 }
@@ -108,15 +123,20 @@ async fn poll_loop(
                     let task_id_clone = task_id.clone();
                     let running_task = running_task.clone();
                     tokio::spawn(async move {
-                        let r = executor_client.execute_partition(
-                            task_id_clone.job_id.clone(),
-                            task_id_clone.stage_id as usize,
-                            vec![task_id_clone.partition_id as usize],
-                            plan,
-                        ).await;
+                        let r = executor_client
+                            .execute_partition(
+                                task_id_clone.job_id.clone(),
+                                task_id_clone.stage_id as usize,
+                                vec![task_id_clone.partition_id as usize],
+                                plan,
+                            )
+                            .await;
                         info!("DONE WITH CURRENT TASK: {:?}", r);
                         let mut running_task = running_task.lock().await;
-                        *running_task = Some((task_id_clone, Some(r.map(|_| ()))));
+                        *running_task = Some(CurrentTaskInformation {
+                            task_id: task_id_clone,
+                            result: Some(r.map(|_| ())),
+                        });
                     });
                 }
             }

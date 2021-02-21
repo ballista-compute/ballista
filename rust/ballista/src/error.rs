@@ -43,7 +43,7 @@ pub enum BallistaError {
     // KubeAPIResponseError(k8s_openapi::ResponseError),
     TonicError(tonic::transport::Error),
     GrpcError(tonic::Status),
-    TokioError(tokio::task::JoinError)
+    TokioError(tokio::task::JoinError),
 }
 
 impl<T> Into<Result<T>> for BallistaError {

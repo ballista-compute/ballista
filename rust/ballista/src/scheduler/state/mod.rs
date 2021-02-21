@@ -20,7 +20,9 @@ use crate::serde::protobuf::{
 };
 use crate::{error::ballista_error, prelude::BallistaError, serde::scheduler::ExecutorMeta};
 
-use super::{SchedulerServer, execution_plans::UnresolvedShuffleExec, planner::remove_unresolved_shuffles};
+use super::{
+    execution_plans::UnresolvedShuffleExec, planner::remove_unresolved_shuffles, SchedulerServer,
+};
 
 mod etcd;
 mod standalone;
@@ -188,7 +190,10 @@ impl SchedulerState {
 
                 // Let's try to resolve any unresolved shuffles we find
                 let unresolved_shuffles = find_unresolved_shuffles(&plan)?;
-                let mut partition_locations: HashMap<usize, Vec<crate::scheduler::planner::PartitionLocation>> = HashMap::new();
+                let mut partition_locations: HashMap<
+                    usize,
+                    Vec<crate::scheduler::planner::PartitionLocation>,
+                > = HashMap::new();
                 for unresolved_shuffle in unresolved_shuffles {
                     for stage_id in unresolved_shuffle.query_stage_ids {
                         for partition_id in 0..unresolved_shuffle.partition_count {
@@ -201,16 +206,24 @@ impl SchedulerState {
                                 ))
                                 .unwrap();
                             let referenced_task: TaskStatus = decode_protobuf(referenced_task)?;
-                            if let Some(task_status::Status::Completed(CompletedTask { executor_id })) = referenced_task.status {
+                            if let Some(task_status::Status::Completed(CompletedTask {
+                                executor_id,
+                            })) = referenced_task.status
+                            {
                                 let empty = vec![];
-                                let locations = partition_locations.entry(stage_id).or_insert(empty);
+                                let locations =
+                                    partition_locations.entry(stage_id).or_insert(empty);
                                 locations.push(crate::scheduler::planner::PartitionLocation {
                                     partition_id: crate::serde::scheduler::PartitionId {
                                         job_id: status.job_id.clone(),
                                         stage_id,
                                         partition_id,
                                     },
-                                    executor_meta: executors.iter().find(|exec| exec.id == executor_id).unwrap().clone(),
+                                    executor_meta: executors
+                                        .iter()
+                                        .find(|exec| exec.id == executor_id)
+                                        .unwrap()
+                                        .clone(),
                                 });
                             } else {
                                 continue 'tasks;
@@ -250,7 +263,9 @@ impl SchedulerState {
         for (key, value) in kvs {
             let job_id = extract_job_id_from_key(&key)?;
             let status: JobStatus = decode_protobuf(&value)?;
-            let new_status = self.get_job_status_from_tasks(namespace, job_id, &executors).await?;
+            let new_status = self
+                .get_job_status_from_tasks(namespace, job_id, &executors)
+                .await?;
             if status != new_status {
                 self.save_job_metadata(namespace, job_id, &new_status)
                     .await?;
@@ -259,7 +274,12 @@ impl SchedulerState {
         Ok(())
     }
 
-    async fn get_job_status_from_tasks(&self, namespace: &str, job_id: &str, executors: &HashMap<String, ExecutorMeta>) -> Result<JobStatus> {
+    async fn get_job_status_from_tasks(
+        &self,
+        namespace: &str,
+        job_id: &str,
+        executors: &HashMap<String, ExecutorMeta>,
+    ) -> Result<JobStatus> {
         let statuses = self
             .config_client
             .get_from_prefix(&get_task_prefix_for_job(namespace, job_id))
@@ -320,7 +340,7 @@ pub trait Lock: Send + Sync {
 
 #[tonic::async_trait]
 impl<T: Send + Sync> Lock for OwnedMutexGuard<T> {
-    async fn unlock(&mut self) { }
+    async fn unlock(&mut self) {}
 }
 
 /// Returns the the unresolved shuffles in the execution plan

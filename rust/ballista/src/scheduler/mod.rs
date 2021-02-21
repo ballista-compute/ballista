@@ -18,16 +18,17 @@ pub mod execution_plans;
 pub mod planner;
 pub mod state;
 
-use std::{convert::TryInto, sync::Arc};
 use std::ffi::OsStr;
 use std::fmt;
+use std::{convert::TryInto, sync::Arc};
 
 use crate::serde::protobuf::{
     job_status, scheduler_grpc_server::SchedulerGrpc, CompletedJob, ExecuteQueryParams,
     ExecuteQueryResult, ExecuteSqlParams, ExecutorMetadata, FailedJob, FilePartitionMetadata,
     FileType, GetExecutorMetadataParams, GetExecutorMetadataResult, GetFileMetadataParams,
-    GetFileMetadataResult, GetJobStatusParams, GetJobStatusResult, JobStatus, PartitionId, PartitionLocation,
-    PollWorkParams, PollWorkResult, QueuedJob, RunningJob, TaskDefinition, TaskStatus
+    GetFileMetadataResult, GetJobStatusParams, GetJobStatusResult, JobStatus, PartitionId,
+    PartitionLocation, PollWorkParams, PollWorkResult, QueuedJob, RunningJob, TaskDefinition,
+    TaskStatus,
 };
 use crate::serde::scheduler::ExecutorMeta;
 
@@ -152,15 +153,14 @@ impl SchedulerGrpc for SchedulerServer {
                 if plan.is_some() {
                     info!("Sending new task to {}", metadata.id);
                 }
-                plan
-                    .map(|(status, plan)| TaskDefinition {
-                        plan: Some(plan.try_into().unwrap()),
-                        task_id: Some(PartitionId {
-                            job_id: status.job_id,
-                            stage_id: status.stage_id,
-                            partition_id: status.partition_id, 
-                        }),
-                    })
+                plan.map(|(status, plan)| TaskDefinition {
+                    plan: Some(plan.try_into().unwrap()),
+                    task_id: Some(PartitionId {
+                        job_id: status.job_id,
+                        stage_id: status.stage_id,
+                        partition_id: status.partition_id,
+                    }),
+                })
             } else {
                 None
             };
@@ -364,19 +364,28 @@ impl SchedulerGrpc for SchedulerServer {
                     error!("{}", msg);
                     tonic::Status::internal(msg)
                 }));
-                let stages = fail_job!(planner.plan_query_stages(&job_id_spawn, plan).map_err(|e| {
-                    let msg = format!("Could not plan query stages: {}", e);
-                    error!("{}", msg);
-                    tonic::Status::internal(msg)
-                }));
-
-                // save stages into state
-                for stage in stages {
-                    fail_job!(state.save_stage_plan(&namespace, &job_id_spawn, stage.stage_id, stage.child.clone()).await.map_err(|e| {
-                        let msg = format!("Could not save stage plan: {}", e);
+                let stages =
+                    fail_job!(planner.plan_query_stages(&job_id_spawn, plan).map_err(|e| {
+                        let msg = format!("Could not plan query stages: {}", e);
                         error!("{}", msg);
                         tonic::Status::internal(msg)
                     }));
+
+                // save stages into state
+                for stage in stages {
+                    fail_job!(state
+                        .save_stage_plan(
+                            &namespace,
+                            &job_id_spawn,
+                            stage.stage_id,
+                            stage.child.clone()
+                        )
+                        .await
+                        .map_err(|e| {
+                            let msg = format!("Could not save stage plan: {}", e);
+                            error!("{}", msg);
+                            tonic::Status::internal(msg)
+                        }));
                     let num_partitions = stage.output_partitioning().partition_count();
                     for partition_id in 0..num_partitions {
                         let pending_status = TaskStatus {
@@ -384,13 +393,15 @@ impl SchedulerGrpc for SchedulerServer {
                             stage_id: stage.stage_id as u32,
                             partition_id: partition_id as u32,
                             status: None,
-
                         };
-                        fail_job!(state.save_task_status(&namespace, &pending_status).await.map_err(|e| {
-                            let msg = format!("Could not save task status: {}", e);
-                            error!("{}", msg);
-                            tonic::Status::internal(msg)
-                        }));
+                        fail_job!(state
+                            .save_task_status(&namespace, &pending_status)
+                            .await
+                            .map_err(|e| {
+                                let msg = format!("Could not save task status: {}", e);
+                                error!("{}", msg);
+                                tonic::Status::internal(msg)
+                            }));
                     }
                 }
             });

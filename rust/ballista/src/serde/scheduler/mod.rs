@@ -116,10 +116,7 @@ impl ExecutePartition {
     }
 
     pub fn key(&self) -> String {
-        format!(
-            "{}.{}.{:?}",
-            self.job_id, self.stage_id, self.partition_id
-        )
+        format!("{}.{}.{:?}", self.job_id, self.stage_id, self.partition_id)
     }
 }
 

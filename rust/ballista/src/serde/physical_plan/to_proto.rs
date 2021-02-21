@@ -289,11 +289,13 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
             })
         } else if let Some(exec) = plan.downcast_ref::<UnresolvedShuffleExec>() {
             Ok(protobuf::PhysicalPlanNode {
-                    physical_plan_type: Some(PhysicalPlanType::Unresolved(protobuf::UnresolvedShuffleExecNode {
-                    query_stage_ids: exec.query_stage_ids.iter().map(|id| *id as u32).collect(),
-                    schema:  Some(exec.schema().as_ref().into()),
-                    partition_count: exec.partition_count as u32,
-                }))
+                physical_plan_type: Some(PhysicalPlanType::Unresolved(
+                    protobuf::UnresolvedShuffleExecNode {
+                        query_stage_ids: exec.query_stage_ids.iter().map(|id| *id as u32).collect(),
+                        schema: Some(exec.schema().as_ref().into()),
+                        partition_count: exec.partition_count as u32,
+                    },
+                )),
             })
         } else {
             Err(BallistaError::General(format!(

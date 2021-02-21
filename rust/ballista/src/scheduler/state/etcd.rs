@@ -64,16 +64,10 @@ impl ConfigBackendClient for EtcdClient {
             .collect())
     }
 
-    async fn put(
-        &self,
-        key: String,
-        value: Vec<u8>,
-        lease_time: Option<Duration>,
-    ) -> Result<()> {
+    async fn put(&self, key: String, value: Vec<u8>, lease_time: Option<Duration>) -> Result<()> {
         let mut etcd = self.etcd.clone();
         let put_options = if let Some(lease_time) = lease_time {
-            etcd
-                .lease_grant(lease_time.as_secs() as i64, None)
+            etcd.lease_grant(lease_time.as_secs() as i64, None)
                 .await
                 .map(|lease| Some(PutOptions::new().with_lease(lease.id())))
                 .map_err(|e| {
@@ -83,8 +77,7 @@ impl ConfigBackendClient for EtcdClient {
         } else {
             None
         };
-        etcd
-            .put(key.clone(), value.clone(), put_options)
+        etcd.put(key.clone(), value.clone(), put_options)
             .await
             .map_err(|e| {
                 warn!("etcd put failed: {}", e);
@@ -95,17 +88,20 @@ impl ConfigBackendClient for EtcdClient {
 
     async fn lock(&self) -> Result<Box<dyn Lock>> {
         let mut etcd = self.etcd.clone();
-        let lock = etcd.lock("/ballista_global_lock", None).await.map_err(|e| {
-            warn!("etcd lock failed: {}", e);
-            ballista_error("etcd lock failed")
-        })?;
+        let lock = etcd
+            .lock("/ballista_global_lock", None)
+            .await
+            .map_err(|e| {
+                warn!("etcd lock failed: {}", e);
+                ballista_error("etcd lock failed")
+            })?;
         Ok(Box::new(EtcdLockGuard { etcd, lock }))
     }
 }
 
 struct EtcdLockGuard {
     etcd: etcd_client::Client,
-    lock: LockResponse
+    lock: LockResponse,
 }
 
 // Cannot use Drop because we need this to be async

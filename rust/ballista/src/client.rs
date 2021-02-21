@@ -117,11 +117,7 @@ impl BallistaClient {
         stage_id: usize,
         partition_id: usize,
     ) -> Result<Vec<RecordBatch>> {
-        let action = Action::FetchPartition(PartitionId::new(
-            job_id,
-            stage_id,
-            partition_id,
-        ));
+        let action = Action::FetchPartition(PartitionId::new(job_id, stage_id, partition_id));
         let stream = self.execute_action(&action).await?;
         Ok(collect(stream)
             .await

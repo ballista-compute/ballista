@@ -155,11 +155,9 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
             let agg_names = exec
                 .aggr_expr()
                 .iter()
-                .map(|expr| {
-                    match expr.field() {
-                        Ok(field) => Ok(field.name().clone()),
-                        Err(e) => Err(BallistaError::DataFusionError(e)),
-                    }
+                .map(|expr| match expr.field() {
+                    Ok(field) => Ok(field.name().clone()),
+                    Err(e) => Err(BallistaError::DataFusionError(e)),
                 })
                 .collect::<Result<_, Self::Error>>()?;
 

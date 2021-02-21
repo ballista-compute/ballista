@@ -1,11 +1,7 @@
 name: Check ASL License
 on:
-  push:
-    paths:
-      - rust/**
+  push
   pull_request:
-    paths:
-      - rust**
   workflow_dispatch:
     
 jobs:

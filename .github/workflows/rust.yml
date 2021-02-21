@@ -1,13 +1,5 @@
 name: Rust
-on:
-  push:
-    paths:
-      - rust/**
-  pull_request:
-    paths:
-      - rust**
-  workflow_dispatch:
-    
+on: [push, pull_request]
 
 # Note, toolchain version must match the rustup version: either "nightly" or "nightly-YYYY-MM-DD"
 # and must contain the toolchain for the OS at the end.

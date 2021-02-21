@@ -38,6 +38,7 @@ def check(files, pattern, exclude_list):
         for line in file:
             if re.search(pattern, line):
                 found = True
+                break
         if not found:
             print("File at {} does not contain ASL license header".format(path))
             count += 1

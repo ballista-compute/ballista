@@ -170,31 +170,6 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
         }
     }
 
-    async fn execute_sql(
-        &self,
-        request: Request<ExecuteSqlParams>,
-    ) -> std::result::Result<Response<ExecuteQueryResult>, tonic::Status> {
-        let ExecuteSqlParams { sql } = request.into_inner();
-        info!("Received execute_sql request: {}", sql);
-
-        //TODO we can't just create a new context because we need a context that has
-        // tables registered from previous SQL statements that have been executed
-
-        let mut ctx = ExecutionContext::new();
-        let df = ctx.sql(&sql).map_err(|e| {
-            let msg = format!("Error executing SQL: {}", e);
-            error!("{}", msg);
-            tonic::Status::internal(msg)
-        })?;
-        let _logical_plan = df.to_logical_plan();
-
-        //TODO delegate to the logic that already exists in execute_logical_plan
-
-        Err(tonic::Status::unimplemented(
-            "execute_sql not implemented yet",
-        ))
-    }
-
     async fn execute_query(
         &self,
         request: Request<ExecuteQueryParams>,
@@ -210,6 +185,8 @@ impl<T: ConfigBackendClient + Send + Sync + 'static> SchedulerGrpc for Scheduler
                     })?
                 }
                 Query::Sql(sql) => {
+                    //TODO we can't just create a new context because we need a context that has
+                    // tables registered from previous SQL statements that have been executed
                     let mut ctx = ExecutionContext::new();
                     let df = ctx.sql(&sql).map_err(|e| {
                         let msg = format!("Error parsing SQL: {}", e);

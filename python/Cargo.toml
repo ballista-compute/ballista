@@ -16,7 +16,7 @@ snmalloc = ["snmalloc-rs"]
 ballista = {path = "../rust/ballista"}
 futures = "0.3"
 snmalloc-rs = {version = "0.2", features= ["cache-friendly"], optional = true}
-pyo3 = {version = "0.13", features = ["extension-module", "abi3-py37"]}
+pyo3 = {version = "0.13", features = ["extension-module", "abi3-py36"]}
 tokio = { version = "1.0", features = ["full"] }
 
 # Should be kept in line with datafusion's serde_json

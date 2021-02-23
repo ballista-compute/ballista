@@ -4,3 +4,6 @@ members = [
     "ballista",
     "benchmarks/tpch",
 ]
+
+# experimental cuDF bindings
+exclude = [ "cudf-rs" ]

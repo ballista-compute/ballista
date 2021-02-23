@@ -15,6 +15,8 @@ def main():
     count = 0
     count += check('rust/**/src/**/*.rs', pattern, exclude_list)
     count += check('rust/**/examples/**/*.rs', pattern, exclude_list)
+    count += check('rust/cudf-rs/**/*.hpp', pattern, exclude_list)
+    count += check('rust/cudf-rs/**/*.cpp', pattern, exclude_list)
     count += check('**/*.java', pattern, exclude_list)
     count += check('**/*.scala', pattern, exclude_list)
     count += check('python/**/*.py', pattern, exclude_list)

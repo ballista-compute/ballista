@@ -5,11 +5,7 @@
 
     <groupId>org.ballistacompute</groupId>
     <artifactId>spark-benchmarks</artifactId>
-<<<<<<< HEAD
-    <version>0.4.1</version>
-=======
     <version>0.4.2-SNAPSHOT</version>
->>>>>>> main
     <packaging>jar</packaging>
 
     <name>Ballista Spark Benchmarks</name>

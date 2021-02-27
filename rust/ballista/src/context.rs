@@ -270,15 +270,15 @@ impl BallistaDataFrame {
                         let mut ballista_client =
                             BallistaClient::try_new(metadata.host.as_str(), metadata.port as u16)
                                 .await?;
-                        result.append(
-                            &mut ballista_client
-                                .fetch_partition(
-                                    &Uuid::parse_str(&partition_id.job_uuid).unwrap(),
-                                    partition_id.stage_id as usize,
-                                    partition_id.partition_id as usize,
-                                )
-                                .await?,
-                        );
+                        let stream = ballista_client
+                            .fetch_partition(
+                                &Uuid::parse_str(&partition_id.job_uuid).unwrap(),
+                                partition_id.stage_id as usize,
+                                partition_id.partition_id as usize,
+                            )
+                            .await?;
+                        result
+                            .append(&mut datafusion::physical_plan::common::collect(stream).await?);
                     }
                     break Ok(Box::pin(MemoryStream::try_new(
                         result,

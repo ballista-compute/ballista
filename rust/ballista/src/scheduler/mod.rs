@@ -150,8 +150,11 @@ impl SchedulerGrpc for SchedulerServer {
                         error!("{}", msg);
                         tonic::Status::internal(msg)
                     })?;
-                if plan.is_some() {
-                    info!("Sending new task to {}", metadata.id);
+                if let Some((task, _plan)) = &plan {
+                    info!(
+                        "Sending new task to {}: {}/{}/{}",
+                        metadata.id, task.job_id, task.stage_id, task.partition_id
+                    );
                 }
                 plan.map(|(status, plan)| TaskDefinition {
                     plan: Some(plan.try_into().unwrap()),

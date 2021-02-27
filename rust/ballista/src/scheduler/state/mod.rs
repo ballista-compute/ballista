@@ -8,7 +8,7 @@ use std::{
 };
 
 use datafusion::physical_plan::ExecutionPlan;
-use log::debug;
+use log::{debug, info};
 use prost::Message;
 use tokio::sync::OwnedMutexGuard;
 
@@ -267,6 +267,12 @@ impl SchedulerState {
                 .get_job_status_from_tasks(namespace, job_id, &executors)
                 .await?;
             if status != new_status {
+                info!(
+                    "Changing status for job {} to {:?}",
+                    job_id, new_status.status
+                );
+                debug!("Old status: {:?}", status);
+                debug!("New status: {:?}", new_status);
                 self.save_job_metadata(namespace, job_id, &new_status)
                     .await?;
             }

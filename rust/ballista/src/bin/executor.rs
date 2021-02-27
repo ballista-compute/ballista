@@ -103,11 +103,12 @@ async fn poll_loop(
                 }
             }
         }
+        let can_accept_task = running_task_guard.is_none();
         drop(running_task_guard);
         let registration_result = scheduler
             .poll_work(PollWorkParams {
                 metadata: Some(executor_meta.clone()),
-                can_accept_task: running_task.lock().await.is_none(), // TODO: honor concurrent_tasks setting. right now each execution runs a single task at a time
+                can_accept_task, // TODO: honor concurrent_tasks setting. right now each execution runs a single task at a time
                 task_status,
             })
             .await;

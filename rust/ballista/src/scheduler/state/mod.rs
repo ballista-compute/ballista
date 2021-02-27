@@ -266,15 +266,17 @@ impl SchedulerState {
             let new_status = self
                 .get_job_status_from_tasks(namespace, job_id, &executors)
                 .await?;
-            if status != new_status {
-                info!(
-                    "Changing status for job {} to {:?}",
-                    job_id, new_status.status
-                );
-                debug!("Old status: {:?}", status);
-                debug!("New status: {:?}", new_status);
-                self.save_job_metadata(namespace, job_id, &new_status)
-                    .await?;
+            if let Some(new_status) = new_status {
+                if status != new_status {
+                    info!(
+                        "Changing status for job {} to {:?}",
+                        job_id, new_status.status
+                    );
+                    debug!("Old status: {:?}", status);
+                    debug!("New status: {:?}", new_status);
+                    self.save_job_metadata(namespace, job_id, &new_status)
+                        .await?;
+                }
             }
         }
         Ok(())
@@ -285,7 +287,7 @@ impl SchedulerState {
         namespace: &str,
         job_id: &str,
         executors: &HashMap<String, ExecutorMeta>,
-    ) -> Result<JobStatus> {
+    ) -> Result<Option<JobStatus>> {
         let statuses = self
             .config_client
             .get_from_prefix(&get_task_prefix_for_job(namespace, job_id))
@@ -293,6 +295,9 @@ impl SchedulerState {
             .into_iter()
             .map(|(_k, v)| decode_protobuf::<TaskStatus>(&v))
             .collect::<Result<Vec<_>>>()?;
+        if statuses.is_empty() {
+            return Ok(None);
+        }
 
         // Check for job completion
         let mut job_status = statuses
@@ -335,7 +340,7 @@ impl SchedulerState {
                 }
             }
         }
-        Ok(JobStatus { status: job_status })
+        Ok(job_status.map(|status| JobStatus { status: Some(status) }))
     }
 }
 
@@ -433,7 +438,8 @@ mod test {
     use std::sync::Arc;
 
     use crate::serde::protobuf::{
-        job_status, task_status, FailedTask, JobStatus, QueuedJob, TaskStatus,
+        job_status, task_status, CompletedTask, FailedTask, JobStatus, QueuedJob, RunningJob, RunningTask,
+        TaskStatus,
     };
     use crate::{prelude::BallistaError, serde::scheduler::ExecutorMeta};
 
@@ -530,6 +536,212 @@ mod test {
         state.save_task_status("test", &meta).await?;
         let result = state._get_task_status("test", "job", 25, 2).await;
         assert!(result.is_err());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn task_synchronize_job_status_queued() -> Result<(), BallistaError> {
+        let state = SchedulerState::new(Arc::new(StandaloneClient::try_new_temporary()?));
+        let namespace = "default";
+        let job_id = "job";
+        let job_status = JobStatus {
+            status: Some(job_status::Status::Queued(QueuedJob {})),
+        };
+        state
+            .save_job_metadata(namespace, job_id, &job_status)
+            .await?;
+        state.synchronize_job_status(namespace).await?;
+        let result = state.get_job_metadata(namespace, job_id).await?;
+        assert_eq!(result, job_status);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn task_synchronize_job_status_running() -> Result<(), BallistaError> {
+        let state = SchedulerState::new(Arc::new(StandaloneClient::try_new_temporary()?));
+        let namespace = "default";
+        let job_id = "job";
+        let job_status = JobStatus {
+            status: Some(job_status::Status::Running(RunningJob {})),
+        };
+        state
+            .save_job_metadata(namespace, job_id, &job_status)
+            .await?;
+        let meta = TaskStatus {
+            status: Some(task_status::Status::Completed(CompletedTask {
+                executor_id: "".to_owned(),
+            })),
+            job_id: job_id.to_owned(),
+            stage_id: 0,
+            partition_id: 0,
+        };
+        state.save_task_status(namespace, &meta).await?;
+        let meta = TaskStatus {
+            status: Some(task_status::Status::Running(RunningTask {
+                executor_id: "".to_owned(),
+            })),
+            job_id: job_id.to_owned(),
+            stage_id: 0,
+            partition_id: 1,
+        };
+        state.save_task_status(namespace, &meta).await?;
+        state.synchronize_job_status(namespace).await?;
+        let result = state.get_job_metadata(namespace, job_id).await?;
+        assert_eq!(result, job_status);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn task_synchronize_job_status_running2() -> Result<(), BallistaError> {
+        let state = SchedulerState::new(Arc::new(StandaloneClient::try_new_temporary()?));
+        let namespace = "default";
+        let job_id = "job";
+        let job_status = JobStatus {
+            status: Some(job_status::Status::Running(RunningJob {})),
+        };
+        state
+            .save_job_metadata(namespace, job_id, &job_status)
+            .await?;
+        let meta = TaskStatus {
+            status: Some(task_status::Status::Completed(CompletedTask {
+                executor_id: "".to_owned(),
+            })),
+            job_id: job_id.to_owned(),
+            stage_id: 0,
+            partition_id: 0,
+        };
+        state.save_task_status(namespace, &meta).await?;
+        let meta = TaskStatus {
+            status: None,
+            job_id: job_id.to_owned(),
+            stage_id: 0,
+            partition_id: 1,
+        };
+        state.save_task_status(namespace, &meta).await?;
+        state.synchronize_job_status(namespace).await?;
+        let result = state.get_job_metadata(namespace, job_id).await?;
+        assert_eq!(result, job_status);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn task_synchronize_job_status_completed() -> Result<(), BallistaError> {
+        let state = SchedulerState::new(Arc::new(StandaloneClient::try_new_temporary()?));
+        let namespace = "default";
+        let job_id = "job";
+        let job_status = JobStatus {
+            status: Some(job_status::Status::Running(RunningJob {})),
+        };
+        state
+            .save_job_metadata(namespace, job_id, &job_status)
+            .await?;
+        let meta = TaskStatus {
+            status: Some(task_status::Status::Completed(CompletedTask {
+                executor_id: "".to_owned(),
+            })),
+            job_id: job_id.to_owned(),
+            stage_id: 0,
+            partition_id: 0,
+        };
+        state.save_task_status(namespace, &meta).await?;
+        let meta = TaskStatus {
+            status: Some(task_status::Status::Completed(CompletedTask {
+                executor_id: "".to_owned(),
+            })),
+            job_id: job_id.to_owned(),
+            stage_id: 0,
+            partition_id: 1,
+        };
+        state.save_task_status(namespace, &meta).await?;
+        state.synchronize_job_status(namespace).await?;
+        let result = state.get_job_metadata(namespace, job_id).await?;
+        match result.status.unwrap() {
+            job_status::Status::Completed(_) => (),
+            status => panic!("Received status: {:?}", status)
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn task_synchronize_job_status_completed2() -> Result<(), BallistaError> {
+        let state = SchedulerState::new(Arc::new(StandaloneClient::try_new_temporary()?));
+        let namespace = "default";
+        let job_id = "job";
+        let job_status = JobStatus {
+            status: Some(job_status::Status::Queued(QueuedJob {})),
+        };
+        state
+            .save_job_metadata(namespace, job_id, &job_status)
+            .await?;
+        let meta = TaskStatus {
+            status: Some(task_status::Status::Completed(CompletedTask {
+                executor_id: "".to_owned(),
+            })),
+            job_id: job_id.to_owned(),
+            stage_id: 0,
+            partition_id: 0,
+        };
+        state.save_task_status(namespace, &meta).await?;
+        let meta = TaskStatus {
+            status: Some(task_status::Status::Completed(CompletedTask {
+                executor_id: "".to_owned(),
+            })),
+            job_id: job_id.to_owned(),
+            stage_id: 0,
+            partition_id: 1,
+        };
+        state.save_task_status(namespace, &meta).await?;
+        state.synchronize_job_status(namespace).await?;
+        let result = state.get_job_metadata(namespace, job_id).await?;
+        match result.status.unwrap() {
+            job_status::Status::Completed(_) => (),
+            status => panic!("Received status: {:?}", status)
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn task_synchronize_job_status_failed() -> Result<(), BallistaError> {
+        let state = SchedulerState::new(Arc::new(StandaloneClient::try_new_temporary()?));
+        let namespace = "default";
+        let job_id = "job";
+        let job_status = JobStatus {
+            status: Some(job_status::Status::Running(RunningJob {})),
+        };
+        state
+            .save_job_metadata(namespace, job_id, &job_status)
+            .await?;
+        let meta = TaskStatus {
+            status: Some(task_status::Status::Completed(CompletedTask {
+                executor_id: "".to_owned(),
+            })),
+            job_id: job_id.to_owned(),
+            stage_id: 0,
+            partition_id: 0,
+        };
+        state.save_task_status(namespace, &meta).await?;
+        let meta = TaskStatus {
+            status: Some(task_status::Status::Failed(FailedTask {
+                error: "".to_owned(),
+            })),
+            job_id: job_id.to_owned(),
+            stage_id: 0,
+            partition_id: 1,
+        };
+        state.save_task_status(namespace, &meta).await?;
+        let meta = TaskStatus {
+            status: None,
+            job_id: job_id.to_owned(),
+            stage_id: 0,
+            partition_id: 2,
+        };
+        state.save_task_status(namespace, &meta).await?;
+        state.synchronize_job_status(namespace).await?;
+        let result = state.get_job_metadata(namespace, job_id).await?;
+        match result.status.unwrap() {
+            job_status::Status::Failed(_) => (),
+            status => panic!("Received status: {:?}", status)
+        }
         Ok(())
     }
 }

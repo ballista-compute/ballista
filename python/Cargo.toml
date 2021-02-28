@@ -23,8 +23,8 @@ tokio = { version = "1.0", features = ["full"] }
 serde_json ="1.0.61"
 serde = "1.0"
 
-arrow = { git = "https://github.com/apache/arrow", rev="5647e90" }
-datafusion = { git = "https://github.com/apache/arrow", rev="5647e90" }
+arrow = { git = "https://github.com/apache/arrow", rev="f7cf157" }
+datafusion = { git = "https://github.com/apache/arrow", rev="f7cf157" }
 
 
 [lib]

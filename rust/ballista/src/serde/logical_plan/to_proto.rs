@@ -1181,7 +1181,7 @@ impl TryInto<protobuf::ScalarFunction> for &BuiltinScalarFunction {
             BuiltinScalarFunction::Round => Ok(protobuf::ScalarFunction::Round),
             BuiltinScalarFunction::Trunc => Ok(protobuf::ScalarFunction::Trunc),
             BuiltinScalarFunction::Abs => Ok(protobuf::ScalarFunction::Abs),
-            BuiltinScalarFunction::Length => Ok(protobuf::ScalarFunction::Length),
+            BuiltinScalarFunction::CharacterLength => Ok(protobuf::ScalarFunction::Length),
             BuiltinScalarFunction::Concat => Ok(protobuf::ScalarFunction::Concat),
             BuiltinScalarFunction::Lower => Ok(protobuf::ScalarFunction::Lower),
             BuiltinScalarFunction::Upper => Ok(protobuf::ScalarFunction::Upper),

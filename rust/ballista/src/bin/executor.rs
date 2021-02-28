@@ -118,24 +118,30 @@ async fn poll_loop(
                     info!("Received task {:?}", task.task_id.as_ref().unwrap());
                     let plan: Arc<dyn ExecutionPlan> = (&task.plan.unwrap()).try_into().unwrap();
                     let task_id = task.task_id.unwrap();
+                    {
+                        let mut running_task = running_task.lock().await;
+                        *running_task = Some(CurrentTaskInformation {
+                            task_id: task_id.clone(),
+                            result: None,
+                        });
+                    }
                     // TODO: This is a convoluted way of executing the task. We should move the task
                     // execution code outside of the FlightService (data plane) into the control plane.
                     let mut executor_client = executor_client.clone();
-                    let task_id_clone = task_id.clone();
                     let running_task = running_task.clone();
                     tokio::spawn(async move {
                         let r = executor_client
                             .execute_partition(
-                                task_id_clone.job_id.clone(),
-                                task_id_clone.stage_id as usize,
-                                vec![task_id_clone.partition_id as usize],
+                                task_id.job_id.clone(),
+                                task_id.stage_id as usize,
+                                vec![task_id.partition_id as usize],
                                 plan,
                             )
                             .await;
                         info!("DONE WITH CURRENT TASK: {:?}", r);
                         let mut running_task = running_task.lock().await;
                         *running_task = Some(CurrentTaskInformation {
-                            task_id: task_id_clone,
+                            task_id,
                             result: Some(r.map(|_| ())),
                         });
                     });

@@ -428,24 +428,24 @@ mod test {
 
     use crate::prelude::BallistaError;
     use crate::serde::protobuf::{
-        execute_query_params::Query, job_status,
-        CompletedJob, ExecuteQueryParams, ExecuteQueryResult, ExecuteSqlParams, ExecutorMetadata,
-        FailedJob, FilePartitionMetadata, FileType, GetExecutorMetadataParams,
-        GetExecutorMetadataResult, GetFileMetadataParams, GetFileMetadataResult,
-        GetJobStatusParams, GetJobStatusResult, JobStatus, PartitionId, PartitionLocation,
-        PollWorkParams, PollWorkResult, QueuedJob, RunningJob, TaskDefinition, TaskStatus,
+        execute_query_params::Query, job_status, CompletedJob, ExecuteQueryParams,
+        ExecuteQueryResult, ExecuteSqlParams, ExecutorMetadata, FailedJob, FilePartitionMetadata,
+        FileType, GetExecutorMetadataParams, GetExecutorMetadataResult, GetFileMetadataParams,
+        GetFileMetadataResult, GetJobStatusParams, GetJobStatusResult, JobStatus, PartitionId,
+        PartitionLocation, PollWorkParams, PollWorkResult, QueuedJob, RunningJob, TaskDefinition,
+        TaskStatus,
     };
 
-    use super::{state::{ConfigBackendClient, StandaloneClient, SchedulerState}, SchedulerGrpc, SchedulerServer};
+    use super::{
+        state::{ConfigBackendClient, SchedulerState, StandaloneClient},
+        SchedulerGrpc, SchedulerServer,
+    };
 
     #[tokio::test]
     async fn test_poll_work() -> Result<(), BallistaError> {
         let state = Arc::new(StandaloneClient::try_new_temporary()?);
         let namespace = "default";
-        let scheduler = SchedulerServer::new(
-            state.clone(),
-            namespace.to_owned(),
-        );
+        let scheduler = SchedulerServer::new(state.clone(), namespace.to_owned());
         let state = SchedulerState::new(state);
         let exec_meta = ExecutorMetadata {
             id: "abc".to_owned(),
@@ -457,28 +457,36 @@ mod test {
             can_accept_task: false,
             task_status: vec![],
         });
-        let response = scheduler.poll_work(request)
+        let response = scheduler
+            .poll_work(request)
             .await
             .expect("Received error response")
             .into_inner();
         // no response task since we told the scheduler we didn't want to accept one
         assert!(response.task.is_none());
         // executor should be registered
-        assert_eq!(state.get_executors_metadata(namespace).await.unwrap().len(), 1);
+        assert_eq!(
+            state.get_executors_metadata(namespace).await.unwrap().len(),
+            1
+        );
 
         let request: Request<PollWorkParams> = Request::new(PollWorkParams {
             metadata: Some(exec_meta.clone()),
             can_accept_task: true,
             task_status: vec![],
         });
-        let response = scheduler.poll_work(request)
+        let response = scheduler
+            .poll_work(request)
             .await
             .expect("Received error response")
             .into_inner();
         // still no response task since there are no tasks in the scheduelr
         assert!(response.task.is_none());
         // executor should be registered
-        assert_eq!(state.get_executors_metadata(namespace).await.unwrap().len(), 1);
+        assert_eq!(
+            state.get_executors_metadata(namespace).await.unwrap().len(),
+            1
+        );
         Ok(())
     }
 }

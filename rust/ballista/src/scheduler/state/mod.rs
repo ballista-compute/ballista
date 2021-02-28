@@ -340,7 +340,9 @@ impl SchedulerState {
                 }
             }
         }
-        Ok(job_status.map(|status| JobStatus { status: Some(status) }))
+        Ok(job_status.map(|status| JobStatus {
+            status: Some(status),
+        }))
     }
 }
 
@@ -438,8 +440,8 @@ mod test {
     use std::sync::Arc;
 
     use crate::serde::protobuf::{
-        job_status, task_status, CompletedTask, FailedTask, JobStatus, QueuedJob, RunningJob, RunningTask,
-        TaskStatus,
+        job_status, task_status, CompletedTask, FailedTask, JobStatus, QueuedJob, RunningJob,
+        RunningTask, TaskStatus,
     };
     use crate::{prelude::BallistaError, serde::scheduler::ExecutorMeta};
 
@@ -657,7 +659,7 @@ mod test {
         let result = state.get_job_metadata(namespace, job_id).await?;
         match result.status.unwrap() {
             job_status::Status::Completed(_) => (),
-            status => panic!("Received status: {:?}", status)
+            status => panic!("Received status: {:?}", status),
         }
         Ok(())
     }
@@ -695,7 +697,7 @@ mod test {
         let result = state.get_job_metadata(namespace, job_id).await?;
         match result.status.unwrap() {
             job_status::Status::Completed(_) => (),
-            status => panic!("Received status: {:?}", status)
+            status => panic!("Received status: {:?}", status),
         }
         Ok(())
     }
@@ -740,7 +742,7 @@ mod test {
         let result = state.get_job_metadata(namespace, job_id).await?;
         match result.status.unwrap() {
             job_status::Status::Failed(_) => (),
-            status => panic!("Received status: {:?}", status)
+            status => panic!("Received status: {:?}", status),
         }
         Ok(())
     }

@@ -305,9 +305,11 @@ async fn execute_query_stage(
     let partition_count = plan.output_partitioning().partition_count();
     let mut meta = Vec::with_capacity(partition_count);
 
+    let num_chunks = partition_count / executors.len();
+    let num_chunks = num_chunks.max(1);
     let partition_chunks: Vec<Vec<usize>> = (0..partition_count)
         .collect::<Vec<usize>>()
-        .chunks(partition_count / executors.len())
+        .chunks(num_chunks)
         .map(|r| r.to_vec())
         .collect();
 

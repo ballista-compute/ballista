@@ -105,7 +105,7 @@ spec:
     spec:
       containers:
       - name: ballista-scheduler
-        image: ballistacompute/ballista-rust:0.4.0-alpha-2
+        image: ballistacompute/ballista-rust:0.4.2-SNAPSHOT
         command: ["/scheduler"]
         args: ["--port=50050"]
         ports:
@@ -137,7 +137,7 @@ spec:
     spec:
       containers:
         - name: ballista-executor
-          image: ballistacompute/ballista-rust:0.4.0-alpha-2
+          image: ballistacompute/ballista-rust:0.4.2-SNAPSHOT
           command: ["/executor"]
           args: ["--port=50051", "--scheduler-host=ballista-scheduler", "--scheduler-port=50050", "--external-host=$(MY_POD_IP)"]
           env:
@@ -184,7 +184,7 @@ You can view the scheduler logs with `kubectl logs ballista-scheduler-0`:
 
 ```
 $ kubectl logs ballista-scheduler-0
-[2021-02-19T00:24:01Z INFO  scheduler] Ballista v0.4.0-alpha-2 Scheduler listening on 0.0.0.0:50050
+[2021-02-19T00:24:01Z INFO  scheduler] Ballista v0.4.2-SNAPSHOT Scheduler listening on 0.0.0.0:50050
 [2021-02-19T00:24:16Z INFO  ballista::scheduler] Received register_executor request for ExecutorMetadata { id: "b5e81711-1c5c-46ec-8522-d8b359793188", host: "10.1.23.149", port: 50051 }
 [2021-02-19T00:24:17Z INFO  ballista::scheduler] Received register_executor request for ExecutorMetadata { id: "816e4502-a876-4ed8-b33f-86d243dcf63f", host: "10.1.23.150", port: 50051 }
 ```

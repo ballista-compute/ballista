@@ -88,19 +88,13 @@ impl ExecutionPlan for ShuffleReaderExec {
         .await
         .map_err(|e| DataFusionError::Execution(format!("Ballista Error: {:?}", e)))?;
 
-        let batches = client
+        client
             .fetch_partition(
                 &partition_location.partition_id.job_id,
                 partition_location.partition_id.stage_id,
                 partition,
             )
             .await
-            .map_err(|e| DataFusionError::Execution(format!("Ballista Error: {:?}", e)))?;
-
-        Ok(Box::pin(MemoryStream::try_new(
-            batches,
-            self.schema(),
-            None,
-        )?))
+            .map_err(|e| DataFusionError::Execution(format!("Ballista Error: {:?}", e)))
     }
 }

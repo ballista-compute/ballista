@@ -1,0 +1,14 @@
+name: Check ASL License
+on: [push, pull_request]
+    
+jobs:
+  CheckLicenses:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.6
+    - name: Run license check
+      run: python ./dev/ci/check-asl-header.py

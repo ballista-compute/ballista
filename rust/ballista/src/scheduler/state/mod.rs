@@ -118,11 +118,12 @@ impl SchedulerState {
     }
 
     pub async fn save_task_status(&self, namespace: &str, status: &TaskStatus) -> Result<()> {
+        let partition_id = status.partition_id.as_ref().unwrap();
         let key = get_task_status_key(
             namespace,
-            &status.job_id,
-            status.stage_id as usize,
-            status.partition_id as usize,
+            &partition_id.job_id,
+            partition_id.stage_id as usize,
+            partition_id.partition_id as usize,
         );
         let value = encode_protobuf(status)?;
         self.config_client.put(key, value, None).await
@@ -196,8 +197,9 @@ impl SchedulerState {
         'tasks: for (_key, value) in kvs.iter() {
             let mut status: TaskStatus = decode_protobuf(&value)?;
             if status.status.is_none() {
+                let partition = status.partition_id.as_ref().unwrap();
                 let plan = self
-                    .get_stage_plan(namespace, &status.job_id, status.stage_id as usize)
+                    .get_stage_plan(namespace, &partition.job_id, partition.stage_id as usize)
                     .await?;
 
                 // Let's try to resolve any unresolved shuffles we find
@@ -212,7 +214,7 @@ impl SchedulerState {
                             let referenced_task = kvs
                                 .get(&get_task_status_key(
                                     namespace,
-                                    &status.job_id,
+                                    &partition.job_id,
                                     stage_id,
                                     partition_id,
                                 ))
@@ -227,7 +229,7 @@ impl SchedulerState {
                                     partition_locations.entry(stage_id).or_insert(empty);
                                 locations.push(crate::scheduler::planner::PartitionLocation {
                                     partition_id: crate::serde::scheduler::PartitionId {
-                                        job_id: status.job_id.clone(),
+                                        job_id: partition.job_id.clone(),
                                         stage_id,
                                         partition_id,
                                     },
@@ -326,11 +328,7 @@ impl SchedulerState {
                 let partition_location = info
                     .into_iter()
                     .map(|(status, execution_id)| PartitionLocation {
-                        partition_id: Some(PartitionId {
-                            job_id: status.job_id.to_owned(),
-                            stage_id: status.stage_id,
-                            partition_id: status.partition_id,
-                        }),
+                        partition_id: status.partition_id.to_owned(),
                         executor_meta: executors.get(execution_id).map(|e| e.clone().into()),
                     })
                     .collect();
@@ -452,8 +450,8 @@ mod test {
     use std::sync::Arc;
 
     use crate::serde::protobuf::{
-        job_status, task_status, CompletedTask, FailedTask, JobStatus, QueuedJob, RunningJob,
-        RunningTask, TaskStatus,
+        job_status, task_status, CompletedTask, FailedTask, JobStatus, PartitionId, QueuedJob,
+        RunningJob, RunningTask, TaskStatus,
     };
     use crate::{prelude::BallistaError, serde::scheduler::ExecutorMeta};
 
@@ -522,9 +520,11 @@ mod test {
             status: Some(task_status::Status::Failed(FailedTask {
                 error: "error".to_owned(),
             })),
-            job_id: "job".to_owned(),
-            stage_id: 1,
-            partition_id: 2,
+            partition_id: Some(PartitionId {
+                job_id: "job".to_owned(),
+                stage_id: 1,
+                partition_id: 2,
+            }),
         };
         state.save_task_status("test", &meta).await?;
         let result = state._get_task_status("test", "job", 1, 2).await?;
@@ -543,9 +543,11 @@ mod test {
             status: Some(task_status::Status::Failed(FailedTask {
                 error: "error".to_owned(),
             })),
-            job_id: "job".to_owned(),
-            stage_id: 1,
-            partition_id: 2,
+            partition_id: Some(PartitionId {
+                job_id: "job".to_owned(),
+                stage_id: 1,
+                partition_id: 2,
+            }),
         };
         state.save_task_status("test", &meta).await?;
         let result = state._get_task_status("test", "job", 25, 2).await;
@@ -585,18 +587,22 @@ mod test {
             status: Some(task_status::Status::Completed(CompletedTask {
                 executor_id: "".to_owned(),
             })),
-            job_id: job_id.to_owned(),
-            stage_id: 0,
-            partition_id: 0,
+            partition_id: Some(PartitionId {
+                job_id: job_id.to_owned(),
+                stage_id: 0,
+                partition_id: 0,
+            }),
         };
         state.save_task_status(namespace, &meta).await?;
         let meta = TaskStatus {
             status: Some(task_status::Status::Running(RunningTask {
                 executor_id: "".to_owned(),
             })),
-            job_id: job_id.to_owned(),
-            stage_id: 0,
-            partition_id: 1,
+            partition_id: Some(PartitionId {
+                job_id: job_id.to_owned(),
+                stage_id: 0,
+                partition_id: 1,
+            }),
         };
         state.save_task_status(namespace, &meta).await?;
         state.synchronize_job_status(namespace).await?;
@@ -620,16 +626,20 @@ mod test {
             status: Some(task_status::Status::Completed(CompletedTask {
                 executor_id: "".to_owned(),
             })),
-            job_id: job_id.to_owned(),
-            stage_id: 0,
-            partition_id: 0,
+            partition_id: Some(PartitionId {
+                job_id: job_id.to_owned(),
+                stage_id: 0,
+                partition_id: 0,
+            }),
         };
         state.save_task_status(namespace, &meta).await?;
         let meta = TaskStatus {
             status: None,
-            job_id: job_id.to_owned(),
-            stage_id: 0,
-            partition_id: 1,
+            partition_id: Some(PartitionId {
+                job_id: job_id.to_owned(),
+                stage_id: 0,
+                partition_id: 1,
+            }),
         };
         state.save_task_status(namespace, &meta).await?;
         state.synchronize_job_status(namespace).await?;
@@ -653,18 +663,22 @@ mod test {
             status: Some(task_status::Status::Completed(CompletedTask {
                 executor_id: "".to_owned(),
             })),
-            job_id: job_id.to_owned(),
-            stage_id: 0,
-            partition_id: 0,
+            partition_id: Some(PartitionId {
+                job_id: job_id.to_owned(),
+                stage_id: 0,
+                partition_id: 0,
+            }),
         };
         state.save_task_status(namespace, &meta).await?;
         let meta = TaskStatus {
             status: Some(task_status::Status::Completed(CompletedTask {
                 executor_id: "".to_owned(),
             })),
-            job_id: job_id.to_owned(),
-            stage_id: 0,
-            partition_id: 1,
+            partition_id: Some(PartitionId {
+                job_id: job_id.to_owned(),
+                stage_id: 0,
+                partition_id: 1,
+            }),
         };
         state.save_task_status(namespace, &meta).await?;
         state.synchronize_job_status(namespace).await?;
@@ -691,18 +705,22 @@ mod test {
             status: Some(task_status::Status::Completed(CompletedTask {
                 executor_id: "".to_owned(),
             })),
-            job_id: job_id.to_owned(),
-            stage_id: 0,
-            partition_id: 0,
+            partition_id: Some(PartitionId {
+                job_id: job_id.to_owned(),
+                stage_id: 0,
+                partition_id: 0,
+            }),
         };
         state.save_task_status(namespace, &meta).await?;
         let meta = TaskStatus {
             status: Some(task_status::Status::Completed(CompletedTask {
                 executor_id: "".to_owned(),
             })),
-            job_id: job_id.to_owned(),
-            stage_id: 0,
-            partition_id: 1,
+            partition_id: Some(PartitionId {
+                job_id: job_id.to_owned(),
+                stage_id: 0,
+                partition_id: 1,
+            }),
         };
         state.save_task_status(namespace, &meta).await?;
         state.synchronize_job_status(namespace).await?;
@@ -729,25 +747,31 @@ mod test {
             status: Some(task_status::Status::Completed(CompletedTask {
                 executor_id: "".to_owned(),
             })),
-            job_id: job_id.to_owned(),
-            stage_id: 0,
-            partition_id: 0,
+            partition_id: Some(PartitionId {
+                job_id: job_id.to_owned(),
+                stage_id: 0,
+                partition_id: 0,
+            }),
         };
         state.save_task_status(namespace, &meta).await?;
         let meta = TaskStatus {
             status: Some(task_status::Status::Failed(FailedTask {
                 error: "".to_owned(),
             })),
-            job_id: job_id.to_owned(),
-            stage_id: 0,
-            partition_id: 1,
+            partition_id: Some(PartitionId {
+                job_id: job_id.to_owned(),
+                stage_id: 0,
+                partition_id: 1,
+            }),
         };
         state.save_task_status(namespace, &meta).await?;
         let meta = TaskStatus {
             status: None,
-            job_id: job_id.to_owned(),
-            stage_id: 0,
-            partition_id: 2,
+            partition_id: Some(PartitionId {
+                job_id: job_id.to_owned(),
+                stage_id: 0,
+                partition_id: 2,
+            }),
         };
         state.save_task_status(namespace, &meta).await?;
         state.synchronize_job_status(namespace).await?;

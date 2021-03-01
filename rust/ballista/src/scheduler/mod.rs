@@ -151,18 +151,18 @@ impl SchedulerGrpc for SchedulerServer {
                         tonic::Status::internal(msg)
                     })?;
                 if let Some((task, _plan)) = &plan {
+                    let partition_id = task.partition_id.as_ref().unwrap();
                     info!(
                         "Sending new task to {}: {}/{}/{}",
-                        metadata.id, task.job_id, task.stage_id, task.partition_id
+                        metadata.id,
+                        partition_id.job_id,
+                        partition_id.stage_id,
+                        partition_id.partition_id
                     );
                 }
                 plan.map(|(status, plan)| TaskDefinition {
                     plan: Some(plan.try_into().unwrap()),
-                    task_id: Some(PartitionId {
-                        job_id: status.job_id,
-                        stage_id: status.stage_id,
-                        partition_id: status.partition_id,
-                    }),
+                    task_id: status.partition_id,
                 })
             } else {
                 None
@@ -376,9 +376,11 @@ impl SchedulerGrpc for SchedulerServer {
                     let num_partitions = stage.output_partitioning().partition_count();
                     for partition_id in 0..num_partitions {
                         let pending_status = TaskStatus {
-                            job_id: job_id_spawn.clone(),
-                            stage_id: stage.stage_id as u32,
-                            partition_id: partition_id as u32,
+                            partition_id: Some(PartitionId {
+                                job_id: job_id_spawn.clone(),
+                                stage_id: stage.stage_id as u32,
+                                partition_id: partition_id as u32,
+                            }),
                             status: None,
                         };
                         fail_job!(state

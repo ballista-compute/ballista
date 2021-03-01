@@ -483,15 +483,12 @@ message CompletedTask {
   string executor_id = 1;
 }
 
-// TODO: Maybe it would be a good idea to use PartitionId as a field member?
 message TaskStatus {
-  string job_id = 1;
-  uint32 stage_id = 2;
-  uint32 partition_id = 3;
+  PartitionId partition_id = 1;
   oneof status {
-    RunningTask running = 4;
-    FailedTask failed = 5;
-    CompletedTask completed = 6;
+    RunningTask running = 2;
+    FailedTask failed = 3;
+    CompletedTask completed = 4;
   }
 }
 

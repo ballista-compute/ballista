@@ -77,9 +77,7 @@ async fn poll_loop(
                     info!("Current task finished");
                     *running_task_guard = None;
                     task_status.push(TaskStatus {
-                        job_id: task_id.job_id,
-                        stage_id: task_id.stage_id,
-                        partition_id: task_id.partition_id,
+                        partition_id: Some(task_id),
                         status: Some(task_status::Status::Completed(CompletedTask {
                             executor_id: executor_meta.id.clone(),
                         })),
@@ -90,9 +88,7 @@ async fn poll_loop(
                     info!("Current task failed: {}", error_msg);
                     *running_task_guard = None;
                     task_status.push(TaskStatus {
-                        job_id: task_id.job_id,
-                        stage_id: task_id.stage_id,
-                        partition_id: task_id.partition_id,
+                        partition_id: Some(task_id),
                         status: Some(task_status::Status::Failed(FailedTask {
                             error: format!("Task failed due to Tokio error: {}", error_msg),
                         })),

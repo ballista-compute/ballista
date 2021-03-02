@@ -166,16 +166,12 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 name = "ballista"
 version = "0.4.2-SNAPSHOT"
 dependencies = [
- "anyhow",
  "arrow",
  "arrow-flight",
  "async-trait",
  "clap",
- "configure_me",
- "configure_me_codegen",
  "crossbeam 0.7.3",
  "datafusion",
- "env_logger",
  "etcd-client",
  "futures",
  "log",
@@ -187,11 +183,44 @@ dependencies = [
  "sled",
  "snmalloc-rs",
  "sqlparser 0.7.0",
- "tempfile",
  "tokio",
  "tonic",
  "tonic-build",
  "uuid",
+]
+
+[[package]]
+name = "ballista-executor"
+version = "0.4.2-SNAPSHOT"
+dependencies = [
+ "anyhow",
+ "arrow-flight",
+ "ballista",
+ "configure_me",
+ "configure_me_codegen",
+ "datafusion",
+ "env_logger",
+ "futures",
+ "log",
+ "tempfile",
+ "tokio",
+ "tonic",
+ "uuid",
+]
+
+[[package]]
+name = "ballista-scheduler"
+version = "0.4.2-SNAPSHOT"
+dependencies = [
+ "anyhow",
+ "ballista",
+ "configure_me",
+ "configure_me_codegen",
+ "env_logger",
+ "etcd-client",
+ "log",
+ "tokio",
+ "tonic",
 ]
 
 [[package]]
@@ -2219,7 +2248,6 @@ name = "tpch"
 version = "0.4.2-SNAPSHOT"
 dependencies = [
  "arrow",
- "arrow-flight",
  "ballista",
  "datafusion",
  "env_logger",

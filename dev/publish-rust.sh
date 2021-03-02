@@ -2,7 +2,7 @@
 
 set -e
 
-pushd rust/ballista
+pushd rust/lib
 cargo publish
 popd
 

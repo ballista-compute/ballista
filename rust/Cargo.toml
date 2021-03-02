@@ -1,6 +1,8 @@
 [workspace]
 
 members = [
-    "ballista",
+    "lib",
+    "executor",
+    "scheduler",
     "benchmarks/tpch",
 ]

@@ -5,14 +5,13 @@ authors = ["Andy Grove <andygrove73@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-ballista = { path="../../ballista" }
+ballista = { path="../../lib" }
 
 arrow = { git = "https://github.com/apache/arrow", rev="5647e90" }
-arrow-flight = { git = "https://github.com/apache/arrow", rev="5647e90" }
 datafusion = { git = "https://github.com/apache/arrow", rev="5647e90" }
 parquet = { git = "https://github.com/apache/arrow", rev="5647e90" }
 
 
 env_logger = "0.8"
-tokio = { version = "1.0", features = ["macros", "rt", "rt-multi-thread", "sync"] }
+tokio = { version = "1.0", features = ["macros", "rt", "rt-multi-thread"] }
 structopt = "0.3"

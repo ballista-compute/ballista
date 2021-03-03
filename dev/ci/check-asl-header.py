@@ -6,7 +6,7 @@ def main():
 
     # these files have ASF license
     exclude_list = [
-        'rust/ballista/src/memory_stream.rs',
+        'rust/lib/src/memory_stream.rs',
         'rust/benchmarks/tpch/src/main.rs'
     ]
 

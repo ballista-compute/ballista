@@ -29,12 +29,7 @@ use tonic::transport::Channel;
 pub mod collect;
 pub mod flight_service;
 
-#[cfg(feature = "snmalloc")]
-#[global_allocator]
-static ALLOC: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
-
 #[derive(Debug, Clone)]
-
 pub struct ExecutorConfig {
     pub(crate) host: String,
     pub(crate) port: u16,

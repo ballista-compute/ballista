@@ -12,7 +12,6 @@ include = ["build.rs", "src/**/*", "Cargo.toml", "proto/ballista.proto"]
 
 [features]
 simd = ["datafusion/simd"]
-snmalloc = ["snmalloc-rs"]
 
 [dependencies]
 async-trait = "0.1.36"
@@ -27,7 +26,6 @@ prost-types = "0.7"
 rand = "0.8"
 serde = {version = "1", features = ["derive"]}
 sled = "0.34"
-snmalloc-rs = {version = "0.2", features= ["cache-friendly"], optional = true}
 sqlparser = "0.7"
 tokio = { version = "1.0", features = ["rt", "sync"] }
 tonic = "0.4"

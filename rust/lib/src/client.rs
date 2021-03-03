@@ -14,9 +14,12 @@
 
 //! Client API for sending requests to executors.
 
-use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 use std::{collections::HashMap, pin::Pin};
+use std::{
+    convert::{TryFrom, TryInto},
+    task::{Context, Poll},
+};
 
 use crate::error::{ballista_error, BallistaError, Result};
 use crate::memory_stream::MemoryStream;
@@ -24,17 +27,22 @@ use crate::serde::protobuf::{self};
 use crate::serde::scheduler::{Action, ExecutePartition, ExecutePartitionResult, PartitionId};
 
 use crate::utils::PartitionStats;
-use arrow::array::{StringArray, StructArray};
-use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
-use arrow_flight::flight_service_client::FlightServiceClient;
+use arrow::{
+    array::{StringArray, StructArray},
+    error::{ArrowError, Result as ArrowResult},
+};
+use arrow::{datatypes::Schema, datatypes::SchemaRef};
 use arrow_flight::utils::flight_data_to_arrow_batch;
 use arrow_flight::Ticket;
+use arrow_flight::{flight_service_client::FlightServiceClient, FlightData};
 use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
 use datafusion::{logical_plan::LogicalPlan, physical_plan::RecordBatchStream};
+use futures::{Stream, StreamExt};
 use log::debug;
 use prost::Message;
+use tonic::Streaming;
 use uuid::Uuid;
 
 /// Client for interacting with Ballista executors.
@@ -151,25 +159,49 @@ impl BallistaClient {
                 let schema = Arc::new(Schema::try_from(&flight_data)?);
 
                 // all the remaining stream messages should be dictionary and record batches
-
-                //TODO we should stream the data rather than load into memory first
-                let mut batches = vec![];
-
-                while let Some(flight_data) = stream
-                    .message()
-                    .await
-                    .map_err(|e| BallistaError::General(format!("{:?}", e)))?
-                {
-                    let batch = flight_data_to_arrow_batch(&flight_data, schema.clone(), &[])?;
-
-                    batches.push(batch);
-                }
-
-                Ok(Box::pin(MemoryStream::try_new(batches, schema, None)?))
+                Ok(Box::pin(FlightDataStream::new(stream, schema)))
             }
             None => Err(ballista_error(
                 "Did not receive schema batch from flight server",
             )),
         }
+    }
+}
+
+struct FlightDataStream {
+    stream: Streaming<FlightData>,
+    schema: SchemaRef,
+}
+
+impl FlightDataStream {
+    pub fn new(stream: Streaming<FlightData>, schema: SchemaRef) -> Self {
+        Self { stream, schema }
+    }
+}
+
+impl Stream for FlightDataStream {
+    type Item = ArrowResult<RecordBatch>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        self.stream.poll_next_unpin(cx).map(|x| match x {
+            Some(flight_data_chunk_result) => {
+                let converted_chunk = flight_data_chunk_result
+                    .map_err(|e| ArrowError::from_external_error(Box::new(e)))
+                    .and_then(|flight_data_chunk| {
+                        flight_data_to_arrow_batch(&flight_data_chunk, self.schema.clone(), &[])
+                    });
+                Some(converted_chunk)
+            }
+            None => None,
+        })
+    }
+}
+
+impl RecordBatchStream for FlightDataStream {
+    fn schema(&self) -> SchemaRef {
+        self.schema.clone()
     }
 }

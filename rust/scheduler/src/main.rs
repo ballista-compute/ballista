@@ -71,7 +71,6 @@ async fn main() -> Result<()> {
         print_version();
         std::process::exit(0);
     }
-    println!("{}", opt.namespace);
 
     let namespace = opt.namespace;
     let bind_host = opt.bind_host;

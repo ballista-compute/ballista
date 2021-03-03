@@ -19,7 +19,6 @@ ARG RELEASE_FLAG=--release
 # force build.rs to run to generate configure_me code.
 RUN apt-get -y install cmake
 ENV FORCE_REBUILD='true'
-ENV RUSTFLAGS='-C lto -C codegen-units=1 -C embed-bitcode'
 ARG EXECUTOR_BUILD_FEATURES='--features snmalloc'
 WORKDIR /tmp/ballista/executor
 RUN cargo build $RELEASE_FLAG $EXECUTOR_BUILD_FEATURES

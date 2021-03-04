@@ -66,93 +66,88 @@ async fn poll_loop(
     executor_meta: ExecutorMeta,
     concurrent_tasks: usize,
 ) {
-    let available_tasks_slots = Arc::new(AtomicUsize::new(concurrent_tasks));
     let executor_meta: protobuf::ExecutorMetadata = executor_meta.into();
+    let available_tasks_slots = Arc::new(AtomicUsize::new(concurrent_tasks));
     let (task_status_sender, mut task_status_receiver) = std::sync::mpsc::channel::<TaskStatus>();
 
     loop {
-        // This run loop consists of 3 stages:
-        // 1) Clean running tasks that finished.
-        // 2) Poll for work in case the executor can receive more work.
-        // 3) Run received tasks.
         debug!("Starting registration loop with scheduler");
-        let poll_work_params = clean_finished_tasks(
-            &executor_meta,
-            &available_tasks_slots,
-            &mut task_status_receiver,
-        )
-        .await;
-        let registration_result: Result<tonic::Response<PollWorkResult>, tonic::Status> =
-            scheduler.poll_work(poll_work_params).await;
-        {
-            let task_status_sender = task_status_sender.clone();
 
-            run_received_tasks(
-                executor_client.clone(),
-                &executor_meta,
-                registration_result,
-                &available_tasks_slots,
-                task_status_sender,
-            )
+        let task_status: Vec<TaskStatus> = sample_tasks_status(&mut task_status_receiver).await;
+
+        let poll_work_result: Result<tonic::Response<PollWorkResult>, tonic::Status> = scheduler
+            .poll_work(PollWorkParams {
+                metadata: Some(executor_meta.clone()),
+                can_accept_task: available_tasks_slots.load(Ordering::SeqCst) > 0,
+                task_status,
+            })
             .await;
+
+        let task_status_sender = task_status_sender.clone();
+
+        match poll_work_result {
+            Ok(result) => {
+                run_received_tasks(
+                    executor_client.clone(),
+                    executor_meta.id.clone(),
+                    available_tasks_slots.clone(),
+                    task_status_sender,
+                    result,
+                )
+                .await;
+            }
+            Err(error) => {
+                warn!("Executor registration failed. If this continues to happen the executor might be marked as dead by the scheduler. Error: {}", error);
+            }
         }
+
         tokio::time::sleep(Duration::from_millis(250)).await;
     }
 }
 
 async fn run_received_tasks(
-    executor_client: BallistaClient,
-    executor_meta: &protobuf::ExecutorMetadata,
-    registration_result: Result<tonic::Response<PollWorkResult>, tonic::Status>,
-    available_tasks_slots: &Arc<AtomicUsize>,
+    mut executor_client: BallistaClient,
+    executor_id: String,
+    available_tasks_slots: Arc<AtomicUsize>,
     task_status_sender: Sender<TaskStatus>,
+    result: tonic::Response<PollWorkResult>,
 ) {
-    match registration_result {
-        Ok(result) => {
-            if let Some(task) = result.into_inner().task {
-                info!("Received task {:?}", task.task_id.as_ref().unwrap());
-                available_tasks_slots.fetch_sub(1, Ordering::SeqCst);
-                let plan: Arc<dyn ExecutionPlan> = (&task.plan.unwrap()).try_into().unwrap();
-                let task_id = task.task_id.unwrap();
-                // TODO: This is a convoluted way of executing the task. We should move the task
-                // execution code outside of the FlightService (data plane) into the control plane.
-                {
-                    let mut executor_client = executor_client;
-                    let available_tasks_slots = available_tasks_slots.clone();
-                    let task_status_sender = task_status_sender.clone();
-                    let executor_id = executor_meta.id.clone();
+    if let Some(task) = result.into_inner().task {
+        info!("Received task {:?}", task.task_id.as_ref().unwrap());
+        available_tasks_slots.fetch_sub(1, Ordering::SeqCst);
+        let plan: Arc<dyn ExecutionPlan> = (&task.plan.unwrap()).try_into().unwrap();
+        let task_id = task.task_id.unwrap();
+        // TODO: This is a convoluted way of executing the task. We should move the task
+        // execution code outside of the FlightService (data plane) into the control plane.
 
-                    tokio::spawn(async move {
-                        let r = executor_client
-                            .execute_partition(
-                                task_id.job_id.clone(),
-                                task_id.stage_id as usize,
-                                vec![task_id.partition_id as usize],
-                                plan,
-                            )
-                            .await;
-                        info!("DONE WITH TASK: {:?}", r);
-                        available_tasks_slots.fetch_add(1, Ordering::SeqCst);
-                        let _ =
-                            task_status_sender.send(as_thing(executor_id, task_id, r.map(|_| ())));
-                    });
-                }
-            }
-        }
-        Err(error) => {
-            warn!("Executor registration failed. If this continues to happen the executor might be marked as dead by the scheduler. Error: {}", error);
-        }
+        tokio::spawn(async move {
+            let execution_result = executor_client
+                .execute_partition(
+                    task_id.job_id.clone(),
+                    task_id.stage_id as usize,
+                    vec![task_id.partition_id as usize],
+                    plan,
+                )
+                .await;
+            info!("DONE WITH TASK: {:?}", execution_result);
+            available_tasks_slots.fetch_add(1, Ordering::SeqCst);
+            let _ = task_status_sender.send(as_task_status(
+                execution_result.map(|_| ()),
+                executor_id,
+                task_id,
+            ));
+        });
     }
 }
 
-fn as_thing(
+fn as_task_status(
+    execution_result: ballista::error::Result<()>,
     executor_id: String,
     task_id: PartitionId,
-    result: ballista::error::Result<()>,
 ) -> TaskStatus {
-    match result {
+    match execution_result {
         Ok(_) => {
-            info!("Current task finished");
+            info!("Task {:?} finished", task_id);
 
             TaskStatus {
                 partition_id: Some(task_id),
@@ -163,7 +158,7 @@ fn as_thing(
         }
         Err(e) => {
             let error_msg = e.to_string();
-            info!("Current task failed: {}", error_msg);
+            info!("Task {:?} failed: {}", task_id, error_msg);
 
             TaskStatus {
                 partition_id: Some(task_id),
@@ -175,12 +170,7 @@ fn as_thing(
     }
 }
 
-async fn clean_finished_tasks(
-    executor_meta: &protobuf::ExecutorMetadata,
-    available_tasks_slots: &Arc<AtomicUsize>,
-    // running_tasks: &Arc<Mutex<Vec<Weak<CurrentTaskInformation>>>>,
-    task_status_receiver: &mut Receiver<TaskStatus>,
-) -> PollWorkParams {
+async fn sample_tasks_status(task_status_receiver: &mut Receiver<TaskStatus>) -> Vec<TaskStatus> {
     let mut task_status: Vec<TaskStatus> = vec![];
 
     loop {
@@ -197,11 +187,7 @@ async fn clean_finished_tasks(
         }
     }
 
-    PollWorkParams {
-        metadata: Some(executor_meta.clone()),
-        can_accept_task: available_tasks_slots.load(Ordering::SeqCst) > 0,
-        task_status,
-    }
+    task_status
 }
 
 #[tokio::main]

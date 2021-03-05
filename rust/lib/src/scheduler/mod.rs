@@ -319,7 +319,7 @@ impl SchedulerGrpc for SchedulerServer {
                 debug!("Received plan for execution: {:?}", plan);
 
                 let optimized_plan = fail_job!(datafusion_ctx.optimize(&plan).map_err(|e| {
-                    let msg = format!("Could not create physical plan: {}", e);
+                    let msg = format!("Could not create optimized logical plan: {}", e);
                     error!("{}", msg);
                     tonic::Status::internal(msg)
                 }));

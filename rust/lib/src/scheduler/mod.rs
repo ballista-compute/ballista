@@ -316,9 +316,18 @@ impl SchedulerGrpc for SchedulerServer {
 
                 let start = Instant::now();
 
+                debug!("Received plan for execution: {:?}", plan);
+
+                let optimized_plan = fail_job!(datafusion_ctx.optimize(&plan).map_err(|e| {
+                    let msg = format!("Could not create physical plan: {}", e);
+                    error!("{}", msg);
+                    tonic::Status::internal(msg)
+                }));
+
+                debug!("Calculated optimized plan: {:?}", optimized_plan);
+
                 let plan = fail_job!(datafusion_ctx
-                    .optimize(&plan)
-                    .and_then(|plan| datafusion_ctx.create_physical_plan(&plan))
+                    .create_physical_plan(&optimized_plan)
                     .map_err(|e| {
                         let msg = format!("Could not create physical plan: {}", e);
                         error!("{}", msg);

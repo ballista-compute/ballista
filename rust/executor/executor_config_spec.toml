@@ -39,7 +39,7 @@ doc = "Local IP address to bind to."
 [[param]]
 name = "external_host"
 type = "String"
-default = "std::string::String::from(\"localhost\")"
+optional = true
 doc = "Host name or IP address to register with scheduler so that other executors can connect to this executor."
 
 [[param]]

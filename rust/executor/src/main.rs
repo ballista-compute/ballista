@@ -15,6 +15,7 @@
 //! Ballista Rust executor binary.
 
 use std::{convert::TryInto, sync::Arc, time::Duration};
+use std::net::UdpSocket;
 
 use anyhow::{Context, Result};
 use arrow_flight::flight_service_server::FlightServiceServer;
@@ -155,6 +156,23 @@ async fn poll_loop(
     }
 }
 
+pub fn get_system_ip() -> Option<String> {
+    let socket = match UdpSocket::bind("0.0.0.0:0") {
+        Ok(s) => s,
+        Err(_) => return None,
+    };
+
+    match socket.connect("8.8.8.8:80") {
+        Ok(()) => (),
+        Err(_) => return None,
+    };
+
+    return match socket.local_addr() {
+        Ok(addr) => Some(addr.ip().to_string()),
+        Err(_) => None,
+    };
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
@@ -169,9 +187,11 @@ async fn main() -> Result<()> {
     }
 
     let namespace = opt.namespace;
-    let external_host = opt.external_host;
+    let external_host: String = opt.external_host.unwrap_or(get_system_ip().unwrap());
     let bind_host = opt.bind_host;
     let port = opt.port;
+
+    println!("Using external host {} for executor", external_host);
 
     let addr = format!("{}:{}", bind_host, port);
     let addr = addr

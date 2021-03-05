@@ -39,19 +39,23 @@ use arrow_flight::{
     FlightDescriptor, FlightInfo, HandshakeRequest, HandshakeResponse, PutResult, SchemaResult,
     Ticket,
 };
-use crossbeam::channel::{bounded, Receiver, RecvError, Sender};
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::RecordBatchStream;
 use futures::{Stream, StreamExt};
 use log::{debug, info, warn};
 use std::collections::HashMap;
 use std::io::{Read, Seek};
-use tokio::task;
+use tokio::sync::mpsc::channel;
 use tokio::task::JoinHandle;
+use tokio::{
+    sync::mpsc::{Receiver, Sender},
+    task,
+};
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status, Streaming};
 
-type FlightDataSender = Sender<Option<Result<FlightData, Status>>>;
-type FlightDataReceiver = Receiver<Option<Result<FlightData, Status>>>;
+type FlightDataSender = Sender<Result<FlightData, Status>>;
+type FlightDataReceiver = Receiver<Result<FlightData, Status>>;
 
 /// Service implementing the Apache Arrow Flight Protocol
 #[derive(Clone)]
@@ -212,18 +216,18 @@ impl FlightService for BallistaFlightService {
                     .map_err(|e| from_ballista_err(&e))?;
                 let reader = FileReader::try_new(file).map_err(|e| from_arrow_err(&e))?;
 
-                let (tx, rx): (FlightDataSender, FlightDataReceiver) = bounded(2);
+                let (tx, rx): (FlightDataSender, FlightDataReceiver) = channel(2);
 
                 // Arrow IPC reader does not implement Sync + Send so we need to use a channel
                 // to communicate
-                task::spawn_blocking(move || {
-                    if let Err(e) = stream_flight_data(reader, tx) {
+                task::spawn(async move {
+                    if let Err(e) = stream_flight_data(reader, tx).await {
                         warn!("Error streaming results: {:?}", e);
                     }
                 });
 
                 Ok(Response::new(
-                    Box::pin(FlightDataStream::new(rx)) as Self::DoGetStream
+                    Box::pin(ReceiverStream::new(rx)) as Self::DoGetStream
                 ))
             }
         }
@@ -312,55 +316,33 @@ fn create_flight_iter(
     )
 }
 
-fn stream_flight_data<T>(reader: FileReader<T>, tx: FlightDataSender) -> Result<(), Status>
+async fn stream_flight_data<T>(reader: FileReader<T>, tx: FlightDataSender) -> Result<(), Status>
 where
     T: Read + Seek,
 {
     let options = arrow::ipc::writer::IpcWriteOptions::default();
     let schema_flight_data =
         arrow_flight::utils::flight_data_from_arrow_schema(reader.schema().as_ref(), &options);
-    send_response(&tx, Some(Ok(schema_flight_data)))?;
+    send_response(&tx, Ok(schema_flight_data)).await?;
 
     for batch in reader {
         let batch_flight_data: Vec<_> = batch
             .map(|b| create_flight_iter(&b, &options).collect())
             .map_err(|e| from_arrow_err(&e))?;
         for batch in &batch_flight_data {
-            send_response(&tx, Some(batch.clone()))?;
+            send_response(&tx, batch.clone()).await?;
         }
     }
-    send_response(&tx, None)?;
     Ok(())
 }
 
-fn send_response(
+async fn send_response(
     tx: &FlightDataSender,
-    data: Option<Result<FlightData, Status>>,
+    data: Result<FlightData, Status>,
 ) -> Result<(), Status> {
     tx.send(data)
+        .await
         .map_err(|e| Status::internal(format!("{:?}", e)))
-}
-
-struct FlightDataStream {
-    response_rx: FlightDataReceiver,
-}
-
-impl FlightDataStream {
-    fn new(response_rx: FlightDataReceiver) -> Self {
-        Self { response_rx }
-    }
-}
-
-impl Stream for FlightDataStream {
-    type Item = Result<FlightData, Status>;
-
-    fn poll_next(self: std::pin::Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match self.response_rx.recv() {
-            Ok(maybe_batch) => Poll::Ready(maybe_batch),
-            // RecvError means receiver has exited and closed the channel
-            Err(RecvError) => Poll::Ready(None),
-        }
-    }
 }
 
 fn from_arrow_err(e: &ArrowError) -> Status {

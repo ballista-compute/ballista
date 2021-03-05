@@ -16,7 +16,6 @@ simd = ["datafusion/simd"]
 [dependencies]
 async-trait = "0.1.36"
 clap = "2"
-crossbeam = "0.7"
 etcd-client = "0.6"
 futures = "0.3"
 log = "0.4"
@@ -28,8 +27,9 @@ serde = {version = "1", features = ["derive"]}
 sled = "0.34"
 sqlparser = "0.7"
 tokio = { version = "1.0", features = ["rt", "sync"] }
+tokio-stream = "0.1"
 tonic = "0.4"
-uuid = { version = "0.8", features = ["serde", "v4"] }
+uuid = { version = "0.8", features = ["v4"] }
 arrow = { git = "https://github.com/apache/arrow", rev="5647e90" }
 arrow-flight = { git = "https://github.com/apache/arrow", rev="5647e90" }
 datafusion = { git = "https://github.com/apache/arrow", rev="5647e90" }

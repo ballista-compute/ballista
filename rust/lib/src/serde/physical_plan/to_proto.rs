@@ -22,7 +22,9 @@ use std::{
     sync::Arc,
 };
 
-use arrow::datatypes::DataType;
+use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
+use datafusion::physical_plan::csv::CsvExec;
+use datafusion::physical_plan::expressions::CastExpr;
 use datafusion::physical_plan::expressions::{
     CaseExpr, InListExpr, IsNotNullExpr, IsNullExpr, NegativeExpr, NotExpr,
 };
@@ -34,12 +36,8 @@ use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
 use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::sort::SortExec;
-use datafusion::physical_plan::{coalesce_batches::CoalesceBatchesExec, expressions::CastExpr};
 use datafusion::{
-    physical_plan::{
-        csv::CsvExec,
-        expressions::{Count, Literal},
-    },
+    physical_plan::expressions::{Count, Literal},
     scalar::ScalarValue,
 };
 

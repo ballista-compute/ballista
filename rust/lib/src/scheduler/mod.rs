@@ -316,8 +316,6 @@ impl SchedulerGrpc for SchedulerServer {
 
                 let start = Instant::now();
 
-                debug!("Received plan for execution: {:?}", plan);
-
                 let optimized_plan = fail_job!(datafusion_ctx.optimize(&plan).map_err(|e| {
                     let msg = format!("Could not create optimized logical plan: {}", e);
                     error!("{}", msg);

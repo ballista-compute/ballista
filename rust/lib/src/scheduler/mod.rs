@@ -335,8 +335,8 @@ impl SchedulerGrpc for SchedulerServer {
                     }));
 
                 info!(
-                    "DataFusion created physical plan in {} seconds",
-                    start.elapsed().as_secs(),
+                    "DataFusion created physical plan in {} milliseconds",
+                    start.elapsed().as_millis(),
                 );
 
                 // create distributed physical plan using Ballista

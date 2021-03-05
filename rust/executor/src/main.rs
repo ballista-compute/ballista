@@ -24,18 +24,15 @@ use tempfile::TempDir;
 use tonic::transport::Server;
 use uuid::Uuid;
 
-use ballista::{
+use ballista_core::{
     client::BallistaClient, serde::protobuf::scheduler_grpc_client::SchedulerGrpcClient,
 };
-use ballista::{
-    executor::flight_service::BallistaFlightService,
-    executor::{BallistaExecutor, ExecutorConfig},
-    print_version,
-    scheduler::{state::StandaloneClient, SchedulerServer},
-    serde::protobuf::scheduler_grpc_server::SchedulerGrpcServer,
-    serde::scheduler::ExecutorMeta,
-    BALLISTA_VERSION,
+use ballista_core::{
+    print_version, serde::protobuf::scheduler_grpc_server::SchedulerGrpcServer,
+    serde::scheduler::ExecutorMeta, BALLISTA_VERSION,
 };
+use ballista_executor::{flight_service::BallistaFlightService, BallistaExecutor, ExecutorConfig};
+use ballista_scheduler::{state::StandaloneClient, SchedulerServer};
 use config::prelude::*;
 
 mod execution_loop;

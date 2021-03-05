@@ -1,5 +1,5 @@
 # Ballista Scheduler
-This crate contains the Ballista Scheduler.
+This crate contains the Ballista Scheduler. It can be used both as a library or as a binary.
 
 ## Run
 

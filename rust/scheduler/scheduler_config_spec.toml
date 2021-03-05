@@ -10,9 +10,9 @@ doc = "Print version of this executable"
 [[param]]
 abbr = "b"
 name = "config_backend"
-type = "ballista::scheduler::ConfigBackend"
+type = "ballista_scheduler::ConfigBackend"
 doc = "The configuration backend for the scheduler, see ConfigBackend::variants() for options. Default: Standalone"
-default = "ballista::scheduler::ConfigBackend::Standalone"
+default = "ballista_scheduler::ConfigBackend::Standalone"
 
 [[param]]
 abbr = "n"

@@ -24,8 +24,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-extern crate ballista;
-
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::util::pretty;
 use ballista::prelude::*;

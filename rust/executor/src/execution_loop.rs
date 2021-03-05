@@ -18,8 +18,8 @@ use datafusion::physical_plan::ExecutionPlan;
 use log::{debug, error, info, warn};
 use tonic::transport::Channel;
 
-use ballista::serde::scheduler::ExecutorMeta;
-use ballista::{
+use ballista_core::serde::scheduler::ExecutorMeta;
+use ballista_core::{
     client::BallistaClient,
     serde::protobuf::{
         self, scheduler_grpc_client::SchedulerGrpcClient, task_status, FailedTask, PartitionId,
@@ -110,7 +110,7 @@ async fn run_received_tasks(
 }
 
 fn as_task_status(
-    execution_result: ballista::error::Result<()>,
+    execution_result: ballista_core::error::Result<()>,
     executor_id: String,
     task_id: PartitionId,
 ) -> TaskStatus {

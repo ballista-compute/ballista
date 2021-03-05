@@ -5,7 +5,7 @@ authors = ["Andy Grove <andygrove73@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-ballista = { path="../../lib" }
+ballista = { path="../../client" }
 
 arrow = { git = "https://github.com/apache/arrow", rev="5647e90" }
 datafusion = { git = "https://github.com/apache/arrow", rev="5647e90" }

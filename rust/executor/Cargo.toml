@@ -7,14 +7,16 @@ homepage = "https://github.com/ballista-compute/ballista"
 repository = "https://github.com/ballista-compute/ballista"
 authors = ["Andy Grove <andygrove73@gmail.com>"]
 edition = "2018"
-include = ["src/**/*", "Cargo.toml"]
 
 [features]
+default = ["snmalloc"]
 snmalloc = ["snmalloc-rs"]
 
 [dependencies]
 anyhow = "1"
-ballista = { path = "../lib" }
+async-trait = "0.1.36"
+ballista-core = { path = "../core" }
+ballista-scheduler = { path = "../scheduler" }
 configure_me = "0.4.0"
 env_logger = "0.8"
 futures = "0.3"
@@ -22,8 +24,11 @@ log = "0.4"
 snmalloc-rs = {version = "0.2", features= ["cache-friendly"], optional = true}
 tempfile = "3"
 tokio = { version = "1.0", features = ["macros", "rt", "rt-multi-thread"] }
+tokio-stream = "0.1"
 tonic = "0.4"
-uuid = { version = "0.8", features = ["serde", "v4"] }
+uuid = { version = "0.8", features = ["v4"] }
+
+arrow = { git = "https://github.com/apache/arrow", rev="5647e90" }
 arrow-flight = { git = "https://github.com/apache/arrow", rev="5647e90" }
 datafusion = { git = "https://github.com/apache/arrow", rev="5647e90" }
 

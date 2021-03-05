@@ -1,6 +1,7 @@
 ARG RELEASE_FLAG=--release
 FROM ballistacompute/rust-base:0.4.0-20210213 AS base
 WORKDIR /tmp/ballista
+RUN apt-get -y install cmake
 RUN cargo install cargo-chef 
 
 FROM base as planner
@@ -17,13 +18,8 @@ COPY --from=cacher /tmp/ballista/target target
 ARG RELEASE_FLAG=--release
 
 # force build.rs to run to generate configure_me code.
-RUN apt-get -y install cmake
 ENV FORCE_REBUILD='true'
 RUN cargo build $RELEASE_FLAG
-ARG EXECUTOR_BUILD_FEATURES='--features snmalloc'
-WORKDIR /tmp/ballista/executor
-RUN cargo build $RELEASE_FLAG $EXECUTOR_BUILD_FEATURES
-WORKDIR /tmp/ballista
 
 # put the executor on /executor (need to be copied from different places depending on FLAG)
 ENV RELEASE_FLAG=${RELEASE_FLAG}

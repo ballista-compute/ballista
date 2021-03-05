@@ -1,10 +1,11 @@
 [workspace]
 
 members = [
-    "lib",
+    "benchmarks/tpch",
+    "client",
+    "core",
     "executor",
     "scheduler",
-    "benchmarks/tpch",
 ]
 
 [profile.release]

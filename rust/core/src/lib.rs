@@ -27,8 +27,5 @@ pub mod execution_plans;
 pub mod memory_stream;
 pub mod utils;
 
-#[cfg(test)]
-pub mod test_utils;
-
 #[macro_use]
 pub mod serde;

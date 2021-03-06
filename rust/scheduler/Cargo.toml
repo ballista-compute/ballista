@@ -29,6 +29,8 @@ arrow = { git = "https://github.com/apache/arrow", rev="5647e90" }
 datafusion = { git = "https://github.com/apache/arrow", rev="5647e90" }
 
 [dev-dependencies]
+ballista-core = { path = "../core" }
+uuid = { version = "0.8", features = ["v4"] }
 
 [build-dependencies]
 configure_me_codegen = "0.4.0"

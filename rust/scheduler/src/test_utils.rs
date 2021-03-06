@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::error::Result;
+use ballista_core::error::Result;
 
 use arrow::datatypes::{DataType, Field, Schema};
 use datafusion::execution::context::ExecutionContext;

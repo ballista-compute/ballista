@@ -361,12 +361,11 @@ async fn execute_query_stage(
 #[cfg(test)]
 mod test {
     use crate::planner::DistributedPlanner;
+    use crate::test_utils::datafusion_test_context;
     use ballista_core::error::BallistaError;
     use ballista_core::execution_plans::UnresolvedShuffleExec;
     use ballista_core::serde::protobuf;
     use ballista_core::serde::scheduler::ExecutorMeta;
-    use ballista_core::test_utils;
-    use ballista_core::test_utils::{datafusion_test_context, TPCH_TABLES};
     use ballista_core::utils::format_plan;
     use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
     use datafusion::physical_plan::merge::MergeExec;

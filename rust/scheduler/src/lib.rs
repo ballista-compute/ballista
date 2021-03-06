@@ -17,6 +17,9 @@
 pub mod planner;
 pub mod state;
 
+#[cfg(test)]
+pub mod test_utils;
+
 use std::fmt;
 use std::{convert::TryInto, sync::Arc};
 

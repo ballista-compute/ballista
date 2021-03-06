@@ -20,8 +20,8 @@ use std::sync::Arc;
 use std::{fs::File, pin::Pin};
 
 use crate::error::{BallistaError, Result};
-use crate::memory_stream::MemoryStream;
 use crate::execution_plans::{QueryStageExec, UnresolvedShuffleExec};
+use crate::memory_stream::MemoryStream;
 use arrow::array::{
     ArrayBuilder, ArrayRef, StructArray, StructBuilder, UInt64Array, UInt64Builder,
 };

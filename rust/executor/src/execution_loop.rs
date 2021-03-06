@@ -23,7 +23,7 @@ use ballista::{
     client::BallistaClient,
     serde::protobuf::{
         self, scheduler_grpc_client::SchedulerGrpcClient, task_status, FailedTask, PartitionId,
-        PollWorkParams, PollWorkResult, TaskStatus,
+        PollWorkParams, PollWorkResult, TaskDefinition, TaskStatus,
     },
 };
 use protobuf::CompletedTask;
@@ -56,14 +56,16 @@ pub async fn poll_loop(
 
         match poll_work_result {
             Ok(result) => {
-                run_received_tasks(
-                    executor_client.clone(),
-                    executor_meta.id.clone(),
-                    available_tasks_slots.clone(),
-                    task_status_sender,
-                    result,
-                )
-                .await;
+                if let Some(task) = result.into_inner().task {
+                    run_received_tasks(
+                        executor_client.clone(),
+                        executor_meta.id.clone(),
+                        available_tasks_slots.clone(),
+                        task_status_sender,
+                        task,
+                    )
+                    .await;
+                }
             }
             Err(error) => {
                 warn!("Executor registration failed. If this continues to happen the executor might be marked as dead by the scheduler. Error: {}", error);
@@ -79,34 +81,32 @@ async fn run_received_tasks(
     executor_id: String,
     available_tasks_slots: Arc<AtomicUsize>,
     task_status_sender: Sender<TaskStatus>,
-    result: tonic::Response<PollWorkResult>,
+    task: TaskDefinition,
 ) {
-    if let Some(task) = result.into_inner().task {
-        info!("Received task {:?}", task.task_id.as_ref().unwrap());
-        available_tasks_slots.fetch_sub(1, Ordering::SeqCst);
-        let plan: Arc<dyn ExecutionPlan> = (&task.plan.unwrap()).try_into().unwrap();
-        let task_id = task.task_id.unwrap();
-        // TODO: This is a convoluted way of executing the task. We should move the task
-        // execution code outside of the FlightService (data plane) into the control plane.
+    info!("Received task {:?}", task.task_id.as_ref().unwrap());
+    available_tasks_slots.fetch_sub(1, Ordering::SeqCst);
+    let plan: Arc<dyn ExecutionPlan> = (&task.plan.unwrap()).try_into().unwrap();
+    let task_id = task.task_id.unwrap();
+    // TODO: This is a convoluted way of executing the task. We should move the task
+    // execution code outside of the FlightService (data plane) into the control plane.
 
-        tokio::spawn(async move {
-            let execution_result = executor_client
-                .execute_partition(
-                    task_id.job_id.clone(),
-                    task_id.stage_id as usize,
-                    vec![task_id.partition_id as usize],
-                    plan,
-                )
-                .await;
-            info!("DONE WITH TASK: {:?}", execution_result);
-            available_tasks_slots.fetch_add(1, Ordering::SeqCst);
-            let _ = task_status_sender.send(as_task_status(
-                execution_result.map(|_| ()),
-                executor_id,
-                task_id,
-            ));
-        });
-    }
+    tokio::spawn(async move {
+        let execution_result = executor_client
+            .execute_partition(
+                task_id.job_id.clone(),
+                task_id.stage_id as usize,
+                vec![task_id.partition_id as usize],
+                plan,
+            )
+            .await;
+        info!("DONE WITH TASK: {:?}", execution_result);
+        available_tasks_slots.fetch_add(1, Ordering::SeqCst);
+        let _ = task_status_sender.send(as_task_status(
+            execution_result.map(|_| ()),
+            executor_id,
+            task_id,
+        ));
+    });
 }
 
 fn as_task_status(

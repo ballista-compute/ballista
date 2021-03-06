@@ -312,9 +312,16 @@ impl SchedulerGrpc for SchedulerServer {
 
                 let start = Instant::now();
 
+                let optimized_plan = fail_job!(datafusion_ctx.optimize(&plan).map_err(|e| {
+                    let msg = format!("Could not create optimized logical plan: {}", e);
+                    error!("{}", msg);
+                    tonic::Status::internal(msg)
+                }));
+
+                debug!("Calculated optimized plan: {:?}", optimized_plan);
+
                 let plan = fail_job!(datafusion_ctx
-                    .optimize(&plan)
-                    .and_then(|plan| datafusion_ctx.create_physical_plan(&plan))
+                    .create_physical_plan(&optimized_plan)
                     .map_err(|e| {
                         let msg = format!("Could not create physical plan: {}", e);
                         error!("{}", msg);
@@ -322,8 +329,8 @@ impl SchedulerGrpc for SchedulerServer {
                     }));
 
                 info!(
-                    "DataFusion created physical plan in {} seconds",
-                    start.elapsed().as_secs(),
+                    "DataFusion created physical plan in {} milliseconds",
+                    start.elapsed().as_millis(),
                 );
 
                 // create distributed physical plan using Ballista

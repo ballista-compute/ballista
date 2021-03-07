@@ -44,7 +44,7 @@ export const Summary: React.FunctionComponent<ClusterProps> = ({
               <Label>Status</Label>
               <Flex alignItems={"center"}>
                 <HiCheckCircle color={"green"} />
-                <Text pl={1}>{clusterInfo.status}</Text>
+                <Text pl={1}>Active</Text>
               </Flex>
             </Flex>
             <Flex>

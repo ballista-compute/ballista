@@ -1,5 +1,5 @@
 import React from "react";
-import {VStack, Skeleton, Stack, Text, Flex, Box} from "@chakra-ui/react";
+import {CircularProgress, CircularProgressLabel, VStack, Skeleton, Stack, Text, Flex, Box} from "@chakra-ui/react";
 import {Column, DateCell, DataTable, LinkCell} from "./DataTable";
 import {FaStop} from "react-icons/fa";
 import {GrPowerReset} from "react-icons/gr";
@@ -15,6 +15,7 @@ export interface Query {
     uuid: string;
     query: string;
     status: QueryStatus;
+    progress: number;
     started: string;
 }
 
@@ -32,6 +33,14 @@ export const ActionsCell: (props: any) => React.ReactNode = (props: any) => {
     )
 }
 
+export const ProgressCell: (props: any) => React.ReactNode = (props: any) => {
+    return (
+        <CircularProgress value={props.value} color="orange.400">
+            <CircularProgressLabel>{props.value}%</CircularProgressLabel>
+        </CircularProgress>
+    )
+}
+
 const columns: Column<any>[] = [
     {
         Header: "UUID",
@@ -45,6 +54,11 @@ const columns: Column<any>[] = [
     {
         Header: "Status",
         accessor: "status",
+    },
+    {
+        Header: "Progress",
+        accessor: "progress",
+        Cell: ProgressCell,
     },
     {
         Header: "Started",

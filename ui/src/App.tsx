@@ -3,7 +3,7 @@ import {Box, Grid, VStack} from "@chakra-ui/react";
 import {Header} from "./components/Header";
 import {ClusterProps, Summary} from "./components/Summary";
 import "./App.css";
-import {NodeInfo} from "./components/NodesList";
+import {NodeInfo, NodeStatus} from "./components/NodesList";
 import {QueriesList, Query, QueryStatus} from "./components/QueriesList";
 import {Footer} from "./components/Footer";
 
@@ -36,6 +36,7 @@ const getRandomNodes = (num: number): NodeInfo[] => {
       started: new Date().toISOString(),
       host: ip(),
       port: 8080,
+      status: NodeStatus.RUNNING,
       uuid: uuidv4(),
     });
   }
@@ -62,6 +63,7 @@ const getRandomQueries = (num: number): Query[] => {
           "ORDER BY\n" +
           "    employee.id ASC;",
       status: QueryStatus.RUNNING,
+      progress: Math.round(Math.random() * 100),
       uuid: uuidv4()
     });
   }

@@ -2,10 +2,16 @@ import React from "react";
 import {Box } from "@chakra-ui/react";
 import {Column, DateCell, DataTable} from "./DataTable";
 
+export enum NodeStatus {
+  RUNNING = "RUNNING",
+  TERMINATED = "TERMINATED"
+}
+
 export interface NodeInfo {
   uuid: string;
   host: string;
   port: number;
+  status: NodeStatus;
   started: string;
 }
 
@@ -25,6 +31,10 @@ const columns : Column<any>[] = [
   {
     Header: "Port",
     accessor: "port",
+  },
+  {
+    Header: "Status",
+    accessor: "status",
   },
   {
     Header: "Started",

@@ -181,11 +181,11 @@ impl PartitionStats {
             .as_any()
             .downcast_ref::<UInt64Array>()
             .expect("from_arrow_struct_array expected num_bytes to be a UInt64Array");
-        return PartitionStats {
+        PartitionStats {
             num_rows: Some(num_rows.value(0).to_owned()),
             num_batches: Some(num_batches.value(0).to_owned()),
             num_bytes: Some(num_bytes.value(0).to_owned()),
-        };
+        }
     }
 }
 

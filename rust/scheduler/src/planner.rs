@@ -16,21 +16,21 @@
 //!
 //! This code is EXPERIMENTAL and still under development
 
-use std::{collections::HashMap, future::Future};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Instant;
+use std::{collections::HashMap, future::Future};
 
 use ballista_core::client::BallistaClient;
 use ballista_core::datasource::DFTableAdapter;
 use ballista_core::error::{BallistaError, Result};
 use ballista_core::serde::scheduler::ExecutorMeta;
 use ballista_core::serde::scheduler::PartitionId;
+use ballista_core::utils::format_plan;
 use ballista_core::{
     execution_plans::{QueryStageExec, ShuffleReaderExec, UnresolvedShuffleExec},
     serde::scheduler::PartitionLocation,
 };
-use ballista_core::utils::format_plan;
 use datafusion::execution::context::ExecutionContext;
 use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
 use datafusion::physical_plan::hash_join::HashJoinExec;
@@ -317,15 +317,15 @@ async fn execute_query_stage(
             let stats = client
                 .execute_partition(job_id.clone(), stage_id, partition_ids.clone(), plan)
                 .await?;
-            let mut meta: Vec<PartitionLocation> = Vec::with_capacity(partition_ids.len());
-            for part in &partition_ids {
-                meta.push(PartitionLocation {
+
+            Ok(partition_ids
+                .iter()
+                .map(|part| PartitionLocation {
                     partition_id: PartitionId::new(&job_id, stage_id, *part),
                     executor_meta: executor_meta.clone(),
                     partition_stats: *stats[*part].statistics(),
-                });
-            }
-            Ok(meta)
+                })
+                .collect())
         }));
     }
 

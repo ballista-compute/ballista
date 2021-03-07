@@ -1,6 +1,6 @@
 [package]
 name = "ballista-py"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Patrick J. More <patrickjmore@gmail.com>","Jorge C. Leitao <jorgecarleitao@gmail.com>"]
 license = "Apache-2.0"
 edition = "2018"
@@ -11,9 +11,8 @@ simd = ["ballista/simd"]
 snmalloc = ["snmalloc-rs"]
 
 
-
 [dependencies]
-ballista = {path = "../rust/ballista"}
+ballista = {path = "../rust/lib"}
 futures = "0.3"
 snmalloc-rs = {version = "0.2", features= ["cache-friendly"], optional = true}
 pyo3 = {version = "0.13", features = ["extension-module", "abi3-py36"]}
@@ -30,7 +29,6 @@ datafusion = { git = "https://github.com/apache/arrow", rev="5647e90" }
 [lib]
 name = "ballista"
 crate-type = ["cdylib"]
-
 
 
 [package.metadata.maturin]

@@ -21,6 +21,7 @@ use ballista_core::serde::protobuf::{
     job_status, task_status, CompletedJob, CompletedTask, ExecutorMetadata, FailedJob, FailedTask,
     JobStatus, PhysicalPlanNode, RunningJob, RunningTask, TaskStatus,
 };
+use ballista_core::serde::scheduler::PartitionStats;
 use ballista_core::{error::BallistaError, serde::scheduler::ExecutorMeta};
 use ballista_core::{
     error::Result, execution_plans::UnresolvedShuffleExec, serde::protobuf::PartitionLocation,
@@ -28,11 +29,14 @@ use ballista_core::{
 
 use super::planner::remove_unresolved_shuffles;
 
+#[cfg(feature = "etcd")]
 mod etcd;
+#[cfg(feature = "sled")]
 mod standalone;
 
-use ballista_core::serde::scheduler::PartitionStats;
+#[cfg(feature = "etcd")]
 pub use etcd::EtcdClient;
+#[cfg(feature = "sled")]
 pub use standalone::StandaloneClient;
 
 const LEASE_TIME: Duration = Duration::from_secs(60);
@@ -443,7 +447,7 @@ fn encode_protobuf<T: Message + Default>(msg: &T) -> Result<Vec<u8>> {
     Ok(value)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "sled"))]
 mod test {
     use std::sync::Arc;
 

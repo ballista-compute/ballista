@@ -17,10 +17,11 @@ use std::{net::SocketAddr, sync::Arc};
 use anyhow::{Context, Result};
 use ballista_core::BALLISTA_VERSION;
 use ballista_core::{print_version, serde::protobuf::scheduler_grpc_server::SchedulerGrpcServer};
-use ballista_scheduler::{
-    state::{ConfigBackendClient, EtcdClient, StandaloneClient},
-    ConfigBackend, SchedulerServer,
-};
+#[cfg(feature = "etcd")]
+use ballista_scheduler::state::EtcdClient;
+#[cfg(feature = "sled")]
+use ballista_scheduler::state::StandaloneClient;
+use ballista_scheduler::{state::ConfigBackendClient, ConfigBackend, SchedulerServer};
 
 use log::info;
 use tonic::transport::Server;
@@ -77,17 +78,35 @@ async fn main() -> Result<()> {
     let addr = addr.parse()?;
 
     let client: Arc<dyn ConfigBackendClient> = match opt.config_backend {
+        #[cfg(not(any(feature = "sled", feature = "etcd")))]
+        _ => std::compile_error!(
+            "To build the scheduler enable at least one config backend feature (`etcd` or `sled`)"
+        ),
+        #[cfg(feature = "etcd")]
         ConfigBackend::Etcd => {
             let etcd = etcd_client::Client::connect(&[opt.etcd_urls], None)
                 .await
                 .context("Could not connect to etcd")?;
             Arc::new(EtcdClient::new(etcd))
         }
+        #[cfg(not(feature = "etcd"))]
+        ConfigBackend::Etcd => {
+            unimplemented!(
+                "build the scheduler with the `etcd` feature to use the etcd config backend"
+            )
+        }
+        #[cfg(feature = "sled")]
         ConfigBackend::Standalone => {
             // TODO: Use a real file and make path is configurable
             Arc::new(
                 StandaloneClient::try_new_temporary()
                     .context("Could not create standalone config backend")?,
+            )
+        }
+        #[cfg(not(feature = "sled"))]
+        ConfigBackend::Standalone => {
+            unimplemented!(
+                "build the scheduler with the `sled` feature to use the standalone config backend"
             )
         }
     };

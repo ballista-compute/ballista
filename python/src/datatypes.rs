@@ -99,13 +99,13 @@ fn Interval(interval_unit: Option<&PyAny>) -> PyResult<BPyDataType> {
 }
 
 #[pyfunction(date_unit = "None", date32 = "false")]
-fn Date(date32: bool) -> PyResult<BPyDataType> {
-    Ok(BPyDataType {
+fn Date(date32: bool) -> BPyDataType {
+    BPyDataType {
         datatype: match date32 {
             true => DataType::Date32,
             false => DataType::Date64,
         },
-    })
+    }
 }
 
 #[pyfunction(time_unit = "None", time32 = "false")]

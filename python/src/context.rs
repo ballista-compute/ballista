@@ -7,10 +7,10 @@ use pyo3::types::PyTuple;
 use pyo3::{exceptions::PyException, prelude::*};
 #[pyclass(unsendable, name = "BallistaContext", module = "ballista")]
 pub(crate) struct BPyBallistaContext {
-    ctx: ballista::context::BallistaContext,
+    ctx: ballista_core::context::BallistaContext,
 }
 
-pub fn wrap_df(df: ballista::context::BallistaDataFrame) -> BPyDataFrame {
+pub fn wrap_df(df: ballista_core::context::BallistaDataFrame) -> BPyDataFrame {
     BPyDataFrame { df }
 }
 

@@ -7,9 +7,9 @@ edition = "2018"
 [dependencies]
 ballista = { path="../../client" }
 
-arrow = { git = "https://github.com/apache/arrow", rev="5647e90" }
-datafusion = { git = "https://github.com/apache/arrow", rev="5647e90" }
-parquet = { git = "https://github.com/apache/arrow", rev="5647e90" }
+arrow = { git = "https://github.com/apache/arrow", rev="69d436d" }
+datafusion = { git = "https://github.com/apache/arrow", rev="69d436d" }
+parquet = { git = "https://github.com/apache/arrow", rev="69d436d" }
 
 
 env_logger = "0.8"

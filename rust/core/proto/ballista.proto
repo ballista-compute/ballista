@@ -95,7 +95,7 @@ enum ScalarFunction {
   TRUNC = 14;
   ABS = 15;
   SIGNUM = 16;
-  LENGTH = 17;
+  OCTETLENGTH = 17;
   CONCAT = 18;
   LOWER = 19;
   UPPER = 20;

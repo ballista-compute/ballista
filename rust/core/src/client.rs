@@ -24,9 +24,10 @@ use std::{
 use crate::error::{ballista_error, BallistaError, Result};
 use crate::memory_stream::MemoryStream;
 use crate::serde::protobuf::{self};
-use crate::serde::scheduler::{Action, ExecutePartition, ExecutePartitionResult, PartitionId};
+use crate::serde::scheduler::{
+    Action, ExecutePartition, ExecutePartitionResult, PartitionId, PartitionStats,
+};
 
-use crate::utils::PartitionStats;
 use arrow::record_batch::RecordBatch;
 use arrow::{
     array::{StringArray, StructArray},

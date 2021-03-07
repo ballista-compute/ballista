@@ -23,8 +23,8 @@ use std::time::Instant;
 use crate::BallistaExecutor;
 use ballista_core::error::BallistaError;
 use ballista_core::serde::decode_protobuf;
-use ballista_core::serde::scheduler::Action as BallistaAction;
-use ballista_core::utils::{self, format_plan, PartitionStats};
+use ballista_core::serde::scheduler::{Action as BallistaAction, PartitionStats};
+use ballista_core::utils::{self, format_plan};
 
 use arrow::array::{ArrayRef, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};

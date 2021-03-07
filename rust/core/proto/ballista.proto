@@ -461,8 +461,10 @@ message PartitionId {
 }
 
 message PartitionStats {
-  uint32 row_count = 1;
-  repeated ColumnStats column_stats = 2;
+  uint64 num_rows = 1;
+  uint64 num_batches = 2;
+  uint64 num_bytes = 3;
+  repeated ColumnStats column_stats = 4;
 }
 
 message ColumnStats {

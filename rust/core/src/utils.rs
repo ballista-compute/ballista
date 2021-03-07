@@ -22,6 +22,7 @@ use std::{fs::File, pin::Pin};
 use crate::error::{BallistaError, Result};
 use crate::execution_plans::{QueryStageExec, UnresolvedShuffleExec};
 use crate::memory_stream::MemoryStream;
+use crate::serde::scheduler::PartitionStats;
 use arrow::array::{
     ArrayBuilder, ArrayRef, StructArray, StructBuilder, UInt64Array, UInt64Builder,
 };
@@ -43,105 +44,6 @@ use datafusion::physical_plan::sort::SortExec;
 use datafusion::physical_plan::{AggregateExpr, ExecutionPlan, PhysicalExpr, RecordBatchStream};
 use futures::StreamExt;
 
-/// Summary of executed partition
-#[derive(Debug, Copy, Clone)]
-pub struct PartitionStats {
-    num_rows: u64,
-    num_batches: u64,
-    num_bytes: u64,
-    null_count: u64,
-}
-
-impl Default for PartitionStats {
-    fn default() -> Self {
-        Self {
-            num_rows: 0,
-            num_batches: 0,
-            num_bytes: 0,
-            null_count: 0,
-        }
-    }
-}
-
-impl PartitionStats {
-    pub fn arrow_struct_repr(self) -> Field {
-        Field::new(
-            "partition_stats",
-            DataType::Struct(self.arrow_struct_fields()),
-            false,
-        )
-    }
-    fn arrow_struct_fields(self) -> Vec<Field> {
-        vec![
-            Field::new("num_rows", DataType::UInt64, false),
-            Field::new("num_batches", DataType::UInt64, false),
-            Field::new("num_bytes", DataType::UInt64, false),
-            Field::new("null_count", DataType::UInt64, false),
-        ]
-    }
-
-    pub fn to_arrow_arrayref(&self) -> Arc<StructArray> {
-        let mut field_builders = Vec::new();
-
-        let mut num_rows_builder = UInt64Builder::new(1);
-        num_rows_builder.append_value(self.num_rows).unwrap();
-        field_builders.push(Box::new(num_rows_builder) as Box<dyn ArrayBuilder>);
-
-        let mut num_batches_builder = UInt64Builder::new(1);
-        num_batches_builder.append_value(self.num_batches).unwrap();
-        field_builders.push(Box::new(num_batches_builder) as Box<dyn ArrayBuilder>);
-
-        let mut num_bytes_builder = UInt64Builder::new(1);
-        num_bytes_builder.append_value(self.num_bytes).unwrap();
-        field_builders.push(Box::new(num_bytes_builder) as Box<dyn ArrayBuilder>);
-
-        let mut null_count_builder = UInt64Builder::new(1);
-        null_count_builder.append_value(self.null_count).unwrap();
-        field_builders.push(Box::new(null_count_builder) as Box<dyn ArrayBuilder>);
-
-        let mut struct_builder = StructBuilder::new(self.arrow_struct_fields(), field_builders);
-        struct_builder.append(true).unwrap();
-        Arc::new(struct_builder.finish())
-    }
-
-    pub fn from_arrow_struct_array(struct_array: &StructArray) -> PartitionStats {
-        return PartitionStats {
-            num_rows: struct_array
-                .column_by_name("num_rows")
-                .expect("from_arrow_struct_array expected a field num_rows")
-                .as_any()
-                .downcast_ref::<UInt64Array>()
-                .expect("from_arrow_struct_array expected num_rows to be a UInt64Array")
-                .value(0)
-                .to_owned(),
-            num_batches: struct_array
-                .column_by_name("num_batches")
-                .expect("from_arrow_struct_array expected a field num_batches")
-                .as_any()
-                .downcast_ref::<UInt64Array>()
-                .expect("from_arrow_struct_array expected num_batches to be a UInt64Array")
-                .value(0)
-                .to_owned(),
-            num_bytes: struct_array
-                .column_by_name("num_bytes")
-                .expect("from_arrow_struct_array expected a field num_bytes")
-                .as_any()
-                .downcast_ref::<UInt64Array>()
-                .expect("from_arrow_struct_array expected num_bytes to be a UInt64Array")
-                .value(0)
-                .to_owned(),
-            null_count: struct_array
-                .column_by_name("null_count")
-                .expect("from_arrow_struct_array expected a field null_count")
-                .as_any()
-                .downcast_ref::<UInt64Array>()
-                .expect("from_arrow_struct_array expected null_count to be a UInt64Array")
-                .value(0)
-                .to_owned(),
-        };
-    }
-}
-
 /// Stream data to disk in Arrow IPC format
 
 pub async fn write_stream_to_disk(
@@ -158,7 +60,6 @@ pub async fn write_stream_to_disk(
     let mut num_rows = 0;
     let mut num_batches = 0;
     let mut num_bytes = 0;
-    let mut null_count = 0;
     let mut writer = FileWriter::try_new(file, stream.schema().as_ref())?;
 
     while let Some(result) = stream.next().await {
@@ -169,20 +70,17 @@ pub async fn write_stream_to_disk(
             .iter()
             .map(|array| array.get_array_memory_size())
             .sum();
-        let batch_null_count: usize = batch.columns().iter().map(|array| array.null_count()).sum();
         num_batches += 1;
         num_rows += batch.num_rows();
         num_bytes += batch_size_bytes;
-        null_count += batch_null_count;
         writer.write(&batch)?;
     }
     writer.finish()?;
-    Ok(PartitionStats {
-        num_rows: num_rows as u64,
+    Ok(PartitionStats::new(
+        num_rows as u64,
         num_batches,
-        num_bytes: num_bytes as u64,
-        null_count: null_count as u64,
-    })
+        num_bytes as u64,
+    ))
 }
 
 pub async fn collect_stream(

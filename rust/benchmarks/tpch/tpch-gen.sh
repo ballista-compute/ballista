@@ -12,6 +12,6 @@ if test -f "$FILE"; then
     echo "$FILE exists."
 else
   mkdir data 2>/dev/null
-  docker run -v `pwd`/data:/data -it ballistacompute/ballista-tpchgen:$BALLISTA_VERSION
+  docker run -v `pwd`/data:/data -it --rm ballistacompute/ballista-tpchgen:$BALLISTA_VERSION
   ls -l data
 fi

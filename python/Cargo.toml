@@ -7,13 +7,15 @@ edition = "2018"
 
 
 [features]
-simd = ["ballista/simd"]
+simd = ["ballista-core/simd"]
 snmalloc = ["snmalloc-rs"]
 
 
 
 [dependencies]
-ballista = {path = "../rust/ballista"}
+ballista = {path = "../rust/client"}
+ballista-core = {path = "../rust/core"}
+
 futures = "0.3"
 snmalloc-rs = {version = "0.2", features= ["cache-friendly"], optional = true}
 pyo3 = {version = "0.13", features = ["extension-module", "abi3-py36"]}
@@ -21,7 +23,7 @@ tokio = { version = "1.0", features = ["full"] }
 
 # Should be kept in line with datafusion's serde_json
 serde_json ="1.0.61"
-serde = "1.0"
+serde = { version="1.0", features = ["derive"] }
 
 arrow = { git = "https://github.com/apache/arrow", rev="5647e90" }
 datafusion = { git = "https://github.com/apache/arrow", rev="5647e90" }

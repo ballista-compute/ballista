@@ -9,7 +9,7 @@ authors = ["Andy Grove <andygrove73@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-ballista-core = { "path" = "../core" }
+ballista-core = { path = "../core" }
 futures = "0.3"
 log = "0.4"
 tokio = "1.0"

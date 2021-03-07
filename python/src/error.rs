@@ -1,9 +1,9 @@
 use pyo3::exceptions;
 use pyo3::prelude::*;
-struct BallistaError(ballista::error::BallistaError);
+struct BallistaError(ballista_core::error::BallistaError);
 
-impl From<ballista::error::BallistaError> for BallistaError {
-    fn from(err: ballista::error::BallistaError) -> Self {
+impl From<ballista_core::error::BallistaError> for BallistaError {
+    fn from(err: ballista_core::error::BallistaError) -> Self {
         BallistaError(err)
     }
 }
@@ -17,13 +17,13 @@ impl From<BallistaError> for PyErr {
 impl std::error::Error for BallistaError {}
 impl std::fmt::Display for BallistaError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        <ballista::error::BallistaError as std::fmt::Display>::fmt(&self.0, f)
+        <ballista_core::error::BallistaError as std::fmt::Display>::fmt(&self.0, f)
     }
 }
 
 impl std::fmt::Debug for BallistaError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        <ballista::error::BallistaError as std::fmt::Debug>::fmt(&self.0, f)
+        <ballista_core::error::BallistaError as std::fmt::Debug>::fmt(&self.0, f)
     }
 }
 

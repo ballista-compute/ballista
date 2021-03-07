@@ -187,8 +187,8 @@ impl BPyDataFrame {
     }
 }
 
-impl From<ballista_core::context::BallistaDataFrame> for BPyDataFrame {
-    fn from(df: ballista_core::context::BallistaDataFrame) -> BPyDataFrame {
+impl From<ballista::context::BallistaDataFrame> for BPyDataFrame {
+    fn from(df: ballista::context::BallistaDataFrame) -> BPyDataFrame {
         BPyDataFrame { df }
     }
 }

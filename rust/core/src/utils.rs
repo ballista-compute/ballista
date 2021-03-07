@@ -77,9 +77,9 @@ pub async fn write_stream_to_disk(
     }
     writer.finish()?;
     Ok(PartitionStats::new(
-        num_rows as u64,
-        num_batches,
-        num_bytes as u64,
+        Some(num_rows as u64),
+        Some(num_batches),
+        Some(num_bytes as u64),
     ))
 }
 

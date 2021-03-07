@@ -23,7 +23,7 @@ use std::{collections::HashMap, future::Future};
 use ballista_core::client::BallistaClient;
 use ballista_core::datasource::DFTableAdapter;
 use ballista_core::error::{BallistaError, Result};
-use ballista_core::serde::scheduler::ExecutorMeta;
+use ballista_core::serde::scheduler::{ExecutorMeta, PartitionStats};
 use ballista_core::serde::scheduler::PartitionId;
 use ballista_core::{
     execution_plans::{QueryStageExec, ShuffleReaderExec, UnresolvedShuffleExec},
@@ -291,6 +291,7 @@ async fn execute_query_stage(
     );
 
     let partition_count = plan.output_partitioning().partition_count();
+    let mut meta = Vec::with_capacity(partition_count);
 
     let num_chunks = partition_count / executors.len();
     let num_chunks = num_chunks.max(1);
@@ -305,8 +306,19 @@ async fn execute_query_stage(
         partition_chunks.len()
     );
 
-    let mut executions: Vec<JoinHandle<Result<Vec<PartitionLocation>>>> =
-        Vec::with_capacity(partition_count);
+    // build metadata for partition locations
+    for i in 0..partition_chunks.len() {
+        let executor_meta = &executors[i % executors.len()];
+        for part in &partition_chunks[i] {
+            meta.push(PartitionLocation {
+                partition_id: PartitionId::new(job_id, stage_id, *part),
+                executor_meta: executor_meta.clone(),
+                partition_stats: PartitionStats::default()
+            });
+        }
+    }
+
+    let mut executions = Vec::with_capacity(partition_count);
     for i in 0..partition_chunks.len() {
         let plan = plan.clone();
         let executor_meta = executors[i % executors.len()].clone();
@@ -315,18 +327,21 @@ async fn execute_query_stage(
         executions.push(tokio::spawn(async move {
             let mut client =
                 BallistaClient::try_new(&executor_meta.host, executor_meta.port).await?;
-            let stats = client
-                .execute_partition(job_id.clone(), stage_id, partition_ids.clone(), plan)
-                .await?;
-            let mut meta: Vec<PartitionLocation> = Vec::with_capacity(partition_ids.len());
-            for part in &partition_ids {
-                meta.push(PartitionLocation {
-                    partition_id: PartitionId::new(&job_id, stage_id, *part),
-                    executor_meta: executor_meta.clone(),
-                    partition_stats: *stats[*part].statistics(),
-                });
-            }
-            Ok(meta)
+            // let stats = client
+            //     .execute_partition(job_id.clone(), stage_id, partition_ids.clone(), plan)
+            //     .await?;
+            // let mut meta: Vec<PartitionLocation> = Vec::with_capacity(partition_ids.len());
+            // for part in &partition_ids {
+            //     meta.push(PartitionLocation {
+            //         partition_id: PartitionId::new(&job_id, stage_id, *part),
+            //         executor_meta: executor_meta.clone(),
+            //         partition_stats: *stats[*part].statistics(),
+            //     });
+            // }
+            // Ok(meta)
+            client
+                .execute_partition(job_id, stage_id, partition_ids, plan)
+                .await
         }));
     }
 
@@ -334,13 +349,13 @@ async fn execute_query_stage(
     let results = futures::future::join_all(executions).await;
 
     // check for errors
-    let mut meta = Vec::with_capacity(partition_count);
+    // mut meta = Vec::with_capacity(partition_count);
     for result in results {
         match result {
             Ok(partition_result) => {
                 let final_result = partition_result?;
                 debug!("Query stage partition result: {:?}", final_result);
-                meta.extend(final_result);
+                //meta.extend(final_result);
             }
             Err(e) => {
                 return Err(BallistaError::General(format!(

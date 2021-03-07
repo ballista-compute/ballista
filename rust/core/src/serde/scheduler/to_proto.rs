@@ -76,10 +76,11 @@ impl TryInto<protobuf::PartitionLocation> for PartitionLocation {
 
 impl Into<protobuf::PartitionStats> for PartitionStats {
     fn into(self) -> protobuf::PartitionStats {
+        let none_value = -1_i64;
         protobuf::PartitionStats {
-            num_rows: self.num_rows,
-            num_batches: self.num_batches,
-            num_bytes: self.num_bytes,
+            num_rows: self.num_rows.map(|n| n as i64).unwrap_or(none_value),
+            num_batches: self.num_batches.map(|n| n as i64).unwrap_or(none_value),
+            num_bytes: self.num_bytes.map(|n| n as i64).unwrap_or(none_value),
             column_stats: vec![],
         }
     }

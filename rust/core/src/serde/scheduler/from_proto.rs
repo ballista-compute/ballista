@@ -70,7 +70,19 @@ impl TryInto<PartitionId> for protobuf::PartitionId {
 
 impl Into<PartitionStats> for protobuf::PartitionStats {
     fn into(self) -> PartitionStats {
-        PartitionStats::new(self.num_rows, self.num_batches, self.num_bytes)
+        PartitionStats::new(
+            foo(self.num_rows),
+            foo(self.num_batches),
+            foo(self.num_bytes),
+        )
+    }
+}
+
+fn foo(n: i64) -> Option<u64> {
+    if n < 0 {
+        None
+    } else {
+        Some(n as u64)
     }
 }
 

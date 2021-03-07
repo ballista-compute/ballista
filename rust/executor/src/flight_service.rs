@@ -145,7 +145,7 @@ impl FlightService for BallistaFlightService {
                         c0.append_value(&path).unwrap();
                         let path: ArrayRef = Arc::new(c0.finish());
 
-                        let stats: ArrayRef = stats.to_arrow_arrayref();
+                        let stats: ArrayRef = stats.to_arrow_arrayref()?;
                         let results =
                             vec![RecordBatch::try_new(schema, vec![path, stats]).unwrap()];
 

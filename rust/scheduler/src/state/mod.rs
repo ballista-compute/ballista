@@ -233,7 +233,7 @@ impl SchedulerState {
                                             .find(|exec| exec.id == executor_id)
                                             .unwrap()
                                             .clone(),
-                                        partition_stats: PartitionStats::new(0, 0, 0),
+                                        partition_stats: PartitionStats::default(),
                                     },
                                 );
                             } else {

@@ -23,6 +23,7 @@ use datafusion::physical_plan::ExecutionPlan;
 use uuid::Uuid;
 
 use super::protobuf;
+use crate::error::BallistaError;
 
 pub mod from_proto;
 pub mod to_proto;
@@ -93,23 +94,23 @@ impl From<protobuf::ExecutorMetadata> for ExecutorMeta {
 /// Summary of executed partition
 #[derive(Debug, Copy, Clone)]
 pub struct PartitionStats {
-    num_rows: u64,
-    num_batches: u64,
-    num_bytes: u64,
+    num_rows: Option<u64>,
+    num_batches: Option<u64>,
+    num_bytes: Option<u64>,
 }
 
 impl Default for PartitionStats {
     fn default() -> Self {
         Self {
-            num_rows: 0,
-            num_batches: 0,
-            num_bytes: 0,
+            num_rows: None,
+            num_batches: None,
+            num_bytes: None,
         }
     }
 }
 
 impl PartitionStats {
-    pub fn new(num_rows: u64, num_batches: u64, num_bytes: u64) -> Self {
+    pub fn new(num_rows: Option<u64>, num_batches: Option<u64>, num_bytes: Option<u64>) -> Self {
         Self {
             num_rows,
             num_batches,
@@ -129,56 +130,61 @@ impl PartitionStats {
             Field::new("num_rows", DataType::UInt64, false),
             Field::new("num_batches", DataType::UInt64, false),
             Field::new("num_bytes", DataType::UInt64, false),
-            Field::new("null_count", DataType::UInt64, false),
         ]
     }
 
-    pub fn to_arrow_arrayref(&self) -> Arc<StructArray> {
+    pub fn to_arrow_arrayref(&self) -> Result<Arc<StructArray>, BallistaError> {
         let mut field_builders = Vec::new();
 
         let mut num_rows_builder = UInt64Builder::new(1);
-        num_rows_builder.append_value(self.num_rows).unwrap();
+        match self.num_rows {
+            Some(n) => num_rows_builder.append_value(n)?,
+            None => num_rows_builder.append_null()?,
+        }
         field_builders.push(Box::new(num_rows_builder) as Box<dyn ArrayBuilder>);
 
         let mut num_batches_builder = UInt64Builder::new(1);
-        num_batches_builder.append_value(self.num_batches).unwrap();
+        match self.num_batches {
+            Some(n) => num_batches_builder.append_value(n)?,
+            None => num_batches_builder.append_null()?,
+        }
         field_builders.push(Box::new(num_batches_builder) as Box<dyn ArrayBuilder>);
 
         let mut num_bytes_builder = UInt64Builder::new(1);
-        num_bytes_builder.append_value(self.num_bytes).unwrap();
+        match self.num_bytes {
+            Some(n) => num_bytes_builder.append_value(n)?,
+            None => num_bytes_builder.append_null()?,
+        }
         field_builders.push(Box::new(num_bytes_builder) as Box<dyn ArrayBuilder>);
 
         let mut struct_builder = StructBuilder::new(self.arrow_struct_fields(), field_builders);
-        struct_builder.append(true).unwrap();
-        Arc::new(struct_builder.finish())
+        struct_builder.append(true)?;
+        Ok(Arc::new(struct_builder.finish()))
     }
 
     pub fn from_arrow_struct_array(struct_array: &StructArray) -> PartitionStats {
+        let num_rows = struct_array
+            .column_by_name("num_rows")
+            .expect("from_arrow_struct_array expected a field num_rows")
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .expect("from_arrow_struct_array expected num_rows to be a UInt64Array");
+        let num_batches = struct_array
+            .column_by_name("num_batches")
+            .expect("from_arrow_struct_array expected a field num_batches")
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .expect("from_arrow_struct_array expected num_batches to be a UInt64Array");
+        let num_bytes = struct_array
+            .column_by_name("num_bytes")
+            .expect("from_arrow_struct_array expected a field num_bytes")
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .expect("from_arrow_struct_array expected num_bytes to be a UInt64Array");
         return PartitionStats {
-            num_rows: struct_array
-                .column_by_name("num_rows")
-                .expect("from_arrow_struct_array expected a field num_rows")
-                .as_any()
-                .downcast_ref::<UInt64Array>()
-                .expect("from_arrow_struct_array expected num_rows to be a UInt64Array")
-                .value(0)
-                .to_owned(),
-            num_batches: struct_array
-                .column_by_name("num_batches")
-                .expect("from_arrow_struct_array expected a field num_batches")
-                .as_any()
-                .downcast_ref::<UInt64Array>()
-                .expect("from_arrow_struct_array expected num_batches to be a UInt64Array")
-                .value(0)
-                .to_owned(),
-            num_bytes: struct_array
-                .column_by_name("num_bytes")
-                .expect("from_arrow_struct_array expected a field num_bytes")
-                .as_any()
-                .downcast_ref::<UInt64Array>()
-                .expect("from_arrow_struct_array expected num_bytes to be a UInt64Array")
-                .value(0)
-                .to_owned(),
+            num_rows: Some(num_rows.value(0).to_owned()),
+            num_batches: Some(num_batches.value(0).to_owned()),
+            num_bytes: Some(num_bytes.value(0).to_owned()),
         };
     }
 }

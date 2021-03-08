@@ -907,7 +907,7 @@ impl TryInto<Expr> for &protobuf::LogicalExprNode {
                     protobuf::ScalarFunction::Trunc => Ok(trunc((&expr.expr[0]).try_into()?)),
                     protobuf::ScalarFunction::Abs => Ok(abs((&expr.expr[0]).try_into()?)),
                     protobuf::ScalarFunction::Signum => Ok(signum((&expr.expr[0]).try_into()?)),
-                    protobuf::ScalarFunction::Length => Ok(length((&expr.expr[0]).try_into()?)),
+                    protobuf::ScalarFunction::Octetlength => Ok(length((&expr.expr[0]).try_into()?)),
                     // // protobuf::ScalarFunction::Concat => Ok(concat((&expr.expr[0]).try_into()?)),
                     protobuf::ScalarFunction::Lower => Ok(lower((&expr.expr[0]).try_into()?)),
                     protobuf::ScalarFunction::Upper => Ok(upper((&expr.expr[0]).try_into()?)),

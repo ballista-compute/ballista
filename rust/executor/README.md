@@ -1,5 +1,5 @@
 # Ballista Executor - Rust
-This crate contains the Ballista Executor.
+This crate contains the Ballista Executor. It can be used both as a library or as a binary.
 
 ## Run
 

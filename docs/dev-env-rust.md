@@ -1,5 +1,7 @@
 # Setting up a Rust development environment
 
+You will need a standard Rust development environment. The easiest way to achieve this is by using rustup: https://rustup.rs/
+
 ## Install OpenSSL
 
 Follow instructions for [setting up OpenSSL](https://docs.rs/openssl/0.10.28/openssl/). For Ubuntu users, the following 
@@ -9,24 +11,10 @@ command works.
 sudo apt-get install pkg-config libssl-dev
 ```
 
+## Install CMake
 
-## Install Protobuf
+You'll need cmake in order to compile some of ballista's dependencies. Ubuntu users can use the following command:
 
-Use following instructions to install the protobuf compiler on Ubuntu or similar Linux platforms.
-
+```bash
+sudo apt-get install cmake
 ```
-$ wget https://github.com/protocolbuffers/protobuf/releases/download/v3.11.4/protobuf-all-3.11.4.tar.gz
-$ tar xzf protobuf-all-3.11.4.tar.gz
-$ cd protobuf-3.11.4
-$ ./configure
-$ make
-$ sudo make install
-$ sudo ldconfig
-```
-
-MacOS user can install with `brew`
-
-```
-$ brew install protobuf
-```
-

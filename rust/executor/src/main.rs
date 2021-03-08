@@ -14,34 +14,28 @@
 
 //! Ballista Rust executor binary.
 
-use std::{convert::TryInto, sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use arrow_flight::flight_service_server::FlightServiceServer;
-use ballista::{
-    client::BallistaClient,
-    serde::protobuf::{
-        self, scheduler_grpc_client::SchedulerGrpcClient, task_status, FailedTask, PartitionId,
-        PollWorkParams, TaskStatus,
-    },
-};
-use ballista::{
-    executor::flight_service::BallistaFlightService,
-    executor::{BallistaExecutor, ExecutorConfig},
-    print_version,
-    scheduler::{state::StandaloneClient, SchedulerServer},
-    serde::protobuf::scheduler_grpc_server::SchedulerGrpcServer,
-    serde::scheduler::ExecutorMeta,
-    BALLISTA_VERSION,
-};
-use datafusion::physical_plan::ExecutionPlan;
 use futures::future::MaybeDone;
-use log::{debug, info, warn};
-use protobuf::CompletedTask;
+use log::info;
 use tempfile::TempDir;
-use tokio::sync::Mutex;
-use tonic::transport::{Channel, Server};
+use tonic::transport::Server;
 use uuid::Uuid;
+
+use ballista_core::{
+    client::BallistaClient, serde::protobuf::scheduler_grpc_client::SchedulerGrpcClient,
+};
+use ballista_core::{
+    print_version, serde::protobuf::scheduler_grpc_server::SchedulerGrpcServer,
+    serde::scheduler::ExecutorMeta, BALLISTA_VERSION,
+};
+use ballista_executor::{flight_service::BallistaFlightService, BallistaExecutor, ExecutorConfig};
+use ballista_scheduler::{state::StandaloneClient, SchedulerServer};
+use config::prelude::*;
+
+mod execution_loop;
 
 #[macro_use]
 extern crate configure_me;
@@ -52,108 +46,10 @@ mod config {
     // #[allow(clippy::all)] to silence clippy warnings from the generated code
     include!(concat!(env!("OUT_DIR"), "/executor_configure_me_config.rs"));
 }
-use config::prelude::*;
 
 #[cfg(feature = "snmalloc")]
 #[global_allocator]
 static ALLOC: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
-
-struct CurrentTaskInformation {
-    task_id: PartitionId,
-    result: Option<ballista::error::Result<()>>,
-}
-
-async fn poll_loop(
-    mut scheduler: SchedulerGrpcClient<Channel>,
-    executor_client: BallistaClient,
-    executor_meta: ExecutorMeta,
-) {
-    let executor_meta: protobuf::ExecutorMetadata = executor_meta.into();
-    let running_task: Arc<Mutex<Option<CurrentTaskInformation>>> = Arc::new(Mutex::new(None));
-    loop {
-        debug!("Starting registration with scheduler");
-        let mut task_status = vec![];
-        let mut running_task_guard = running_task.lock().await;
-        if let Some(CurrentTaskInformation { task_id, result }) = &*running_task_guard {
-            let task_id = task_id.clone();
-            match result {
-                Some(Ok(_)) => {
-                    info!("Current task finished");
-                    *running_task_guard = None;
-                    task_status.push(TaskStatus {
-                        partition_id: Some(task_id),
-                        status: Some(task_status::Status::Completed(CompletedTask {
-                            executor_id: executor_meta.id.clone(),
-                        })),
-                    });
-                }
-                Some(Err(e)) => {
-                    let error_msg = e.to_string();
-                    info!("Current task failed: {}", error_msg);
-                    *running_task_guard = None;
-                    task_status.push(TaskStatus {
-                        partition_id: Some(task_id),
-                        status: Some(task_status::Status::Failed(FailedTask {
-                            error: format!("Task failed due to Tokio error: {}", error_msg),
-                        })),
-                    });
-                }
-                None => {
-                    info!("Current task still in progress");
-                }
-            }
-        }
-        let can_accept_task = running_task_guard.is_none();
-        drop(running_task_guard);
-        let registration_result = scheduler
-            .poll_work(PollWorkParams {
-                metadata: Some(executor_meta.clone()),
-                can_accept_task, // TODO: honor concurrent_tasks setting. right now each execution runs a single task at a time
-                task_status,
-            })
-            .await;
-        match registration_result {
-            Ok(result) => {
-                if let Some(task) = result.into_inner().task {
-                    info!("Received task {:?}", task.task_id.as_ref().unwrap());
-                    let plan: Arc<dyn ExecutionPlan> = (&task.plan.unwrap()).try_into().unwrap();
-                    let task_id = task.task_id.unwrap();
-                    {
-                        let mut running_task = running_task.lock().await;
-                        *running_task = Some(CurrentTaskInformation {
-                            task_id: task_id.clone(),
-                            result: None,
-                        });
-                    }
-                    // TODO: This is a convoluted way of executing the task. We should move the task
-                    // execution code outside of the FlightService (data plane) into the control plane.
-                    let mut executor_client = executor_client.clone();
-                    let running_task = running_task.clone();
-                    tokio::spawn(async move {
-                        let r = executor_client
-                            .execute_partition(
-                                task_id.job_id.clone(),
-                                task_id.stage_id as usize,
-                                vec![task_id.partition_id as usize],
-                                plan,
-                            )
-                            .await;
-                        info!("DONE WITH CURRENT TASK: {:?}", r);
-                        let mut running_task = running_task.lock().await;
-                        *running_task = Some(CurrentTaskInformation {
-                            task_id,
-                            result: Some(r.map(|_| ())),
-                        });
-                    });
-                }
-            }
-            Err(error) => {
-                warn!("Executor registration failed. If this continues to happen the executor might be marked as dead by the scheduler. Error: {}", error);
-            }
-        }
-        tokio::time::sleep(Duration::from_millis(250)).await;
-    }
-}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -254,7 +150,12 @@ async fn main() -> Result<()> {
     );
     let server_future = tokio::spawn(Server::builder().add_service(server).serve(addr));
     let client = BallistaClient::try_new(&external_host, port).await?;
-    tokio::spawn(poll_loop(scheduler, client, executor_meta));
+    tokio::spawn(execution_loop::poll_loop(
+        scheduler,
+        client,
+        executor_meta,
+        opt.concurrent_tasks,
+    ));
 
     server_future
         .await

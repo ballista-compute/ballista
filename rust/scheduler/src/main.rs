@@ -15,14 +15,11 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::{Context, Result};
-use ballista::BALLISTA_VERSION;
-use ballista::{
-    print_version,
-    scheduler::{
-        state::{ConfigBackendClient, EtcdClient, StandaloneClient},
-        ConfigBackend, SchedulerServer,
-    },
-    serde::protobuf::scheduler_grpc_server::SchedulerGrpcServer,
+use ballista_core::BALLISTA_VERSION;
+use ballista_core::{print_version, serde::protobuf::scheduler_grpc_server::SchedulerGrpcServer};
+use ballista_scheduler::{
+    state::{ConfigBackendClient, EtcdClient, StandaloneClient},
+    ConfigBackend, SchedulerServer,
 };
 
 use log::info;

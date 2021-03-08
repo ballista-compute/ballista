@@ -98,33 +98,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "arrow"
-version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow?rev=5647e90#5647e900d597fd7790a4bbb6727e65d6ebdc5569"
-dependencies = [
- "cfg_aliases",
- "chrono",
- "csv",
- "flatbuffers",
- "hex",
- "indexmap",
- "lazy_static",
- "lexical-core",
- "num",
- "prettytable-rs",
- "rand 0.7.3",
- "regex",
- "serde",
- "serde_derive",
- "serde_json",
-]
-
-[[package]]
 name = "arrow-flight"
 version = "4.0.0-SNAPSHOT"
 source = "git+https://github.com/apache/arrow?rev=46161d2#46161d26fd439c17cd7c7d2a52d5f8e0b1c14726"
 dependencies = [
- "arrow 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=46161d2)",
+ "arrow",
  "bytes",
  "futures",
  "proc-macro2",
@@ -188,9 +166,9 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 name = "ballista"
 version = "0.4.2-SNAPSHOT"
 dependencies = [
- "arrow 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=5647e90)",
+ "arrow",
  "ballista-core",
- "datafusion 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=5647e90)",
+ "datafusion",
  "futures",
  "log",
  "tokio",
@@ -200,10 +178,10 @@ dependencies = [
 name = "ballista-core"
 version = "0.4.2-SNAPSHOT"
 dependencies = [
- "arrow 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=46161d2)",
+ "arrow",
  "arrow-flight",
  "async-trait",
- "datafusion 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=46161d2)",
+ "datafusion",
  "futures",
  "log",
  "prost",
@@ -218,10 +196,10 @@ dependencies = [
 name = "ballista-py"
 version = "0.1.0"
 dependencies = [
- "arrow 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=46161d2)",
+ "arrow",
  "ballista",
  "ballista-core",
- "datafusion 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=46161d2)",
+ "datafusion",
  "futures",
  "pyo3",
  "serde",
@@ -399,64 +377,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crossbeam"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd01a6eb3daaafa260f6fc94c3a6c36390abc2080e38e3e34ced87393fb77d80"
-dependencies = [
- "cfg-if 1.0.0",
- "crossbeam-channel",
- "crossbeam-deque",
- "crossbeam-epoch",
- "crossbeam-queue",
- "crossbeam-utils",
-]
-
-[[package]]
-name = "crossbeam-channel"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dca26ee1f8d361640700bde38b2c37d8c22b3ce2d360e1fc1c74ea4b0aa7d775"
-dependencies = [
- "cfg-if 1.0.0",
- "crossbeam-utils",
-]
-
-[[package]]
-name = "crossbeam-deque"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94af6efb46fef72616855b036a624cf27ba656ffc9be1b9a3c931cfc7749a9a9"
-dependencies = [
- "cfg-if 1.0.0",
- "crossbeam-epoch",
- "crossbeam-utils",
-]
-
-[[package]]
-name = "crossbeam-epoch"
-version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2584f639eb95fea8c798496315b297cf81b9b58b6d30ab066a75455333cf4b12"
-dependencies = [
- "cfg-if 1.0.0",
- "crossbeam-utils",
- "lazy_static",
- "memoffset",
- "scopeguard",
-]
-
-[[package]]
-name = "crossbeam-queue"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f6cb3c7f5b8e51bc3ebb73a2327ad4abdbd119dc13223f14f961d2f38486756"
-dependencies = [
- "cfg-if 1.0.0",
- "crossbeam-utils",
-]
-
-[[package]]
 name = "crossbeam-utils"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -505,7 +425,7 @@ version = "4.0.0-SNAPSHOT"
 source = "git+https://github.com/apache/arrow?rev=46161d2#46161d26fd439c17cd7c7d2a52d5f8e0b1c14726"
 dependencies = [
  "ahash 0.7.2",
- "arrow 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=46161d2)",
+ "arrow",
  "async-trait",
  "chrono",
  "clap",
@@ -515,7 +435,7 @@ dependencies = [
  "md-5",
  "num_cpus",
  "ordered-float 2.1.1",
- "parquet 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=46161d2)",
+ "parquet",
  "paste 1.0.4",
  "pin-project-lite",
  "rustyline",
@@ -524,32 +444,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "unicode-segmentation",
-]
-
-[[package]]
-name = "datafusion"
-version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow?rev=5647e90#5647e900d597fd7790a4bbb6727e65d6ebdc5569"
-dependencies = [
- "ahash 0.7.2",
- "arrow 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=5647e90)",
- "async-trait",
- "chrono",
- "clap",
- "crossbeam",
- "futures",
- "hashbrown",
- "log",
- "md-5",
- "num_cpus",
- "ordered-float 2.1.1",
- "parquet 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=5647e90)",
- "paste 1.0.4",
- "pin-project-lite",
- "rustyline",
- "sha2",
- "sqlparser",
- "tokio",
 ]
 
 [[package]]
@@ -1075,15 +969,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ee1c47aaa256ecabcaea351eae4a9b01ef39ed810004e298d2511ed284b1525"
 
 [[package]]
-name = "memoffset"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "157b4208e3059a8f9e78d559edc658e13df41410cb3ae03979c83130067fdd87"
-dependencies = [
- "autocfg",
-]
-
-[[package]]
 name = "miniz_oxide"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1299,26 +1184,7 @@ name = "parquet"
 version = "4.0.0-SNAPSHOT"
 source = "git+https://github.com/apache/arrow?rev=46161d2#46161d26fd439c17cd7c7d2a52d5f8e0b1c14726"
 dependencies = [
- "arrow 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=46161d2)",
- "base64 0.12.3",
- "brotli",
- "byteorder",
- "chrono",
- "flate2",
- "lz4",
- "num-bigint",
- "parquet-format",
- "snap",
- "thrift",
- "zstd",
-]
-
-[[package]]
-name = "parquet"
-version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow?rev=5647e90#5647e900d597fd7790a4bbb6727e65d6ebdc5569"
-dependencies = [
- "arrow 4.0.0-SNAPSHOT (git+https://github.com/apache/arrow?rev=5647e90)",
+ "arrow",
  "base64 0.12.3",
  "brotli",
  "byteorder",

@@ -836,14 +836,14 @@ impl TryInto<protobuf::LogicalPlanNode> for &LogicalPlan {
                 use protobuf::repartition_node::PartitionMethod;
 
                 let pb_partition_method = match partitioning_scheme {
-                    Partitioning::Hash(exprs, batch_size) => {
+                    Partitioning::Hash(exprs, partition_count) => {
                         PartitionMethod::Hash(protobuf::HashRepartition {
                             hash_expr: exprs.iter().map(|expr| expr.try_into()).collect::<Result<
                                 Vec<_>,
                                 BallistaError,
                             >>(
                             )?,
-                            batch_size: *batch_size as u64,
+                            partition_count: *partition_count as u64,
                         })
                     }
                     Partitioning::RoundRobinBatch(batch_size) => {

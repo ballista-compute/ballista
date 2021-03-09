@@ -108,9 +108,9 @@ impl PyNumberProtocol for BPyExpr {
         })
     }
 
-    fn __invert__(&self) -> PyResult<BPyExpr> {
+    fn __invert__(self) -> PyResult<BPyExpr> {
         Ok(BPyExpr {
-            expr: self.expr.not(),
+            expr: self.expr.clone().not(),
         })
     }
 }
@@ -125,22 +125,22 @@ impl PyObjectProtocol for BPyExpr {
         let other_expr = any_to_expression(other)?;
         Ok(match op {
             CompareOp::Lt => BPyExpr {
-                expr: self.expr.lt(other_expr),
+                expr: self.expr.clone().lt(other_expr),
             },
             CompareOp::Le => BPyExpr {
-                expr: self.expr.lt_eq(other_expr),
+                expr: self.expr.clone().lt_eq(other_expr),
             },
             CompareOp::Eq => BPyExpr {
-                expr: self.expr.eq(other_expr),
+                expr: self.expr.clone().eq(other_expr),
             },
             CompareOp::Ne => BPyExpr {
-                expr: self.expr.not_eq(other_expr),
+                expr: self.expr.clone().not_eq(other_expr),
             },
             CompareOp::Gt => BPyExpr {
-                expr: self.expr.gt(other_expr),
+                expr: self.expr.clone().gt(other_expr),
             },
             CompareOp::Ge => BPyExpr {
-                expr: self.expr.gt_eq(other_expr),
+                expr: self.expr.clone().gt_eq(other_expr),
             },
         })
     }
@@ -159,7 +159,7 @@ impl BPyExpr {
     /// assign a name to the expression
     pub fn alias(&self, name: &str) -> PyResult<BPyExpr> {
         Ok(BPyExpr {
-            expr: self.expr.alias(name),
+            expr: self.expr.clone().alias(name),
         })
     }
     #[args(negated = "false")]

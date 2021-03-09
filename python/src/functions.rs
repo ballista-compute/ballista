@@ -63,7 +63,7 @@ pub fn count_distinct(expr: BPyExpr) -> BPyExpr {
     }
 }
 
-#[pyfunction(expr = "*")]
+#[pyfunction(expr)]
 pub fn concat(expr: BPyExpr) -> PyResult<BPyExpr> {
     Ok(BPyExpr {
         expr: logical_plan::concat(expr.expr),

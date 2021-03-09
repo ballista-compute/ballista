@@ -289,8 +289,8 @@ impl TryInto<protobuf::PhysicalPlanNode> for Arc<dyn ExecutionPlan> {
                 Partitioning::RoundRobinBatch(partition_count) => {
                     PartitionMethod::RoundRobin(*partition_count as u64)
                 }
-                Partitioning::UnknownPartitioning(_) => {
-                    todo!()
+                Partitioning::UnknownPartitioning(partition_count) => {
+                    PartitionMethod::Unknown(*partition_count as u64)
                 }
             };
 

@@ -5,5 +5,5 @@ set -e
 
 for query in 1 3 5 6 10 12
 do
-  cargo run benchmark --host ballista-scheduler --port 50050 --query $query --path /data --format tbl --iterations 1 --debug
+  /tpch benchmark --host ballista-scheduler --port 50050 --query $query --path /data --format tbl --iterations 1 --debug
 done

@@ -25,9 +25,13 @@ RUN cargo build $RELEASE_FLAG
 ENV RELEASE_FLAG=${RELEASE_FLAG}
 RUN if [ -z "$RELEASE_FLAG" ]; then mv /tmp/ballista/target/debug/ballista-executor /executor; else mv /tmp/ballista/target/release/ballista-executor /executor; fi
 
-# put the executor on /executor (need to be copied from different places depending on FLAG)
+# put the scheduler on /scheduler (need to be copied from different places depending on FLAG)
 ENV RELEASE_FLAG=${RELEASE_FLAG}
 RUN if [ -z "$RELEASE_FLAG" ]; then mv /tmp/ballista/target/debug/ballista-scheduler /scheduler; else mv /tmp/ballista/target/release/ballista-scheduler /scheduler; fi
+
+# put the tpch on /tpch (need to be copied from different places depending on FLAG)
+ENV RELEASE_FLAG=${RELEASE_FLAG}
+RUN if [ -z "$RELEASE_FLAG" ]; then mv /tmp/ballista/target/debug/tpch /tpch; else mv /tmp/ballista/target/release/tpch /tpch; fi
 
 # Copy the binary into a new container for a smaller docker image
 FROM ballistacompute/rust-base:0.4.0-20210213
@@ -35,6 +39,8 @@ FROM ballistacompute/rust-base:0.4.0-20210213
 COPY --from=builder /executor /
 
 COPY --from=builder /scheduler /
+
+COPY --from=builder /tpch /
 
 ENV RUST_LOG=info
 ENV RUST_BACKTRACE=full

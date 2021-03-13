@@ -16,6 +16,7 @@
 
 pub mod planner;
 pub mod state;
+pub mod api;
 
 #[cfg(test)]
 pub mod test_utils;
@@ -64,6 +65,7 @@ use self::state::{ConfigBackendClient, SchedulerState};
 use datafusion::physical_plan::parquet::ParquetExec;
 use std::time::Instant;
 
+#[derive(Clone)]
 pub struct SchedulerServer {
     state: SchedulerState,
     namespace: String,

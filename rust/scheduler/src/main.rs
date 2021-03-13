@@ -24,7 +24,7 @@ use ballista_scheduler::state::StandaloneClient;
 use ballista_scheduler::{state::ConfigBackendClient, ConfigBackend, SchedulerServer};
 
 use log::info;
-use tonic::transport::Server;
+use tokio;
 
 #[macro_use]
 extern crate configure_me;
@@ -34,22 +34,33 @@ mod config {
     // Ideally we would use the include_config macro from configure_me, but then we cannot use
     // #[allow(clippy::all)] to silence clippy warnings from the generated code
     include!(concat!(
-        env!("OUT_DIR"),
-        "/scheduler_configure_me_config.rs"
+    env!("OUT_DIR"),
+    "/scheduler_configure_me_config.rs"
     ));
 }
-use config::prelude::*;
 
-async fn start_server(
-    config_backend: Arc<dyn ConfigBackendClient>,
-    namespace: String,
+use config::prelude::*;
+use ballista_scheduler::api::{start_api_server, DataServer};
+use tonic::transport::Server;
+use std::cell::RefCell;
+use std::sync::RwLock;
+
+
+fn get_scheduler_server(config_backend: Arc<dyn ConfigBackendClient>,
+                        namespace: String) -> SchedulerServer {
+    return SchedulerServer::new(config_backend, namespace);
+}
+
+async fn start_scheduler_server(
+    scheduler_server: SchedulerServer,
     addr: SocketAddr,
 ) -> Result<()> {
     info!(
         "Ballista v{} Scheduler listening on {:?}",
         BALLISTA_VERSION, addr
     );
-    let server = SchedulerGrpcServer::new(SchedulerServer::new(config_backend, namespace));
+
+    let server = SchedulerGrpcServer::new(scheduler_server);
     Ok(Server::builder()
         .add_service(server)
         .serve(addr)
@@ -110,6 +121,9 @@ async fn main() -> Result<()> {
             )
         }
     };
-    start_server(client, namespace, addr).await?;
+
+    let scheduler_server = get_scheduler_server(client, namespace);
+    let data_server = DataServer::new(RwLock::new(scheduler_server.clone()));
+    tokio::try_join!(start_scheduler_server(scheduler_server, addr), start_api_server(&data_server, [127, 0, 0, 1], 3005))?;
     Ok(())
 }

@@ -21,6 +21,7 @@ use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::ExecutionPlan;
 use uuid::Uuid;
+use serde::Serialize;
 
 use super::protobuf;
 use crate::error::BallistaError;
@@ -64,7 +65,7 @@ pub struct PartitionLocation {
 }
 
 /// Meta-data for an executor, used when fetching shuffle partitions from other executors
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ExecutorMeta {
     pub id: String,
     pub host: String,

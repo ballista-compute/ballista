@@ -20,6 +20,7 @@ prost = "0.7"
 sqlparser = "0.8"
 tokio = "1.0"
 tonic = "0.4"
+serde = {version = "1", features = ["derive"]}
 uuid = { version = "0.8", features = ["v4"] }
 arrow = { git = "https://github.com/apache/arrow", rev="46161d2" }
 arrow-flight = { git = "https://github.com/apache/arrow", rev="46161d2" }

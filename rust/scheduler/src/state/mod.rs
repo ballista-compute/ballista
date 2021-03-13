@@ -59,7 +59,7 @@ pub trait ConfigBackendClient: Send + Sync {
 }
 
 #[derive(Clone)]
-pub(super) struct SchedulerState {
+pub struct SchedulerState {
     config_client: Arc<dyn ConfigBackendClient>,
 }
 

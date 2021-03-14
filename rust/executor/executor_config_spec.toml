@@ -62,6 +62,6 @@ default = "4"
 doc = "Max concurrent tasks."
 
 [[param]]
-name = "standalone_data_path"
+name = "scheduler_data_path"
 type = "String"
 doc = "Path for standalone data"

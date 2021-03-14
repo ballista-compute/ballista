@@ -104,7 +104,7 @@ async fn main() -> Result<()> {
     if opt.local {
         info!("Running in local mode. Scheduler will be run in-proc");
 
-        let client = match opt.standalone_data_path {
+        let client = match opt.scheduler_data_path {
             Some(v) => StandaloneClient::try_new(v)
                 .context("Could not create standalone config backend")?,
             None => StandaloneClient::try_new_temporary()

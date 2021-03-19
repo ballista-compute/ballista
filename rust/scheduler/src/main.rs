@@ -13,7 +13,6 @@
 //! Ballista Rust scheduler binary.
 
 use std::{net::SocketAddr, sync::Arc};
-
 use anyhow::{Context, Result};
 use ballista_core::BALLISTA_VERSION;
 use ballista_core::{print_version, serde::protobuf::scheduler_grpc_server::SchedulerGrpcServer};
@@ -40,19 +39,16 @@ mod config {
 }
 
 use config::prelude::*;
-use ballista_scheduler::api::{start_api_server, DataServer};
-use tonic::transport::Server;
-use std::cell::RefCell;
-use std::sync::RwLock;
+use tonic::{transport::Server as TonicServer};
+use hyper::{service::make_service_fn, Server};
+use std::convert::Infallible;
+use futures::future::{self, Either, TryFutureExt};
+use tower::Service;
+use ballista_scheduler::api::{get_routes, EitherBody};
 
-
-fn get_scheduler_server(config_backend: Arc<dyn ConfigBackendClient>,
-                        namespace: String) -> SchedulerServer {
-    return SchedulerServer::new(config_backend, namespace);
-}
-
-async fn start_scheduler_server(
-    scheduler_server: SchedulerServer,
+async fn start_server(
+    config_backend: Arc<dyn ConfigBackendClient>,
+    namespace: String,
     addr: SocketAddr,
 ) -> Result<()> {
     info!(
@@ -60,10 +56,37 @@ async fn start_scheduler_server(
         BALLISTA_VERSION, addr
     );
 
-    let server = SchedulerGrpcServer::new(scheduler_server);
-    Ok(Server::builder()
-        .add_service(server)
-        .serve(addr)
+    type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+
+    Ok(Server::bind(&addr)
+        .serve(make_service_fn(move |_| {
+            let scheduler_server = SchedulerServer::new(config_backend.clone(), namespace.clone());
+            let scheduler_grpc_server = SchedulerGrpcServer::new(scheduler_server.clone());
+
+            let mut tonic = TonicServer::builder()
+                .add_service(scheduler_grpc_server)
+                .into_service();
+            let mut warp = warp::service(get_routes(scheduler_server));
+
+
+            future::ok::<_, Infallible>(tower::service_fn(
+                move |req: hyper::Request<hyper::Body>| {
+                    let header = req.headers().get(hyper::header::ACCEPT);
+                    if header.is_some() && header.unwrap().eq("application/json") {
+                        return Either::Left(
+                            warp.call(req)
+                                .map_ok(|res| res.map(EitherBody::Left))
+                                .map_err(Error::from)
+                        );
+                    }
+                    Either::Right(
+                        tonic.call(req)
+                            .map_ok(|res| res.map(EitherBody::Right))
+                            .map_err(Error::from),
+                    )
+                },
+            ))
+        }))
         .await
         .context("Could not start grpc server")?)
 }
@@ -122,8 +145,6 @@ async fn main() -> Result<()> {
         }
     };
 
-    let scheduler_server = get_scheduler_server(client, namespace);
-    let data_server = DataServer::new(RwLock::new(scheduler_server.clone()));
-    tokio::try_join!(start_scheduler_server(scheduler_server, addr), start_api_server(&data_server, [127, 0, 0, 1], 3005))?;
+    start_server(client, namespace, addr).await?;
     Ok(())
 }

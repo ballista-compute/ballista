@@ -231,6 +231,9 @@ dependencies = [
  "env_logger",
  "etcd-client",
  "futures",
+ "http",
+ "http-body",
+ "hyper",
  "log",
  "parse_arg",
  "prost",
@@ -239,6 +242,7 @@ dependencies = [
  "sled",
  "tokio",
  "tonic",
+ "tower",
  "uuid",
  "warp",
 ]

@@ -22,11 +22,11 @@ pub(crate) async fn list_executors_data(data_server: SchedulerServer) -> Result<
     let res: &GetExecutorMetadataResult = result.get_ref();
     let vec: &Vec<ExecutorMetadata> = &res.metadata;
     let metadata: Vec<ExecutorMeta> = vec.iter().map(|v: &ExecutorMetadata| {
-        return ExecutorMeta {
+        ExecutorMeta {
             host: v.host.clone(),
             port: v.port as u16,
             id: v.id.clone(),
-        };
+        }
     }).collect();
     Ok(warp::reply::json(&metadata))
 }

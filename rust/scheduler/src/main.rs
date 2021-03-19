@@ -13,7 +13,14 @@
 //! Ballista Rust scheduler binary.
 
 use std::{net::SocketAddr, sync::Arc};
+use std::convert::Infallible;
 use anyhow::{Context, Result};
+use tonic::{transport::Server as TonicServer};
+use hyper::{service::make_service_fn, Server};
+use futures::future::{self, Either, TryFutureExt};
+use tower::Service;
+
+use ballista_scheduler::api::{get_routes, EitherBody};
 use ballista_core::BALLISTA_VERSION;
 use ballista_core::{print_version, serde::protobuf::scheduler_grpc_server::SchedulerGrpcServer};
 #[cfg(feature = "etcd")]
@@ -23,7 +30,6 @@ use ballista_scheduler::state::StandaloneClient;
 use ballista_scheduler::{state::ConfigBackendClient, ConfigBackend, SchedulerServer};
 
 use log::info;
-use tokio;
 
 #[macro_use]
 extern crate configure_me;
@@ -39,12 +45,6 @@ mod config {
 }
 
 use config::prelude::*;
-use tonic::{transport::Server as TonicServer};
-use hyper::{service::make_service_fn, Server};
-use std::convert::Infallible;
-use futures::future::{self, Either, TryFutureExt};
-use tower::Service;
-use ballista_scheduler::api::{get_routes, EitherBody};
 
 async fn start_server(
     config_backend: Arc<dyn ConfigBackendClient>,

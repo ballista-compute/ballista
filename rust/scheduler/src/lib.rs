@@ -14,9 +14,9 @@
 
 //! Support for distributed schedulers, such as Kubernetes
 
+pub mod api;
 pub mod planner;
 pub mod state;
-pub mod api;
 
 #[cfg(test)]
 pub mod test_utils;

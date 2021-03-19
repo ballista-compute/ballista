@@ -13,13 +13,13 @@
 mod handlers;
 
 use crate::SchedulerServer;
-use warp::{Filter, Reply, Buf};
-use anyhow::{Result};
-use warp::filters::BoxedFilter;
+use anyhow::Result;
 use std::{
     pin::Pin,
     task::{Context as TaskContext, Poll},
 };
+use warp::filters::BoxedFilter;
+use warp::{Buf, Filter, Reply};
 
 pub enum EitherBody<A, B> {
     Left(A),
@@ -27,14 +27,14 @@ pub enum EitherBody<A, B> {
 }
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
-pub type HttpBody = dyn http_body::Body<Data=dyn Buf, Error=Error> + 'static;
+pub type HttpBody = dyn http_body::Body<Data = dyn Buf, Error = Error> + 'static;
 
 impl<A, B> http_body::Body for EitherBody<A, B>
-    where
-        A: http_body::Body + Send + Unpin,
-        B: http_body::Body<Data=A::Data> + Send + Unpin,
-        A::Error: Into<Error>,
-        B::Error: Into<Error>,
+where
+    A: http_body::Body + Send + Unpin,
+    B: http_body::Body<Data = A::Data> + Send + Unpin,
+    A::Error: Into<Error>,
+    B::Error: Into<Error>,
 {
     type Data = A::Data;
     type Error = Error;
@@ -71,14 +71,15 @@ fn map_option_err<T, U: Into<Error>>(err: Option<Result<T, U>>) -> Option<Result
     err.map(|e| e.map_err(Into::into))
 }
 
-fn with_data_server(db: SchedulerServer) -> impl Filter<Extract=(SchedulerServer, ), Error=std::convert::Infallible> + Clone {
+fn with_data_server(
+    db: SchedulerServer,
+) -> impl Filter<Extract = (SchedulerServer,), Error = std::convert::Infallible> + Clone {
     warp::any().map(move || db.clone())
 }
 
-pub fn get_routes(scheduler_server: SchedulerServer) -> BoxedFilter<(impl Reply, )> {
+pub fn get_routes(scheduler_server: SchedulerServer) -> BoxedFilter<(impl Reply,)> {
     let routes = warp::path("executors")
         .and(with_data_server(scheduler_server))
         .and_then(handlers::list_executors_data);
     routes.boxed()
 }
-

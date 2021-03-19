@@ -12,17 +12,17 @@
 
 //! Ballista Rust scheduler binary.
 
-use std::{net::SocketAddr, sync::Arc};
-use std::convert::Infallible;
 use anyhow::{Context, Result};
-use tonic::{transport::Server as TonicServer};
-use hyper::{service::make_service_fn, Server};
 use futures::future::{self, Either, TryFutureExt};
+use hyper::{service::make_service_fn, Server};
+use std::convert::Infallible;
+use std::{net::SocketAddr, sync::Arc};
+use tonic::transport::Server as TonicServer;
 use tower::Service;
 
-use ballista_scheduler::api::{get_routes, EitherBody};
 use ballista_core::BALLISTA_VERSION;
 use ballista_core::{print_version, serde::protobuf::scheduler_grpc_server::SchedulerGrpcServer};
+use ballista_scheduler::api::{get_routes, EitherBody};
 #[cfg(feature = "etcd")]
 use ballista_scheduler::state::EtcdClient;
 #[cfg(feature = "sled")]
@@ -39,8 +39,8 @@ mod config {
     // Ideally we would use the include_config macro from configure_me, but then we cannot use
     // #[allow(clippy::all)] to silence clippy warnings from the generated code
     include!(concat!(
-    env!("OUT_DIR"),
-    "/scheduler_configure_me_config.rs"
+        env!("OUT_DIR"),
+        "/scheduler_configure_me_config.rs"
     ));
 }
 
@@ -68,7 +68,6 @@ async fn start_server(
                 .into_service();
             let mut warp = warp::service(get_routes(scheduler_server));
 
-
             future::ok::<_, Infallible>(tower::service_fn(
                 move |req: hyper::Request<hyper::Body>| {
                     let header = req.headers().get(hyper::header::ACCEPT);
@@ -76,11 +75,12 @@ async fn start_server(
                         return Either::Left(
                             warp.call(req)
                                 .map_ok(|res| res.map(EitherBody::Left))
-                                .map_err(Error::from)
+                                .map_err(Error::from),
                         );
                     }
                     Either::Right(
-                        tonic.call(req)
+                        tonic
+                            .call(req)
                             .map_ok(|res| res.map(EitherBody::Right))
                             .map_err(Error::from),
                     )

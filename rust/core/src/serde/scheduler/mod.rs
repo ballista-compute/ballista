@@ -20,8 +20,8 @@ use arrow::array::{
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::ExecutionPlan;
-use uuid::Uuid;
 use serde::Serialize;
+use uuid::Uuid;
 
 use super::protobuf;
 use crate::error::BallistaError;

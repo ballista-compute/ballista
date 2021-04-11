@@ -17,13 +17,12 @@ Ballista is a distributed compute platform primarily implemented in Rust, powere
 is built on an architecture that allows other programming languages (such as Python, C++, and Java) to be supported 
 as first-class citizens without paying a penalty for serialization costs.
 
-## Ballista is being donated to Apache Arrow
+## Ballista is now part of Apache Arrow
 
-**April 2021: Ballista is now in the process of being donated to the Apache Arrow project 
-([PR](https://github.com/apache/arrow/pull/9723)).**
+**April 2021: Ballista has been donated to the Apache Arrow project!**
 
-This repository is now archived and development will continue in the Apache Arrow repository once the donation 
-is merged.
+This repository is now archived and development is now happening in the 
+[Apache Arrow repository](https://github.com/apache/arrow).
 
 We will now use the official [ASF Slack](https://github.com/apache/arrow/tree/master/rust#arrow-rust-community) for 
 informal discussions and coordination. This is a great place to meet other contributors and get guidance on where to 
